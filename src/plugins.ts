@@ -179,7 +179,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
 export async function runPlugins(server: PluginsServer, event: PluginEvent): Promise<PluginEvent | null> {
     const pluginsToRun = pluginConfigsPerTeam.get(event.team_id) || defaultConfigs
 
-    let returnedEvent: PluginEvent | null = event
+    let returnedEvent: PluginEvent | null | undefined = event
 
     for (const pluginConfig of pluginsToRun.reverse()) {
         if (pluginConfig.vm) {
@@ -197,10 +197,10 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
                     logTime(pluginConfig.plugin.name, ms, true)
                 }
             }
-
-            if (!returnedEvent) {
-                return null
-            }
+            // if processEvent didn't return or explicitly returned undefined, pass on original event
+            if (returnedEvent === undefined) return event
+            // if processEvent returned a non-undefined falsy value, discard the event altogether
+            if (!returnedEvent) return null
         }
     }
 
