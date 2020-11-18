@@ -24,7 +24,7 @@ export function createPluginConfigVM(
     vm.freeze(
         {
             cache: createCache(server, pluginConfig.plugin.name, pluginConfig.team_id),
-            config: pluginConfig.config,
+            config: pluginConfig.config, // TODO: rename `config` here to something clearer like `plugin-config`
             attachments: pluginConfig.attachments,
         },
         '__pluginHostMeta'
