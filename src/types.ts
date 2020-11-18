@@ -4,6 +4,7 @@ import { PluginEvent, PluginAttachment, PluginConfigSchema } from 'posthog-plugi
 import { VM, VMScript } from 'vm2'
 
 export interface PluginsServerConfig {
+    VERSION?: string
     CELERY_DEFAULT_QUEUE: string
     DATABASE_URL: string
     PLUGINS_CELERY_QUEUE: string
@@ -54,6 +55,11 @@ export interface PluginJsonConfig {
     main?: string
     lib?: string
     config?: Record<string, PluginConfigSchema> | PluginConfigSchema[]
+    engines?: {
+        node: string
+        posthog?: string
+    }
+    [packageJsonEntry: string]: unknown
 }
 
 export interface PluginError {

@@ -11,6 +11,7 @@ import {
     PluginConfigId,
     TeamId,
 } from './types'
+import { satisfies } from 'semver'
 import { PluginEvent, PluginAttachment } from 'posthog-plugins'
 import { clearError, processError } from './error'
 import { getFileFromArchive } from './utils'
@@ -107,21 +108,27 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
 
     if (plugin.url.startsWith('file:')) {
         const pluginPath = path.resolve(server.BASE_DIR, plugin.url.substring(5))
-        const configPath = path.resolve(pluginPath, 'plugin.json')
-
         let config: PluginJsonConfig = {}
-        if (fs.existsSync(configPath)) {
-            try {
-                const jsonBuffer = fs.readFileSync(configPath)
-                config = JSON.parse(jsonBuffer.toString())
-            } catch (e) {
-                await processError(
-                    server,
-                    pluginConfig,
-                    `Could not load posthog config at "${configPath}" for plugin "${plugin.name}"`
-                )
-                return
+
+        for (const jsonFileName of ['package', 'plugin']) {
+            const configPath = path.resolve(pluginPath, `${jsonFileName}.json`)
+            if (fs.existsSync(configPath)) {
+                try {
+                    config = { ...config, ...JSON.parse(fs.readFileSync(configPath).toString()) }
+                } catch (e) {
+                    await processError(server, pluginConfig, `Could not load ${configPath} for plugin "${plugin.name}"`)
+                    return
+                }
             }
+        }
+
+        if (server.VERSION && config.engines?.posthog && !satisfies(server.VERSION, config.engines.posthog)) {
+            await processError(
+                server,
+                pluginConfig,
+                `Running PostHog version ${server.VERSION} is out of compatibility range "${config.engines.posthog}" for plugin "${plugin.name}"`
+            )
+            return
         }
 
         if (!config['main'] && !fs.existsSync(path.resolve(pluginPath, 'index.js'))) {
@@ -148,15 +155,21 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
         }
     } else if (plugin.archive) {
         let config: PluginJsonConfig = {}
-        const json = await getFileFromArchive(plugin.archive, 'plugin.json')
-        if (json) {
-            try {
-                config = JSON.parse(json)
-            } catch (error) {
-                await processError(server, pluginConfig, `Can not load plugin.json for plugin "${plugin.name}"`)
+        for (const jsonFileName of ['package', 'plugin']) {
+            const json = await getFileFromArchive(plugin.archive, `${jsonFileName}.json`)
+            if (json) {
+                try {
+                    config = { ...config, ...JSON.parse(json) }
+                } catch (error) {
+                    await processError(
+                        server,
+                        pluginConfig,
+                        `Cannot load ${jsonFileName}.json for plugin "${plugin.name}:\n${error}"`
+                    )
+                    return
+                }
             }
         }
-
         const indexJs = await getFileFromArchive(plugin.archive, config['main'] || 'index.js')
         const libJs = await getFileFromArchive(plugin.archive, config['lib'] || 'lib.js')
 
