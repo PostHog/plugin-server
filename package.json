@@ -7,6 +7,7 @@
     "scripts": {
         "test": "yarn run lint",
         "start:dist": "pm2 start ecosystem.config.js --no-daemon",
+        "start:daemon": "pm2 start ecosystem.config.js",
         "start:dev": "ts-node src/index.ts start --config \"{\\\"BASE_DIR\\\": \\\"../posthog\\\"}\"",
         "stop": "pm2 stop all",
         "build": "yarn run clean && yarn run compile",
