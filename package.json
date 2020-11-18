@@ -5,16 +5,17 @@
     "types": "dist/index.d.ts",
     "main": "dist/index.js",
     "scripts": {
-        "test": "yarn run lint",
+        "test": "yarn lint",
+        "start": "yarn start:dev",
         "start:dist": "pm2 start ecosystem.config.js --no-daemon",
         "start:daemon": "pm2 start ecosystem.config.js",
         "start:dev": "ts-node src/index.ts start --config \"{\\\"BASE_DIR\\\": \\\"../posthog\\\"}\"",
         "stop": "pm2 stop all",
-        "build": "yarn run clean && yarn run compile",
+        "build": "yarn clean && yarn compile",
         "clean": "rimraf dist/*",
         "compile": "rollup -c",
         "lint": "eslint .",
-        "prepublish": "yarn run test && yarn run build"
+        "prepublish": "yarn test && yarn build"
     },
     "bin": {
         "posthog-plugin-server": "./bin/posthog-plugin-server"
