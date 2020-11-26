@@ -23,7 +23,9 @@ export async function startWebServer(
     }
     if (withSignalHandling) {
         // Free up port
-        for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, stopWebServer)
+        for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+            process.on(signal, stopWebServer)
+        }
     }
 }
 

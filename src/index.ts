@@ -12,6 +12,8 @@ yargs
     .command(['start', '$0'], 'start the server', ({ argv: { config, disableWeb, webPort, webHostname } }) => {
         const parsedConfig: PluginsServerConfig = config ? JSON.parse(config) : {}
         startPluginsServer(parsedConfig)
-        if (!disableWeb) startWebServer(webPort, webHostname)
+        if (!disableWeb) {
+            startWebServer(webPort, webHostname)
+        }
     })
     .help().argv
