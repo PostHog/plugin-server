@@ -54,7 +54,13 @@ export const ingestionServer = createServer((request: IncomingMessage, response:
         // Mimicking Express Response with json method
         const adjustedResponse = (response as unknown) as JsonServerResponse
         adjustedResponse.json = json
-        getEvent(adjustedRequest, adjustedResponse)
+        try {
+            getEvent(adjustedRequest, adjustedResponse)
+        } catch {
+            adjustedResponse.json(500, {
+                message: 'An unexpected server error occurred!',
+            })
+        }
     })
 })
 

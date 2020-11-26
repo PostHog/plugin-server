@@ -8,13 +8,16 @@ export function getEvent(request: ServerRequest, response: JsonServerResponse): 
         return response.json(
             405,
             {
-                detail: `Method ${request.method} not allowed! Try ${ALLOWED_METHODS.join(' or ')}.`,
+                message: `Method ${request.method} not allowed! Try ${ALLOWED_METHODS.join(' or ')}.`,
             },
             {
                 Allow: ALLOWED_METHODS.join(', '),
             }
         )
     }
+
+    // Edge case for testing error handling
+    if (request.body === '1337') throw new Error('Unexpected leet detected!')
 
     // TODO: statsd timer
 
@@ -27,14 +30,12 @@ export function getEvent(request: ServerRequest, response: JsonServerResponse): 
         data = dataFromRequest['data']
     } catch {
         return response.json(400, {
-            code: 'validation',
             message: "Malformed request data. Make sure you're sending valid JSON.",
         })
     }
 
     if (isLooselyFalsy(data))
         return response.json(400, {
-            code: 'validation',
             message:
                 'No data found. Make sure to use a POST request when sending the payload in the body of the request.',
         })
@@ -54,7 +55,6 @@ export function getEvent(request: ServerRequest, response: JsonServerResponse): 
                 request,
                 JsonResponse(
                     {
-                        "code": "validation",
                         "message": "Neither api_key nor personal_api_key set. You can find your project API key in PostHog project settings.",
                     },
                     status=400,
@@ -67,7 +67,6 @@ export function getEvent(request: ServerRequest, response: JsonServerResponse): 
                 request,
                 JsonResponse(
                     {
-                        "code": "validation",
                         "message": "Project or personal API key invalid. You can find your project API key in PostHog project settings.",
                     },
                     status=400,
@@ -94,7 +93,6 @@ export function getEvent(request: ServerRequest, response: JsonServerResponse): 
                     request,
                     JsonResponse(
                         {
-                            "code": "validation",
                             "message": "You need to set user distinct ID field `distinct_id`.",
                             "item": event,
                         },
@@ -105,7 +103,7 @@ export function getEvent(request: ServerRequest, response: JsonServerResponse): 
                 return cors_response(
                     request,
                     JsonResponse(
-                        {"code": "validation", "message": "You need to set event name field `event`.", "item": event,},
+                        {"message": "You need to set event name field `event`.", "item": event},
                         status=400,
                     ),
                 )
