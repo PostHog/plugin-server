@@ -2,6 +2,7 @@ import { exception } from 'console'
 import { createServer, IncomingMessage, OutgoingHttpHeaders, ServerResponse } from 'http'
 import { parse as parseQuerystring, ParsedUrlQuery } from 'querystring'
 import { parse as parseUrl, UrlWithParsedQuery } from 'url'
+import { getEvent } from './capture'
 
 export interface JsonServerResponse extends ServerResponse {
     json: (
@@ -53,6 +54,7 @@ export const ingestionServer = createServer((request: IncomingMessage, response:
         // Mimicking Express Response with json method
         const adjustedResponse = (response as unknown) as JsonServerResponse
         adjustedResponse.json = json
+        getEvent(adjustedRequest, adjustedResponse)
     })
 })
 
