@@ -25,4 +25,4 @@ jobs:
               run: yarn lint
 
             - name: Test with Jest
-              run: yarn test --passWithNoTests
+              run: yarn test
