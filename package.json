@@ -8,11 +8,12 @@
         "test": "jest --passWithNoTests",
         "start": "yarn start:dev",
         "start:dist": "node dist/index.js --config \"{\\\"BASE_DIR\\\": \\\"../posthog\\\"}\"",
-        "start:dev": "ts-node src/index.ts --config \"{\\\"BASE_DIR\\\": \\\"../posthog\\\"}\"",
+        "start:dev": "ts-node-dev --exit-child src/index.ts --config \"{\\\"BASE_DIR\\\": \\\"../posthog\\\"}\"",
         "build": "yarn clean && yarn compile",
         "clean": "rimraf dist/*",
         "compile": "rollup -c",
         "lint": "eslint .",
+        "prettier": "prettier --write .",
         "prettier:check": "prettier --check .",
         "prepublish": "yarn test && yarn build"
     },
@@ -79,6 +80,7 @@
         "rollup-plugin-typescript2": "^0.29.0",
         "supertest": "^6.0.1",
         "ts-node": "^9.0.0",
+        "ts-node-dev": "^1.0.0",
         "typescript": "^4.0.5"
     },
     "husky": {
