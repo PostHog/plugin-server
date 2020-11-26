@@ -1,6 +1,7 @@
+import yargs from 'yargs'
 import { PluginsServerConfig } from './types'
 import { startPluginsServer } from './server'
-import yargs from 'yargs'
+import { startIngestionServer } from 'ingestion/server'
 
 yargs
     .scriptName('posthog-plugins')
@@ -11,9 +12,6 @@ yargs
     .command(['start', '$0'], 'start the server', ({ argv: { config, ingest, ingestionPort, ingestionHostname } }) => {
         const parsedConfig: PluginsServerConfig = config ? JSON.parse(config) : {}
         startPluginsServer(parsedConfig)
-        if (ingest)
-            import('./ingestion/server').then(({ startIngestionServer }) =>
-                startIngestionServer(ingestionPort, ingestionHostname)
-            )
+        if (ingest) startIngestionServer(ingestionPort, ingestionHostname)
     })
     .help().argv
