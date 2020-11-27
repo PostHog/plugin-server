@@ -1,8 +1,8 @@
-import { ingestionServer } from './server'
+import { webServer } from './server'
 import request from 'supertest'
 
 test('Rejects capture request with no data at all', async (done) => {
-    const response = await request(ingestionServer).get('/')
+    const response = await request(webServer).get('/')
     expect(response.body).toEqual({
         message: 'No data found. Make sure to use a POST request when sending the payload in the body of the request.',
     })
@@ -11,7 +11,7 @@ test('Rejects capture request with no data at all', async (done) => {
 })
 
 test('Handles server errors', async (done) => {
-    const response = await request(ingestionServer).get('/').send('1337')
+    const response = await request(webServer).get('/').send('1337')
     expect(response.body).toEqual({
         message: 'An unexpected server error occurred!',
     })
@@ -20,7 +20,7 @@ test('Handles server errors', async (done) => {
 })
 
 test('Disallows PATCH method', async (done) => {
-    const response = await request(ingestionServer).patch('/')
+    const response = await request(webServer).patch('/')
     expect(response.body).toEqual({
         message: `Method PATCH not allowed! Try GET or POST.`,
     })
@@ -29,7 +29,7 @@ test('Disallows PATCH method', async (done) => {
 })
 
 test('Disallows DELETE method', async (done) => {
-    const response = await request(ingestionServer).delete('/')
+    const response = await request(webServer).delete('/')
     expect(response.body).toEqual({
         message: `Method DELETE not allowed! Try GET or POST.`,
     })
