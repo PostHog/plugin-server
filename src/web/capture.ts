@@ -1,19 +1,13 @@
-import { JsonServerResponse, ServerRequest } from './server'
+import { FastifyRequest, FastifyReply } from 'fastify'
 import { isLooselyFalsy, loadDataFromRequest } from './utils'
 
 const ALLOWED_METHODS = ['GET', 'POST']
 
-export function getEvent(request: ServerRequest, response: JsonServerResponse): JsonServerResponse {
-    if (!request.method || !ALLOWED_METHODS.includes(request.method)) {
-        return response.json(
-            405,
-            {
-                message: `Method ${request.method} not allowed! Try ${ALLOWED_METHODS.join(' or ')}.`,
-            },
-            {
-                Allow: ALLOWED_METHODS.join(', '),
-            }
-        )
+export async function getEvent(request: FastifyRequest, reply: FastifyReply): Promise<Record<string, any>> {
+    if (!ALLOWED_METHODS.includes(request.method)) {
+        const badRequest = new Error(`Method ${request.method} not allowed! Try ${ALLOWED_METHODS.join(' or ')}.`)
+        ;((badRequest as unknown) as Record<string, number>).statusCode = 405
+        throw badRequest
     }
 
     // Edge case for testing error handling
@@ -29,16 +23,18 @@ export function getEvent(request: ServerRequest, response: JsonServerResponse): 
         dataFromRequest = loadDataFromRequest(request)
         data = dataFromRequest['data']
     } catch {
-        return response.json(400, {
-            message: "Malformed request data. Make sure you're sending valid JSON.",
-        })
+        const badRequest = new Error("Malformed request data. Make sure you're sending valid JSON.")
+        ;((badRequest as unknown) as Record<string, number>).statusCode = 400
+        throw badRequest
     }
 
-    if (isLooselyFalsy(data))
-        return response.json(400, {
-            message:
-                'No data found. Make sure to use a POST request when sending the payload in the body of the request.',
-        })
+    if (isLooselyFalsy(data)) {
+        const badRequest = new Error(
+            'No data found. Make sure to use a POST request when sending the payload in the body of the request.'
+        )
+        ;((badRequest as unknown) as Record<string, number>).statusCode = 400
+        throw badRequest
+    }
 
     /*
         sent_at = _get_sent_at(data, request)
@@ -131,5 +127,5 @@ export function getEvent(request: ServerRequest, response: JsonServerResponse): 
                 )
 */
 
-    return response.json(200, { status: 1 })
+    return { status: 1 }
 }

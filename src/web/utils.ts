@@ -1,15 +1,23 @@
+import { FastifyRequest } from 'fastify'
 import { decode } from 'js-base64'
+import { ParsedUrlQuery } from 'querystring'
 import { gunzipSync } from 'zlib'
-import { ServerRequest } from './server'
 
-export function loadDataFromRequest(request: ServerRequest): any {
+declare module 'fastify' {
+    export interface FastifyRequest {
+        GET: ParsedUrlQuery
+        POST: ParsedUrlQuery
+    }
+}
+
+export function loadDataFromRequest(request: FastifyRequest): any {
     const dataRes: Record<string, any> = { data: {}, body: null }
     let data: any
     if (request.method === 'POST') {
         if (request.headers['content-type'] === 'application/json') {
             data = request.body
             try {
-                dataRes['body'] = { ...JSON.parse(request.body) }
+                dataRes['body'] = { ...JSON.parse(request.body as string) }
             } catch {}
         } else {
             try {

@@ -1,18 +1,19 @@
 import { fastify, FastifyRequest, FastifyReply, FastifyInstance } from 'fastify'
 import middie from 'middie'
-import { parse as querystringParse } from 'querystring'
+import { parse as querystringParse, ParsedUrlQuery } from 'querystring'
 import { parse as urlParse } from 'url'
+import { getEvent } from './capture'
 
-async function getEvent(request: FastifyRequest, reply: FastifyReply): Promise<Record<string, any>> {
-    return {}
+declare module 'fastify' {
+    export interface FastifyRequest {
+        GET: ParsedUrlQuery
+        POST: ParsedUrlQuery
+    }
 }
 
-async function buildWebServer(): Promise<FastifyInstance> {
+export function buildWebServer(): FastifyInstance {
     const webServer = fastify()
-    webServer.get('*', getEvent)
-    webServer.post('*', getEvent)
-    await webServer.register(middie)
-    webServer.use((request: FastifyRequest, reply: FastifyReply, next: () => void) => {
+    webServer.addHook('preHandler', (request, reply, done) => {
         // Mimicking Django HttpRequest with GET and POST properties
         request.GET = urlParse(request.url, true).query
         try {
@@ -20,33 +21,36 @@ async function buildWebServer(): Promise<FastifyInstance> {
         } catch {
             request.POST = {}
         }
-        next()
+        done()
     })
+    webServer.all('*', getEvent)
     return webServer
+}
+
+export const webServer = buildWebServer()
+
+export async function stopWebServer(webServerToStop: FastifyInstance = webServer): Promise<void> {
+    await webServerToStop.close()
+    console.info(`\n🛑 Web server cleaned up!`)
 }
 
 export async function startWebServer(
     port: string | number = 3008,
     hostname?: string,
     withSignalHandling = true
-): Promise<[FastifyInstance, () => Promise<void>]> {
+): Promise<FastifyInstance> {
     console.info(`👾 Starting web server…`)
-    const webServer = await buildWebServer()
     try {
         const address = await webServer.listen(port, hostname)
         console.info(`✅ Web server listening on ${address}!`)
     } catch (e) {
         console.error(`🛑 Web server could not start! ${e}`)
     }
-    async function stopWebServer(): Promise<void> {
-        await webServer.close()
-        console.info(`\n🛑 Web server cleaned up!`)
-    }
     if (withSignalHandling) {
         // Free up port
         for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-            process.on(signal, stopWebServer)
+            process.on(signal, () => stopWebServer(webServer))
         }
     }
-    return [webServer, stopWebServer]
+    return webServer
 }
