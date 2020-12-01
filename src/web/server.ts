@@ -9,6 +9,8 @@ async function getEvent(request: FastifyRequest, reply: FastifyReply): Promise<R
 
 async function buildWebServer(): Promise<FastifyInstance> {
     const webServer = fastify()
+    webServer.get('*', getEvent)
+    webServer.post('*', getEvent)
     await webServer.register(middie)
     webServer.use((request: FastifyRequest, reply: FastifyReply, next: () => void) => {
         // Mimicking Django HttpRequest with GET and POST properties
@@ -31,8 +33,6 @@ export async function startWebServer(
     console.info(`👾 Starting web server…`)
     const webServer = await buildWebServer()
     try {
-        webServer.get('*', getEvent)
-        webServer.post('*', getEvent)
         const address = await webServer.listen(port, hostname)
         console.info(`✅ Web server listening on ${address}!`)
     } catch (e) {
