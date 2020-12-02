@@ -1,12 +1,12 @@
 import { Pool } from 'pg'
+import * as schedule from 'node-schedule'
+import * as Redis from 'ioredis'
+import { FastifyInstance } from 'fastify'
 import { PluginsServer, PluginsServerConfig } from './types'
 import { version } from '../package.json'
 import { setupPlugins } from './plugins'
 import { startWorker } from './worker'
-import schedule from 'node-schedule'
-import Redis from 'ioredis'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
-import { FastifyInstance } from 'fastify'
 
 export const defaultConfig: PluginsServerConfig = {
     CELERY_DEFAULT_QUEUE: 'celery',
@@ -67,16 +67,18 @@ export async function startPluginsServer(config: PluginsServerConfig): Promise<v
     })
     console.info(`✅ Started posthog-plugin-server v${version}!`)
 
+    const closeJobs = async () => {
+        if (!serverConfig.DISABLE_WEB) {
+            await stopFastifyInstance(fastifyInstance!)
+        }
+        await stopWorker()
+        pubSub.disconnect()
+        schedule.cancelJob(job)
+        await redis.quit()
+        await db.end()
+    }
+
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-        process.on(signal, async () => {
-            if (!serverConfig.DISABLE_WEB) {
-                await stopFastifyInstance(fastifyInstance!)
-            }
-            await stopWorker()
-            pubSub.disconnect()
-            schedule.cancelJob(job)
-            await redis.quit()
-            await db.end()
-        })
+        process.on(signal, closeJobs)
     }
 }
