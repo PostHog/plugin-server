@@ -1,5 +1,4 @@
 import { FastifyRequest } from 'fastify'
-import { decode } from 'js-base64'
 import { ParsedUrlQuery } from 'querystring'
 import { gunzipSync } from 'zlib'
 
@@ -65,7 +64,7 @@ export function loadDataFromRequest(request: FastifyRequest): any {
 
 export function base64ToJson(data: string): any {
     return JSON.parse(
-        decode(data.replace(' ', '+') + '===')
+        btoa(data.replace(' ', '+') + '===')
         // TODO: investigate UTF-8/UTF-16 surrogate passes here
     )
 }

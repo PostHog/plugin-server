@@ -1,5 +1,4 @@
-import { fastify, FastifyRequest, FastifyReply, FastifyInstance } from 'fastify'
-import middie from 'middie'
+import { fastify, FastifyInstance } from 'fastify'
 import { parse as querystringParse, ParsedUrlQuery } from 'querystring'
 import { parse as urlParse } from 'url'
 import { getEvent } from './capture'
