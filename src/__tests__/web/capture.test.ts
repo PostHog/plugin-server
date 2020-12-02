@@ -1,4 +1,4 @@
-import { buildFastifyInstance } from './server'
+import { buildFastifyInstance } from '../../web/server'
 import request from 'supertest'
 
 const fastifyInstance = buildFastifyInstance()
