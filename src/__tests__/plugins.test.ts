@@ -2,7 +2,7 @@ import { runPlugins, setupPlugins } from '../plugins'
 import { defaultConfig } from '../server'
 import { Pool } from 'pg'
 import * as Redis from 'ioredis'
-import { Plugin, PluginAttachmentDB, PluginConfig, PluginError, PluginsServer } from '../types'
+import { Plugin, PluginAttachmentDB, PluginConfig, PluginsServer } from '../types'
 import * as s from '../sql'
 import * as AdmZip from 'adm-zip'
 import { PluginEvent } from 'posthog-plugins/src/types'
@@ -10,6 +10,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 
+// mock functions that get data from posthgres and give them the right types
 jest.mock('../sql')
 type UnPromisify<F> = F extends (...args: infer A) => Promise<infer T> ? (...args: A) => T : never
 const getPluginRows = (s.getPluginRows as unknown) as jest.MockedFunction<UnPromisify<typeof s.getPluginRows>>
@@ -21,11 +22,7 @@ const getPluginConfigRows = (s.getPluginConfigRows as unknown) as jest.MockedFun
 >
 const setError = (s.setError as unknown) as jest.MockedFunction<UnPromisify<typeof s.setError>>
 
-// Tests missing:
-// - global plugins (need to be discussed how to implement)
-// - lib.js loading, even if deprecated
-
-function createArchive(name: string, { indexJs, pluginJson }: { indexJs?: string; pluginJson?: string }): Buffer {
+function createZipBuffer(name: string, { indexJs, pluginJson }: { indexJs?: string; pluginJson?: string }): Buffer {
     const zip = new AdmZip()
     if (indexJs) {
         zip.addFile('testplugin/index.js', Buffer.alloc(indexJs.length, indexJs))
@@ -47,6 +44,34 @@ function createArchive(name: string, { indexJs, pluginJson }: { indexJs?: string
         )
     }
     return zip.toBuffer()
+}
+
+const mockPluginWithArchive = (indexJs: string, pluginJson?: string) => ({
+    ...plugin60,
+    archive: createZipBuffer('posthog-maxmind-plugin', { indexJs, pluginJson }),
+})
+
+function mockPluginTempFolder(indexJs: string, pluginJson?: string): [Plugin, () => void] {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'foo-'))
+
+    fs.writeFileSync(path.join(folder, 'index.js'), indexJs)
+    fs.writeFileSync(
+        path.join(folder, 'plugin.json'),
+        pluginJson ||
+            JSON.stringify({
+                name: 'posthog-maxmind-plugin',
+                description: 'just for testing',
+                url: 'http://example.com/plugin',
+                config: {},
+                main: 'index.js',
+            })
+    )
+    return [
+        { ...plugin60, url: `file:${folder}`, archive: null },
+        () => {
+            fs.rmdirSync(folder, { recursive: true })
+        },
+    ]
 }
 
 const plugin60: Plugin = {
@@ -74,7 +99,7 @@ const plugin60: Plugin = {
         },
     },
     tag: '0.0.2',
-    archive: createArchive('posthog-maxmind-plugin', {
+    archive: createZipBuffer('posthog-maxmind-plugin', {
         indexJs:
             'function processEvent (event) { if (event.properties) { event.properties.processed = true } return event }',
     }),
@@ -102,34 +127,6 @@ const pluginConfig39: PluginConfig = {
     error: undefined,
 }
 
-const mockPluginWithArchive = (indexJs: string, pluginJson?: string) => ({
-    ...plugin60,
-    archive: createArchive('posthog-maxmind-plugin', { indexJs, pluginJson }),
-})
-
-function mockPluginTempFolder(indexJs: string, pluginJson?: string): [Plugin, () => void] {
-    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'foo-'))
-
-    fs.writeFileSync(path.join(folder, 'index.js'), indexJs)
-    fs.writeFileSync(
-        path.join(folder, 'plugin.json'),
-        pluginJson ||
-            JSON.stringify({
-                name: 'posthog-maxmind-plugin',
-                description: 'just for testing',
-                url: 'http://example.com/plugin',
-                config: {},
-                main: 'index.js',
-            })
-    )
-    return [
-        { ...plugin60, url: `file:${folder}`, archive: null },
-        () => {
-            fs.rmdirSync(folder, { recursive: true })
-        },
-    ]
-}
-
 let mockServer: PluginsServer
 beforeEach(async () => {
     mockServer = {
@@ -151,7 +148,7 @@ test('setupPlugins and runPlugins', async () => {
     expect(getPluginConfigRows).toHaveBeenCalled()
     expect(setError).toHaveBeenCalled()
 
-    expect(defaultConfigs).toEqual([])
+    expect(defaultConfigs).toEqual([]) // this will be used with global plugins
     expect(Array.from(plugins.entries())).toEqual([[60, plugin60]])
     expect(Array.from(pluginConfigs.keys())).toEqual([39])
 
