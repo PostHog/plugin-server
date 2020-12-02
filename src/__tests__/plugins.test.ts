@@ -151,6 +151,11 @@ test('setupPlugins and runPlugins', async () => {
     expect(pluginConfig.vm).toBeDefined()
     expect(Object.keys(pluginConfig.vm!.methods)).toEqual(['processEvent'])
 
+    expect(setError).toHaveBeenCalled()
+    expect(setError.mock.calls[0][0]).toEqual(mockServer)
+    expect(setError.mock.calls[0][1]).toEqual(null)
+    expect(setError.mock.calls[0][2]).toEqual(pluginConfig)
+
     const processEvent = pluginConfig.vm!.methods['processEvent']
     const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
     await processEvent(event)
