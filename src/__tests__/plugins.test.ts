@@ -1,4 +1,4 @@
-import { setupPlugins } from '../plugins'
+import { runPlugins, setupPlugins } from '../plugins'
 import { defaultConfig } from '../server'
 import { Pool } from 'pg'
 import * as Redis from 'ioredis'
@@ -6,6 +6,14 @@ import { PluginConfig, PluginError, PluginsServer } from '../types'
 import { getPluginRows, getPluginAttachmentRows, getPluginConfigRows, setError } from '../sql'
 import * as AdmZip from 'adm-zip'
 import { PluginEvent } from 'posthog-plugins/src/types'
+
+// Tests missing:
+// - load local "file:" plugins
+// - how various errors during load are handled (broken index, broken zip, broken json, etc)
+// - global plugins (need to be discussed how to implement)
+// - lib.js loading, even if deprecated
+
+jest.mock('../sql')
 
 function createArchive(name: string, indexJs: string): Buffer {
     const zip = new AdmZip()
@@ -63,14 +71,10 @@ const pluginConfig39 = {
     error: null,
 }
 
-jest.mock('../sql', () => ({
-    getPluginRows: jest.fn(async () => [plugin60]),
-    getPluginAttachmentRows: jest.fn(async () => [pluginAttachment1]),
-    getPluginConfigRows: jest.fn(async () => [pluginConfig39]),
-    setError: jest.fn((server: PluginsServer, pluginError: PluginError | null, pluginConfig: PluginConfig) => {
-        return true
-    }),
-}))
+const mockPluginIndex = (indexJs: string) => ({
+    ...plugin60,
+    archive: createArchive('posthog-maxmind-plugin', indexJs),
+})
 
 let mockServer: PluginsServer
 beforeEach(async () => {
@@ -81,7 +85,11 @@ beforeEach(async () => {
     }
 })
 
-test('setupPlugins', async () => {
+test('setupPlugins and runPlugins', async () => {
+    ;(getPluginRows as any).mockReturnValueOnce([plugin60])
+    ;(getPluginAttachmentRows as any).mockReturnValueOnce([pluginAttachment1])
+    ;(getPluginConfigRows as any).mockReturnValueOnce([pluginConfig39])
+
     const { plugins, pluginConfigs, pluginConfigsPerTeam, defaultConfigs } = await setupPlugins(mockServer)
 
     expect(getPluginRows).toHaveBeenCalled()
@@ -113,8 +121,52 @@ test('setupPlugins', async () => {
     expect(Object.keys(pluginConfig.vm!.methods)).toEqual(['processEvent'])
 
     const processEvent = pluginConfig.vm!.methods['processEvent']
-    const event = { event: '$test', properties: {} } as PluginEvent
+    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
     await processEvent(event)
 
     expect(event.properties!['processed']).toEqual(true)
+
+    event.properties!['processed'] = false
+
+    const returnedEvent = await runPlugins(mockServer, event)
+    expect(event.properties!['processed']).toEqual(true)
+    expect(returnedEvent!.properties!['processed']).toEqual(true)
+})
+
+test('plugin returns null', async () => {
+    ;(getPluginRows as any).mockReturnValueOnce([
+        mockPluginIndex('function processEvent (event, meta) { return null }'),
+    ])
+    ;(getPluginConfigRows as any).mockReturnValueOnce([pluginConfig39])
+    ;(getPluginAttachmentRows as any).mockReturnValueOnce([])
+
+    await setupPlugins(mockServer)
+
+    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
+    const returnedEvent = await runPlugins(mockServer, event)
+
+    expect(returnedEvent).toEqual(null)
+})
+
+test('plugin meta has what it should have', async () => {
+    ;(getPluginRows as any).mockReturnValueOnce([
+        mockPluginIndex(`
+            function setupPlugin (meta) { meta.global.key = 'value' } 
+            function processEvent (event, meta) { event.properties=meta; return event }
+        `),
+    ])
+    ;(getPluginConfigRows as any).mockReturnValueOnce([pluginConfig39])
+    ;(getPluginAttachmentRows as any).mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(mockServer)
+
+    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
+    const returnedEvent = await runPlugins(mockServer, event)
+
+    expect(Object.keys(returnedEvent!.properties!).sort()).toEqual(['attachments', 'cache', 'config', 'global'])
+    expect(returnedEvent!.properties!['attachments']).toEqual({
+        maxmindMmdb: { content_type: 'application/octet-stream', contents: 'test', file_name: 'test.txt' },
+    })
+    expect(returnedEvent!.properties!['config']).toEqual('{"localhostIP": "94.224.212.175"}')
+    expect(returnedEvent!.properties!['global']).toEqual({ key: 'value' })
 })
