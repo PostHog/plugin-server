@@ -1275,13 +1275,6 @@
   dependencies:
     "@types/node" "*"
 
-"@types/gunzip-maybe@^1.4.0":
-  version "1.4.0"
-  resolved "https://registry.yarnpkg.com/@types/gunzip-maybe/-/gunzip-maybe-1.4.0.tgz#9410fd15ff68eca8907b7b9198e63e2a7c14d511"
-  integrity sha512-dFP9GrYAR9KhsjTkWJ8q8Gsfql75YIKcg9DuQOj/IrlPzR7W+1zX+cclw1McV82UXAQ+Lpufvgk3e9bC8+HzgA==
-  dependencies:
-    "@types/node" "*"
-
 "@types/ioredis@^4.17.7":
   version "4.17.7"
   resolved "https://registry.yarnpkg.com/@types/ioredis/-/ioredis-4.17.7.tgz#5007a56380fd387315efabc6c777c050feabb121"
