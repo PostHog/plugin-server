@@ -4966,7 +4966,7 @@ node-notifier@^8.0.0:
     uuid "^8.3.0"
     which "^2.0.2"
 
-node-rdkafka@^2.8.1:
+node-rdkafka@^2.8.1, node-rdkafka@^2.9.1:
   version "2.9.1"
   resolved "https://registry.yarnpkg.com/node-rdkafka/-/node-rdkafka-2.9.1.tgz#ac711bc7845ccb1de87391aec7f27f683d265149"
   integrity sha512-C5EVDZlDG+5D8KXiz2zKwEiLWIGW5Z1mkVFRzp13T4mrbXz+ESyjrDSLIj7aoUIi5+T10H9p1wwLZJBh9ivjLg==
