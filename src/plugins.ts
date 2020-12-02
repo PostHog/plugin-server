@@ -102,89 +102,96 @@ export async function setupPlugins(
     }
 }
 
-async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Promise<void> {
+async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Promise<boolean> {
     const { plugin } = pluginConfig
 
     if (!plugin) {
-        return
+        return false
     }
 
-    if (plugin.url.startsWith('file:')) {
-        const pluginPath = path.resolve(server.BASE_DIR, plugin.url.substring(5))
-        const configPath = path.resolve(pluginPath, 'plugin.json')
+    try {
+        if (plugin.url.startsWith('file:')) {
+            const pluginPath = path.resolve(server.BASE_DIR, plugin.url.substring(5))
+            const configPath = path.resolve(pluginPath, 'plugin.json')
 
-        let config: PluginJsonConfig = {}
-        if (fs.existsSync(configPath)) {
-            try {
-                const jsonBuffer = fs.readFileSync(configPath)
-                config = JSON.parse(jsonBuffer.toString())
-            } catch (e) {
+            let config: PluginJsonConfig = {}
+            if (fs.existsSync(configPath)) {
+                try {
+                    const jsonBuffer = fs.readFileSync(configPath)
+                    config = JSON.parse(jsonBuffer.toString())
+                } catch (e) {
+                    await processError(
+                        server,
+                        pluginConfig,
+                        `Could not load posthog config at "${configPath}" for plugin "${plugin.name}"`
+                    )
+                    return false
+                }
+            }
+
+            if (!config['main'] && !fs.existsSync(path.resolve(pluginPath, 'index.js'))) {
                 await processError(
                     server,
                     pluginConfig,
-                    `Could not load posthog config at "${configPath}" for plugin "${plugin.name}"`
+                    `No "main" config key or "index.js" file found for plugin "${plugin.name}"`
                 )
-                return
+                return false
             }
-        }
 
-        if (!config['main'] && !fs.existsSync(path.resolve(pluginPath, 'index.js'))) {
-            await processError(
-                server,
-                pluginConfig,
-                `No "main" config key or "index.js" file found for plugin "${plugin.name}"`
-            )
-            return
-        }
+            const jsPath = path.resolve(pluginPath, config['main'] || 'index.js')
+            const indexJs = fs.readFileSync(jsPath).toString()
 
-        const jsPath = path.resolve(pluginPath, config['main'] || 'index.js')
-        const indexJs = fs.readFileSync(jsPath).toString()
-
-        const libPath = path.resolve(pluginPath, config['lib'] || 'lib.js')
-        const libJs = fs.existsSync(libPath) ? fs.readFileSync(libPath).toString() : ''
-        if (libJs) {
-            console.warn(`⚠️ Using "lib.js" is deprecated! Used by: ${plugin.name} (${plugin.url})`)
-        }
-
-        try {
-            pluginConfig.vm = createPluginConfigVM(server, pluginConfig, indexJs, libJs)
-            console.log(`Loaded local plugin "${plugin.name}" from "${pluginPath}"!`)
-            await clearError(server, pluginConfig)
-        } catch (error) {
-            await processError(server, pluginConfig, error)
-        }
-    } else if (plugin.archive) {
-        let config: PluginJsonConfig = {}
-        const json = await getFileFromArchive(plugin.archive, 'plugin.json')
-        if (json) {
-            try {
-                config = JSON.parse(json)
-            } catch (error) {
-                await processError(server, pluginConfig, `Can not load plugin.json for plugin "${plugin.name}"`)
-                return
+            const libPath = path.resolve(pluginPath, config['lib'] || 'lib.js')
+            const libJs = fs.existsSync(libPath) ? fs.readFileSync(libPath).toString() : ''
+            if (libJs) {
+                console.warn(`⚠️ Using "lib.js" is deprecated! Used by: ${plugin.name} (${plugin.url})`)
             }
-        }
 
-        const indexJs = await getFileFromArchive(plugin.archive, config['main'] || 'index.js')
-        const libJs = await getFileFromArchive(plugin.archive, config['lib'] || 'lib.js')
-        if (libJs) {
-            console.warn(`⚠️ Using "lib.js" is deprecated! Used by: ${plugin.name} (${plugin.url})`)
-        }
-
-        if (indexJs) {
             try {
-                pluginConfig.vm = createPluginConfigVM(server, pluginConfig, indexJs, libJs || '')
-                console.log(`Loaded plugin "${plugin.name}"!`)
+                pluginConfig.vm = createPluginConfigVM(server, pluginConfig, indexJs, libJs)
+                console.log(`Loaded local plugin "${plugin.name}" from "${pluginPath}"!`)
                 await clearError(server, pluginConfig)
+                return true
             } catch (error) {
                 await processError(server, pluginConfig, error)
             }
+        } else if (plugin.archive) {
+            let config: PluginJsonConfig = {}
+            const json = await getFileFromArchive(plugin.archive, 'plugin.json')
+            if (json) {
+                try {
+                    config = JSON.parse(json)
+                } catch (error) {
+                    await processError(server, pluginConfig, `Can not load plugin.json for plugin "${plugin.name}"`)
+                    return false
+                }
+            }
+
+            const indexJs = await getFileFromArchive(plugin.archive, config['main'] || 'index.js')
+            const libJs = await getFileFromArchive(plugin.archive, config['lib'] || 'lib.js')
+            if (libJs) {
+                console.warn(`⚠️ Using "lib.js" is deprecated! Used by: ${plugin.name} (${plugin.url})`)
+            }
+
+            if (indexJs) {
+                try {
+                    pluginConfig.vm = createPluginConfigVM(server, pluginConfig, indexJs, libJs || '')
+                    console.log(`Loaded plugin "${plugin.name}"!`)
+                    await clearError(server, pluginConfig)
+                    return true
+                } catch (error) {
+                    await processError(server, pluginConfig, error)
+                }
+            } else {
+                await processError(server, pluginConfig, `Could not load index.js for plugin "${plugin.name}"!`)
+            }
         } else {
-            await processError(server, pluginConfig, `Could not load index.js for plugin "${plugin.name}"!`)
+            await processError(server, pluginConfig, 'Un-downloaded remote plugins not supported!')
         }
-    } else {
-        await processError(server, pluginConfig, 'Un-downloaded remote plugins not supported!')
+    } catch (error) {
+        await processError(server, pluginConfig, error)
     }
+    return false
 }
 
 export async function runPlugins(server: PluginsServer, event: PluginEvent): Promise<PluginEvent | null> {

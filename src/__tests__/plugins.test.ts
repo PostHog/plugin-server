@@ -270,3 +270,22 @@ test('plugin with http urls must have an archive', async () => {
     expect(setError.mock.calls[0][1]!.time).toBeDefined()
     expect(pluginConfigs.get(39)!.vm).toEqual(null)
 })
+
+test("plugin with broken archive doesn't load", async () => {
+    // silence some spam
+    console.log = jest.fn()
+    console.error = jest.fn()
+
+    getPluginRows.mockReturnValueOnce([{ ...plugin60, archive: Buffer.from('this is not a zip') }])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    const { pluginConfigs } = await setupPlugins(mockServer)
+
+    expect(pluginConfigs.get(39)!.plugin!.url).toContain('https://')
+    expect(setError).toHaveBeenCalled()
+    expect(setError.mock.calls[0][0]).toEqual(mockServer)
+    expect(setError.mock.calls[0][1]!.message).toEqual('Could not read archive as .zip or .tgz')
+    expect(setError.mock.calls[0][1]!.time).toBeDefined()
+    expect(pluginConfigs.get(39)!.vm).toEqual(null)
+})
