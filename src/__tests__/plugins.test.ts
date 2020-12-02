@@ -251,3 +251,22 @@ test('plugin with broken plugin.json does not do much', async () => {
     expect(setError.mock.calls[0][1]!.time).toBeDefined()
     expect(pluginConfigs.get(39)!.vm).toEqual(null)
 })
+
+test('plugin with http urls must have an archive', async () => {
+    // silence some spam
+    console.log = jest.fn()
+    console.error = jest.fn()
+
+    getPluginRows.mockReturnValueOnce([{ ...plugin60, archive: null }])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    const { pluginConfigs } = await setupPlugins(mockServer)
+
+    expect(pluginConfigs.get(39)!.plugin!.url).toContain('https://')
+    expect(setError).toHaveBeenCalled()
+    expect(setError.mock.calls[0][0]).toEqual(mockServer)
+    expect(setError.mock.calls[0][1]!.message).toEqual('Un-downloaded remote plugins not supported!')
+    expect(setError.mock.calls[0][1]!.time).toBeDefined()
+    expect(pluginConfigs.get(39)!.vm).toEqual(null)
+})
