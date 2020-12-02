@@ -1,15 +1,7 @@
 import * as path from 'path'
 import * as fs from 'fs'
 import { createPluginConfigVM, prepareForRun } from './vm'
-import {
-    PluginsServer,
-    Plugin,
-    PluginConfig,
-    PluginJsonConfig,
-    PluginId,
-    PluginConfigId,
-    TeamId,
-} from './types'
+import { PluginsServer, Plugin, PluginConfig, PluginJsonConfig, PluginId, PluginConfigId, TeamId } from './types'
 import { PluginEvent, PluginAttachment } from 'posthog-plugins'
 import { clearError, processError } from './error'
 import { getFileFromArchive } from './utils'
@@ -22,7 +14,14 @@ const pluginConfigs = new Map<PluginConfigId, PluginConfig>()
 const pluginConfigsPerTeam = new Map<TeamId, PluginConfig[]>()
 let defaultConfigs: PluginConfig[] = []
 
-export async function setupPlugins(server: PluginsServer): Promise<void> {
+export async function setupPlugins(
+    server: PluginsServer
+): Promise<{
+    plugins: Map<PluginId, Plugin>
+    pluginConfigs: Map<PluginConfigId, PluginConfig>
+    pluginConfigsPerTeam: Map<TeamId, PluginConfig[]>
+    defaultConfigs: PluginConfig[]
+}> {
     const pluginRows = await getPluginRows(server)
     const foundPlugins = new Map<number, boolean>()
     for (const row of pluginRows) {
@@ -93,6 +92,13 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
             pluginConfigsPerTeam.set(teamId, [...(pluginConfigsPerTeam.get(teamId) || []), ...defaultConfigs])
             pluginConfigsPerTeam.get(teamId)?.sort((a, b) => a.id - b.id)
         }
+    }
+
+    return {
+        plugins,
+        pluginConfigs,
+        pluginConfigsPerTeam,
+        defaultConfigs,
     }
 }
 
