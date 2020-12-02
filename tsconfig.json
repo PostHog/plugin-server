@@ -12,8 +12,7 @@
         "outDir": "./dist",
         "types": ["node", "jest"],
         "resolveJsonModule": true,
-        "strict": true,
-        "esModuleInterop": true
+        "strict": true
     },
     "exclude": ["node_modules", "dist", "bin"]
 }
