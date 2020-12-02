@@ -27,6 +27,8 @@
     "dependencies": {
         "adm-zip": "^0.4.16",
         "fastify": "^3.8.0",
+        "fastify-kafka": "^0.3.0",
+        "fastify-postgres": "^3.3.0",
         "gunzip-maybe": "^1.4.2",
         "ioredis": "^4.19.2",
         "node-fetch": "^2.6.1",

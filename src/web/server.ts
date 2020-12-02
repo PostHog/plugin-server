@@ -1,7 +1,29 @@
-import { fastify, FastifyInstance } from 'fastify'
+import { fastify, FastifyInstance, FastifyPluginAsync, FastifyPluginCallback } from 'fastify'
+import { fastifyPostgres } from 'fastify-postgres'
+import fastifyKafka from 'fastify-kafka'
 
-export function buildFastifyInstance(): FastifyInstance {
+export interface FastifySettings {
+    DATABASE_URL: string // Postgres database URL
+    KAFKA_HOSTS: string
+}
+
+export function buildFastifyInstance({ DATABASE_URL, KAFKA_HOSTS }: FastifySettings): FastifyInstance {
     const fastifyInstance = fastify()
+    fastifyInstance.register(fastifyPostgres, {
+        connectionString: DATABASE_URL,
+    })
+    fastifyInstance.register(fastifyKafka as FastifyPluginAsync<fastifyKafka.FastifyKafkaOptions>, {
+        producer: {
+            dr_cb: true,
+            'metadata.broker.list': KAFKA_HOSTS,
+        },
+        consumer: {
+            'metadata.broker.list': KAFKA_HOSTS,
+        },
+        consumerTopicConf: {
+            'auto.offset.reset': 'earliest',
+        },
+    })
     return fastifyInstance
 }
 
