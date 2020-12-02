@@ -105,6 +105,10 @@ export async function setupPlugins(
 async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Promise<void> {
     const { plugin } = pluginConfig
 
+    if (!plugin) {
+        return
+    }
+
     if (plugin.url.startsWith('file:')) {
         const pluginPath = path.resolve(server.BASE_DIR, plugin.url.substring(5))
         const configPath = path.resolve(pluginPath, 'plugin.json')
@@ -157,6 +161,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                 config = JSON.parse(json)
             } catch (error) {
                 await processError(server, pluginConfig, `Can not load plugin.json for plugin "${plugin.name}"`)
+                return
             }
         }
 
@@ -196,11 +201,11 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
                 try {
                     returnedEvent = (await processEvent(returnedEvent)) || null
                     const ms = Math.round((performance.now() - startTime) * 1000) / 1000
-                    logTime(pluginConfig.plugin.name, ms)
+                    logTime(pluginConfig.plugin?.name || 'noname', ms)
                 } catch (error) {
                     await processError(server, pluginConfig, error, returnedEvent)
                     const ms = Math.round((performance.now() - startTime) * 1000) / 1000
-                    logTime(pluginConfig.plugin.name, ms, true)
+                    logTime(pluginConfig.plugin?.name || 'noname', ms, true)
                 }
             }
 

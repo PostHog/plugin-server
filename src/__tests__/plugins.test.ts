@@ -2,10 +2,21 @@ import { runPlugins, setupPlugins } from '../plugins'
 import { defaultConfig } from '../server'
 import { Pool } from 'pg'
 import * as Redis from 'ioredis'
-import { PluginConfig, PluginError, PluginsServer } from '../types'
-import { getPluginRows, getPluginAttachmentRows, getPluginConfigRows, setError } from '../sql'
+import { Plugin, PluginAttachmentDB, PluginConfig, PluginError, PluginsServer } from '../types'
+import * as s from '../sql'
 import * as AdmZip from 'adm-zip'
 import { PluginEvent } from 'posthog-plugins/src/types'
+
+jest.mock('../sql')
+type UnPromisify<F> = F extends (...args: infer A) => Promise<infer T> ? (...args: A) => T : never
+const getPluginRows = (s.getPluginRows as unknown) as jest.MockedFunction<UnPromisify<typeof s.getPluginRows>>
+const getPluginAttachmentRows = (s.getPluginAttachmentRows as unknown) as jest.MockedFunction<
+    UnPromisify<typeof s.getPluginAttachmentRows>
+>
+const getPluginConfigRows = (s.getPluginConfigRows as unknown) as jest.MockedFunction<
+    UnPromisify<typeof s.getPluginConfigRows>
+>
+const setError = (s.setError as unknown) as jest.MockedFunction<UnPromisify<typeof s.setError>>
 
 // Tests missing:
 // - load local "file:" plugins
@@ -13,67 +24,86 @@ import { PluginEvent } from 'posthog-plugins/src/types'
 // - global plugins (need to be discussed how to implement)
 // - lib.js loading, even if deprecated
 
-jest.mock('../sql')
-
-function createArchive(name: string, indexJs: string): Buffer {
+function createArchive(name: string, { indexJs, pluginJson }: { indexJs?: string; pluginJson?: string }): Buffer {
     const zip = new AdmZip()
-    zip.addFile('testplugin/index.js', Buffer.alloc(indexJs.length, indexJs))
-    zip.addFile(
-        'testplugin/plugin.json',
-        new Buffer(
-            JSON.stringify({
-                name,
-                description: 'just for testing',
-                url: 'http://example.com/plugin',
-                config: {},
-                main: 'index.js',
-            })
+    if (indexJs) {
+        zip.addFile('testplugin/index.js', Buffer.alloc(indexJs.length, indexJs))
+    }
+    if (pluginJson) {
+        zip.addFile('testplugin/plugin.json', Buffer.alloc(pluginJson.length, pluginJson))
+    } else {
+        zip.addFile(
+            'testplugin/plugin.json',
+            new Buffer(
+                JSON.stringify({
+                    name,
+                    description: 'just for testing',
+                    url: 'http://example.com/plugin',
+                    config: {},
+                    main: 'index.js',
+                })
+            )
         )
-    )
+    }
     return zip.toBuffer()
 }
 
-const plugin60 = {
+const plugin60: Plugin = {
     id: 60,
     name: 'posthog-maxmind-plugin',
     description: 'Ingest GeoIP data via MaxMind',
     url: 'https://www.npmjs.com/package/posthog-maxmind-plugin',
-    config_schema:
-        '{"localhostIP": {"hint": "Useful if testing locally", "name": "IP to use instead of 127.0.0.1", "type": "string", "order": 2, "default": "", "required": false}, "maxmindMmdb": {"hint": "The \\"GeoIP2 City\\" or \\"GeoLite2 City\\" database file", "name": "GeoIP .mddb database", "type": "attachment", "order": 1, "markdown": "Sign up for a [MaxMind.com](https://www.maxmind.com) account, download and extract the database and then upload the `.mmdb` file below", "required": true}}',
+    config_schema: {
+        localhostIP: {
+            hint: 'Useful if testing locally',
+            name: 'IP to use instead of 127.0.0.1',
+            type: 'string',
+            order: 2,
+            default: '',
+            required: false,
+        },
+        maxmindMmdb: {
+            hint: 'The "GeoIP2 City" or "GeoLite2 City" database file',
+            name: 'GeoIP .mddb database',
+            type: 'attachment',
+            order: 1,
+            markdown:
+                'Sign up for a [MaxMind.com](https://www.maxmind.com) account, download and extract the database and then upload the `.mmdb` file below',
+            required: true,
+        },
+    },
     tag: '0.0.2',
-    archive: createArchive(
-        'posthog-maxmind-plugin',
-        'function processEvent (event) { if (event.properties) { event.properties.processed = true } return event }'
-    ),
-    from_json: false,
-    from_web: false,
-    error: null,
+    archive: createArchive('posthog-maxmind-plugin', {
+        indexJs:
+            'function processEvent (event) { if (event.properties) { event.properties.processed = true } return event }',
+    }),
+    error: undefined,
 }
 
-const pluginAttachment1 = {
+const pluginAttachment1: PluginAttachmentDB = {
     id: 1,
     key: 'maxmindMmdb',
     content_type: 'application/octet-stream',
     file_name: 'test.txt',
     file_size: 4,
-    contents: 'test',
+    contents: Buffer.from('test'),
     plugin_config_id: 39,
     team_id: 2,
 }
 
-const pluginConfig39 = {
+const pluginConfig39: PluginConfig = {
     id: 39,
     team_id: 2,
     plugin_id: 60,
     enabled: true,
     order: 0,
-    config: '{"localhostIP": "94.224.212.175"}',
-    error: null,
+    config: { localhostIP: '94.224.212.175' },
+    error: undefined,
 }
 
-const mockPluginIndex = (indexJs: string) => ({
+const mockPluginIndex = (indexJs: string, pluginJson?: string) => ({
     ...plugin60,
-    archive: createArchive('posthog-maxmind-plugin', indexJs),
+    archive: createArchive('posthog-maxmind-plugin', { indexJs, pluginJson }),
 })
 
 let mockServer: PluginsServer
@@ -86,9 +116,9 @@ beforeEach(async () => {
 })
 
 test('setupPlugins and runPlugins', async () => {
-    ;(getPluginRows as any).mockReturnValueOnce([plugin60])
-    ;(getPluginAttachmentRows as any).mockReturnValueOnce([pluginAttachment1])
-    ;(getPluginConfigRows as any).mockReturnValueOnce([pluginConfig39])
+    getPluginRows.mockReturnValueOnce([plugin60])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
 
     const { plugins, pluginConfigs, pluginConfigsPerTeam, defaultConfigs } = await setupPlugins(mockServer)
 
@@ -118,6 +148,7 @@ test('setupPlugins and runPlugins', async () => {
             contents: pluginAttachment1.contents,
         },
     })
+    expect(pluginConfig.vm).toBeDefined()
     expect(Object.keys(pluginConfig.vm!.methods)).toEqual(['processEvent'])
 
     const processEvent = pluginConfig.vm!.methods['processEvent']
@@ -134,11 +165,9 @@ test('setupPlugins and runPlugins', async () => {
 })
 
 test('plugin returns null', async () => {
-    ;(getPluginRows as any).mockReturnValueOnce([
-        mockPluginIndex('function processEvent (event, meta) { return null }'),
-    ])
-    ;(getPluginConfigRows as any).mockReturnValueOnce([pluginConfig39])
-    ;(getPluginAttachmentRows as any).mockReturnValueOnce([])
+    getPluginRows.mockReturnValueOnce([mockPluginIndex('function processEvent (event, meta) { return null }')])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([])
 
     await setupPlugins(mockServer)
 
@@ -149,14 +178,14 @@ test('plugin returns null', async () => {
 })
 
 test('plugin meta has what it should have', async () => {
-    ;(getPluginRows as any).mockReturnValueOnce([
+    getPluginRows.mockReturnValueOnce([
         mockPluginIndex(`
             function setupPlugin (meta) { meta.global.key = 'value' } 
             function processEvent (event, meta) { event.properties=meta; return event }
         `),
     ])
-    ;(getPluginConfigRows as any).mockReturnValueOnce([pluginConfig39])
-    ;(getPluginAttachmentRows as any).mockReturnValueOnce([pluginAttachment1])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
 
     await setupPlugins(mockServer)
 
@@ -165,8 +194,60 @@ test('plugin meta has what it should have', async () => {
 
     expect(Object.keys(returnedEvent!.properties!).sort()).toEqual(['attachments', 'cache', 'config', 'global'])
     expect(returnedEvent!.properties!['attachments']).toEqual({
-        maxmindMmdb: { content_type: 'application/octet-stream', contents: 'test', file_name: 'test.txt' },
+        maxmindMmdb: { content_type: 'application/octet-stream', contents: Buffer.from('test'), file_name: 'test.txt' },
     })
-    expect(returnedEvent!.properties!['config']).toEqual('{"localhostIP": "94.224.212.175"}')
+    expect(returnedEvent!.properties!['config']).toEqual({ localhostIP: '94.224.212.175' })
     expect(returnedEvent!.properties!['global']).toEqual({ key: 'value' })
+})
+
+test('plugin with broken index.js does not do much', async () => {
+    // silence some spam
+    console.log = jest.fn()
+    console.error = jest.fn()
+
+    getPluginRows.mockReturnValueOnce([
+        mockPluginIndex(`
+            function setupPlugin (met
+        `),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    const { pluginConfigs } = await setupPlugins(mockServer)
+
+    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
+    const returnedEvent = await runPlugins(mockServer, { ...event })
+    expect(returnedEvent).toEqual(event)
+
+    expect(setError).toHaveBeenCalled()
+    expect(setError.mock.calls[0][0]).toEqual(mockServer)
+    expect(setError.mock.calls[0][1]!.message).toEqual("Unexpected token ';'")
+    expect(setError.mock.calls[0][1]!.name).toEqual('SyntaxError')
+    expect(setError.mock.calls[0][1]!.stack).toContain('vm.js:')
+    expect(setError.mock.calls[0][1]!.time).toBeDefined()
+    expect(setError.mock.calls[0][2]).toEqual(pluginConfigs.get(39))
+    expect(pluginConfigs.get(39)!.vm).toEqual(null)
+})
+
+test('plugin with broken plugin.json does not do much', async () => {
+    // silence some spam
+    console.log = jest.fn()
+    console.error = jest.fn()
+
+    getPluginRows.mockReturnValueOnce([
+        mockPluginIndex(
+            `function processEvent (event, meta) { event.properties.processed = true; return event }`,
+            '{ broken: "plugin.json" -=- '
+        ),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    const { pluginConfigs } = await setupPlugins(mockServer)
+
+    expect(setError).toHaveBeenCalled()
+    expect(setError.mock.calls[0][0]).toEqual(mockServer)
+    expect(setError.mock.calls[0][1]!.message).toEqual('Can not load plugin.json for plugin "posthog-maxmind-plugin"')
+    expect(setError.mock.calls[0][1]!.time).toBeDefined()
+    expect(pluginConfigs.get(39)!.vm).toEqual(null)
 })
