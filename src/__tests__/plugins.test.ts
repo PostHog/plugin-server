@@ -10,7 +10,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 
-// mock functions that get data from posthgres and give them the right types
+// mock functions that get data from postgres and give them the right types
 jest.mock('../sql')
 type UnPromisify<F> = F extends (...args: infer A) => Promise<infer T> ? (...args: A) => T : never
 const getPluginRows = (s.getPluginRows as unknown) as jest.MockedFunction<UnPromisify<typeof s.getPluginRows>>
