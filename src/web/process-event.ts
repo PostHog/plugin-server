@@ -1,11 +1,13 @@
 import { Message } from 'node-rdkafka'
 import { UUIDT } from './utils'
 
+export type Data = Record<string, any>
+
 export interface PostHogEvent {
     distinct_id: string
     ip: string
     site_url: string
-    data: Record<string, any>
+    data: Data
     team_id: number
     now: string
     sent_at: string
@@ -30,7 +32,7 @@ function processEventEE(
     distinct_id: string,
     ip: string,
     site_url: string,
-    data: Record<string, any>,
+    data: Data,
     team_id: number,
     now: Date,
     sent_at: Date | null
@@ -57,4 +59,25 @@ function processEventEE(
     } else {
         _capture_ee(event_uuid, person_uuid, ip, site_url, team_id, data['event'], distinct_id, properties, ts)
     }
+}
+
+function handle_timestamp(data: Data, now: Date, sent_at: Date | null): Date {
+    if (data["timestamp"]) {
+        if (sent_at) {
+            // sent_at - timestamp == now - x
+            // x = now + (timestamp - sent_at)
+            try {
+                // timestamp and sent_at must both be in the same format: either both with or both without timezones
+                // otherwise we can't get a diff to add to now
+                return now + (new Date(data["timestamp"]) - sent_at)
+            } catch (e) {
+                capture_exception(e)
+            }
+        }
+        return new Date(data["timestamp"])
+    }
+    if (!data["offset"]) {
+        return now - relativedelta(microseconds=data["offset"] * 1000)
+    }
+    return now
 }
