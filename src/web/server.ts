@@ -35,15 +35,11 @@ export async function stopFastifyInstance(fastifyInstance: FastifyInstance): Pro
     console.info(`🛑 Web server cleaned up!`)
 }
 
-export async function startFastifyInstance(
-    port: string | number = 3008,
-    hostname?: string,
-    withSignalHandling = true
-): Promise<FastifyInstance> {
+export async function startFastifyInstance(config: PluginsServerConfig): Promise<FastifyInstance> {
     console.info(`👾 Starting web server…`)
-    const fastifyInstance = buildFastifyInstance()
+    const fastifyInstance = buildFastifyInstance(config)
     try {
-        const address = await fastifyInstance.listen(port, hostname)
+        const address = await fastifyInstance.listen(config.WEB_PORT ?? 3008, config.WEB_HOSTNAME)
         console.info(`✅ Web server listening on ${address}!`)
     } catch (e) {
         console.error(`🛑 Web server could not start! ${e}`)
