@@ -11,7 +11,7 @@ export async function getEvent(request: FastifyRequest, reply: FastifyReply): Pr
     }
 
     // Edge case for testing error handling
-    if (request.body === '1337') throw new Error('Unexpected leet detected!')
+    if (request.body == '1337') throw new Error('Unexpected leet detected!')
 
     // TODO: statsd timer
 

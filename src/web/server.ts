@@ -11,26 +11,23 @@ declare module 'fastify' {
     }
 }
 
-export function buildWebServer(): FastifyInstance {
-    const webServer = fastify()
-    webServer.addHook('preHandler', (request, reply, done) => {
-        // Mimicking Django HttpRequest with GET and POST properties
+export function buildFastifyInstance(): FastifyInstance {
+    const fastifyInstance = fastify()
+    fastifyInstance.addHook('preHandler', async (request) => {
+        // Mimic Django HttpRequest with GET and POST properties
         request.GET = urlParse(request.url, true).query
         try {
             request.POST = querystringParse(String(request.body))
         } catch {
             request.POST = {}
         }
-        done()
     })
-    webServer.all('*', getEvent)
-    return webServer
+    fastifyInstance.all('*', getEvent)
+    return fastifyInstance
 }
 
-export const webServer = buildWebServer()
-
-export async function stopWebServer(webServerToStop: FastifyInstance = webServer): Promise<void> {
-    await webServerToStop.close()
+export async function stopFastifyInstance(fastifyInstance: FastifyInstance): Promise<void> {
+    await fastifyInstance.close()
     console.info(`\n🛑 Web server cleaned up!`)
 }
 
@@ -40,17 +37,19 @@ export async function startWebServer(
     withSignalHandling = true
 ): Promise<FastifyInstance> {
     console.info(`👾 Starting web server…`)
+    const fastifyInstance = buildFastifyInstance()
     try {
-        const address = await webServer.listen(port, hostname)
+        const address = await fastifyInstance.listen(port, hostname)
         console.info(`✅ Web server listening on ${address}!`)
     } catch (e) {
         console.error(`🛑 Web server could not start! ${e}`)
+        return fastifyInstance
     }
     if (withSignalHandling) {
         // Free up port
         for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-            process.on(signal, () => stopWebServer(webServer))
+            process.on(signal, () => stopFastifyInstance(fastifyInstance))
         }
     }
-    return webServer
+    return fastifyInstance
 }
