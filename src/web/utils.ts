@@ -27,7 +27,9 @@ export function loadDataFromRequest(request: FastifyRequest): any {
         data = request.GET['data']
     }
 
-    if (isLooselyFalsy(data)) return {}
+    if (isLooselyFalsy(data)) {
+        return {}
+    }
 
     // TODO: convert below from Python
     // # add the data in sentry's scope in case there's an exception
@@ -35,7 +37,9 @@ export function loadDataFromRequest(request: FastifyRequest): any {
     //     scope.set_context("data", data)
 
     let compression = request.GET['compression'] || request.POST['compression'] || request.headers['content-encoding']
-    if (Array.isArray(compression)) compression = compression[0]
+    if (Array.isArray(compression)) {
+        compression = compression[0]
+    }
     compression = compression && compression.toLowerCase()
 
     switch (compression) {
