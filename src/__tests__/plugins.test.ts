@@ -6,6 +6,9 @@ import { Plugin, PluginAttachmentDB, PluginConfig, PluginError, PluginsServer } 
 import * as s from '../sql'
 import * as AdmZip from 'adm-zip'
 import { PluginEvent } from 'posthog-plugins/src/types'
+import * as fs from 'fs'
+import * as os from 'os'
+import * as path from 'path'
 
 jest.mock('../sql')
 type UnPromisify<F> = F extends (...args: infer A) => Promise<infer T> ? (...args: A) => T : never
@@ -19,8 +22,6 @@ const getPluginConfigRows = (s.getPluginConfigRows as unknown) as jest.MockedFun
 const setError = (s.setError as unknown) as jest.MockedFunction<UnPromisify<typeof s.setError>>
 
 // Tests missing:
-// - load local "file:" plugins
-// - how various errors during load are handled (broken index, broken zip, broken json, etc)
 // - global plugins (need to be discussed how to implement)
 // - lib.js loading, even if deprecated
 
@@ -101,10 +102,33 @@ const pluginConfig39: PluginConfig = {
     error: undefined,
 }
 
-const mockPluginIndex = (indexJs: string, pluginJson?: string) => ({
+const mockPluginWithArchive = (indexJs: string, pluginJson?: string) => ({
     ...plugin60,
     archive: createArchive('posthog-maxmind-plugin', { indexJs, pluginJson }),
 })
+
+function mockPluginTempFolder(indexJs: string, pluginJson?: string): [Plugin, () => void] {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'foo-'))
+
+    fs.writeFileSync(path.join(folder, 'index.js'), indexJs)
+    fs.writeFileSync(
+        path.join(folder, 'plugin.json'),
+        pluginJson ||
+            JSON.stringify({
+                name: 'posthog-maxmind-plugin',
+                description: 'just for testing',
+                url: 'http://example.com/plugin',
+                config: {},
+                main: 'index.js',
+            })
+    )
+    return [
+        { ...plugin60, url: `file:${folder}`, archive: null },
+        () => {
+            fs.rmdirSync(folder, { recursive: true })
+        },
+    ]
+}
 
 let mockServer: PluginsServer
 beforeEach(async () => {
@@ -170,7 +194,7 @@ test('setupPlugins and runPlugins', async () => {
 })
 
 test('plugin returns null', async () => {
-    getPluginRows.mockReturnValueOnce([mockPluginIndex('function processEvent (event, meta) { return null }')])
+    getPluginRows.mockReturnValueOnce([mockPluginWithArchive('function processEvent (event, meta) { return null }')])
     getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
     getPluginAttachmentRows.mockReturnValueOnce([])
 
@@ -184,7 +208,7 @@ test('plugin returns null', async () => {
 
 test('plugin meta has what it should have', async () => {
     getPluginRows.mockReturnValueOnce([
-        mockPluginIndex(`
+        mockPluginWithArchive(`
             function setupPlugin (meta) { meta.global.key = 'value' } 
             function processEvent (event, meta) { event.properties=meta; return event }
         `),
@@ -205,13 +229,13 @@ test('plugin meta has what it should have', async () => {
     expect(returnedEvent!.properties!['global']).toEqual({ key: 'value' })
 })
 
-test('plugin with broken index.js does not do much', async () => {
+test('archive plugin with broken index.js does not do much', async () => {
     // silence some spam
     console.log = jest.fn()
     console.error = jest.fn()
 
     getPluginRows.mockReturnValueOnce([
-        mockPluginIndex(`
+        mockPluginWithArchive(`
             function setupPlugin (met
         `),
     ])
@@ -234,13 +258,41 @@ test('plugin with broken index.js does not do much', async () => {
     expect(pluginConfigs.get(39)!.vm).toEqual(null)
 })
 
-test('plugin with broken plugin.json does not do much', async () => {
+test('local plugin with broken index.js does not do much', async () => {
+    // silence some spam
+    console.log = jest.fn()
+    console.error = jest.fn()
+
+    const [plugin, unlink] = mockPluginTempFolder(`function setupPlugin (met`)
+    getPluginRows.mockReturnValueOnce([plugin])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    const { pluginConfigs } = await setupPlugins(mockServer)
+
+    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
+    const returnedEvent = await runPlugins(mockServer, { ...event })
+    expect(returnedEvent).toEqual(event)
+
+    expect(setError).toHaveBeenCalled()
+    expect(setError.mock.calls[0][0]).toEqual(mockServer)
+    expect(setError.mock.calls[0][1]!.message).toEqual("Unexpected token ';'")
+    expect(setError.mock.calls[0][1]!.name).toEqual('SyntaxError')
+    expect(setError.mock.calls[0][1]!.stack).toContain('vm.js:')
+    expect(setError.mock.calls[0][1]!.time).toBeDefined()
+    expect(setError.mock.calls[0][2]).toEqual(pluginConfigs.get(39))
+    expect(pluginConfigs.get(39)!.vm).toEqual(null)
+
+    unlink()
+})
+
+test('archive plugin with broken plugin.json does not do much', async () => {
     // silence some spam
     console.log = jest.fn()
     console.error = jest.fn()
 
     getPluginRows.mockReturnValueOnce([
-        mockPluginIndex(
+        mockPluginWithArchive(
             `function processEvent (event, meta) { event.properties.processed = true; return event }`,
             '{ broken: "plugin.json" -=- '
         ),
@@ -255,6 +307,30 @@ test('plugin with broken plugin.json does not do much', async () => {
     expect(setError.mock.calls[0][1]!.message).toEqual('Can not load plugin.json for plugin "posthog-maxmind-plugin"')
     expect(setError.mock.calls[0][1]!.time).toBeDefined()
     expect(pluginConfigs.get(39)!.vm).toEqual(null)
+})
+
+test('local plugin with broken plugin.json does not do much', async () => {
+    // silence some spam
+    console.log = jest.fn()
+    console.error = jest.fn()
+
+    const [plugin, unlink] = mockPluginTempFolder(
+        `function processEvent (event, meta) { event.properties.processed = true; return event }`,
+        '{ broken: "plugin.json" -=- '
+    )
+    getPluginRows.mockReturnValueOnce([plugin])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    const { pluginConfigs } = await setupPlugins(mockServer)
+
+    expect(setError).toHaveBeenCalled()
+    expect(setError.mock.calls[0][0]).toEqual(mockServer)
+    expect(setError.mock.calls[0][1]!.message).toContain('Could not load posthog config at ')
+    expect(setError.mock.calls[0][1]!.time).toBeDefined()
+    expect(pluginConfigs.get(39)!.vm).toEqual(null)
+
+    unlink()
 })
 
 test('plugin with http urls must have an archive', async () => {
