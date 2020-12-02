@@ -5,7 +5,6 @@ import {
     PluginsServer,
     Plugin,
     PluginConfig,
-    PluginAttachmentDB,
     PluginJsonConfig,
     PluginId,
     PluginConfigId,
@@ -16,6 +15,7 @@ import { clearError, processError } from './error'
 import { getFileFromArchive } from './utils'
 import { performance } from 'perf_hooks'
 import { logTime } from './stats'
+import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows } from './sql'
 
 const plugins = new Map<PluginId, Plugin>()
 const pluginConfigs = new Map<PluginConfigId, PluginConfig>()
@@ -23,9 +23,7 @@ const pluginConfigsPerTeam = new Map<TeamId, PluginConfig[]>()
 let defaultConfigs: PluginConfig[] = []
 
 export async function setupPlugins(server: PluginsServer): Promise<void> {
-    const { rows: pluginRows }: { rows: Plugin[] } = await server.db.query(
-        "SELECT * FROM posthog_plugin WHERE id in (SELECT plugin_id FROM posthog_pluginconfig WHERE enabled='t' GROUP BY plugin_id)"
-    )
+    const pluginRows = await getPluginRows(server)
     const foundPlugins = new Map<number, boolean>()
     for (const row of pluginRows) {
         foundPlugins.set(row.id, true)
@@ -37,9 +35,7 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         }
     }
 
-    const { rows: pluginAttachmentRows }: { rows: PluginAttachmentDB[] } = await server.db.query(
-        "SELECT * FROM posthog_pluginattachment WHERE plugin_config_id in (SELECT id FROM posthog_pluginconfig WHERE enabled='t')"
-    )
+    const pluginAttachmentRows = await getPluginAttachmentRows(server)
     const attachmentsPerConfig = new Map<TeamId, Record<string, PluginAttachment>>()
     for (const row of pluginAttachmentRows) {
         let attachments = attachmentsPerConfig.get(row.plugin_config_id)
@@ -54,9 +50,7 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         }
     }
 
-    const { rows: pluginConfigRows }: { rows: PluginConfig[] } = await server.db.query(
-        "SELECT * FROM posthog_pluginconfig WHERE enabled='t'"
-    )
+    const pluginConfigRows = await getPluginConfigRows(server)
     const foundPluginConfigs = new Map<number, boolean>()
     pluginConfigsPerTeam.clear()
     defaultConfigs = []
