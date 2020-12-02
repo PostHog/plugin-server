@@ -11,16 +11,13 @@ export function createPluginConfigVM(
     server: PluginsServer,
     pluginConfig: PluginConfig, // NB! might have team_id = 0
     indexJs: string,
-    libJs: string | null
+    libJs = ''
 ): PluginConfigVMReponse {
     const vm = new VM({
         sandbox: {},
     })
     vm.freeze(createConsole(), 'console')
     vm.freeze(fetch, 'fetch')
-
-    vm.run('const exports = {};')
-    vm.run('const __pluginLocalMeta = { global: {} };')
     vm.freeze(
         {
             cache: createCache(server, pluginConfig.plugin.name, pluginConfig.team_id),
@@ -29,26 +26,40 @@ export function createPluginConfigVM(
         },
         '__pluginHostMeta'
     )
-    vm.run(`const __pluginMeta = { ...__pluginHostMeta, ...__pluginLocalMeta };`)
-    vm.run(`${libJs} ; ${indexJs}`)
-    // remain backwards compatible with 1) compiled and non-compiled js, 2) setupPlugin and old setupTeam
-    vm.run(`;global.setupPlugin 
-            ? global.setupPlugin(__pluginMeta) 
-            : exports.setupPlugin 
-                ? exports.setupPlugin(__pluginMeta) 
-                : global.setupTeam 
-                    ? global.setupTeam(__pluginMeta) 
-                    : exports.setupTeam 
-                        ? exports.setupTeam(__pluginMeta) 
-                        : false;`)
+    vm.run(
+        `
+        // two ways packages could export themselves (plus "global")
+        const module = { exports: {} };
+        let exports = {};
+        const __getExported = (key) => exports[key] || module.exports[key] || global[key]; 
+        
+        // the plugin JS code        
+        ${libJs};
+        ${indexJs};
 
-    const global = vm.run('global')
-    const exports = vm.run('exports')
-
-    vm.run(`
-    const __methods = {
-        processEvent: exports.processEvent || global.processEvent ? (...args) => (exports.processEvent || global.processEvent)(...args, __pluginMeta) : null
-    }`)
+        // inject the meta object + shareable 'global' to the end of each exported function
+        const __pluginMeta = { 
+            ...__pluginHostMeta, 
+            global: {}
+        };
+        function __bindMeta (keyOrFunc) {
+            const func = typeof keyOrFunc === 'function' ? keyOrFunc : __getExported(keyOrFunc);
+            if (func) return (...args) => func(...args, __pluginMeta); 
+        }
+        function __callWithMeta (keyOrFunc, ...args) {
+            const func = __bindMeta(keyOrFunc);
+            if (func) return func(...args); 
+        }
+        
+        // run the plugin setup script, if present
+        __callWithMeta('setupPlugin');
+        
+        // export various functions
+        const __methods = {
+            processEvent: __bindMeta('processEvent')
+        };
+        `
+    )
 
     return {
         vm,
@@ -62,7 +73,7 @@ export function prepareForRun(
     pluginConfig: PluginConfig, // might have team_id=0
     method: 'processEvent',
     event?: PluginEvent
-): null | ((event: PluginEvent) => PluginEvent) | (() => void) {
+): null | ((event: PluginEvent) => Promise<PluginEvent>) | (() => Promise<void>) {
     if (!pluginConfig.vm?.methods[method]) {
         return null
     }
@@ -70,7 +81,7 @@ export function prepareForRun(
     const { vm } = pluginConfig.vm
 
     if (event?.properties?.token) {
-        // TODO: this should be nicer...
+        // TODO: this should be nicer... and it's not optimised for batch processing
         const posthog = createInternalPostHogInstance(
             event.properties.token,
             { apiHost: event.site_url, fetch },
@@ -82,5 +93,6 @@ export function prepareForRun(
     } else {
         vm.freeze(null, 'posthog')
     }
+
     return pluginConfig.vm.methods[method]
 }

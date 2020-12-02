@@ -10,6 +10,9 @@ export interface PluginsServerConfig {
     REDIS_URL: string
     BASE_DIR: string
     PLUGINS_RELOAD_PUBSUB_CHANNEL: string
+    DISABLE_WEB: boolean
+    WEB_PORT: number
+    WEB_HOSTNAME: string
 }
 
 export interface PluginsServer extends PluginsServerConfig {
@@ -82,6 +85,6 @@ export interface PluginScript {
 export interface PluginConfigVMReponse {
     vm: VM
     methods: {
-        processEvent: (event: PluginEvent) => PluginEvent
+        processEvent: (event: PluginEvent) => Promise<PluginEvent>
     }
 }

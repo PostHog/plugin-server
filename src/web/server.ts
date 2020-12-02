@@ -31,7 +31,7 @@ export async function stopFastifyInstance(fastifyInstance: FastifyInstance): Pro
     console.info(`\n🛑 Web server cleaned up!`)
 }
 
-export async function startWebServer(
+export async function startFastifyInstance(
     port: string | number = 3008,
     hostname?: string,
     withSignalHandling = true
@@ -44,12 +44,6 @@ export async function startWebServer(
     } catch (e) {
         console.error(`🛑 Web server could not start! ${e}`)
         return fastifyInstance
-    }
-    if (withSignalHandling) {
-        // Free up port
-        for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-            process.on(signal, () => stopFastifyInstance(fastifyInstance))
-        }
     }
     return fastifyInstance
 }
