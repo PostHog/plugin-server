@@ -62,22 +62,22 @@ function processEventEE(
 }
 
 function handle_timestamp(data: Data, now: Date, sent_at: Date | null): Date {
-    if (data["timestamp"]) {
+    if (data['timestamp']) {
         if (sent_at) {
             // sent_at - timestamp == now - x
             // x = now + (timestamp - sent_at)
             try {
                 // timestamp and sent_at must both be in the same format: either both with or both without timezones
                 // otherwise we can't get a diff to add to now
-                return now + (new Date(data["timestamp"]) - sent_at)
+                return now + (new Date(data['timestamp']) - sent_at)
             } catch (e) {
                 capture_exception(e)
             }
         }
-        return new Date(data["timestamp"])
+        return new Date(data['timestamp'])
     }
-    if (!data["offset"]) {
-        return now - relativedelta(microseconds=data["offset"] * 1000)
+    if (!data['offset']) {
+        return now - relativedelta((microseconds = data['offset'] * 1000))
     }
     return now
 }
