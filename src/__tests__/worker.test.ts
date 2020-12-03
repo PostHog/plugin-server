@@ -1,7 +1,7 @@
 import { startWorker } from '../worker'
 import { defaultConfig } from '../server'
 import { Pool } from 'pg'
-import * as Redis from 'ioredis'
+import Redis from 'ioredis'
 import { PluginsServer } from '../types'
 import Client from '../celery/client'
 

@@ -2,7 +2,7 @@ import { createPluginConfigVM, prepareForRun } from '../vm'
 import { PluginConfig, PluginsServer, Plugin } from '../types'
 import { PluginEvent } from 'posthog-plugins'
 import { defaultConfig } from '../server'
-import * as Redis from 'ioredis'
+import Redis from 'ioredis'
 import * as fetch from 'node-fetch'
 import { Pool } from 'pg'
 
