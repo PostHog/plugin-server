@@ -1,4 +1,42 @@
-import { stringify as uuidStringify } from 'uuid'
+import { randomBytes } from 'crypto'
+import { DateTime } from 'luxon';
+
+const byteToHex: string[] = []
+for (let i = 0; i < 256; i++) {
+    byteToHex.push((i + 0x100).toString(16).substr(1));
+}
+
+/**
+ * Convert array of 16 byte values to UUID string format of the form:
+ * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+ * Adapted from https://github.com/uuidjs/uuid/blob/master/src/stringify.js
+ */
+function uuidStringify(arr: Uint8Array) {
+    // Note: Be careful editing this code! It's been tuned for performance and works in ways you may not expect.
+    // See https://github.com/uuidjs/uuid/pull/434
+    return (
+        byteToHex[arr[0]] +
+        byteToHex[arr[1]] +
+        byteToHex[arr[2]] +
+        byteToHex[arr[3]] +
+        '-' +
+        byteToHex[arr[4]] +
+        byteToHex[arr[5]] +
+        '-' +
+        byteToHex[arr[6]] +
+        byteToHex[arr[7]] +
+        '-' +
+        byteToHex[arr[8]] +
+        byteToHex[arr[9]] +
+        '-' +
+        byteToHex[arr[10]] +
+        byteToHex[arr[11]] +
+        byteToHex[arr[12]] +
+        byteToHex[arr[13]] +
+        byteToHex[arr[14]] +
+        byteToHex[arr[15]]
+    ).toLowerCase()
+}
 
 /**
  * UUID (mostly) sortable by generation time.
@@ -22,7 +60,6 @@ import { stringify as uuidStringify } from 'uuid'
  */
 export class UUIDT {
     static currentSeriesPerMs: Map<number, number> = new Map()
-    static crypto = new Crypto()
 
     /** Get per-millisecond series integer in range [0-65536). */
     static getSeries(unixTimeMs: number): number {
@@ -40,24 +77,27 @@ export class UUIDT {
 
     constructor(unixTimeMs?: number) {
         if (!unixTimeMs) {
-            unixTimeMs = Date.now()
+            unixTimeMs = DateTime.utc().toMillis()
         }
-
+        let series = UUIDT.getSeries(unixTimeMs)
+        // 64 bits (8 bytes) total
         this.array = new Uint8Array(16)
         // 48 bits for time, WILL FAIL in 10 895 CE
-        let shiftedUnixTimeMs = unixTimeMs
+        // XXXXXXXX-XXXX-****-****-************
+        // TODO: why the hell are the two leftmost octets (four hexadecimal chars) always zero?
         for (let i = 5; i >= 0; i--) {
-            this.array[i] = shiftedUnixTimeMs & 0b11111111 // use last 8 binary digits
-            shiftedUnixTimeMs >>= 8 // remove these last 8 binary digits
+            this.array[i] = unixTimeMs & 0xff // use last 8 binary digits to set UUID 2 hexadecimal digits
+            unixTimeMs >>= 8 // remove these last 8 binary digits
         }
         // 16 bits for series
-        let series = UUIDT.getSeries(unixTimeMs)
+        // ********-****-XXXX-****-************
         for (let i = 7; i >= 6; i--) {
-            this.array[i] = series & 0b11111111 // use last 8 binary digits
+            this.array[i] = series & 0xff // use last 8 binary digits to set UUID 2 hexadecimal digits
             series >>= 8 // remove these last 8 binary digits
         }
         // 64 bits for random gibberish
-        this.array.set(UUIDT.crypto.getRandomValues(new Uint32Array(2)), 8)
+        // ********-****-****-XXXX-XXXXXXXXXXXX
+        this.array.set(randomBytes(8), 8)
     }
 
     toNumber(): number {
