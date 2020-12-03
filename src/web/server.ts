@@ -6,8 +6,9 @@ import { KAFKA_EVENTS_WAL } from './topics'
 import { EventEmitter } from 'events'
 import { processEventFromKafka } from './process-event'
 
+export const fastifyInstance = fastify()
+
 export function buildFastifyInstance({ DATABASE_URL, EE_ENABLED, KAFKA_HOSTS }: PluginsServerConfig): FastifyInstance {
-    const fastifyInstance = fastify()
     fastifyInstance.register(fastifyPostgres, {
         connectionString: DATABASE_URL,
     })

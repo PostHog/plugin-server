@@ -113,3 +113,8 @@ export class UUIDT {
         return uuidStringify(this.array)
     }
 }
+
+/** Simplistic Python `not` equivalent. */
+export function isLooselyFalsy<T>(value: T): boolean {
+    return Array.isArray(value) ? !value.length : !value || !Object.keys(value).length
+}
