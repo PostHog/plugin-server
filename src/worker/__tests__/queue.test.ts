@@ -1,9 +1,10 @@
-import { startWorker } from '../worker'
-import { defaultConfig } from '../server'
+import { startQueue } from '../queue'
+import { defaultConfig } from '../../server'
 import { Pool } from 'pg'
 import Redis from 'ioredis'
-import { PluginsServer } from '../types'
-import Client from '../celery/client'
+import { PluginsServer } from '../../types'
+import Client from '../../celery/client'
+import { runPlugins } from '../../plugins'
 
 function advanceOneTick() {
     return new Promise((resolve) => process.nextTick(resolve))
@@ -63,7 +64,7 @@ test('worker and task passing via redis', async () => {
     expect(args2).toEqual(args)
     expect(kwargs2).toEqual({})
 
-    const stopWorker = startWorker(mockServer)
+    const stopQueue = startQueue(mockServer, (event) => runPlugins(mockServer, event))
     await advanceOneTick()
     await advanceOneTick()
 
@@ -88,7 +89,7 @@ test('worker and task passing via redis', async () => {
     const queue5 = await mockServer.redis.get(mockServer.CELERY_DEFAULT_QUEUE)
     await advanceOneTick()
 
-    await stopWorker()
+    await stopQueue()
 })
 
 test('process multiple tasks', async () => {
@@ -121,7 +122,7 @@ test('process multiple tasks', async () => {
     expect((await mockServer.redis.get(mockServer.PLUGINS_CELERY_QUEUE))!.length).toBe(3)
     expect(await mockServer.redis.get(mockServer.CELERY_DEFAULT_QUEUE)).toBe(null)
 
-    const stopWorker = startWorker(mockServer)
+    const stopQueue = startQueue(mockServer, (event) => runPlugins(mockServer, event))
     await advanceOneTick()
 
     expect((await mockServer.redis.get(mockServer.PLUGINS_CELERY_QUEUE))!.length).toBe(2)
@@ -146,5 +147,5 @@ test('process multiple tasks', async () => {
 
     expect(defaultQueue.map((q) => JSON.parse(q)['headers']['lang']).join('-o-')).toBe('js-o-js-o-js')
 
-    await stopWorker()
+    await stopQueue()
 })

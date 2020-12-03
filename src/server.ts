@@ -3,12 +3,11 @@ import * as schedule from 'node-schedule'
 import Redis from 'ioredis'
 import { FastifyInstance } from 'fastify'
 import { PluginsServer, PluginsServerConfig } from './types'
-import { setupPlugins } from './plugins'
-import { startWorker } from './worker'
+import { startQueue } from './worker/queue'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
-import { piscina } from './server/piscina'
-
-const { version } = require('../package.json')
+import { version } from '../package.json'
+import { makePiscina } from './worker/piscina'
+import { PluginEvent } from 'posthog-plugins'
 
 export const defaultConfig: PluginsServerConfig = {
     CELERY_DEFAULT_QUEUE: 'celery',
@@ -22,9 +21,7 @@ export const defaultConfig: PluginsServerConfig = {
     WEB_HOSTNAME: '0.0.0.0',
 }
 
-export async function startPluginsServer(config: PluginsServerConfig): Promise<void> {
-    console.info(`⚡ Starting posthog-plugin-server v${version}…`)
-
+export async function createServer(config: PluginsServerConfig): Promise<[PluginsServer, () => Promise<void>]> {
     const serverConfig: PluginsServerConfig = {
         ...defaultConfig,
         ...config,
@@ -42,46 +39,59 @@ export async function startPluginsServer(config: PluginsServerConfig): Promise<v
         redis,
     }
 
-    // TODO: remove in next commits
-    const result = await piscina.runTask({ task: 'hello', args: ['world'] })
-    console.log(result) // Prints 'hello world'
-
-    await setupPlugins(server)
-
-    let fastifyInstance: FastifyInstance | null = null
-    if (!serverConfig.DISABLE_WEB) {
-        fastifyInstance = await startFastifyInstance(serverConfig.WEB_PORT, serverConfig.WEB_HOSTNAME)
+    const closeServer = async () => {
+        await server.redis.quit()
+        await server.db.end()
     }
 
-    let stopWorker = startWorker(server)
+    return [server, closeServer]
+}
 
-    const pubSub = new Redis(serverConfig.REDIS_URL)
-    pubSub.subscribe(serverConfig.PLUGINS_RELOAD_PUBSUB_CHANNEL)
+export async function startPluginsServer(config: PluginsServerConfig): Promise<void> {
+    console.info(`⚡ Starting posthog-plugin-server v${version}…`)
+
+    const [server, closeServer] = await createServer(config)
+
+    let piscina = makePiscina(config)
+    const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
+
+    let fastifyInstance: FastifyInstance | null = null
+    if (!server.DISABLE_WEB) {
+        fastifyInstance = await startFastifyInstance(server.WEB_PORT, server.WEB_HOSTNAME)
+    }
+
+    let stopQueue = startQueue(server, processEvent)
+
+    const pubSub = new Redis(server.REDIS_URL)
+    pubSub.subscribe(server.PLUGINS_RELOAD_PUBSUB_CHANNEL)
     pubSub.on('message', async (channel, message) => {
-        if (channel === serverConfig.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
-            console.log('Reloading plugins!')
-            await stopWorker()
-            await setupPlugins(server)
-            stopWorker = startWorker(server)
+        if (channel === server.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
+            console.log('Reloading plugins! NOT IMPLEMENTED FOR MULTITHREADING!')
+            await stopQueue()
+            await piscina.destroy()
+
+            piscina = makePiscina(config)
+            stopQueue = startQueue(server, processEvent)
         }
     })
 
     // every 5 sec set a @posthog-plugin-server/ping redis key
     const job = schedule.scheduleJob('*/5 * * * * *', function () {
-        redis.set('@posthog-plugin-server/ping', new Date().toISOString())
-        redis.expire('@posthog-plugin-server/ping', 60)
+        server.redis.set('@posthog-plugin-server/ping', new Date().toISOString())
+        server.redis.expire('@posthog-plugin-server/ping', 60)
     })
     console.info(`✅ Started posthog-plugin-server v${version}!`)
 
     const closeJobs = async () => {
-        if (!serverConfig.DISABLE_WEB) {
-            await stopFastifyInstance(fastifyInstance!)
-        }
-        await stopWorker()
         pubSub.disconnect()
         schedule.cancelJob(job)
-        await redis.quit()
-        await db.end()
+
+        if (!server.DISABLE_WEB) {
+            await stopFastifyInstance(fastifyInstance!)
+        }
+        await stopQueue()
+        await piscina.destroy()
+        await closeServer()
     }
 
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
