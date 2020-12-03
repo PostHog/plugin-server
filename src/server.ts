@@ -7,6 +7,7 @@ import { version } from '../package.json'
 import { setupPlugins } from './plugins'
 import { startWorker } from './worker'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
+import { piscina } from './server/piscina'
 
 export const defaultConfig: PluginsServerConfig = {
     CELERY_DEFAULT_QUEUE: 'celery',
@@ -39,6 +40,10 @@ export async function startPluginsServer(config: PluginsServerConfig): Promise<v
         db,
         redis,
     }
+
+    // TODO: remove in next commits
+    const result = await piscina.runTask({ task: 'hello', args: ['world'] })
+    console.log(result) // Prints 'hello world'
 
     await setupPlugins(server)
 
