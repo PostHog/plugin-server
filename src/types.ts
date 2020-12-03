@@ -7,7 +7,7 @@ export interface PluginsServerConfig {
     CELERY_DEFAULT_QUEUE: string
     DATABASE_URL: string // Postgres database URL
     KAFKA_HOSTS: string // comma-delimited Kafka hosts
-    EE_ENABLED: boolean // whether EE features, such as Kafka + ClickHouse, are enabled
+    EE_ENABLED: boolean // whether EE features Kafka + ClickHouse are enabled
     PLUGINS_CELERY_QUEUE: string
     REDIS_URL: string
     BASE_DIR: string

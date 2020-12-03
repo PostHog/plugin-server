@@ -25,11 +25,13 @@
     "repository": "https://github.com/PostHog/posthog-plugin-server",
     "license": "MIT",
     "dependencies": {
+        "@types/luxon": "^1.25.0",
         "adm-zip": "^0.4.16",
         "fastify": "^3.8.0",
         "fastify-kafka": "^0.3.0",
         "fastify-postgres": "^3.3.0",
         "ioredis": "^4.19.2",
+        "luxon": "^1.25.0",
         "node-fetch": "^2.6.1",
         "node-rdkafka": "^2.9.1",
         "node-schedule": "^1.3.2",

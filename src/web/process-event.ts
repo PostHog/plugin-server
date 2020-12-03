@@ -1,4 +1,5 @@
 import { Message } from 'node-rdkafka'
+import { DateTime, Duration } from 'luxon'
 import { UUIDT } from './utils'
 
 export type Data = Record<string, any>
@@ -22,8 +23,8 @@ export function processEventFromKafka(message: Message, commit: () => void): voi
         event.site_url,
         event.data,
         event.team_id,
-        new Date(event.now),
-        event.sent_at ? new Date(event.sent_at) : null
+        DateTime.fromISO(event.now),
+        event.sent_at ? DateTime.fromISO(event.sent_at) : null
     )
     commit()
 }
@@ -34,8 +35,8 @@ function processEventEE(
     site_url: string,
     data: Data,
     team_id: number,
-    now: Date,
-    sent_at: Date | null
+    now: DateTime,
+    sent_at: DateTime | null
 ): void {
     const properties: Record<string, any> = data.properties ?? {}
     if (data['$set']) {
@@ -61,23 +62,23 @@ function processEventEE(
     }
 }
 
-function handle_timestamp(data: Data, now: Date, sent_at: Date | null): Date {
-    if (data['timestamp']) {
+function handle_timestamp(data: Data, now: DateTime, sent_at: DateTime | null): DateTime {
+    if (data["timestamp"]) {
         if (sent_at) {
             // sent_at - timestamp == now - x
             // x = now + (timestamp - sent_at)
             try {
                 // timestamp and sent_at must both be in the same format: either both with or both without timezones
                 // otherwise we can't get a diff to add to now
-                return now + (new Date(data['timestamp']) - sent_at)
-            } catch (e) {
-                capture_exception(e)
+                return now.plus(DateTime.fromISO(data["timestamp"]).diff(sent_at))
+            } catch (error) {
+                console.error(error)
             }
         }
-        return new Date(data['timestamp'])
+        return DateTime.fromISO(data["timestamp"])
     }
-    if (!data['offset']) {
-        return now - relativedelta((microseconds = data['offset'] * 1000))
+    if (!data["offset"]) {
+        return now.minus(Duration.fromMillis(data["offset"]))
     }
     return now
 }
