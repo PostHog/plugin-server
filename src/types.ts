@@ -90,3 +90,34 @@ export interface PluginConfigVMReponse {
         processEvent: (event: PluginEvent) => Promise<PluginEvent>
     }
 }
+
+export interface EventUsage {
+    event: string
+    usage_count: number
+    volume: number
+}
+
+export interface PropertyUsage {
+    key: string
+    usage_count: number
+    volume: number
+}
+
+export interface Team {
+    id: number
+    name: string
+    anonymize_ips: boolean
+    api_token: string
+    app_urls: string[]
+    completed_snippet_onboarding: boolean
+    event_names: string[]
+    event_properties: string[]
+    event_properties_numerical: string[]
+    event_names_with_usage: EventUsage[]
+    event_properties_with_usage: PropertyUsage[]
+    opt_out_capture: boolean
+    slack_incoming_webhook: string
+    session_recording_opt_in: boolean
+    plugins_opt_in: boolean
+    ingested_event: boolean
+}

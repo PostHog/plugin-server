@@ -1,32 +1,36 @@
-import { fastify, FastifyInstance, FastifyPluginAsync, FastifyPluginCallback } from 'fastify'
+import { fastify, FastifyInstance, FastifyPluginAsync } from 'fastify'
 import { fastifyPostgres } from 'fastify-postgres'
 import fastifyKafka from 'fastify-kafka'
-import { PluginsServerConfig } from 'types'
+import { PluginsServer } from 'types'
 import { KAFKA_EVENTS_WAL } from './topics'
 import { EventEmitter } from 'events'
-import { processEventFromKafka } from './process-event'
+import { EventsProcessor } from './process-event'
 
 export const fastifyInstance = fastify()
 
-export function buildFastifyInstance({ DATABASE_URL, EE_ENABLED, KAFKA_HOSTS }: PluginsServerConfig): FastifyInstance {
+export function buildFastifyInstance(pluginsServer: PluginsServer): FastifyInstance {
     fastifyInstance.register(fastifyPostgres, {
-        connectionString: DATABASE_URL,
+        connectionString: pluginsServer.DATABASE_URL,
     })
-    if (EE_ENABLED) {
+    if (pluginsServer.EE_ENABLED) {
         fastifyInstance.register(fastifyKafka as FastifyPluginAsync<fastifyKafka.FastifyKafkaOptions>, {
             producer: {
                 dr_cb: true,
-                'metadata.broker.list': KAFKA_HOSTS,
+                'metadata.broker.list': pluginsServer.KAFKA_HOSTS,
             },
             consumer: {
-                'metadata.broker.list': KAFKA_HOSTS,
+                'metadata.broker.list': pluginsServer.KAFKA_HOSTS,
             },
             consumerTopicConf: {
                 'auto.offset.reset': 'earliest',
             },
         })
         fastifyInstance.kafka.subscribe([KAFKA_EVENTS_WAL])
-        ;((fastifyInstance.kafka as unknown) as EventEmitter).on(KAFKA_EVENTS_WAL, processEventFromKafka)
+        const eventsProcessor = new EventsProcessor(pluginsServer)
+        ;((fastifyInstance.kafka as unknown) as EventEmitter).on(
+            KAFKA_EVENTS_WAL,
+            eventsProcessor.processEventFromKafka
+        )
     }
     return fastifyInstance
 }
@@ -36,11 +40,11 @@ export async function stopFastifyInstance(fastifyInstance: FastifyInstance): Pro
     console.info(`🛑 Web server cleaned up!`)
 }
 
-export async function startFastifyInstance(config: PluginsServerConfig): Promise<FastifyInstance> {
+export async function startFastifyInstance(pluginsServer: PluginsServer): Promise<FastifyInstance> {
     console.info(`👾 Starting web server…`)
-    const fastifyInstance = buildFastifyInstance(config)
+    const fastifyInstance = buildFastifyInstance(pluginsServer)
     try {
-        const address = await fastifyInstance.listen(config.WEB_PORT ?? 3008, config.WEB_HOSTNAME)
+        const address = await fastifyInstance.listen(pluginsServer.WEB_PORT ?? 3008, pluginsServer.WEB_HOSTNAME)
         console.info(`✅ Web server listening on ${address}!`)
     } catch (e) {
         console.error(`🛑 Web server could not start! ${e}`)

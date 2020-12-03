@@ -72,7 +72,7 @@ export async function startPluginsServer(config: PluginsServerConfig): Promise<v
         await setupPlugins(server)
 
         if (!serverConfig.DISABLE_WEB) {
-            fastifyInstance = await startFastifyInstance(serverConfig)
+            fastifyInstance = await startFastifyInstance(server)
         }
 
         worker = startWorker(server)
