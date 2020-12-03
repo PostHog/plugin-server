@@ -3,11 +3,12 @@ import * as schedule from 'node-schedule'
 import Redis from 'ioredis'
 import { FastifyInstance } from 'fastify'
 import { PluginsServer, PluginsServerConfig } from './types'
-import { version } from '../package.json'
 import { setupPlugins } from './plugins'
 import { startWorker } from './worker'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { piscina } from './server/piscina'
+
+const { version } = require('../package.json')
 
 export const defaultConfig: PluginsServerConfig = {
     CELERY_DEFAULT_QUEUE: 'celery',
