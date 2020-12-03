@@ -1,6 +1,6 @@
 import { Pool } from 'pg'
 import * as schedule from 'node-schedule'
-import * as Redis from 'ioredis'
+import Redis from 'ioredis'
 import { FastifyInstance } from 'fastify'
 import { PluginsServer, PluginsServerConfig } from './types'
 import { version } from '../package.json'
