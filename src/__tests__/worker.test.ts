@@ -12,6 +12,8 @@ function advanceOneTick() {
 let mockServer: PluginsServer
 
 beforeEach(() => {
+    // silence logs
+    console.info = jest.fn()
     mockServer = {
         ...defaultConfig,
         db: new Pool(),

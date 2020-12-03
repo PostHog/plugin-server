@@ -178,11 +178,11 @@ export default class Worker extends Base {
     public async stop(): Promise<void> {
         const taskCount = this.activeTasks.size
         if (taskCount > 0) {
-            console.log(`In progress: ${taskCount} tasks. Waiting for them to finish.`)
+            console.info(`In progress: ${taskCount} tasks. Waiting for them to finish.`)
             await this.whenCurrentJobsFinished()
-            console.log(`Finished. Shutting down celery worker.`)
+            console.info(`Finished. Shutting down celery worker.`)
         } else {
-            console.log(`No tasks in progress, shutting down celery worker`)
+            console.info(`No tasks in progress, shutting down celery worker`)
         }
 
         await this.disconnect()
