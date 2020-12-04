@@ -7,8 +7,8 @@ import { version } from '../package.json'
 import { setupPlugins } from './plugins'
 import { startWorker } from './worker'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
-import { Worker } from 'celery/worker'
-import { EventsProcessor } from 'ingestion/process-event'
+import { Worker } from './celery/worker'
+import { EventsProcessor } from './ingestion/process-event'
 
 export const defaultConfig: PluginsServerConfig = {
     CELERY_DEFAULT_QUEUE: 'celery',
@@ -39,6 +39,7 @@ export async function startPluginsServer(config: PluginsServerConfig): Promise<v
 
     async function closeJobs() {
         eventsProcessor?.kafkaConsumer.disconnect()
+        eventsProcessor?.kafkaProducerStream.destroy()
         if (fastifyInstance) {
             await stopFastifyInstance(fastifyInstance!)
         }

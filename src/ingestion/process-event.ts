@@ -1,16 +1,32 @@
-import { KafkaConsumer } from 'node-rdkafka'
+import { KafkaConsumer, Producer, ProducerStream } from 'node-rdkafka'
 import { DateTime, Duration } from 'luxon'
-import { UUID, UUIDT } from './utils'
+import { loadSync } from 'protobufjs'
 import { PluginsServer, Data, Properties, Element, Team, Event, Person } from 'types'
-import { KAFKA_EVENTS_WAL } from './topics'
+import { UUID, UUIDT } from './utils'
+import { KAFKA_EVENTS, KAFKA_EVENTS_WAL } from './topics'
+import { elements_to_string } from './element'
+import { join } from 'path'
+
+const root = loadSync(join(__dirname, 'idl/events.proto'))
+const EventProto = root.lookupType('Event')
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
     kafkaConsumer: KafkaConsumer
+    kafkaProducerStream: ProducerStream
 
     constructor(pluginsServer: PluginsServer) {
         this.pluginsServer = pluginsServer
         this.kafkaConsumer = this.buildKafkaConsumer()
+        this.kafkaProducerStream = Producer.createWriteStream(
+            {
+                'metadata.broker.list': pluginsServer.KAFKA_HOSTS,
+            },
+            {},
+            {
+                topic: KAFKA_EVENTS,
+            }
+        )
     }
 
     buildKafkaConsumer(): KafkaConsumer {
@@ -64,7 +80,7 @@ export class EventsProcessor {
         team_id: number,
         now: DateTime,
         sent_at: DateTime | null
-    ): void {
+    ): Promise<void> {
         const properties: Properties = data.properties ?? {}
         if (data['$set']) {
             properties['$set'] = data['$set']
@@ -205,8 +221,8 @@ export class EventsProcessor {
         distinct_id: string,
         properties: Properties,
         timestamp: DateTime,
-        sent_at: DateTime
-    ): void {
+        sent_at: DateTime | null
+    ): Promise<void> {
         const elements: Record<string, any>[] | undefined = properties['$elements']
         let elements_list: Element[] = []
         if (elements && elements.length) {
@@ -255,7 +271,7 @@ export class EventsProcessor {
                     rows: Person[]
                 } = await this.pluginsServer.db.query(
                     'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6)',
-                    [sent_at.toISO(), {}, team_id, null, false, person_uuid.toString()]
+                    [sent_at ? sent_at.toISO() : DateTime.utc(), {}, team_id, null, false, person_uuid.toString()]
                 )
                 await this.pluginsServer.db.query(
                     'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3)',
@@ -264,15 +280,7 @@ export class EventsProcessor {
             } catch {}
         }
 
-        this.create_event(
-            event_uuid,
-            event,
-            team,
-            distinct_id,
-            properties,
-            timestamp,
-            elements_list,
-        )
+        this.create_event(event_uuid, event, team, distinct_id, properties, timestamp, elements_list)
     }
 
     create_event(
@@ -283,28 +291,28 @@ export class EventsProcessor {
         properties?: Properties,
         timestamp?: DateTime | string,
         elements?: Element[]
-    ): void {
-        timestamp ??= DateTime.utc()
-    
+    ): string {
+        if (!timestamp) timestamp = DateTime.utc()
+
         // ClickHouse specific formatting
         timestamp = typeof timestamp === 'string' ? DateTime.fromISO(timestamp) : timestamp.toUTC()
-    
-        let elements_chain = elements && elements.length ? elements_to_string(elements=elements) : ''
-    
-        pb_event = events_pb2.Event()
-        pb_event.uuid = str(event_uuid)
-        pb_event.event = event
-        pb_event.properties = json.dumps(properties ?? {})
-        pb_event.timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S.%f")
-        pb_event.team_id = team.pk
-        pb_event.distinct_id = str(distinct_id)
-        pb_event.elements_chain = elements_chain
-        pb_event.created_at = timestamp.strftime("%Y-%m-%d %H:%M:%S.%f")
-    
-        p = ClickhouseProducer()
-    
-        p.produce_proto(sql=INSERT_EVENT_SQL, topic=KAFKA_EVENTS, data=pb_event)
-    
-        return str(event_uuid)
+
+        const elements_chain = elements && elements.length ? elements_to_string(elements) : ''
+        const eventUuidString = event_uuid.toString()
+
+        const message = EventProto.create({
+            uuid: eventUuidString,
+            event,
+            properties: JSON.stringify(properties ?? {}),
+            timestamp: timestamp.toFormat('yyyy-MM-dd HH:mm:ss.u'),
+            team_id: team.id,
+            distinct_id,
+            elements_chain,
+            created_at: timestamp.toFormat('yyyy-MM-dd HH:mm:ss.u'),
+        })
+
+        this.kafkaProducerStream.write(EventProto.encode(message).finish())
+
+        return eventUuidString
     }
 }
