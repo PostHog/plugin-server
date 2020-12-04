@@ -14,6 +14,8 @@ export interface PluginsServerConfig {
     DISABLE_WEB: boolean
     WEB_PORT: number
     WEB_HOSTNAME: string
+
+    __jestMock?: any
 }
 
 export interface PluginsServer extends PluginsServerConfig {
