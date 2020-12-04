@@ -1,6 +1,6 @@
 import { Plugin, PluginAttachmentDB, PluginConfig, PluginError, PluginsServer } from './types'
 
-// This nice "mocking" system is used since we want to mock data in forked worker threads
+// This nice "mocking" system is used since we want to mock data in worker threads.
 // Jest mocks don't penetrate that far. Improvements welcome.
 function areWeTestingWithJest() {
     return process.env.JEST_WORKER_ID !== undefined
