@@ -2,6 +2,7 @@ import { Pool } from 'pg'
 import { Redis } from 'ioredis'
 import { PluginEvent, PluginAttachment, PluginConfigSchema } from 'posthog-plugins'
 import { VM, VMScript } from 'vm2'
+import { DateTime } from 'luxon'
 
 export interface PluginsServerConfig {
     CELERY_DEFAULT_QUEUE: string
@@ -13,8 +14,8 @@ export interface PluginsServerConfig {
     BASE_DIR: string
     PLUGINS_RELOAD_PUBSUB_CHANNEL: string
     DISABLE_WEB: boolean
-    WEB_PORT?: number
-    WEB_HOSTNAME?: string
+    WEB_PORT: number
+    WEB_HOSTNAME: string
 }
 
 export interface PluginsServer extends PluginsServerConfig {
@@ -120,4 +121,41 @@ export interface Team {
     session_recording_opt_in: boolean
     plugins_opt_in: boolean
     ingested_event: boolean
+}
+
+export type Data = Record<string, any>
+export type Properties = Record<string, any>
+
+export interface Event {
+    id: number
+    distinct_id: string
+    ip: string
+    site_url: string
+    data: Data
+    team_id: number
+    now: string
+    sent_at: string
+}
+
+export interface Element {
+    text: string
+    tag_name: string
+    href: string
+    attr_class: string[]
+    attr_id: string
+    nth_child: number
+    nth_of_type: number
+    attributes: Record<string, string>
+}
+
+export type User = Record<string, any> // not really typed as not needed so far
+
+export interface Person {
+    id: number
+    created_at: DateTime
+    team: Team
+    properties: Properties
+    is_user: User
+    is_identified: boolean
+    uuid: string
 }
