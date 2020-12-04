@@ -21,7 +21,9 @@ export const defaultConfig: PluginsServerConfig = {
     WEB_HOSTNAME: '0.0.0.0',
 }
 
-export async function createServer(config: PluginsServerConfig): Promise<[PluginsServer, () => Promise<void>]> {
+export async function createServer(
+    config: Partial<PluginsServerConfig> = {}
+): Promise<[PluginsServer, () => Promise<void>]> {
     const serverConfig: PluginsServerConfig = {
         ...defaultConfig,
         ...config,
