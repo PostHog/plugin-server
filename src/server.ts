@@ -6,8 +6,8 @@ import { PluginsServer, PluginsServerConfig } from './types'
 import { startQueue } from './worker/queue'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { version } from '../package.json'
-import { makePiscina } from './worker/piscina'
 import { PluginEvent } from 'posthog-plugins'
+import Piscina from 'piscina'
 
 export const defaultConfig: PluginsServerConfig = {
     CELERY_DEFAULT_QUEUE: 'celery',
@@ -19,6 +19,7 @@ export const defaultConfig: PluginsServerConfig = {
     DISABLE_WEB: false,
     WEB_PORT: 3008,
     WEB_HOSTNAME: '0.0.0.0',
+    WORKER_CONCURRENCY: 0, // use all cores
 }
 
 export async function createServer(
@@ -54,7 +55,10 @@ export async function createServer(
     return [server, closeServer]
 }
 
-export async function startPluginsServer(config: PluginsServerConfig): Promise<void> {
+export async function startPluginsServer(
+    config: PluginsServerConfig,
+    makePiscina: (config: PluginsServerConfig) => Piscina
+): Promise<void> {
     console.info(`⚡ Starting posthog-plugin-server v${version}…`)
 
     const [server, closeServer] = await createServer(config)

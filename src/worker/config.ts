@@ -21,5 +21,15 @@ interface Options {
 }
 
 export function createConfig(serverConfig: PluginsServerConfig, filename: string): Options {
-    return { filename, workerData: { serverConfig } }
+    const config: Options = {
+        filename,
+        workerData: { serverConfig },
+    }
+
+    if (serverConfig.WORKER_CONCURRENCY && serverConfig.WORKER_CONCURRENCY > 0) {
+        config.minThreads = serverConfig.WORKER_CONCURRENCY
+        config.maxThreads = serverConfig.WORKER_CONCURRENCY
+    }
+
+    return config
 }
