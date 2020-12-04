@@ -62,7 +62,7 @@ function setupPiscina(workers: number) {
 test('piscina 2-24 workers', async () => {
     const cpuCount = os.cpus().length
 
-    const workers = [1, 2, 4, 8, 16, 24, 32, 48, 64].filter((cores) => cores <= cpuCount)
+    const workers = [1, 2, 4, 8, 12, 16, 24, 32, 48, 64].filter((cores) => cores <= cpuCount)
     const events = 10000
     const rounds = 5
 
