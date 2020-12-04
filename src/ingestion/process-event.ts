@@ -1,9 +1,9 @@
 import { KafkaConsumer, Producer, ProducerStream } from 'node-rdkafka'
-import { DateTime, Duration } from 'luxon'
+import { DateTime, DateTimeOptions, Duration } from 'luxon'
 import { loadSync } from 'protobufjs'
 import { PluginsServer, Data, Properties, Element, Team, Event, Person } from 'types'
-import { UUID, UUIDT } from './utils'
-import { KAFKA_EVENTS, KAFKA_EVENTS_WAL } from './topics'
+import { castTimestampOrNow, UUID, UUIDT } from './utils'
+import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { elements_to_string } from './element'
 import { join } from 'path'
 
@@ -13,18 +13,28 @@ const EventProto = root.lookupType('Event')
 export class EventsProcessor {
     pluginsServer: PluginsServer
     kafkaConsumer: KafkaConsumer
-    kafkaProducerStream: ProducerStream
+    kafkaProducerStreamEvent: ProducerStream
+    kafkaProducerStreamSessionRecording: ProducerStream
 
     constructor(pluginsServer: PluginsServer) {
         this.pluginsServer = pluginsServer
         this.kafkaConsumer = this.buildKafkaConsumer()
-        this.kafkaProducerStream = Producer.createWriteStream(
+        this.kafkaProducerStreamEvent = Producer.createWriteStream(
             {
                 'metadata.broker.list': pluginsServer.KAFKA_HOSTS,
             },
             {},
             {
                 topic: KAFKA_EVENTS,
+            }
+        )
+        this.kafkaProducerStreamSessionRecording = Producer.createWriteStream(
+            {
+                'metadata.broker.list': pluginsServer.KAFKA_HOSTS,
+            },
+            {},
+            {
+                topic: KAFKA_SESSION_RECORDING_EVENTS,
             }
         )
     }
@@ -72,6 +82,12 @@ export class EventsProcessor {
         this.kafkaConsumer.connect()
     }
 
+    stop(): void {
+        this.kafkaConsumer.disconnect()
+        this.kafkaProducerStreamEvent.destroy()
+        this.kafkaProducerStreamSessionRecording.destroy()
+    }
+
     async process_event_ee(
         distinct_id: string,
         ip: string,
@@ -89,10 +105,9 @@ export class EventsProcessor {
         const person_uuid = new UUIDT()
         const event_uuid = new UUIDT()
         const ts = this.handle_timestamp(data, now, sent_at)
-        // TODO: this.handle_identify_or_alias(data['event'], properties, distinct_id, team_id)
+        this.handle_identify_or_alias(data['event'], properties, distinct_id, team_id)
 
         if (data['event'] === '$snapshot') {
-            /* TODO:
             this.create_session_recording_event(
                 event_uuid,
                 team_id,
@@ -101,7 +116,6 @@ export class EventsProcessor {
                 ts,
                 properties['$snapshot_data']
             )
-            */
         } else {
             await this._capture_ee(
                 event_uuid,
@@ -139,77 +153,27 @@ export class EventsProcessor {
         return now
     }
 
-    /*
-    function handle_identify_or_alias(event: string, properties: Properties, distinct_id: string, team_id: number): void {
-        if (event === "$create_alias") {
+    handle_identify_or_alias(event: string, properties: Properties, distinct_id: string, team_id: number): void {
+        if (event === '$create_alias') {
+            /* TODO: 
             _alias(
                 properties["alias"], distinct_id, team_id,
             )
-        } else if (event === "$identify") {
-            if (properties["$anon_distinct_id"]) {
+            */
+        } else if (event === '$identify') {
+            if (properties['$anon_distinct_id']) {
+                /* TODO:
                 _alias(
                     properties["$anon_distinct_id"], distinct_id, team_id,
                 )
+                */
             }
-            if (properties["$set"]) {
-                _update_person_properties(team_id=team_id, distinct_id=distinct_id, properties=properties["$set"])
+            if (properties['$set']) {
+                // TODO: _update_person_properties(team_id=team_id, distinct_id=distinct_id, properties=properties["$set"])
             }
-            _set_is_identified(team_id=team_id, distinct_id=distinct_id)
+            // TODO: _set_is_identified(team_id=team_id, distinct_id=distinct_id)
         }
     }
-
-    function _alias(previous_distinct_id: string, distinct_id: string, team_id: number, retry_if_failed = true): void {
-        let old_person: Person | null = null
-        let new_person: Person | null = null
-
-        try {
-            old_person = Person.objects.get(
-                team_id=team_id, persondistinctid__team_id=team_id, persondistinctid__distinct_id=previous_distinct_id
-            )
-        except Person.DoesNotExist:
-            pass
-
-        try:
-            new_person = Person.objects.get(
-                team_id=team_id, persondistinctid__team_id=team_id, persondistinctid__distinct_id=distinct_id
-            )
-        except Person.DoesNotExist:
-            pass
-
-        if old_person and not new_person:
-            try:
-                old_person.add_distinct_id(distinct_id)
-            # Catch race case when somebody already added this distinct_id between .get and .add_distinct_id
-            except IntegrityError:
-                if retry_if_failed:  # run everything again to merge the users if needed
-                    _alias(previous_distinct_id, distinct_id, team_id, False)
-            return
-
-        if not old_person and new_person:
-            try:
-                new_person.add_distinct_id(previous_distinct_id)
-            # Catch race case when somebody already added this distinct_id between .get and .add_distinct_id
-            except IntegrityError:
-                if retry_if_failed:  # run everything again to merge the users if needed
-                    _alias(previous_distinct_id, distinct_id, team_id, False)
-            return
-
-        if not old_person and not new_person:
-            try:
-                Person.objects.create(
-                    team_id=team_id, distinct_ids=[str(distinct_id), str(previous_distinct_id)],
-                )
-            # Catch race condition where in between getting and creating, another request already created this user.
-            except IntegrityError:
-                if retry_if_failed:
-                    # try once more, probably one of the two persons exists now
-                    _alias(previous_distinct_id, distinct_id, team_id, False)
-            return
-
-        if old_person and new_person and old_person != new_person:
-            new_person.merge_people([old_person])
-    }
-    */
 
     async _capture_ee(
         event_uuid: UUID,
@@ -292,11 +256,7 @@ export class EventsProcessor {
         timestamp?: DateTime | string,
         elements?: Element[]
     ): string {
-        if (!timestamp) timestamp = DateTime.utc()
-
-        // ClickHouse specific formatting
-        timestamp = typeof timestamp === 'string' ? DateTime.fromISO(timestamp) : timestamp.toUTC()
-
+        const timestampString = castTimestampOrNow(timestamp)
         const elements_chain = elements && elements.length ? elements_to_string(elements) : ''
         const eventUuidString = event_uuid.toString()
 
@@ -304,15 +264,41 @@ export class EventsProcessor {
             uuid: eventUuidString,
             event,
             properties: JSON.stringify(properties ?? {}),
-            timestamp: timestamp.toFormat('yyyy-MM-dd HH:mm:ss.u'),
+            timestamp: timestampString,
             team_id: team.id,
             distinct_id,
             elements_chain,
-            created_at: timestamp.toFormat('yyyy-MM-dd HH:mm:ss.u'),
+            created_at: timestampString,
         })
 
-        this.kafkaProducerStream.write(EventProto.encode(message).finish())
+        this.kafkaProducerStreamEvent.write(EventProto.encode(message).finish())
 
         return eventUuidString
+    }
+
+    create_session_recording_event(
+        uuid: UUID,
+        team_id: number,
+        distinct_id: string,
+        session_id: string,
+        timestamp: DateTime | string,
+        snapshot_data: Record<any, any>
+    ): string {
+        const timestampString = castTimestampOrNow(timestamp)
+        const uuidString = uuid.toString()
+
+        const data = {
+            uuid: uuidString,
+            team_id: team_id,
+            distinct_id: distinct_id,
+            session_id: session_id,
+            snapshot_data: JSON.stringify(snapshot_data),
+            timestamp: timestampString,
+            created_at: timestampString,
+        }
+
+        this.kafkaProducerStreamSessionRecording.write(Buffer.from(JSON.stringify(data)))
+
+        return uuidString
     }
 }

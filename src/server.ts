@@ -38,8 +38,7 @@ export async function startPluginsServer(config: PluginsServerConfig): Promise<v
     let job: schedule.Job | undefined
 
     async function closeJobs() {
-        eventsProcessor?.kafkaConsumer.disconnect()
-        eventsProcessor?.kafkaProducerStream.destroy()
+        eventsProcessor?.stop()
         if (fastifyInstance) {
             await stopFastifyInstance(fastifyInstance!)
         }
