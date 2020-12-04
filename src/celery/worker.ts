@@ -78,7 +78,7 @@ export class Worker extends Base {
 
         return () => {
             const result = this.broker.subscribe(queue, onMessage)
-            console.info(`✅ Celery worker subscribed to ${Object.keys(this.handlers).join(', ')}`)
+            console.info(`✅ Celery worker subscribed to ${Object.keys(this.handlers).join(', ')}!`)
             return result
         }
     }
