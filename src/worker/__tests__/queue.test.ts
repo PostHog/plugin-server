@@ -1,7 +1,5 @@
 import { startQueue } from '../queue'
-import { defaultConfig } from '../../server'
-import { Pool } from 'pg'
-import Redis from 'ioredis'
+import { createServer, defaultConfig } from '../../server'
 import { PluginsServer } from '../../types'
 import Client from '../../celery/client'
 import { runPlugins } from '../../plugins'
@@ -12,14 +10,11 @@ function advanceOneTick() {
 
 let mockServer: PluginsServer
 
-beforeEach(() => {
+beforeEach(async () => {
     // silence logs
     console.info = jest.fn()
-    mockServer = {
-        ...defaultConfig,
-        db: new Pool(),
-        redis: new Redis('redis://mockmockmock/'),
-    }
+
+    mockServer = (await createServer(defaultConfig))[0]
 })
 
 test('worker and task passing via redis', async () => {
