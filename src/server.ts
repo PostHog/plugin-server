@@ -8,6 +8,7 @@ import { setupPlugins } from './plugins'
 import { startWorker } from './worker'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { Worker } from 'celery/worker'
+import { EventsProcessor } from 'ingestion/process-event'
 
 export const defaultConfig: PluginsServerConfig = {
     CELERY_DEFAULT_QUEUE: 'celery',
@@ -19,6 +20,8 @@ export const defaultConfig: PluginsServerConfig = {
     DISABLE_WEB: false,
     WEB_PORT: 3008,
     WEB_HOSTNAME: '0.0.0.0',
+    KAFKA_HOSTS: '',
+    EE_ENABLED: false,
 }
 
 export async function startPluginsServer(config: PluginsServerConfig): Promise<void> {
@@ -29,13 +32,14 @@ export async function startPluginsServer(config: PluginsServerConfig): Promise<v
     let redis: Redis.Redis | undefined
     let pubSub: Redis.Redis | undefined
     let server: PluginsServer | undefined
+    let eventsProcessor: EventsProcessor | undefined
     let fastifyInstance: FastifyInstance | undefined
     let worker: Worker | undefined
     let job: schedule.Job | undefined
 
     async function closeJobs() {
-        console.info()
-        if (fastifyInstance && !serverConfig?.DISABLE_WEB) {
+        eventsProcessor?.kafkaConsumer.disconnect()
+        if (fastifyInstance) {
             await stopFastifyInstance(fastifyInstance!)
         }
         await worker?.stop()
@@ -70,6 +74,11 @@ export async function startPluginsServer(config: PluginsServerConfig): Promise<v
         }
 
         await setupPlugins(server)
+
+        if (serverConfig.EE_ENABLED) {
+            eventsProcessor = new EventsProcessor(server)
+            eventsProcessor.connectKafkaConsumer()
+        }
 
         if (!serverConfig.DISABLE_WEB) {
             fastifyInstance = await startFastifyInstance(server)
