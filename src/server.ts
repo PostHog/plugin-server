@@ -37,6 +37,11 @@ export async function createServer(config: PluginsServerConfig): Promise<[Plugin
         ...serverConfig,
         db,
         redis,
+
+        plugins: new Map(),
+        pluginConfigs: new Map(),
+        pluginConfigsPerTeam: new Map(),
+        defaultConfigs: [],
     }
 
     const closeServer = async () => {

@@ -16,8 +16,15 @@ export interface PluginsServerConfig {
 }
 
 export interface PluginsServer extends PluginsServerConfig {
+    // active connections to postgres and redis
     db: Pool
     redis: Redis
+
+    // currently enabled plugin status
+    plugins: Map<PluginId, Plugin>
+    pluginConfigs: Map<PluginConfigId, PluginConfig>
+    pluginConfigsPerTeam: Map<TeamId, PluginConfig[]>
+    defaultConfigs: PluginConfig[]
 }
 
 export type PluginId = number

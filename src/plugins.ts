@@ -17,11 +17,6 @@ import { getFileFromArchive } from './utils'
 import { performance } from 'perf_hooks'
 import { logTime } from './stats'
 
-const plugins = new Map<PluginId, Plugin>()
-const pluginConfigs = new Map<PluginConfigId, PluginConfig>()
-const pluginConfigsPerTeam = new Map<TeamId, PluginConfig[]>()
-let defaultConfigs: PluginConfig[] = []
-
 export async function setupPlugins(server: PluginsServer): Promise<void> {
     const { rows: pluginRows }: { rows: Plugin[] } = await server.db.query(
         "SELECT * FROM posthog_plugin WHERE id in (SELECT plugin_id FROM posthog_pluginconfig WHERE enabled='t' GROUP BY plugin_id)"
@@ -29,11 +24,11 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
     const foundPlugins = new Map<number, boolean>()
     for (const row of pluginRows) {
         foundPlugins.set(row.id, true)
-        plugins.set(row.id, row)
+        server.plugins.set(row.id, row)
     }
-    for (const [id, plugin] of plugins) {
+    for (const [id, plugin] of server.plugins) {
         if (!foundPlugins.has(id)) {
-            plugins.delete(id)
+            server.plugins.delete(id)
         }
     }
 
@@ -58,10 +53,10 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         "SELECT * FROM posthog_pluginconfig WHERE enabled='t'"
     )
     const foundPluginConfigs = new Map<number, boolean>()
-    pluginConfigsPerTeam.clear()
-    defaultConfigs = []
+    server.pluginConfigsPerTeam.clear()
+    server.defaultConfigs = []
     for (const row of pluginConfigRows) {
-        const plugin = plugins.get(row.plugin_id)
+        const plugin = server.plugins.get(row.plugin_id)
         if (!plugin) {
             continue
         }
@@ -72,32 +67,35 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
             attachments: attachmentsPerConfig.get(row.id) || {},
             vm: null,
         }
-        pluginConfigs.set(row.id, pluginConfig)
+        server.pluginConfigs.set(row.id, pluginConfig)
 
         if (!row.team_id) {
-            defaultConfigs.push(row)
+            server.defaultConfigs.push(row)
         } else {
-            let teamConfigs = pluginConfigsPerTeam.get(row.team_id)
+            let teamConfigs = server.pluginConfigsPerTeam.get(row.team_id)
             if (!teamConfigs) {
                 teamConfigs = []
-                pluginConfigsPerTeam.set(row.team_id, teamConfigs)
+                server.pluginConfigsPerTeam.set(row.team_id, teamConfigs)
             }
             teamConfigs.push(pluginConfig)
         }
     }
-    for (const [id, pluginConfig] of pluginConfigs) {
+    for (const [id, pluginConfig] of server.pluginConfigs) {
         if (!foundPluginConfigs.has(id)) {
-            pluginConfigs.delete(id)
+            server.pluginConfigs.delete(id)
         } else if (!pluginConfig.vm) {
             await loadPlugin(server, pluginConfig)
         }
     }
 
-    if (defaultConfigs.length > 0) {
-        defaultConfigs.sort((a, b) => a.order - b.order)
-        for (const teamId of Object.keys(pluginConfigsPerTeam).map((key: string) => parseInt(key))) {
-            pluginConfigsPerTeam.set(teamId, [...(pluginConfigsPerTeam.get(teamId) || []), ...defaultConfigs])
-            pluginConfigsPerTeam.get(teamId)?.sort((a, b) => a.id - b.id)
+    if (server.defaultConfigs.length > 0) {
+        server.defaultConfigs.sort((a, b) => a.order - b.order)
+        for (const teamId of Object.keys(server.pluginConfigsPerTeam).map((key: string) => parseInt(key))) {
+            server.pluginConfigsPerTeam.set(teamId, [
+                ...(server.pluginConfigsPerTeam.get(teamId) || []),
+                ...server.defaultConfigs,
+            ])
+            server.pluginConfigsPerTeam.get(teamId)?.sort((a, b) => a.id - b.id)
         }
     }
 }
@@ -183,7 +181,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
 }
 
 export async function runPlugins(server: PluginsServer, event: PluginEvent): Promise<PluginEvent | null> {
-    const pluginsToRun = pluginConfigsPerTeam.get(event.team_id) || defaultConfigs
+    const pluginsToRun = server.pluginConfigsPerTeam.get(event.team_id) || server.defaultConfigs
 
     let returnedEvent: PluginEvent | null = event
 
