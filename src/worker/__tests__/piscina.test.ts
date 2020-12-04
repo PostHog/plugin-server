@@ -2,7 +2,10 @@ import { defaultConfig } from '../../server'
 import { makePiscina } from '../piscina'
 import { PluginEvent } from 'posthog-plugins/src/types'
 import { performance } from 'perf_hooks'
+import { mockJestWithIndex } from '../../__tests__/helpers/plugins'
+import * as os from 'os'
 
+jest.mock('../../sql')
 jest.setTimeout(300000) // 300 sec timeout
 
 function processOneEvent(processEvent: (event: PluginEvent) => Promise<PluginEvent>): Promise<PluginEvent> {
@@ -10,7 +13,7 @@ function processOneEvent(processEvent: (event: PluginEvent) => Promise<PluginEve
         distinct_id: 'my_id',
         ip: '127.0.0.1',
         site_url: 'http://localhost',
-        team_id: 3,
+        team_id: 2,
         now: new Date().toISOString(),
         event: 'default event',
         properties: { key: 'value' },
@@ -39,33 +42,52 @@ async function processCountEvents(count: number, piscina: ReturnType<typeof make
         averageEventMs: ms / count,
     }
 
-    console.log(JSON.stringify(log, null, 2))
+    return log
 }
 
-test('piscina 2 workers', async () => {
-    const piscina = makePiscina({ ...defaultConfig, WORKER_CONCURRENCY: 2 })
+function setupPiscina(workers: number) {
+    return makePiscina({
+        ...defaultConfig,
+        WORKER_CONCURRENCY: workers,
+        __jestMock: mockJestWithIndex(`
+            function processEvent (event, meta) {
+                let j = 0; for(let i = 0; i < 200000; i++) { j = i };
+                event.properties = { "somewhere": "over the rainbow" }; 
+                return event
+            }
+        `),
+    })
+}
 
-    console.log('100 event warmup!')
-    await processCountEvents(100, piscina)
+test('piscina 2-24 workers', async () => {
+    const cpuCount = os.cpus().length
 
-    console.log('--- START BENCHMARKING ---')
-    for (let i = 0; i < 10; i++) {
-        await processCountEvents(10000, piscina)
+    const workers = [1, 2, 4, 8, 16, 24, 32, 48, 64].filter((cores) => cores <= cpuCount)
+    const events = 10000
+    const rounds = 5
+
+    const results: Record<number, number> = {}
+    for (const cores of workers) {
+        const piscina = setupPiscina(cores)
+
+        // warmup
+        await processCountEvents(cpuCount * 4, piscina)
+
+        // start
+        let throughput = 0
+        for (let i = 0; i < 5; i++) {
+            const { eventsPerSecond } =  await processCountEvents(10000, piscina)
+            throughput += eventsPerSecond
+        }
+        results[cores] = throughput / 5
+        await piscina.destroy()
     }
 
-    await piscina.destroy()
-})
+    console.log({ cpuCount })
+    console.log(JSON.stringify(results, null, 2))
 
-test('piscina 4 workers', async () => {
-    const piscina = makePiscina({ ...defaultConfig, WORKER_CONCURRENCY: 4 })
-
-    console.log('100 event warmup!')
-    await processCountEvents(100, piscina)
-
-    console.log('--- START BENCHMARKING ---')
-    for (let i = 0; i < 10; i++) {
-        await processCountEvents(10000, piscina)
+    // expect that adding more cores (up to cpuCount) increases throughput
+    for (let i = 1; i < workers.length; i++) {
+        expect(results[workers[i - 1]]).toBeLessThan(results[workers[i]])
     }
-
-    await piscina.destroy()
 })
