@@ -75,11 +75,11 @@ test('piscina 2-24 workers', async () => {
 
         // start
         let throughput = 0
-        for (let i = 0; i < 5; i++) {
-            const { eventsPerSecond } = await processCountEvents(10000, piscina)
+        for (let i = 0; i < rounds; i++) {
+            const { eventsPerSecond } = await processCountEvents(events, piscina)
             throughput += eventsPerSecond
         }
-        results[cores] = throughput / 5
+        results[cores] = Math.round(throughput / rounds)
         await piscina.destroy()
     }
 
