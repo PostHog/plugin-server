@@ -22,10 +22,29 @@ function processOneEvent(processEvent: (event: PluginEvent) => Promise<PluginEve
     return processEvent(defaultEvent)
 }
 
-async function processCountEvents(count: number, piscina: ReturnType<typeof makePiscina>) {
+function processOneBatch(
+    processEvents: (events: PluginEvent[]) => Promise<PluginEvent[]>,
+    batchSize: number = 10
+): Promise<PluginEvent[]> {
+    const events = [...Array(batchSize)].map(() => ({
+        distinct_id: 'my_id',
+        ip: '127.0.0.1',
+        site_url: 'http://localhost',
+        team_id: 2,
+        now: new Date().toISOString(),
+        event: 'default event',
+        properties: { key: 'value' },
+    }))
+
+    return processEvents(events)
+}
+
+async function processCountEvents(count: number, piscina: ReturnType<typeof makePiscina>, batched: false) {
     const startTime = performance.now()
     const promises = Array(count)
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
+    const processEvents = (events: PluginEvent[]) => piscina.runTask({ task: 'processEvents', args: { events } })
+
     for (let i = 0; i < count; i++) {
         promises[i] = processOneEvent(processEvent)
     }
@@ -46,6 +65,8 @@ async function processCountEvents(count: number, piscina: ReturnType<typeof make
 }
 
 function setupPiscina(workers: number) {
+    console.log(defaultConfig)
+    console.log('!!!!')
     return makePiscina({
         ...defaultConfig,
         WORKER_CONCURRENCY: workers,
