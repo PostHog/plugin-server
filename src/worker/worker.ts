@@ -2,7 +2,9 @@ import { runPlugins, setupPlugins } from '../plugins'
 import { createServer } from '../server'
 import { PluginsServerConfig } from '../types'
 
-export async function createWorker(config: PluginsServerConfig) {
+type TaskWorker = ({ task, args }: { task: string; args: any }) => Promise<any>
+
+export async function createWorker(config: PluginsServerConfig): Promise<TaskWorker> {
     const [server, closeServer] = await createServer(config)
     await setupPlugins(server)
 
@@ -13,7 +15,7 @@ export async function createWorker(config: PluginsServerConfig) {
         process.on(signal, closeJobs)
     }
 
-    return async ({ task, args }: { task: string; args: any }): Promise<any> => {
+    return async ({ task, args }) => {
         if (task === 'hello') {
             return `hello ${args[0]}!`
         }

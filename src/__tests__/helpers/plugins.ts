@@ -81,12 +81,18 @@ function createZipBuffer(name: string, { indexJs, pluginJson }: { indexJs?: stri
     return zip.toBuffer()
 }
 
-export const mockPluginWithArchive = (indexJs: string, pluginJson?: string) => ({
+export const mockPluginWithArchive = (indexJs: string, pluginJson?: string): Plugin => ({
     ...plugin60,
     archive: createZipBuffer('posthog-maxmind-plugin', { indexJs, pluginJson }),
 })
 
-export const mockJestWithIndex = (indexJs: string) => ({
+export const mockJestWithIndex = (
+    indexJs: string
+): {
+    getPluginRows: Plugin[]
+    getPluginConfigRows: PluginConfig[]
+    getPluginAttachmentRows: PluginAttachmentDB[]
+} => ({
     getPluginRows: [mockPluginWithArchive(indexJs)],
     getPluginConfigRows: [pluginConfig39],
     getPluginAttachmentRows: [pluginAttachment1],

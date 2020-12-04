@@ -15,7 +15,11 @@ export interface PluginsServerConfig {
     WEB_PORT: number
     WEB_HOSTNAME: string
 
-    __jestMock?: any
+    __jestMock?: {
+        getPluginRows: Plugin[]
+        getPluginConfigRows: PluginConfig[]
+        getPluginAttachmentRows: PluginAttachmentDB[]
+    }
 }
 
 export interface PluginsServer extends PluginsServerConfig {

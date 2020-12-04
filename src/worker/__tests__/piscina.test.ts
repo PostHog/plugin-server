@@ -76,7 +76,7 @@ test('piscina 2-24 workers', async () => {
         // start
         let throughput = 0
         for (let i = 0; i < 5; i++) {
-            const { eventsPerSecond } =  await processCountEvents(10000, piscina)
+            const { eventsPerSecond } = await processCountEvents(10000, piscina)
             throughput += eventsPerSecond
         }
         results[cores] = throughput / 5
