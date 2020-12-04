@@ -1,11 +1,13 @@
-import { KafkaConsumer, Producer, ProducerStream } from 'node-rdkafka'
-import { DateTime, DateTimeOptions, Duration } from 'luxon'
+import { KafkaConsumer, Message, Producer, ProducerStream } from 'node-rdkafka'
+import { DateTime, Duration } from 'luxon'
 import { loadSync } from 'protobufjs'
 import { PluginsServer, Data, Properties, Element, Team, Event, Person } from 'types'
 import { castTimestampOrNow, UUID, UUIDT } from './utils'
 import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { elements_to_string } from './element'
 import { join } from 'path'
+import { runPlugins } from 'plugins'
+import { PluginEvent } from 'posthog-plugins'
 
 const root = loadSync(join(__dirname, 'idl/events.proto'))
 const EventProto = root.lookupType('Event')
@@ -60,16 +62,19 @@ export class EventsProcessor {
             })
             .on('data', async (message) => {
                 // TODO: time with statsd
-                const event = JSON.parse(message.value!.toString()) as Event
-                await this.process_event_ee(
-                    event.distinct_id,
-                    event.ip,
-                    event.site_url,
-                    event.data,
-                    event.team_id,
-                    DateTime.fromISO(event.now),
-                    event.sent_at ? DateTime.fromISO(event.sent_at) : null
-                )
+                let event: Event = JSON.parse(message.value!.toString())
+                event = await runPlugins(this.pluginsServer, event)
+                if (event) {
+                    await this.process_event_ee(
+                        event.distinct_id,
+                        event.ip,
+                        event.site_url,
+                        event.data,
+                        event.team_id,
+                        DateTime.fromISO(event.now),
+                        event.sent_at ? DateTime.fromISO(event.sent_at) : null
+                    )
+                }
                 kafkaConsumer.commitMessage(message)
             })
 

@@ -127,7 +127,6 @@ export type Data = Record<string, any>
 export type Properties = Record<string, any>
 
 export interface Event {
-    id: number
     distinct_id: string
     ip: string
     site_url: string
