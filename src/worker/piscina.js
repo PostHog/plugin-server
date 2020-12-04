@@ -9,13 +9,11 @@ if (isMainThread) {
 
     if (areWeTestingWithJest()) {
         require('ts-node').register()
-        const { worker } = require('./worker.ts')
-        module.exports = worker
-    } else {
-        const { createWorker } = require('./worker')
-        const { workerData } = require('piscina')
-        module.exports = createWorker(workerData.serverConfig)
     }
+
+    const { createWorker } = require('./worker')
+    const { workerData } = require('piscina')
+    module.exports = createWorker(workerData.serverConfig)
 }
 
 function areWeTestingWithJest() {
