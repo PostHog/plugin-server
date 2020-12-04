@@ -18,7 +18,21 @@ export async function createWorker(config: PluginsServerConfig) {
             return `hello ${args[0]}!`
         }
         if (task === 'processEvent') {
-            return await runPlugins(server, args.event)
+            const processedEvent = await runPlugins(server, args.event)
+            // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
+            return cloneObject(processedEvent as Record<string, any>)
         }
     }
+}
+
+function cloneObject(obj: Record<string, any>) {
+    const clone: Record<string, any> = {}
+    for (const i in obj) {
+        if (typeof obj[i] == 'object' && obj[i] !== null) {
+            clone[i] = cloneObject(obj[i])
+        } else {
+            clone[i] = obj[i]
+        }
+    }
+    return clone
 }
