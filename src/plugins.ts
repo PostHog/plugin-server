@@ -141,7 +141,8 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
             }
         } else if (plugin.archive) {
             let config: PluginJsonConfig = {}
-            const json = await getFileFromArchive(plugin.archive, 'plugin.json')
+            const archive = Buffer.from(plugin.archive)
+            const json = await getFileFromArchive(archive, 'plugin.json')
             if (json) {
                 try {
                     config = JSON.parse(json)
@@ -151,8 +152,8 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                 }
             }
 
-            const indexJs = await getFileFromArchive(plugin.archive, config['main'] || 'index.js')
-            const libJs = await getFileFromArchive(plugin.archive, config['lib'] || 'lib.js')
+            const indexJs = await getFileFromArchive(archive, config['main'] || 'index.js')
+            const libJs = await getFileFromArchive(archive, config['lib'] || 'lib.js')
             if (libJs) {
                 console.warn(`⚠️ Using "lib.js" is deprecated! Used by: ${plugin.name} (${plugin.url})`)
             }
