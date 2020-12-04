@@ -18,9 +18,7 @@ export async function createWorker(config: PluginsServerConfig) {
             return `hello ${args[0]}!`
         }
         if (task === 'processEvent') {
-            const processedEvent = await runPlugins(server, args.event)
-            console.log('processed an event!')
-            return processedEvent
+            return await runPlugins(server, args.event)
         }
     }
 }
