@@ -1,4 +1,4 @@
-import { runPlugins, setupPlugins } from '../plugins'
+import { runPlugins, runPluginsBatch, setupPlugins } from '../plugins'
 import { createServer } from '../server'
 import { PluginsServerConfig } from '../types'
 
@@ -23,6 +23,11 @@ export async function createWorker(config: PluginsServerConfig): Promise<TaskWor
             const processedEvent = await runPlugins(server, args.event)
             // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
             return cloneObject(processedEvent as Record<string, any>)
+        }
+        if (task === 'processEvents') {
+            const processedEvents = await runPluginsBatch(server, args.events)
+            // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
+            return cloneObject(processedEvents as any[])
         }
     }
 }

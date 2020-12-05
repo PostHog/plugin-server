@@ -88,9 +88,13 @@ export function prepareForRun(
     server: PluginsServer,
     teamId: number,
     pluginConfig: PluginConfig, // might have team_id=0
-    method: 'processEvent',
+    method: 'processEvent' | 'processEvents',
     event?: PluginEvent
-): null | ((event: PluginEvent) => Promise<PluginEvent>) | (() => Promise<void>) {
+):
+    | null
+    | ((event: PluginEvent) => Promise<PluginEvent>)
+    | ((events: PluginEvent[]) => Promise<PluginEvent[]>)
+    | (() => Promise<void>) {
     if (!pluginConfig.vm?.methods[method]) {
         return null
     }
@@ -98,7 +102,8 @@ export function prepareForRun(
     const { vm } = pluginConfig.vm
 
     if (event?.properties?.token) {
-        // TODO: this should be nicer... and it's not optimised for batch processing
+        // TODO: this should be nicer... and it's not optimised for batch processing!
+        // We should further split the batches per site_url and token!
         const posthog = createInternalPostHogInstance(
             event.properties.token,
             { apiHost: event.site_url, fetch },

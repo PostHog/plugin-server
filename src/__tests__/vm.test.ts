@@ -406,7 +406,9 @@ test('prepareForRun without token', async () => {
         event: 'prepareForRun event',
         properties: {},
     }
-    const processEvent = prepareForRun(mockServer, pluginConfig.team_id, pluginConfig, 'processEvent', event)
+    const processEvent = prepareForRun(mockServer, pluginConfig.team_id, pluginConfig, 'processEvent', event) as (
+        event: PluginEvent
+    ) => Promise<PluginEvent>
 
     expect(processEvent).toBeDefined()
 
@@ -434,7 +436,9 @@ test('prepareForRun with token gets posthog', async () => {
             token: 'posthog-token',
         },
     }
-    const processEvent = prepareForRun(mockServer, pluginConfig.team_id, pluginConfig, 'processEvent', event)
+    const processEvent = prepareForRun(mockServer, pluginConfig.team_id, pluginConfig, 'processEvent', event) as (
+        event: PluginEvent
+    ) => Promise<PluginEvent>
     expect(processEvent).toBeDefined()
 
     await processEvent!(event)
@@ -461,7 +465,9 @@ test('posthog.capture', async () => {
             token: 'posthog-token',
         },
     }
-    const processEvent = prepareForRun(mockServer, pluginConfig.team_id, pluginConfig, 'processEvent', event)
+    const processEvent = prepareForRun(mockServer, pluginConfig.team_id, pluginConfig, 'processEvent', event) as (
+        event: PluginEvent
+    ) => Promise<PluginEvent>
     expect(processEvent).toBeDefined()
     await processEvent!(event)
 

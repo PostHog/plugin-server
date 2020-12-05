@@ -186,7 +186,9 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
 
     for (const pluginConfig of pluginsToRun.reverse()) {
         if (pluginConfig.vm) {
-            const processEvent = prepareForRun(server, event.team_id, pluginConfig, 'processEvent', event)
+            const processEvent = prepareForRun(server, event.team_id, pluginConfig, 'processEvent', event) as (
+                event: PluginEvent
+            ) => Promise<PluginEvent>
 
             if (processEvent) {
                 const startTime = performance.now()
@@ -208,4 +210,53 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
     }
 
     return returnedEvent
+}
+
+export async function runPluginsBatch(server: PluginsServer, events: PluginEvent[]): Promise<PluginEvent[]> {
+    const eventsByTeam = new Map<number, PluginEvent[]>()
+    // TODO: batch also by site_url and event.properties.token
+    for (const event of events) {
+        if (eventsByTeam.has(event.team_id)) {
+            eventsByTeam.get(event.team_id)!.push(event)
+        } else {
+            eventsByTeam.set(event.team_id, [event])
+        }
+    }
+
+    let allReturnedEvents: PluginEvent[] = []
+
+    for (const [teamId, teamEvents] of eventsByTeam.entries()) {
+        const pluginsToRun = server.pluginConfigsPerTeam.get(teamId) || server.defaultConfigs
+
+        let returnedEvents: PluginEvent[] = teamEvents
+
+        for (const pluginConfig of pluginsToRun.reverse()) {
+            if (pluginConfig.vm && returnedEvents.length > 0) {
+                const processEvents = prepareForRun(server, teamId, pluginConfig, 'processEvents', events[0]) as (
+                    events: PluginEvent[]
+                ) => Promise<PluginEvent[]>
+
+                if (processEvents) {
+                    const startTime = performance.now()
+                    try {
+                        returnedEvents = (await processEvents(returnedEvents)) || null
+                        const ms = Math.round((performance.now() - startTime) * 1000) / 1000
+                        logTime(pluginConfig.plugin?.name || 'noname', ms)
+                    } catch (error) {
+                        await processError(server, pluginConfig, error, returnedEvents[0])
+                        const ms = Math.round((performance.now() - startTime) * 1000) / 1000
+                        logTime(pluginConfig.plugin?.name || 'noname', ms, true)
+                    }
+                }
+
+                if (!returnedEvents) {
+                    returnedEvents = []
+                }
+            }
+        }
+
+        allReturnedEvents = allReturnedEvents.concat(returnedEvents)
+    }
+
+    return allReturnedEvents
 }
