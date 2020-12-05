@@ -101,5 +101,6 @@ export interface PluginConfigVMReponse {
     vm: VM
     methods: {
         processEvent: (event: PluginEvent) => Promise<PluginEvent>
+        processEvents: (events: PluginEvent[]) => Promise<PluginEvent[]>
     }
 }

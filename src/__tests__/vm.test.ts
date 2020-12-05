@@ -55,8 +55,9 @@ test('empty plugins', async () => {
     const vm = createPluginConfigVM(mockServer, mockConfig, indexJs, libJs)
 
     expect(Object.keys(vm).sort()).toEqual(['methods', 'vm'])
-    expect(Object.keys(vm.methods).sort()).toEqual(['processEvent'])
+    expect(Object.keys(vm.methods).sort()).toEqual(['processEvent', 'processEvents'])
     expect(vm.methods.processEvent).toEqual(undefined)
+    expect(vm.methods.processEvents).toEqual(undefined)
 })
 
 test('processEvent', async () => {
@@ -68,17 +69,61 @@ test('processEvent', async () => {
     `
     const vm = createPluginConfigVM(mockServer, mockConfig, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
+    expect(vm.methods.processEvents).not.toEqual(undefined)
 
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'original event',
     }
-
     const newEvent = await vm.methods.processEvent(event)
-
     expect(event.event).toEqual('changed event')
     expect(newEvent.event).toEqual('changed event')
     expect(newEvent).toBe(event)
+
+    const events: PluginEvent[] = [
+        {
+            ...defaultEvent,
+            event: 'original event',
+        },
+    ]
+    const newEvents = await vm.methods.processEvents(events)
+    expect(events[0].event).toEqual('changed event')
+    expect(newEvents[0].event).toEqual('changed event')
+    expect(newEvents[0]).toBe(events[0])
+})
+
+test('processEvents', async () => {
+    const indexJs = `
+        function processEvents (events, meta) {
+            return events.map(event => {
+                event.event = 'changed event'
+                return event
+            })
+        }  
+    `
+    const vm = createPluginConfigVM(mockServer, mockConfig, indexJs)
+    expect(vm.methods.processEvent).not.toEqual(undefined)
+    expect(vm.methods.processEvents).not.toEqual(undefined)
+
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'original event',
+    }
+    const newEvent = await vm.methods.processEvent(event)
+    expect(event.event).toEqual('changed event')
+    expect(newEvent.event).toEqual('changed event')
+    expect(newEvent).toBe(event)
+
+    const events: PluginEvent[] = [
+        {
+            ...defaultEvent,
+            event: 'original event',
+        },
+    ]
+    const newEvents = await vm.methods.processEvents(events)
+    expect(events[0].event).toEqual('changed event')
+    expect(newEvents[0].event).toEqual('changed event')
+    expect(newEvents[0]).toBe(events[0])
 })
 
 test('processEvent without returning', async () => {

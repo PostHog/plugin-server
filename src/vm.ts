@@ -58,9 +58,22 @@ export function createPluginConfigVM(
         // run the plugin setup script, if present
         __callWithMeta('setupPlugin');
         
+        // we have processEvent, but not processEvents
+        if (!__getExported('processEvents') && __getExported('processEvent')) {
+            function processEvents (events, meta) {
+                return events.map(event => processEvent(event, meta)).filter(e => e)
+            }
+        // we have processEvents, but not processEvent
+        } else if (!__getExported('processEvent') && __getExported('processEvents')) {
+            function processEvent (event, meta) {
+                return processEvents([event], meta)?.[0]
+            }
+        }
+        
         // export various functions
         const __methods = {
-            processEvent: __bindMeta('processEvent')
+            processEvent: __bindMeta('processEvent'),
+            processEvents: __bindMeta('processEvents')
         };
         `
     )
