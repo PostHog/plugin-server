@@ -92,6 +92,38 @@ test('processEvent', async () => {
     expect(newEvents[0]).toBe(events[0])
 })
 
+test('async processEvent', async () => {
+    const indexJs = `
+        async function processEvent (event, meta) {
+            event.event = 'changed event'
+            return event
+        }  
+    `
+    const vm = createPluginConfigVM(mockServer, mockConfig, indexJs)
+    expect(vm.methods.processEvent).not.toEqual(undefined)
+    expect(vm.methods.processEvents).not.toEqual(undefined)
+
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'original event',
+    }
+    const newEvent = await vm.methods.processEvent(event)
+    expect(event.event).toEqual('changed event')
+    expect(newEvent.event).toEqual('changed event')
+    expect(newEvent).toBe(event)
+
+    const events: PluginEvent[] = [
+        {
+            ...defaultEvent,
+            event: 'original event',
+        },
+    ]
+    const newEvents = await vm.methods.processEvents(events)
+    expect(events[0].event).toEqual('changed event')
+    expect(newEvents[0].event).toEqual('changed event')
+    expect(newEvents[0]).toBe(events[0])
+})
+
 test('processEvents', async () => {
     const indexJs = `
         function processEvents (events, meta) {
@@ -123,6 +155,78 @@ test('processEvents', async () => {
     const newEvents = await vm.methods.processEvents(events)
     expect(events[0].event).toEqual('changed event')
     expect(newEvents[0].event).toEqual('changed event')
+    expect(newEvents[0]).toBe(events[0])
+})
+
+test('async processEvents', async () => {
+    const indexJs = `
+        async function processEvents (events, meta) {
+            return events.map(event => {
+                event.event = 'changed event'
+                return event
+            })
+        }  
+    `
+    const vm = createPluginConfigVM(mockServer, mockConfig, indexJs)
+    expect(vm.methods.processEvent).not.toEqual(undefined)
+    expect(vm.methods.processEvents).not.toEqual(undefined)
+
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'original event',
+    }
+    const newEvent = await vm.methods.processEvent(event)
+    expect(event.event).toEqual('changed event')
+    expect(newEvent.event).toEqual('changed event')
+    expect(newEvent).toBe(event)
+
+    const events: PluginEvent[] = [
+        {
+            ...defaultEvent,
+            event: 'original event',
+        },
+    ]
+    const newEvents = await vm.methods.processEvents(events)
+    expect(events[0].event).toEqual('changed event')
+    expect(newEvents[0].event).toEqual('changed event')
+    expect(newEvents[0]).toBe(events[0])
+})
+
+test('processEvent && processEvents', async () => {
+    const indexJs = `
+        function processEvent (event, meta) {
+            event.event = 'changed event 1'
+            return event
+        }  
+        function processEvents (events, meta) {
+            return events.map(event => {
+                event.event = 'changed event 2'
+                return event
+            })
+        }  
+    `
+    const vm = createPluginConfigVM(mockServer, mockConfig, indexJs)
+    expect(vm.methods.processEvent).not.toEqual(undefined)
+    expect(vm.methods.processEvents).not.toEqual(undefined)
+
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'original event',
+    }
+    const newEvent = await vm.methods.processEvent(event)
+    expect(event.event).toEqual('changed event 1')
+    expect(newEvent.event).toEqual('changed event 1')
+    expect(newEvent).toBe(event)
+
+    const events: PluginEvent[] = [
+        {
+            ...defaultEvent,
+            event: 'original event',
+        },
+    ]
+    const newEvents = await vm.methods.processEvents(events)
+    expect(events[0].event).toEqual('changed event 2')
+    expect(newEvents[0].event).toEqual('changed event 2')
     expect(newEvents[0]).toBe(events[0])
 })
 

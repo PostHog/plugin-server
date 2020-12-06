@@ -60,13 +60,16 @@ export function createPluginConfigVM(
         
         // we have processEvent, but not processEvents
         if (!__getExported('processEvents') && __getExported('processEvent')) {
-            function processEvents (events, meta) {
-                return events.map(event => processEvent(event, meta)).filter(e => e)
+            exports.processEvents = async function processEvents (events, meta) {
+                const processEvent = __getExported('processEvent');
+                const pArray = events.map(async event => await processEvent(event, meta))
+                const response = await Promise.all(pArray);
+                return response.filter(r => r)
             }
         // we have processEvents, but not processEvent
         } else if (!__getExported('processEvent') && __getExported('processEvents')) {
-            function processEvent (event, meta) {
-                return processEvents([event], meta)?.[0]
+            exports.processEvent = async function processEvent (event, meta) {
+                return (await (__getExported('processEvents'))([event], meta))?.[0]
             }
         }
         
