@@ -5,6 +5,7 @@ import { VM, VMScript } from 'vm2'
 import { DateTime } from 'luxon'
 
 export interface PluginsServerConfig {
+    WORKER_CONCURRENCY: number
     CELERY_DEFAULT_QUEUE: string
     DATABASE_URL: string // Postgres database URL
     KAFKA_HOSTS: string // comma-delimited Kafka hosts
@@ -16,11 +17,24 @@ export interface PluginsServerConfig {
     DISABLE_WEB: boolean
     WEB_PORT: number
     WEB_HOSTNAME: string
+
+    __jestMock?: {
+        getPluginRows: Plugin[]
+        getPluginConfigRows: PluginConfig[]
+        getPluginAttachmentRows: PluginAttachmentDB[]
+    }
 }
 
 export interface PluginsServer extends PluginsServerConfig {
+    // active connections to postgres and redis
     db: Pool
     redis: Redis
+
+    // currently enabled plugin status
+    plugins: Map<PluginId, Plugin>
+    pluginConfigs: Map<PluginConfigId, PluginConfig>
+    pluginConfigsPerTeam: Map<TeamId, PluginConfig[]>
+    defaultConfigs: PluginConfig[]
 }
 
 export type PluginId = number
@@ -41,7 +55,7 @@ export interface Plugin {
 export interface PluginConfig {
     id: PluginConfigId
     team_id: TeamId
-    plugin: Plugin
+    plugin?: Plugin
     plugin_id: PluginId
     enabled: boolean
     order: number
@@ -74,6 +88,7 @@ export interface PluginAttachmentDB {
     plugin_config_id: PluginConfigId
     key: string
     content_type: string
+    file_size: number | null
     file_name: string
     contents: Buffer | null
 }
