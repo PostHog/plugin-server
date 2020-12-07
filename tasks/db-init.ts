@@ -3,14 +3,24 @@ import { createServer } from '../src/server'
 async function task() {
     const [server, closeServer] = await createServer()
 
+    await server.db.query(createTeam)
     await server.db.query(createPlugin)
-    await server.db.query(createPluginAttachment)
     await server.db.query(createPluginConfig)
+    await server.db.query(createPluginAttachment)
 
     await closeServer()
 }
 
 const ifNotExists = 'IF NOT EXISTS'
+
+const createTeam = `
+    CREATE TABLE ${ifNotExists} posthog_team
+    (
+        id            serial  NOT NULL
+            CONSTRAINT posthog_team_pkey
+                PRIMARY KEY
+    );
+`
 
 const createPlugin = `
     CREATE TABLE ${ifNotExists} posthog_plugin
