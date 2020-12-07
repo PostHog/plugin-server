@@ -33,7 +33,7 @@ export const defaultConfig: PluginsServerConfig = overrideWithEnv({
     WEB_HOSTNAME: '0.0.0.0',
     WORKER_CONCURRENCY: 0, // use all cores
     STATSD_PORT: 8125,
-    STATSD_PREFIX: ''
+    STATSD_PREFIX: '',
 })
 
 export async function createServer(
@@ -50,11 +50,12 @@ export async function createServer(
 
     const redis = new Redis(serverConfig.REDIS_URL)
 
-    const statsd = serverConfig.STATSD_HOST ? new StatsD({
-        port: serverConfig.STATSD_PORT,
-        host: serverConfig.STATSD_HOST,
-    }) : null
-
+    const statsd = serverConfig.STATSD_HOST
+        ? new StatsD({
+              port: serverConfig.STATSD_PORT,
+              host: serverConfig.STATSD_HOST,
+          })
+        : null
 
     const server: PluginsServer = {
         ...serverConfig,
