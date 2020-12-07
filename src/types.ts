@@ -3,13 +3,14 @@ import { Redis } from 'ioredis'
 import { PluginEvent, PluginAttachment, PluginConfigSchema } from 'posthog-plugins'
 import { VM, VMScript } from 'vm2'
 import { DateTime } from 'luxon'
+import { StatsD } from 'hot-shots'
 
 export interface PluginsServerConfig {
     WORKER_CONCURRENCY: number
     CELERY_DEFAULT_QUEUE: string
     DATABASE_URL: string // Postgres database URL
-    KAFKA_HOSTS: string // comma-delimited Kafka hosts
-    EE_ENABLED: boolean // whether EE features Kafka + ClickHouse are enabled
+    KAFKA_HOSTS?: string // comma-delimited Kafka hosts
+    EE_ENABLED?: boolean // whether EE features Kafka + ClickHouse are enabled
     PLUGINS_CELERY_QUEUE: string
     REDIS_URL: string
     BASE_DIR: string
@@ -17,6 +18,9 @@ export interface PluginsServerConfig {
     DISABLE_WEB: boolean
     WEB_PORT: number
     WEB_HOSTNAME: string
+    STATSD_HOST?: string
+    STATSD_PORT: number
+    STATSD_PREFIX: string
 
     __jestMock?: {
         getPluginRows: Plugin[]
@@ -29,7 +33,7 @@ export interface PluginsServer extends PluginsServerConfig {
     // active connections to postgres and redis
     db: Pool
     redis: Redis
-
+    statsd: StatsD | null
     // currently enabled plugin status
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>

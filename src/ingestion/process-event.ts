@@ -1,7 +1,7 @@
 import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from 'node-rdkafka'
 import { DateTime, DateTimeOptions, Duration } from 'luxon'
 import { loadSync } from 'protobufjs'
-import { PluginsServer, Data, Properties, Element, Team, Event, Person } from 'types'
+import { PluginsServer, Data, Properties, Element, Team, Person } from 'types'
 import { castTimestampOrNow, UUID, UUIDT } from './utils'
 import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { elements_to_string } from './element'
@@ -56,7 +56,7 @@ export class EventsProcessor {
                 throw error // TODO: handle errors in a smarter way
             }
             for (const message of messages) {
-                // TODO: time with statsd
+                const timer = new Date()
                 let event: PluginEvent | null = JSON.parse(message.value!.toString()) as PluginEvent
                 event = await runPlugins(this.pluginsServer, event)
                 if (event) {
@@ -70,6 +70,7 @@ export class EventsProcessor {
                         event.sent_at ? DateTime.fromISO(event.sent_at) : null
                     )
                 }
+                this.pluginsServer.statsd?.timing(`${this.pluginsServer.STATSD_PREFIX}_posthog_cloud`, timer)
             }
             kafkaConsumer.commit()
         }

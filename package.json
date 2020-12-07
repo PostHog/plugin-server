@@ -29,6 +29,7 @@
         "@types/luxon": "^1.25.0",
         "adm-zip": "^0.4.16",
         "fastify": "^3.8.0",
+        "hot-shots": "^8.2.1",
         "ioredis": "^4.19.2",
         "luxon": "^1.25.0",
         "node-fetch": "^2.6.1",

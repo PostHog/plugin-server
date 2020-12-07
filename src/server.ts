@@ -9,6 +9,7 @@ import { Worker } from 'celery/worker'
 import { version } from '../package.json'
 import { PluginEvent } from 'posthog-plugins'
 import Piscina from 'piscina'
+import { StatsD } from 'hot-shots'
 
 function overrideWithEnv(config: PluginsServerConfig): PluginsServerConfig {
     const newConfig: Record<string, any> = { ...config }
@@ -31,6 +32,8 @@ export const defaultConfig: PluginsServerConfig = overrideWithEnv({
     WEB_PORT: 3008,
     WEB_HOSTNAME: '0.0.0.0',
     WORKER_CONCURRENCY: 0, // use all cores
+    STATSD_PORT: 8125,
+    STATSD_PREFIX: ''
 })
 
 export async function createServer(
@@ -47,11 +50,17 @@ export async function createServer(
 
     const redis = new Redis(serverConfig.REDIS_URL)
 
+    const statsd = serverConfig.STATSD_HOST ? new StatsD({
+        port: serverConfig.STATSD_PORT,
+        host: serverConfig.STATSD_HOST,
+    }) : null
+
+
     const server: PluginsServer = {
         ...serverConfig,
         db,
         redis,
-
+        statsd,
         plugins: new Map(),
         pluginConfigs: new Map(),
         pluginConfigsPerTeam: new Map(),
