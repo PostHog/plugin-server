@@ -10,79 +10,79 @@ async function task() {
     await closeServer()
 }
 
-const ifNotExists = 'if not exists'
+const ifNotExists = 'IF NOT EXISTS'
 
 const createPlugin = `
-    create table ${ifNotExists} posthog_plugin
+    CREATE TABLE ${ifNotExists} posthog_plugin
     (
-        id            serial  not null
-            constraint posthog_plugin_pkey
-                primary key,
+        id            serial  NOT NULL
+            CONSTRAINT posthog_plugin_pkey
+                PRIMARY KEY,
         name          varchar(200),
         description   text,
         url           varchar(800),
-        config_schema jsonb   not null,
+        config_schema jsonb   NOT NULL,
         tag           varchar(200),
         archive       bytea,
-        from_json     boolean not null,
-        from_web      boolean not null,
+        from_json     boolean NOT NULL,
+        from_web      boolean NOT NULL,
         error         jsonb
     );
 `
 
 const createPluginAttachment = `
-    create table ${ifNotExists} posthog_pluginattachment
+    CREATE TABLE ${ifNotExists} posthog_pluginattachment
     (
-        id               serial       not null
-            constraint posthog_pluginattachment_pkey
-                primary key,
-        key              varchar(200) not null,
-        content_type     varchar(200) not null,
-        file_name        varchar(200) not null,
-        file_size        integer      not null,
-        contents         bytea        not null,
-        plugin_config_id integer      not null
-            constraint posthog_pluginattach_plugin_config_id_cc94a1b9_fk_posthog_p
-                references posthog_pluginconfig
-                deferrable initially deferred,
+        id               serial       NOT NULL
+            CONSTRAINT posthog_pluginattachment_pkey
+                PRIMARY KEY,
+        key              varchar(200) NOT NULL,
+        content_type     varchar(200) NOT NULL,
+        file_name        varchar(200) NOT NULL,
+        file_size        integer      NOT NULL,
+        contents         bytea        NOT NULL,
+        plugin_config_id integer      NOT NULL
+            CONSTRAINT posthog_pluginattach_plugin_config_id_cc94a1b9_fk_posthog_p
+                REFERENCES posthog_pluginconfig
+                DEFERRABLE INITIALLY DEFERRED,
         team_id          integer
-            constraint posthog_pluginattachment_team_id_415eacc7_fk_posthog_team_id
-                references posthog_team
-                deferrable initially deferred
+            CONSTRAINT posthog_pluginattachment_team_id_415eacc7_fk_posthog_team_id
+                REFERENCES posthog_team
+                DEFERRABLE INITIALLY DEFERRED
     );
     
-    create index ${ifNotExists} posthog_pluginattachment_plugin_config_id_cc94a1b9
-        on posthog_pluginattachment (plugin_config_id);
+    CREATE INDEX ${ifNotExists} posthog_pluginattachment_plugin_config_id_cc94a1b9
+        ON posthog_pluginattachment (plugin_config_id);
     
-    create index ${ifNotExists} posthog_pluginattachment_team_id_415eacc7
-        on posthog_pluginattachment (team_id);
+    CREATE INDEX ${ifNotExists} posthog_pluginattachment_team_id_415eacc7
+        ON posthog_pluginattachment (team_id);
 `
 
 const createPluginConfig = `
-    create table ${ifNotExists} posthog_pluginconfig
+    CREATE TABLE ${ifNotExists} posthog_pluginconfig
     (
-        id        serial  not null
-            constraint posthog_pluginconfig_pkey
-                primary key,
+        id        serial  NOT NULL
+            CONSTRAINT posthog_pluginconfig_pkey
+                PRIMARY KEY,
         team_id   integer
-            constraint posthog_pluginconfig_team_id_71185766_fk_posthog_team_id
-                references posthog_team
-                deferrable initially deferred,
-        plugin_id integer not null
-            constraint posthog_pluginconfig_plugin_id_d014ca1c_fk_posthog_plugin_id
-                references posthog_plugin
-                deferrable initially deferred,
-        enabled   boolean not null,
+            CONSTRAINT posthog_pluginconfig_team_id_71185766_fk_posthog_team_id
+                REFERENCES posthog_team
+                DEFERRABLE INITIALLY DEFERRED,
+        plugin_id integer NOT NULL
+            CONSTRAINT posthog_pluginconfig_plugin_id_d014ca1c_fk_posthog_plugin_id
+                REFERENCES posthog_plugin
+                DEFERRABLE INITIALLY DEFERRED,
+        enabled   boolean NOT NULL,
         "order"   integer,
-        config    jsonb   not null,
+        config    jsonb   NOT NULL,
         error     jsonb
     );
     
-    create index ${ifNotExists} posthog_pluginconfig_team_id_71185766
-        on posthog_pluginconfig (team_id);
+    CREATE INDEX ${ifNotExists} posthog_pluginconfig_team_id_71185766
+        ON posthog_pluginconfig (team_id);
     
-    create index ${ifNotExists} posthog_pluginconfig_plugin_id_d014ca1c
-        on posthog_pluginconfig (plugin_id);
+    CREATE INDEX ${ifNotExists} posthog_pluginconfig_plugin_id_d014ca1c
+        ON posthog_pluginconfig (plugin_id);
 `
 
 task()
