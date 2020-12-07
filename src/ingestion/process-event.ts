@@ -1,5 +1,5 @@
-import { KafkaConsumer, Message, Producer, ProducerStream } from 'node-rdkafka'
-import { DateTime, Duration } from 'luxon'
+import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from 'node-rdkafka'
+import { DateTime, DateTimeOptions, Duration } from 'luxon'
 import { loadSync } from 'protobufjs'
 import { PluginsServer, Data, Properties, Element, Team, Event, Person } from 'types'
 import { castTimestampOrNow, UUID, UUIDT } from './utils'
@@ -51,32 +51,34 @@ export class EventsProcessor {
             }
         )
 
+        const processBatch = async (error: LibrdKafkaError, messages: Message[]): Promise<void> => {
+            if (error) {
+                throw error // TODO: handle errors in a smarter way
+            }
+            for (const message of messages) {
+                // TODO: time with statsd
+                let event: PluginEvent | null = JSON.parse(message.value!.toString()) as PluginEvent
+                event = await runPlugins(this.pluginsServer, event)
+                if (event) {
+                    await this.process_event_ee(
+                        event.distinct_id,
+                        event.ip,
+                        event.site_url,
+                        event,
+                        event.team_id,
+                        DateTime.fromISO(event.now),
+                        event.sent_at ? DateTime.fromISO(event.sent_at) : null
+                    )
+                }
+            }
+            kafkaConsumer.commit()
+        }
+
         kafkaConsumer
             .on('ready', () => {
                 kafkaConsumer.subscribe([KAFKA_EVENTS_WAL])
                 // consume event messages in batches of 100
-                kafkaConsumer.consume(100, async (error, messages) => {
-                    if (error) {
-                        throw error // TODO: handle errors in a smarter way
-                    }
-                    for (const message of messages) {
-                        // TODO: time with statsd
-                        let event: PluginEvent | null = JSON.parse(message.value!.toString()) as PluginEvent
-                        event = await runPlugins(this.pluginsServer, event)
-                        if (event) {
-                            await this.process_event_ee(
-                                event.distinct_id,
-                                event.ip,
-                                event.site_url,
-                                event,
-                                event.team_id,
-                                DateTime.fromISO(event.now),
-                                event.sent_at ? DateTime.fromISO(event.sent_at) : null
-                            )
-                        }
-                    }
-                    kafkaConsumer.commit()
-                }) // consume in batches of 100
+                kafkaConsumer.consume(100, processBatch)
                 console.info(`✅ Kafka consumer ready and subscribed to topic ${KAFKA_EVENTS_WAL}!`)
             })
             .on('disconnected', () => {
