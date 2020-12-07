@@ -146,8 +146,9 @@ export function isLooselyFalsy(value: any): boolean {
     return Array.isArray(value) ? !value.length : !value || !Object.keys(value).length
 }
 
-function castTimestampOrNow(timestamp?: DateTime | string | null): string {
-    if (!timestamp) timestamp = DateTime.utc()
+export function castTimestampOrNow(timestamp?: DateTime | string | null): string {
+    if (!timestamp)
+        timestamp = DateTime.utc()
 
     // ClickHouse specific formatting
     timestamp = typeof timestamp === 'string' ? DateTime.fromISO(timestamp) : timestamp.toUTC()
