@@ -78,10 +78,9 @@ export async function startPluginsServer(
     let pubSub: Redis.Redis | undefined
     let server: PluginsServer | undefined
     let fastifyInstance: FastifyInstance | undefined
-    let worker: Worker | undefined
     let job: schedule.Job | undefined
     let piscina: Piscina | undefined
-    let stopQueue: () => Promise<void> | undefined
+    let queue: Worker | undefined
     let closeServer: () => Promise<void> | undefined
 
     async function closeJobs() {
@@ -89,13 +88,11 @@ export async function startPluginsServer(
         if (fastifyInstance && !serverConfig?.DISABLE_WEB) {
             await stopFastifyInstance(fastifyInstance!)
         }
-        await worker?.stop()
-
+        await queue?.stop()
         pubSub?.disconnect()
         if (job) {
             schedule.cancelJob(job)
         }
-        await stopQueue()
         await piscina?.destroy()
         await closeServer()
     }
@@ -118,18 +115,18 @@ export async function startPluginsServer(
             fastifyInstance = await startFastifyInstance(server.WEB_PORT, server.WEB_HOSTNAME)
         }
 
-        stopQueue = startQueue(server, processEvent)
+        queue = startQueue(server, processEvent)
 
         pubSub = new Redis(server.REDIS_URL)
         pubSub.subscribe(server.PLUGINS_RELOAD_PUBSUB_CHANNEL)
         pubSub.on('message', async (channel, message) => {
             if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
                 console.log('Reloading plugins! NOT IMPLEMENTED FOR MULTITHREADING!')
-                await stopQueue()
+                await queue?.stop()
                 await piscina?.destroy()
 
                 piscina = makePiscina(config)
-                stopQueue = startQueue(server!, processEvent)
+                queue = startQueue(server!, processEvent)
             }
         })
 
