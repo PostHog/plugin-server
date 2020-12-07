@@ -67,7 +67,7 @@ function createZipBuffer(name: string, { indexJs, pluginJson }: { indexJs?: stri
     } else {
         zip.addFile(
             'testplugin/plugin.json',
-            new Buffer(
+            Buffer.from(
                 JSON.stringify({
                     name,
                     description: 'just for testing',
