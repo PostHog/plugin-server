@@ -3,7 +3,17 @@ const { isMainThread } = require('worker_threads')
 if (isMainThread) {
     const Piscina = require('piscina')
     const { createConfig } = require('./config')
-    module.exports = { makePiscina: (serverConfig) => new Piscina(createConfig(serverConfig, __filename)) }
+    module.exports = {
+        makePiscina: (serverConfig) => {
+            const piscina = new Piscina(createConfig(serverConfig, __filename))
+            piscina.on('error', (error) => {
+                console.error('🔴 Piscina Worker Error! Sending SIGTERM!')
+                console.error(error)
+                process.kill(process.pid, 'SIGTERM')
+            })
+            return piscina
+        },
+    }
 } else {
     console.log('🧵 Starting Piscina Worker Thread')
 

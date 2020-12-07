@@ -7,7 +7,7 @@ import Client from '../celery/client'
 export function startQueue(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
-): () => Promise<void> {
+): Worker {
     const worker = new Worker(server.redis, server.PLUGINS_CELERY_QUEUE)
     const client = new Client(server.redis, server.CELERY_DEFAULT_QUEUE)
 
@@ -41,5 +41,5 @@ export function startQueue(
 
     worker.start()
 
-    return async () => worker.stop()
+    return worker
 }

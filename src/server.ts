@@ -17,7 +17,7 @@ function overrideWithEnv(config: PluginsServerConfig): PluginsServerConfig {
             newConfig[key] = process.env[key]
         }
     }
-    return config
+    return newConfig as PluginsServerConfig
 }
 
 export const defaultConfig: PluginsServerConfig = overrideWithEnv({
@@ -73,29 +73,30 @@ export async function startPluginsServer(
     console.info(`⚡ posthog-plugin-server v${version}`)
 
     let serverConfig: PluginsServerConfig | undefined
-    let db: Pool | undefined
-    let redis: Redis.Redis | undefined
     let pubSub: Redis.Redis | undefined
     let server: PluginsServer | undefined
     let fastifyInstance: FastifyInstance | undefined
-    let worker: Worker | undefined
     let job: schedule.Job | undefined
     let piscina: Piscina | undefined
-    let stopQueue: () => Promise<void> | undefined
+    let queue: Worker | undefined
     let closeServer: () => Promise<void> | undefined
 
+    let shuttingDown = false
+
     async function closeJobs() {
+        if (shuttingDown) {
+            return
+        }
+        shuttingDown = true
         console.info()
         if (fastifyInstance && !serverConfig?.DISABLE_WEB) {
             await stopFastifyInstance(fastifyInstance!)
         }
-        await worker?.stop()
-
+        await queue?.stop()
         pubSub?.disconnect()
         if (job) {
             schedule.cancelJob(job)
         }
-        await stopQueue()
         await piscina?.destroy()
         await closeServer()
     }
@@ -118,18 +119,18 @@ export async function startPluginsServer(
             fastifyInstance = await startFastifyInstance(server.WEB_PORT, server.WEB_HOSTNAME)
         }
 
-        stopQueue = startQueue(server, processEvent)
+        queue = startQueue(server, processEvent)
 
         pubSub = new Redis(server.REDIS_URL)
         pubSub.subscribe(server.PLUGINS_RELOAD_PUBSUB_CHANNEL)
         pubSub.on('message', async (channel, message) => {
             if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
-                console.log('Reloading plugins! NOT IMPLEMENTED FOR MULTITHREADING!')
-                await stopQueue()
+                console.log('⚡ Reloading plugins!')
+                await queue?.stop()
                 await piscina?.destroy()
 
                 piscina = makePiscina(config)
-                stopQueue = startQueue(server!, processEvent)
+                queue = startQueue(server!, processEvent)
             }
         })
 
