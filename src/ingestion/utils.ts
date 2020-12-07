@@ -123,7 +123,7 @@ export class UUIDT extends UUID {
         const array = new Uint8Array(16)
         // 48 bits for time, WILL FAIL in 10 895 CE
         // XXXXXXXX-XXXX-****-****-************
-        // TODO: why the hell are the two leftmost octets (four hexadecimal chars) always zero?
+        // TODO: why the hell are the two leftmost octets (first four hexadecimal chars) always zero?
         for (let i = 5; i >= 0; i--) {
             array[i] = unixTimeMs & 0xff // use last 8 binary digits to set UUID 2 hexadecimal digits
             unixTimeMs >>>= 8 // remove these last 8 binary digits
@@ -147,8 +147,9 @@ export function isLooselyFalsy(value: any): boolean {
 }
 
 export function castTimestampOrNow(timestamp?: DateTime | string | null): string {
-    if (!timestamp)
+    if (!timestamp) {
         timestamp = DateTime.utc()
+    }
 
     // ClickHouse specific formatting
     timestamp = typeof timestamp === 'string' ? DateTime.fromISO(timestamp) : timestamp.toUTC()
