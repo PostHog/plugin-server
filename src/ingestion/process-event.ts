@@ -54,28 +54,33 @@ export class EventsProcessor {
         kafkaConsumer
             .on('ready', () => {
                 kafkaConsumer.subscribe([KAFKA_EVENTS_WAL])
-                kafkaConsumer.consume()
+                // consume event messages in batches of 100
+                kafkaConsumer.consume(100, async (error, messages) => {
+                    if (error) {
+                        throw error // TODO: handle errors in a smarter way
+                    }
+                    for (const message of messages) {
+                        // TODO: time with statsd
+                        let event: PluginEvent | null = JSON.parse(message.value!.toString()) as PluginEvent
+                        event = await runPlugins(this.pluginsServer, event)
+                        if (event) {
+                            await this.process_event_ee(
+                                event.distinct_id,
+                                event.ip,
+                                event.site_url,
+                                event,
+                                event.team_id,
+                                DateTime.fromISO(event.now),
+                                event.sent_at ? DateTime.fromISO(event.sent_at) : null
+                            )
+                        }
+                    }
+                    kafkaConsumer.commit()
+                }) // consume in batches of 100
                 console.info(`✅ Kafka consumer ready and subscribed to topic ${KAFKA_EVENTS_WAL}!`)
             })
             .on('disconnected', () => {
                 console.info(`🛑 Kafka consumer disconnected!`)
-            })
-            .on('data', async (message) => {
-                // TODO: time with statsd
-                let event: Event = JSON.parse(message.value!.toString())
-                event = await runPlugins(this.pluginsServer, event)
-                if (event) {
-                    await this.process_event_ee(
-                        event.distinct_id,
-                        event.ip,
-                        event.site_url,
-                        event.data,
-                        event.team_id,
-                        DateTime.fromISO(event.now),
-                        event.sent_at ? DateTime.fromISO(event.sent_at) : null
-                    )
-                }
-                kafkaConsumer.commitMessage(message)
             })
 
         return kafkaConsumer

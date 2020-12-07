@@ -141,16 +141,6 @@ export interface Team {
 export type Data = Record<string, any>
 export type Properties = Record<string, any>
 
-export interface Event {
-    distinct_id: string
-    ip: string
-    site_url: string
-    data: Data
-    team_id: number
-    now: string
-    sent_at: string
-}
-
 export interface Element {
     text: string
     tag_name: string
