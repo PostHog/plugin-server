@@ -27,13 +27,13 @@ yargs
             if (typeof webHostname !== 'undefined') {
                 parsedConfig['WEB_HOSTNAME'] = webHostname
             }
-            if (typeof webHostname !== 'undefined') {
+            if (typeof webPort !== 'undefined') {
                 parsedConfig['WEB_PORT'] = webPort
             }
-            if (typeof webHostname !== 'undefined') {
+            if (typeof disableWeb !== 'undefined') {
                 parsedConfig['DISABLE_WEB'] = disableWeb
             }
-            if (typeof webHostname !== 'undefined') {
+            if (typeof concurrency !== 'undefined') {
                 parsedConfig['WORKER_CONCURRENCY'] = concurrency
             }
             startPluginsServer(parsedConfig, makePiscina)
