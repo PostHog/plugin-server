@@ -59,7 +59,7 @@ test('worker and task passing via redis', async () => {
     expect(args2).toEqual(args)
     expect(kwargs2).toEqual({})
 
-    const stopQueue = startQueue(mockServer, (event) => runPlugins(mockServer, event))
+    const queue = startQueue(mockServer, (event) => runPlugins(mockServer, event))
     await advanceOneTick()
     await advanceOneTick()
 
@@ -84,7 +84,7 @@ test('worker and task passing via redis', async () => {
     const queue5 = await mockServer.redis.get(mockServer.CELERY_DEFAULT_QUEUE)
     await advanceOneTick()
 
-    await stopQueue()
+    await queue.stop()
 })
 
 test('process multiple tasks', async () => {
@@ -117,7 +117,7 @@ test('process multiple tasks', async () => {
     expect((await mockServer.redis.get(mockServer.PLUGINS_CELERY_QUEUE))!.length).toBe(3)
     expect(await mockServer.redis.get(mockServer.CELERY_DEFAULT_QUEUE)).toBe(null)
 
-    const stopQueue = startQueue(mockServer, (event) => runPlugins(mockServer, event))
+    const queue = startQueue(mockServer, (event) => runPlugins(mockServer, event))
     await advanceOneTick()
 
     expect((await mockServer.redis.get(mockServer.PLUGINS_CELERY_QUEUE))!.length).toBe(2)
@@ -142,5 +142,5 @@ test('process multiple tasks', async () => {
 
     expect(defaultQueue.map((q) => JSON.parse(q)['headers']['lang']).join('-o-')).toBe('js-o-js-o-js')
 
-    await stopQueue()
+    await queue.stop()
 })
