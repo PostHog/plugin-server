@@ -17,12 +17,12 @@ function overrideWithEnv(config: PluginsServerConfig): PluginsServerConfig {
             newConfig[key] = process.env[key]
         }
     }
-    return config
+    return newConfig as PluginsServerConfig
 }
 
 export const defaultConfig: PluginsServerConfig = overrideWithEnv({
     CELERY_DEFAULT_QUEUE: 'celery',
-    DATABASE_URL: 'postgres://kkjkj:kkhkhkj@localhost:5432/posthog',
+    DATABASE_URL: 'postgres://localhost:5432/posthog',
     PLUGINS_CELERY_QUEUE: 'posthog-plugins',
     REDIS_URL: 'redis://localhost/',
     BASE_DIR: '.',
