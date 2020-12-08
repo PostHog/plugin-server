@@ -101,9 +101,12 @@ export function setLogLevel(logLevel: LogLevel): void {
         if (loopLevel === logLevel) {
             break
         }
-        const originalFunction = (console as any)[loopLevel]._original || (console as any)[loopLevel]
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        ;(console as any)[loopLevel] = () => {}
-        ;(console as any)[loopLevel]._original = originalFunction
+        const logFunction = (console as any)[loopLevel]
+        if (logFunction) {
+            const originalFunction = logFunction._original || logFunction
+            // eslint-disable-next-line @typescript-eslint/no-empty-function
+            ;(console as any)[loopLevel] = () => {}
+            ;(console as any)[loopLevel]._original = originalFunction
+        }
     }
 }
