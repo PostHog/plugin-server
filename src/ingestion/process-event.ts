@@ -1,13 +1,14 @@
 import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from 'node-rdkafka'
 import { DateTime, DateTimeOptions, Duration } from 'luxon'
 import { loadSync } from 'protobufjs'
-import { PluginsServer, Data, Properties, Element, Team, Person } from 'types'
+import { PluginsServer, Data, Properties, Element, Team, Person, PersonDistinctId, CohortPeople } from 'types'
 import { castTimestampOrNow, UUID, UUIDT } from './utils'
 import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { elements_to_string } from './element'
 import { join } from 'path'
 import { runPlugins } from 'plugins'
 import { PluginEvent } from 'posthog-plugins'
+import { exception } from 'console'
 
 const root = loadSync(join(__dirname, 'idl/events.proto'))
 const EventProto = root.lookupType('Event')
@@ -168,23 +169,132 @@ export class EventsProcessor {
 
     handle_identify_or_alias(event: string, properties: Properties, distinct_id: string, team_id: number): void {
         if (event === '$create_alias') {
-            /* TODO: 
-            _alias(
-                properties["alias"], distinct_id, team_id,
-            )
-            */
+            this._alias(properties['alias'], distinct_id, team_id)
         } else if (event === '$identify') {
             if (properties['$anon_distinct_id']) {
-                /* TODO:
-                _alias(
-                    properties["$anon_distinct_id"], distinct_id, team_id,
-                )
-                */
+                this._alias(properties['$anon_distinct_id'], distinct_id, team_id)
             }
             if (properties['$set']) {
                 // TODO: _update_person_properties(team_id=team_id, distinct_id=distinct_id, properties=properties["$set"])
             }
             // TODO: _set_is_identified(team_id=team_id, distinct_id=distinct_id)
+        }
+    }
+
+    async _alias(
+        previous_distinct_id: string,
+        distinct_id: string,
+        team_id: number,
+        retry_if_failed = true
+    ): Promise<void> {
+        const old_person: Person | undefined = (
+            await this.pluginsServer.db.query(
+                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                [team_id, previous_distinct_id]
+            )
+        ).rows[0]
+
+        const new_person: Person | undefined = (
+            await this.pluginsServer.db.query(
+                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                [team_id, distinct_id]
+            )
+        ).rows[0]
+
+        if (old_person && !new_person) {
+            try {
+                this.add_distinct_id(old_person, distinct_id)
+                // Catch race case when somebody already added this distinct_id between .get and .add_distinct_id
+            } catch {
+                // integrity error
+                if (retry_if_failed) {
+                    // run everything again to merge the users if needed
+                    this._alias(previous_distinct_id, distinct_id, team_id, false)
+                }
+            }
+            return
+        }
+
+        if (!old_person && new_person) {
+            try {
+                this.add_distinct_id(new_person, previous_distinct_id)
+                // Catch race case when somebody already added this distinct_id between .get and .add_distinct_id
+            } catch {
+                // integrity error
+                if (retry_if_failed) {
+                    // run everything again to merge the users if needed
+                    this._alias(previous_distinct_id, distinct_id, team_id, false)
+                }
+            }
+            return
+        }
+
+        if (!old_person && !new_person) {
+            try {
+                const personCreated = await this.create_person(DateTime.utc(), {}, team_id, null, false, new UUIDT())
+                this.add_distinct_id(personCreated, distinct_id)
+                this.add_distinct_id(personCreated, previous_distinct_id)
+                // Catch race condition where in between getting and creating, another request already created this user.
+            } catch {
+                // integrity error
+                if (retry_if_failed) {
+                    // try once more, probably one of the two persons exists now
+                    this._alias(previous_distinct_id, distinct_id, team_id, false)
+                }
+            }
+            return
+        }
+
+        if (old_person && new_person && old_person.id !== new_person.id) {
+            this.merge_people(new_person, [old_person])
+        }
+    }
+
+    async merge_people(merge_into: Person, people_to_merge: Person[]): Promise<void> {
+        let first_seen = merge_into.created_at
+
+        // merge the properties
+        for (const other_person of people_to_merge) {
+            merge_into.properties = { ...other_person.properties, ...merge_into.properties }
+            if (other_person.created_at < first_seen) {
+                // Keep the oldest created_at (i.e. the first time we've seen this person)
+                first_seen = other_person.created_at
+            }
+        }
+
+        await this.pluginsServer.db.query('UPDATE posthog_person SET created_at = $1 WHERE id = $2', [
+            first_seen.toISO(),
+            merge_into.id,
+        ])
+
+        // merge the distinct_ids
+        for (const other_person of people_to_merge) {
+            const other_person_distinct_ids: PersonDistinctId[] = (
+                await this.pluginsServer.db.query(
+                    'SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2',
+                    [other_person, merge_into.team_id]
+                )
+            ).rows
+            for (const person_distinct_id of other_person_distinct_ids) {
+                await this.pluginsServer.db.query('UPDATE posthog_persondistinctid SET person_id = $1 WHERE id = $2', [
+                    merge_into.id,
+                    person_distinct_id.id,
+                ])
+            }
+
+            const other_person_cohort_ids: CohortPeople[] = (
+                await this.pluginsServer.db.query('SELECT * FROM posthog_cohortpeople WHERE person_id = $1', [
+                    other_person.id,
+                ])
+            ).rows
+            for (const person_cohort_id of other_person_cohort_ids) {
+                await this.pluginsServer.db.query('UPDATE posthog_cohortpeople SET person_id = $1 WHERE id = $2', [
+                    merge_into.id,
+                    person_cohort_id.id,
+                ])
+            }
+
+            await this.pluginsServer.db.query('DELETE FROM posthog_person WHERE id = $1', [other_person.id])
         }
     }
 
@@ -242,22 +352,42 @@ export class EventsProcessor {
         if (!pdiCount) {
             // Catch race condition where in between getting and creating, another request already created this user
             try {
-                const {
-                    rows: [personCreated],
-                }: {
-                    rows: Person[]
-                } = await this.pluginsServer.db.query(
-                    'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6)',
-                    [sent_at ? sent_at.toISO() : DateTime.utc(), {}, team_id, null, false, person_uuid.toString()]
+                const personCreated: Person = await this.create_person(
+                    sent_at || DateTime.utc(),
+                    {},
+                    team_id,
+                    null,
+                    false,
+                    person_uuid.toString()
                 )
-                await this.pluginsServer.db.query(
-                    'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3)',
-                    [distinct_id, personCreated.id, team_id]
-                )
+                await this.add_distinct_id(personCreated, distinct_id)
             } catch {}
         }
 
         this.create_event(event_uuid, event, team, distinct_id, properties, timestamp, elements_list)
+    }
+
+    async create_person(
+        created_at: DateTime,
+        properties: Properties,
+        team_id: number,
+        is_user_id: number | null,
+        is_identified: boolean,
+        uuid: UUID | string
+    ): Promise<Person> {
+        return (
+            await this.pluginsServer.db.query(
+                'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6)',
+                [created_at.toISO(), properties, team_id, is_user_id, is_identified, uuid.toString()]
+            )
+        ).rows[0]
+    }
+
+    async add_distinct_id(person: Person, distinct_id: string): Promise<void> {
+        await this.pluginsServer.db.query(
+            'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3)',
+            [distinct_id, person.id, person.team_id]
+        )
     }
 
     create_event(

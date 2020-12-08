@@ -161,9 +161,22 @@ export type User = Record<string, any> // not really typed as not needed so far
 export interface Person {
     id: number
     created_at: DateTime
-    team: Team
+    team_id: number
     properties: Properties
     is_user: User
     is_identified: boolean
     uuid: string
+}
+
+export interface PersonDistinctId {
+    id: number
+    team_id: number
+    person_id: number
+    distinct_id: string
+}
+
+export interface CohortPeople {
+    id: number
+    cohort_id: number
+    person_id: number
 }
