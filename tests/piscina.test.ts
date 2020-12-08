@@ -8,7 +8,10 @@ import * as os from 'os'
 jest.mock('../src/sql')
 jest.setTimeout(300000) // 300 sec timeout
 
-function processOneEvent(processEvent: (event: PluginEvent) => Promise<PluginEvent>, index: number): Promise<PluginEvent> {
+function processOneEvent(
+    processEvent: (event: PluginEvent) => Promise<PluginEvent>,
+    index: number
+): Promise<PluginEvent> {
     const defaultEvent = {
         distinct_id: 'my_id',
         ip: '127.0.0.1',
