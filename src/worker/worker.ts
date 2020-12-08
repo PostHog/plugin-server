@@ -29,8 +29,8 @@ export async function createWorker(config: PluginsServerConfig): Promise<TaskWor
             // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
             return cloneObject(processedEvent as Record<string, any>)
         }
-        if (task === 'processEvents') {
-            const processedEvents = await runPluginsOnBatch(server, args.events)
+        if (task === 'processEventBatch') {
+            const processedEvents = await runPluginsOnBatch(server, args.batch)
             // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
             return cloneObject(processedEvents as any[])
         }

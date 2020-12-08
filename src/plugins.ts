@@ -206,10 +206,10 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
     return returnedEvent
 }
 
-export async function runPluginsOnBatch(server: PluginsServer, events: PluginEvent[]): Promise<PluginEvent[]> {
+export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEvent[]): Promise<PluginEvent[]> {
     const eventsByTeam = new Map<number, PluginEvent[]>()
 
-    for (const event of events) {
+    for (const event of batch) {
         if (eventsByTeam.has(event.team_id)) {
             eventsByTeam.get(event.team_id)!.push(event)
         } else {
@@ -225,12 +225,12 @@ export async function runPluginsOnBatch(server: PluginsServer, events: PluginEve
         let returnedEvents: PluginEvent[] = teamEvents
 
         for (const pluginConfig of pluginsToRun.reverse()) {
-            if (pluginConfig.vm?.methods?.processEvents && returnedEvents.length > 0) {
-                const { processEvents } = pluginConfig.vm.methods
+            if (pluginConfig.vm?.methods?.processEventBatch && returnedEvents.length > 0) {
+                const { processEventBatch } = pluginConfig.vm.methods
                 const startTime = performance.now()
                 let errored = false
                 try {
-                    returnedEvents = (await processEvents(returnedEvents)) || []
+                    returnedEvents = (await processEventBatch(returnedEvents)) || []
                 } catch (error) {
                     errored = true
                     await processError(server, pluginConfig, error, returnedEvents[0])

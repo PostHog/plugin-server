@@ -65,25 +65,25 @@ export function createPluginConfigVM(
         // run the plugin setup script, if present
         __callWithMeta('setupPlugin');
         
-        // we have processEvent, but not processEvents
-        if (!__getExported('processEvents') && __getExported('processEvent')) {
-            exports.processEvents = async function processEvents (events, meta) {
+        // we have processEvent, but not processEventBatch
+        if (!__getExported('processEventBatch') && __getExported('processEvent')) {
+            exports.processEventBatch = async function processEventBatch (events, meta) {
                 const processEvent = __getExported('processEvent');
                 const pArray = events.map(async event => await processEvent(event, meta))
                 const response = await Promise.all(pArray);
                 return response.filter(r => r)
             }
-        // we have processEvents, but not processEvent
-        } else if (!__getExported('processEvent') && __getExported('processEvents')) {
+        // we have processEventBatch, but not processEvent
+        } else if (!__getExported('processEvent') && __getExported('processEventBatch')) {
             exports.processEvent = async function processEvent (event, meta) {
-                return (await (__getExported('processEvents'))([event], meta))?.[0]
+                return (await (__getExported('processEventBatch'))([event], meta))?.[0]
             }
         }
         
         // export various functions
         const __methods = {
             processEvent: __bindMeta('processEvent'),
-            processEvents: __bindMeta('processEvents')
+            processEventBatch: __bindMeta('processEventBatch')
         };
         `
     )

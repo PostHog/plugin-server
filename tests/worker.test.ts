@@ -27,7 +27,7 @@ function processOneEvent(
 }
 
 function processOneBatch(
-    processEvents: (events: PluginEvent[]) => Promise<PluginEvent[]>,
+    processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>,
     batchSize: number,
     batchIndex: number
 ): Promise<PluginEvent[]> {
@@ -41,21 +41,21 @@ function processOneBatch(
         properties: { key: 'value', batchIndex, indexInBatch: i },
     }))
 
-    return processEvents(events)
+    return processEventBatch(events)
 }
 
 async function processCountEvents(piscina: ReturnType<typeof makePiscina>, count: number, batchSize = 1) {
     const maxPromises = 1000
     const promises = Array(maxPromises)
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
-    const processEvents = (events: PluginEvent[]) => piscina.runTask({ task: 'processEvents', args: { events } })
+    const processEventBatch = (batch: PluginEvent[]) => piscina.runTask({ task: 'processEventBatch', args: { batch } })
 
     const groups = Math.ceil(count / maxPromises)
     for (let j = 0; j < groups; j++) {
         const groupCount = groups === 1 ? count : j === groups - 1 ? count % maxPromises : maxPromises
         for (let i = 0; i < groupCount; i++) {
             promises[i] =
-                batchSize === 1 ? processOneEvent(processEvent, i) : processOneBatch(processEvents, batchSize, i)
+                batchSize === 1 ? processOneEvent(processEvent, i) : processOneBatch(processEventBatch, batchSize, i)
         }
         await Promise.all(promises)
     }
