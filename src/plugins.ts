@@ -185,17 +185,17 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
 
     for (const pluginConfig of pluginsToRun.reverse()) {
         if (pluginConfig.vm?.methods?.processEvent) {
+            let errored = false
             const { processEvent } = pluginConfig.vm.methods
             const startTime = performance.now()
             try {
                 returnedEvent = (await processEvent(returnedEvent)) || null
-                const ms = Math.round((performance.now() - startTime) * 1000) / 1000
-                logTime(pluginConfig.plugin?.name || 'noname', ms)
             } catch (error) {
+                errored = true
                 await processError(server, pluginConfig, error, returnedEvent)
-                const ms = Math.round((performance.now() - startTime) * 1000) / 1000
-                logTime(pluginConfig.plugin?.name || 'noname', ms, true)
             }
+            const ms = Math.round((performance.now() - startTime) * 1000) / 1000
+            logTime(pluginConfig.plugin?.name || 'noname', ms, errored)
 
             if (!returnedEvent) {
                 return null
@@ -228,15 +228,15 @@ export async function runPluginsOnBatch(server: PluginsServer, events: PluginEve
             if (pluginConfig.vm?.methods?.processEvents && returnedEvents.length > 0) {
                 const { processEvents } = pluginConfig.vm.methods
                 const startTime = performance.now()
+                let errored = false
                 try {
                     returnedEvents = (await processEvents(returnedEvents)) || []
-                    const ms = Math.round((performance.now() - startTime) * 1000) / 1000
-                    logTime(pluginConfig.plugin?.name || 'noname', ms)
                 } catch (error) {
+                    errored = true
                     await processError(server, pluginConfig, error, returnedEvents[0])
-                    const ms = Math.round((performance.now() - startTime) * 1000) / 1000
-                    logTime(pluginConfig.plugin?.name || 'noname', ms, true)
                 }
+                const ms = Math.round((performance.now() - startTime) * 1000) / 1000
+                logTime(pluginConfig.plugin?.name || 'noname', ms, errored)
             }
         }
 
