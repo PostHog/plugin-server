@@ -67,10 +67,17 @@ export function createPluginConfigVM(
         
         // we have processEvent, but not processEventBatch
         if (!__getExported('processEventBatch') && __getExported('processEvent')) {
-            exports.processEventBatch = async function processEventBatch (events, meta) {
+            exports.processEventBatch = async function processEventBatch (batch, meta) {
                 const processEvent = __getExported('processEvent');
-                const pArray = events.map(async event => await processEvent(event, meta))
-                const response = await Promise.all(pArray);
+                let waitFor = false
+                const processedEvents = batch.map(event => {
+                    const e = processEvent(event, meta)
+                    if (e && typeof e.then !== 'undefined') {
+                        waitFor = true
+                    }
+                    return e
+                })
+                const response = waitFor ? (await Promise.all(processedEvents)) : processedEvents;
                 return response.filter(r => r)
             }
         // we have processEventBatch, but not processEvent
