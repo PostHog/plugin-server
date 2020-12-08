@@ -1,5 +1,5 @@
 import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from 'node-rdkafka'
-import { DateTime, DateTimeOptions, Duration } from 'luxon'
+import { DateTime, Duration } from 'luxon'
 import { loadSync } from 'protobufjs'
 import { PluginsServer, Data, Properties, Element, Team, Person, PersonDistinctId, CohortPeople } from 'types'
 import { castTimestampOrNow, UUID, UUIDT } from './utils'
@@ -8,7 +8,6 @@ import { elements_to_string } from './element'
 import { join } from 'path'
 import { runPlugins } from 'plugins'
 import { PluginEvent } from 'posthog-plugins'
-import { exception } from 'console'
 
 const root = loadSync(join(__dirname, 'idl/events.proto'))
 const EventProto = root.lookupType('Event')
@@ -167,17 +166,88 @@ export class EventsProcessor {
         return now
     }
 
-    handle_identify_or_alias(event: string, properties: Properties, distinct_id: string, team_id: number): void {
+    async handle_identify_or_alias(
+        event: string,
+        properties: Properties,
+        distinct_id: string,
+        team_id: number
+    ): Promise<void> {
         if (event === '$create_alias') {
-            this._alias(properties['alias'], distinct_id, team_id)
+            await this._alias(properties['alias'], distinct_id, team_id)
         } else if (event === '$identify') {
             if (properties['$anon_distinct_id']) {
-                this._alias(properties['$anon_distinct_id'], distinct_id, team_id)
+                await this._alias(properties['$anon_distinct_id'], distinct_id, team_id)
             }
             if (properties['$set']) {
-                // TODO: _update_person_properties(team_id=team_id, distinct_id=distinct_id, properties=properties["$set"])
+                this._update_person_properties(team_id, distinct_id, properties['$set'])
             }
-            // TODO: _set_is_identified(team_id=team_id, distinct_id=distinct_id)
+            this._set_is_identified(team_id, distinct_id)
+        }
+    }
+
+    async _set_is_identified(team_id: number, distinct_id: string, is_identified = true): Promise<void> {
+        let personFound: Person | undefined
+        personFound = (
+            await this.pluginsServer.db.query(
+                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                [team_id, distinct_id]
+            )
+        ).rows[0]
+        if (!personFound) {
+            try {
+                const personCreated = await this.create_person(DateTime.utc(), {}, team_id, null, true, new UUIDT())
+                this.add_distinct_id(personCreated, distinct_id)
+                // Catch race condition where in between getting and creating, another request already created this person
+            } catch {
+                personFound = (
+                    await this.pluginsServer.db.query(
+                        'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                        [team_id, distinct_id]
+                    )
+                ).rows[0]
+            }
+        }
+        if (personFound && !personFound.is_identified) {
+            await this.pluginsServer.db.query('UPDATE posthog_person SET is_identified = 1 WHERE id = $1', [
+                personFound.id,
+            ])
+        }
+    }
+
+    async _update_person_properties(team_id: number, distinct_id: string, properties: Properties): Promise<void> {
+        let personFound: Person | undefined
+        personFound = (
+            await this.pluginsServer.db.query(
+                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                [team_id, distinct_id]
+            )
+        ).rows[0]
+        if (!personFound) {
+            try {
+                const personCreated = await this.create_person(
+                    DateTime.utc(),
+                    properties,
+                    team_id,
+                    null,
+                    false,
+                    new UUIDT()
+                )
+                await this.add_distinct_id(personCreated, distinct_id)
+                // Catch race condition where in between getting and creating, another request already created this person
+            } catch {
+                personFound = (
+                    await this.pluginsServer.db.query(
+                        'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                        [team_id, distinct_id]
+                    )
+                ).rows[0]
+            }
+        }
+        if (personFound) {
+            this.pluginsServer.db.query('UPDATE posthog_person SET properties = $1 WHERE id = $2', [
+                { ...personFound.properties, ...properties },
+                personFound.id,
+            ])
         }
     }
 
@@ -338,7 +408,7 @@ export class EventsProcessor {
             properties['$ip'] = ip
         }
 
-        // TODO: store_names_and_properties(team=team, event=event, properties=properties)
+        this.store_names_and_properties(team, event, properties)
 
         const {
             rows: [{ pdiCount }],
@@ -365,6 +435,47 @@ export class EventsProcessor {
         }
 
         this.create_event(event_uuid, event, team, distinct_id, properties, timestamp, elements_list)
+    }
+
+    async store_names_and_properties(team: Team, event: string, properties: Properties): Promise<void> {
+        // In _capture we only prefetch a couple of fields in Team to avoid fetching too much data
+        let save = false
+        if (!team.ingested_event) {
+            // First event for the team captured
+            // TODO: capture "first team event ingested"
+            team.ingested_event = true
+            save = true
+        }
+        if (!(event in team.event_names)) {
+            save = true
+            team.event_names.push(event)
+            team.event_names_with_usage.push({ event: event, usage_count: null, volume: null })
+        }
+        for (const [key, value] of Object.entries(properties)) {
+            if (!(key in team.event_properties)) {
+                team.event_properties.push(key)
+                team.event_properties_with_usage.push({ key: key, usage_count: null, volume: null })
+                save = true
+            }
+            if (typeof value === 'number' && !(key in team.event_properties_numerical)) {
+                team.event_properties_numerical.push(key)
+                save = true
+            }
+        }
+        if (save) {
+            await this.pluginsServer.db.query(
+                'UPDATE posthog_team SET ingested_event = $1, event_names = $2, event_names_with_usage = $3, event_properties = $4, event_properties_with_usage = $5, event_properties_numerical = $6 WHERE id = $7',
+                [
+                    team.ingested_event,
+                    team.event_names,
+                    team.event_names_with_usage,
+                    team.event_properties,
+                    team.event_names_with_usage,
+                    team.event_properties_numerical,
+                    team.id,
+                ]
+            )
+        }
     }
 
     async create_person(

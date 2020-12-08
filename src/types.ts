@@ -113,14 +113,14 @@ export interface PluginConfigVMReponse {
 
 export interface EventUsage {
     event: string
-    usage_count: number
-    volume: number
+    usage_count: number | null
+    volume: number | null
 }
 
 export interface PropertyUsage {
     key: string
-    usage_count: number
-    volume: number
+    usage_count: number | null
+    volume: number | null
 }
 
 export interface Team {
