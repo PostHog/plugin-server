@@ -7,7 +7,7 @@ import * as os from 'os'
 import { LogLevel } from '../src/types'
 
 jest.mock('../src/sql')
-jest.setTimeout(300000) // 300 sec timeout
+jest.setTimeout(600000) // 600 sec timeout
 
 function processOneEvent(
     processEvent: (event: PluginEvent) => Promise<PluginEvent>,
@@ -77,7 +77,7 @@ test('piscina worker test', async () => {
 
     const coreCount = os.cpus().length
     const workerThreads = [1, 2, 4, 8, 12, 16].filter((threads) => (isDevRun ? threads <= 8 : threads <= coreCount))
-    const rounds = isDevRun ? 1 : 3
+    const rounds = 1
 
     const tests: { testName: string; events: number; testCode: string }[] = [
         {
