@@ -46,7 +46,6 @@ function processOneBatch(
 
 async function processCountEvents(piscina: ReturnType<typeof makePiscina>, count: number, batchSize = 1) {
     const maxPromises = 1000
-    const startTime = performance.now()
     const promises = Array(maxPromises)
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
     const processEvents = (events: PluginEvent[]) => piscina.runTask({ task: 'processEvents', args: { events } })
@@ -60,18 +59,6 @@ async function processCountEvents(piscina: ReturnType<typeof makePiscina>, count
         }
         await Promise.all(promises)
     }
-
-    const ms = Math.round((performance.now() - startTime) * 1000) / 1000
-
-    const log = {
-        eventsPerSecond: 1000 / (ms / count),
-        events: count,
-        concurrency: piscina.threads.length,
-        totalMs: ms,
-        averageEventMs: ms / count,
-    }
-
-    return log
 }
 
 function setupPiscina(workers: number, code: string, tasksPerWorker: number) {
@@ -90,9 +77,9 @@ test('piscina worker test', async () => {
 
     const coreCount = os.cpus().length
     const workerThreads = [1, 2, 4, 8, 12, 16].filter((threads) =>
-        isDevRun ? threads < coreCount : threads <= coreCount
+        isDevRun ? threads <= 8 : threads <= coreCount
     )
-    const rounds = 5
+    const rounds = isDevRun ? 1 : 3
 
     const tests: { testName: string; events: number; testCode: string }[] = [
         {
@@ -130,28 +117,35 @@ test('piscina worker test', async () => {
     ]
 
     const results: Array<Record<string, string | number>> = []
-    for (const { testName, events, testCode } of tests) {
-        const result: Record<string, any> = {
-            testName,
-            coreCount,
-        }
-        for (const threads of workerThreads) {
-            const piscina = setupPiscina(threads, testCode, 100)
-
-            // warmup
-            await processCountEvents(piscina, threads * 4)
-
-            // start
-            let throughput = 0
-            for (let i = 0; i < rounds; i++) {
-                const { eventsPerSecond } = await processCountEvents(piscina, isDevRun ? events / 10 : events)
-                throughput += eventsPerSecond
+    for (const { testName, events: _events, testCode } of tests) {
+        const events = isDevRun ? _events / 10 : _events
+        for (const batchSize of [1, 10, 100].filter((size) => size <= events)) {
+            const result: Record<string, any> = {
+                testName,
+                coreCount,
+                events,
+                batchSize,
             }
-            result[`${threads} threads`] = Math.round(throughput / rounds)
-            await piscina.destroy()
+            for (const threads of workerThreads) {
+                const piscina = setupPiscina(threads, testCode, 100)
+
+                // warmup
+                await processCountEvents(piscina, threads * 4)
+
+                // start
+                const startTime = performance.now()
+                for (let i = 0; i < rounds; i++) {
+                    await processCountEvents(piscina, events / batchSize, batchSize)
+                }
+                const ms = Math.round((performance.now() - startTime) * 1000) / 1000
+                const throughput = Math.round(1000 / (ms / events / rounds))
+                result[`${threads} thread${threads === 1 ? '' : 's'}`] = Math.round(throughput)
+
+                await piscina.destroy()
+            }
+            results.push(result)
+            console.log(JSON.stringify({ result }, null, 2))
         }
-        results.push(result)
-        console.log(JSON.stringify({ result }, null, 2))
     }
     console.table(results)
 })
