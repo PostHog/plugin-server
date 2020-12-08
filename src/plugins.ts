@@ -180,8 +180,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
 }
 
 export async function runPlugins(server: PluginsServer, event: PluginEvent): Promise<PluginEvent | null> {
-    const pluginsToRun = server.pluginConfigsPerTeam.get(event.team_id) || server.defaultConfigs
-
+    const pluginsToRun = getPluginsForTeam(server, event.team_id)
     let returnedEvent: PluginEvent | null = event
 
     for (const pluginConfig of pluginsToRun.reverse()) {
@@ -221,7 +220,7 @@ export async function runPluginsOnBatch(server: PluginsServer, events: PluginEve
     let allReturnedEvents: PluginEvent[] = []
 
     for (const [teamId, teamEvents] of eventsByTeam.entries()) {
-        const pluginsToRun = server.pluginConfigsPerTeam.get(teamId) || server.defaultConfigs
+        const pluginsToRun = getPluginsForTeam(server, teamId)
 
         let returnedEvents: PluginEvent[] = teamEvents
 
@@ -245,4 +244,8 @@ export async function runPluginsOnBatch(server: PluginsServer, events: PluginEve
     }
 
     return allReturnedEvents
+}
+
+function getPluginsForTeam(server: PluginsServer, teamId: number): PluginConfig[] {
+    return server.pluginConfigsPerTeam.get(teamId) || server.defaultConfigs
 }
