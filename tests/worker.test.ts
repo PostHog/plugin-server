@@ -76,9 +76,7 @@ test('piscina worker test', async () => {
     const isDevRun = false
 
     const coreCount = os.cpus().length
-    const workerThreads = [1, 2, 4, 8, 12, 16].filter((threads) =>
-        isDevRun ? threads <= 8 : threads <= coreCount
-    )
+    const workerThreads = [1, 2, 4, 8, 12, 16].filter((threads) => (isDevRun ? threads <= 8 : threads <= coreCount))
     const rounds = isDevRun ? 1 : 3
 
     const tests: { testName: string; events: number; testCode: string }[] = [
@@ -105,7 +103,7 @@ test('piscina worker test', async () => {
         },
         {
             testName: 'timeout100ms',
-            events: 2000,
+            events: 10000,
             testCode: `
                 async function processEvent (event, meta) {
                     await new Promise(resolve => __jestSetTimeout(() => resolve(), 100))
