@@ -11,6 +11,7 @@ import { PluginEvent } from 'posthog-plugins'
 import { defaultConfig } from './config'
 import Piscina from 'piscina'
 import * as Sentry from '@sentry/node'
+import { delay } from './utils'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {}
@@ -86,7 +87,7 @@ export async function startPluginsServer(
         await closeServer()
 
         // wait an extra second for any misc async task to finish
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        await delay(1000)
     }
 
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
@@ -115,6 +116,8 @@ export async function startPluginsServer(
             if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
                 console.log('⚡ Reloading plugins!')
                 await queue?.stop()
+                // wait an extra second for any misc async task to finish
+                await delay(1000)
                 await piscina?.destroy()
 
                 piscina = makePiscina(serverConfig!)
