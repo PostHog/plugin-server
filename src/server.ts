@@ -10,6 +10,7 @@ import { version } from '../package.json'
 import { PluginEvent } from 'posthog-plugins'
 import Piscina from 'piscina'
 import { StatsD } from 'hot-shots'
+import { EventsProcessor } from './ingestion/process-event'
 
 function overrideWithEnv(config: PluginsServerConfig): PluginsServerConfig {
     const newConfig: Record<string, any> = { ...config }
@@ -139,7 +140,7 @@ export async function startPluginsServer(
 
         pubSub = new Redis(server.REDIS_URL)
         pubSub.subscribe(server.PLUGINS_RELOAD_PUBSUB_CHANNEL)
-        pubSub.on('message', async (channel, message) => {
+        pubSub.on('message', async (channel: string, message) => {
             if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
                 console.log('⚡ Reloading plugins!')
                 await queue?.stop()

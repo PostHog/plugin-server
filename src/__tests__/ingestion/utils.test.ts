@@ -111,7 +111,7 @@ describe('UUIDT', () => {
     it('is well-formed', () => {
         const uuidt = new UUIDT()
         const uuidtString = uuidt.toString()
-        // UTC timestamp matching (roughly)
+        // UTC timestamp matching (roughly, only comparing the beginning as the timestamp's end inevitably drifts away)
         expect(uuidtString.slice(0, 8)).toEqual(Date.now().toString(16).padStart(12, '0').slice(0, 8))
         // series matching
         expect(uuidtString.slice(14, 18)).toEqual('0000')
