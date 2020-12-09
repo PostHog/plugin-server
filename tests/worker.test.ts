@@ -74,10 +74,12 @@ function setupPiscina(workers: number, code: string, tasksPerWorker: number) {
 test('piscina worker test', async () => {
     // Uncomment this to become a 10x developer and make the test run just as fast!
     // Reduces events by 10x and limits threads to max 8
-    const isDevRun = false
+    const isLightDevRun = false
 
     const coreCount = os.cpus().length
-    const workerThreads = [1, 2, 4, 8, 12, 16].filter((threads) => (isDevRun ? threads <= 8 : threads <= coreCount))
+    const workerThreads = [1, 2, 4, 8, 12, 16].filter((threads) =>
+        isLightDevRun ? threads <= 8 : threads <= coreCount
+    )
     const rounds = 1
 
     const tests: { testName: string; events: number; testCode: string }[] = [
@@ -117,7 +119,7 @@ test('piscina worker test', async () => {
 
     const results: Array<Record<string, string | number>> = []
     for (const { testName, events: _events, testCode } of tests) {
-        const events = isDevRun ? _events / 10 : _events
+        const events = isLightDevRun ? _events / 10 : _events
         for (const batchSize of [1, 10, 100].filter((size) => size <= events)) {
             const result: Record<string, any> = {
                 testName,
