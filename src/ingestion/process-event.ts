@@ -8,9 +8,7 @@ import { elements_to_string } from './element'
 import { join } from 'path'
 import { runPlugins } from 'plugins'
 import { PluginEvent } from 'posthog-plugins'
-
-const root = loadSync(join(__dirname, 'idl/events.proto'))
-const EventProto = root.lookupType('Event')
+import { Event as EventProto } from '../idl/protos'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
@@ -505,13 +503,13 @@ export class EventsProcessor {
         event_uuid: UUID,
         event: string,
         team: Team,
-        distinct_id: string,
+        distinctId: string,
         properties?: Properties,
         timestamp?: DateTime | string,
         elements?: Element[]
     ): string {
         const timestampString = castTimestampOrNow(timestamp)
-        const elements_chain = elements && elements.length ? elements_to_string(elements) : ''
+        const elementsChain = elements && elements.length ? elements_to_string(elements) : ''
         const eventUuidString = event_uuid.toString()
 
         const message = EventProto.create({
@@ -519,10 +517,10 @@ export class EventsProcessor {
             event,
             properties: JSON.stringify(properties ?? {}),
             timestamp: timestampString,
-            team_id: team.id,
-            distinct_id,
-            elements_chain,
-            created_at: timestampString,
+            teamId: team.id,
+            distinctId,
+            elementsChain,
+            createdAt: timestampString,
         })
 
         this.kafkaProducerStreamEvent.write(EventProto.encode(message).finish())

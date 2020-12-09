@@ -11,7 +11,9 @@
         "start:dev": "ts-node-dev --exit-child src/index.ts --config \"{\\\"BASE_DIR\\\": \\\"../posthog\\\"}\"",
         "build": "yarn clean && yarn compile",
         "clean": "rimraf dist/*",
-        "compile": "tsc -p .",
+        "compile:protobuf": "cd src/idl/ && rimraf protos.* && pbjs -t static-module -w commonjs -o protos.js *.protos && pbts -o protos.d.ts protos.js",
+        "compile:typescript": "tsc -p .",
+        "compile": "yarn compile:protobuf && yarn compile:typescript",
         "lint": "eslint .",
         "lint:fix": "eslint --fix .",
         "prettier": "prettier --write .",
@@ -91,6 +93,7 @@
         }
     },
     "lint-staged": {
+        "*.{js,ts}": "eslint --fix",
         "*.{js,css,scss}": "prettier --write"
     }
 }
