@@ -1,6 +1,6 @@
 {
     "name": "posthog-plugin-server",
-    "version": "0.3.3",
+    "version": "0.3.4",
     "description": "PostHog Plugin Server",
     "types": "dist/src/index.d.ts",
     "main": "dist/src/index.js",
@@ -40,7 +40,7 @@
         "pg": "^8.4.2",
         "piscina": "^2.1.0",
         "posthog-js-lite": "^0.0.5",
-        "posthog-plugins": "^0.2.3",
+        "posthog-plugins": "0.2.4",
         "protobufjs": "^6.10.2",
         "tar-stream": "^2.1.4",
         "uuid": "^8.3.1",
