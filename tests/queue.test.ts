@@ -1,8 +1,8 @@
-import { startQueue } from '../queue'
-import { createServer, defaultConfig } from '../../server'
-import { PluginsServer } from '../../types'
-import Client from '../../celery/client'
-import { runPlugins } from '../../plugins'
+import { startQueue } from '../src/worker/queue'
+import { createServer } from '../src/server'
+import { PluginsServer } from '../src/types'
+import Client from '../src/celery/client'
+import { runPlugins } from '../src/plugins'
 
 function advanceOneTick() {
     return new Promise((resolve) => process.nextTick(resolve))
@@ -14,7 +14,7 @@ beforeEach(async () => {
     // silence logs
     console.info = jest.fn()
 
-    mockServer = (await createServer(defaultConfig))[0]
+    mockServer = (await createServer())[0]
 })
 
 test('worker and task passing via redis', async () => {

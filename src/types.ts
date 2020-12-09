@@ -5,12 +5,22 @@ import { VM, VMScript } from 'vm2'
 import { DateTime } from 'luxon'
 import { StatsD } from 'hot-shots'
 
+export enum LogLevel {
+    Debug = 'debug',
+    Info = 'info',
+    Log = 'log',
+    Warn = 'warn',
+    Error = 'error',
+    None = 'none',
+}
+
 export interface PluginsServerConfig {
     WORKER_CONCURRENCY: number
+    TASKS_PER_WORKER: number
     CELERY_DEFAULT_QUEUE: string
-    DATABASE_URL: string // Postgres database URL
-    KAFKA_HOSTS?: string // comma-delimited Kafka hosts
-    EE_ENABLED?: boolean // whether EE features Kafka + ClickHouse are enabled
+    DATABASE_URL: string
+    KAFKA_HOSTS?: string
+    EE_ENABLED?: boolean
     PLUGINS_CELERY_QUEUE: string
     REDIS_URL: string
     BASE_DIR: string
@@ -21,6 +31,7 @@ export interface PluginsServerConfig {
     STATSD_HOST?: string
     STATSD_PORT: number
     STATSD_PREFIX: string
+    LOG_LEVEL: LogLevel
 
     __jestMock?: {
         getPluginRows: Plugin[]
@@ -28,6 +39,7 @@ export interface PluginsServerConfig {
         getPluginAttachmentRows: PluginAttachmentDB[]
     }
 }
+export type PluginsServerConfigKey = Exclude<keyof PluginsServerConfig, '__jestMock'>
 
 export interface PluginsServer extends PluginsServerConfig {
     // active connections to postgres and redis

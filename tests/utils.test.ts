@@ -1,4 +1,12 @@
-import { getFileFromTGZ, getFileFromZip, getFileFromArchive, bufferToStream } from '../utils'
+import {
+    getFileFromTGZ,
+    getFileFromZip,
+    getFileFromArchive,
+    bufferToStream,
+    setLogLevel,
+    cloneObject,
+} from '../src/utils'
+import { LogLevel } from '../src/types'
 
 // .zip in Base64: github repo posthog/helloworldplugin
 const zip =
@@ -54,4 +62,116 @@ test('bufferToStream', async () => {
     const buffer = Buffer.from(zip, 'base64')
     const stream = bufferToStream(buffer)
     expect(stream.read()).toEqual(buffer)
+})
+
+test('setLogLevel', async () => {
+    function resetMocks() {
+        console.debug = jest.fn()
+        console.info = jest.fn()
+        console.log = jest.fn()
+        console.warn = jest.fn()
+        console.error = jest.fn()
+    }
+
+    resetMocks()
+    setLogLevel(LogLevel.Debug)
+    console.debug('debug')
+    console.info('debug')
+    console.log('debug')
+    console.warn('debug')
+    console.error('debug')
+    expect(console.debug).toHaveBeenCalledWith('debug')
+    expect(console.info).toHaveBeenCalledWith('debug')
+    expect(console.log).toHaveBeenCalledWith('debug')
+    expect(console.warn).toHaveBeenCalledWith('debug')
+    expect(console.error).toHaveBeenCalledWith('debug')
+
+    resetMocks()
+    setLogLevel(LogLevel.Info)
+    console.debug('info')
+    console.info('info')
+    console.log('info')
+    console.warn('info')
+    console.error('info')
+    expect((console.debug as any)._original).toBeDefined()
+    expect(console.info).toHaveBeenCalledWith('info')
+    expect(console.log).toHaveBeenCalledWith('info')
+    expect(console.warn).toHaveBeenCalledWith('info')
+    expect(console.error).toHaveBeenCalledWith('info')
+
+    resetMocks()
+    setLogLevel(LogLevel.Log)
+    console.debug('log')
+    console.info('log')
+    console.log('log')
+    console.warn('log')
+    console.error('log')
+    expect((console.debug as any)._original).toBeDefined()
+    expect((console.info as any)._original).toBeDefined()
+    expect(console.log).toHaveBeenCalledWith('log')
+    expect(console.warn).toHaveBeenCalledWith('log')
+    expect(console.error).toHaveBeenCalledWith('log')
+
+    resetMocks()
+    setLogLevel(LogLevel.Warn)
+    console.debug('warn')
+    console.info('warn')
+    console.log('warn')
+    console.warn('warn')
+    console.error('warn')
+    expect((console.debug as any)._original).toBeDefined()
+    expect((console.info as any)._original).toBeDefined()
+    expect((console.log as any)._original).toBeDefined()
+    expect(console.warn).toHaveBeenCalledWith('warn')
+    expect(console.error).toHaveBeenCalledWith('warn')
+
+    resetMocks()
+    setLogLevel(LogLevel.Error)
+    console.debug('error')
+    console.info('error')
+    console.log('error')
+    console.warn('error')
+    console.error('error')
+    expect((console.debug as any)._original).toBeDefined()
+    expect((console.info as any)._original).toBeDefined()
+    expect((console.log as any)._original).toBeDefined()
+    expect((console.warn as any)._original).toBeDefined()
+    expect(console.error).toHaveBeenCalledWith('error')
+
+    resetMocks()
+    setLogLevel(LogLevel.None)
+    console.debug('none')
+    console.info('none')
+    console.log('none')
+    console.warn('none')
+    console.error('none')
+    expect((console.debug as any)._original).toBeDefined()
+    expect((console.info as any)._original).toBeDefined()
+    expect((console.log as any)._original).toBeDefined()
+    expect((console.warn as any)._original).toBeDefined()
+    expect((console.error as any)._original).toBeDefined()
+})
+
+test('cloneObject', async () => {
+    const o1 = ['string', 'value']
+    expect(cloneObject(o1)).toEqual(o1)
+    expect(cloneObject(o1) === o1).toBe(false)
+
+    const o2 = { key: 'value' }
+    expect(cloneObject(o2)).toEqual(o2)
+    expect(cloneObject(o2) === o2).toBe(false)
+
+    const o3 = { key: 'value', nested: ['a1', 'a2'], nestedObj: { key: 'other' } }
+    expect(cloneObject(o3)).toEqual(o3)
+    expect(cloneObject(o3) === o3).toBe(false)
+    expect((cloneObject(o3) as typeof o3).nested === o3.nested).toBe(false)
+    expect((cloneObject(o3) as typeof o3).nestedObj === o3.nestedObj).toBe(false)
+
+    const o4 = null
+    expect(cloneObject(o4)).toEqual(o4)
+    expect(cloneObject(o4) === o4).toBe(true)
+
+    const o5 = 'string'
+    expect(cloneObject(o5)).toEqual(o5)
+    expect(cloneObject(o5) === o5).toBe(true)
 })
