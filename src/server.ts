@@ -112,7 +112,7 @@ export async function startPluginsServer(
                 await queue?.stop()
                 await piscina?.destroy()
 
-                piscina = makePiscina(config)
+                piscina = makePiscina(serverConfig!)
                 queue = startQueue(server!, processEvent)
             }
         })
