@@ -17,6 +17,8 @@ export function getDefaultConfig(): PluginsServerConfig {
         WORKER_CONCURRENCY: 0, // use all cores
         TASKS_PER_WORKER: 100,
         LOG_LEVEL: LogLevel.Info,
+        STATSD_PORT: 8125,
+        STATSD_PREFIX: '',
     }
 }
 
@@ -34,6 +36,11 @@ export function getConfigHelp(): Record<PluginsServerConfigKey, string> {
         WORKER_CONCURRENCY: 'number of concurrent worker threads',
         TASKS_PER_WORKER: 'number of parallel tasks per worker thread',
         LOG_LEVEL: 'minimum log level',
+        STATSD_HOST: 'StatsD host - integration disabled if not provided',
+        STATSD_PORT: 'StatsD port',
+        STATSD_PREFIX: 'StatsD prefix',
+        KAFKA_HOSTS: 'comma-delimited Kafka hosts',
+        EE_ENABLED: 'whether EE features Kafka + ClickHouse are enabled',
     }
 }
 
