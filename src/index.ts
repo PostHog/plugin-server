@@ -28,8 +28,8 @@ for (const [key, value] of Object.entries(defaultConfig)) {
 const { config: configArg, ...otherArgs }: Argv = app.help().argv
 
 const configJson = configArg || process.env.CONFIG
-
 const config: PluginsServerConfig = { ...defaultConfig, ...(configJson ? JSON.parse(configJson) : {}) }
+
 for (const [key, value] of Object.entries(otherArgs)) {
     if (typeof value !== 'undefined') {
         // convert camelCase argument keys to under_score
