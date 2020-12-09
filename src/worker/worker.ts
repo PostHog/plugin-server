@@ -1,5 +1,6 @@
-import { setLogLevel } from '../utils'
+
 import { runPlugins, runPluginsOnBatch, setupPlugins } from '../plugins'
+import { cloneObject, setLogLevel } from '../utils'
 import { createServer } from '../server'
 import { PluginsServerConfig } from '../types'
 
@@ -35,16 +36,4 @@ export async function createWorker(config: PluginsServerConfig): Promise<TaskWor
             return cloneObject(processedEvents as any[])
         }
     }
-}
-
-function cloneObject(obj: Record<string, any>) {
-    const clone: Record<string, any> = {}
-    for (const i in obj) {
-        if (typeof obj[i] == 'object' && obj[i] !== null) {
-            clone[i] = cloneObject(obj[i])
-        } else {
-            clone[i] = obj[i]
-        }
-    }
-    return clone
 }

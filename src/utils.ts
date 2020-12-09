@@ -97,13 +97,30 @@ export function getFileFromZip(archive: Buffer, file: string): string | null {
 }
 
 export function setLogLevel(logLevel: LogLevel): void {
-    for (const loopLevel of ['debug', 'info', 'log', 'warn', 'error', 'none']) {
+    for (const loopLevel of ['debug', 'info', 'log', 'warn', 'error']) {
         if (loopLevel === logLevel) {
             break
         }
-        const originalFunction = (console as any)[loopLevel]._original || (console as any)[loopLevel]
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        ;(console as any)[loopLevel] = () => {}
-        ;(console as any)[loopLevel]._original = originalFunction
+        const logFunction = (console as any)[loopLevel]
+        if (logFunction) {
+            const originalFunction = logFunction._original || logFunction
+            // eslint-disable-next-line @typescript-eslint/no-empty-function
+            ;(console as any)[loopLevel] = () => {}
+            ;(console as any)[loopLevel]._original = originalFunction
+        }
     }
+}
+
+export function cloneObject<T extends any | any[]>(obj: T): T {
+    if (obj !== Object(obj)) {
+        return obj
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(cloneObject) as T
+    }
+    const clone: Record<string, any> = {}
+    for (const i in obj) {
+        clone[i] = cloneObject(obj[i])
+    }
+    return clone as T
 }
