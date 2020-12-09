@@ -7,7 +7,7 @@ import { initApp } from '../init'
 type TaskWorker = ({ task, args }: { task: string; args: any }) => Promise<any>
 
 export async function createWorker(config: PluginsServerConfig): Promise<TaskWorker> {
-    console.info('🧵 Starting Piscina Worker Thread')
+    console.info('🧵 Starting Piscina worker thread…')
 
     initApp(config)
 

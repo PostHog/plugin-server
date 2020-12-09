@@ -56,7 +56,7 @@ export class EventsProcessor {
             }
             for (const message of messages) {
                 const timer = new Date()
-                let event: PluginEvent | null = JSON.parse(message.value!.toString()) as PluginEvent
+                let event: EventData | null = JSON.parse(message.value!.toString()) as EventData
                 event = await runPlugins(this.pluginsServer, event)
                 if (event) {
                     await this.process_event_ee(
