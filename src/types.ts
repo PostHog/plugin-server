@@ -25,6 +25,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     WEB_PORT: number
     WEB_HOSTNAME: string
     LOG_LEVEL: LogLevel
+    SENTRY_DSN: string | null
 
     __jestMock?: {
         getPluginRows: Plugin[]

@@ -17,6 +17,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         WORKER_CONCURRENCY: 0, // use all cores
         TASKS_PER_WORKER: 10,
         LOG_LEVEL: LogLevel.Info,
+        SENTRY_DSN: null,
     }
 }
 
@@ -34,6 +35,7 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         WORKER_CONCURRENCY: 'number of concurrent worker threads',
         TASKS_PER_WORKER: 'number of parallel tasks per worker thread',
         LOG_LEVEL: 'minimum log level',
+        SENTRY_DSN: 'sentry ingestion url',
     }
 }
 
