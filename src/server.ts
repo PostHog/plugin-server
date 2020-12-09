@@ -11,7 +11,9 @@ import { PluginEvent } from 'posthog-plugins'
 import { defaultConfig } from './config'
 import Piscina from 'piscina'
 import { StatsD } from 'hot-shots'
+import * as Sentry from '@sentry/node'
 import { EventsProcessor } from './ingestion/process-event'
+import { delay } from './utils'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {}
@@ -23,6 +25,7 @@ export async function createServer(
 
     const redis = new Redis(serverConfig.REDIS_URL, { maxRetriesPerRequest: -1 })
     redis.on('error', (error) => {
+        Sentry.captureException(error)
         console.error('🔴 Redis error! Trying to reconnect.')
         console.error(error)
     })
@@ -90,8 +93,11 @@ export async function startPluginsServer(
         if (job) {
             schedule.cancelJob(job)
         }
-        await piscina?.destroy()
+        await stopPiscina(piscina!)
         await closeServer()
+
+        // wait an extra second for any misc async task to finish
+        await delay(1000)
     }
 
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
@@ -125,9 +131,8 @@ export async function startPluginsServer(
             if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
                 console.log('⚡ Reloading plugins!')
                 await queue?.stop()
-                await piscina?.destroy()
-
-                piscina = makePiscina(config)
+                await stopPiscina(piscina!)
+                piscina = makePiscina(serverConfig!)
                 queue = startQueue(server!, processEvent)
             }
         })
@@ -139,8 +144,18 @@ export async function startPluginsServer(
         })
         console.info(`🚀 All systems go.`)
     } catch (error) {
+        Sentry.captureException(error)
         console.error(`💥 Launchpad failure!\n${error.stack}`)
+        Sentry.flush().then(() => true) // flush in the background
         await closeJobs()
+
         process.exit(1)
     }
+}
+
+export async function stopPiscina(piscina: Piscina): Promise<void> {
+    // Wait two seconds for any running workers to stop.
+    // TODO: better "wait until everything is done"
+    await delay(2000)
+    await piscina.destroy()
 }

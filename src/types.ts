@@ -14,7 +14,7 @@ export enum LogLevel {
     None = 'none',
 }
 
-export interface PluginsServerConfig {
+export interface PluginsServerConfig extends Record<string, any> {
     WORKER_CONCURRENCY: number
     TASKS_PER_WORKER: number
     CELERY_DEFAULT_QUEUE: string
@@ -32,6 +32,7 @@ export interface PluginsServerConfig {
     STATSD_PORT: number
     STATSD_PREFIX: string
     LOG_LEVEL: LogLevel
+    SENTRY_DSN: string | null
 
     __jestMock?: {
         getPluginRows: Plugin[]
@@ -39,7 +40,6 @@ export interface PluginsServerConfig {
         getPluginAttachmentRows: PluginAttachmentDB[]
     }
 }
-export type PluginsServerConfigKey = Exclude<keyof PluginsServerConfig, '__jestMock'>
 
 export interface PluginsServer extends PluginsServerConfig {
     // active connections to postgres and redis

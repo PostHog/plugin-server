@@ -1,4 +1,4 @@
-import { LogLevel, PluginsServerConfig, PluginsServerConfigKey } from './types'
+import { LogLevel, PluginsServerConfig } from './types'
 
 export const defaultConfig = overrideWithEnv(getDefaultConfig())
 export const configHelp = getConfigHelp()
@@ -7,6 +7,8 @@ export function getDefaultConfig(): PluginsServerConfig {
     return {
         CELERY_DEFAULT_QUEUE: 'celery',
         DATABASE_URL: 'postgres://localhost:5432/posthog',
+        KAFKA_HOSTS: null,
+        EE_ENABLED: false,
         PLUGINS_CELERY_QUEUE: 'posthog-plugins',
         REDIS_URL: 'redis://localhost/',
         BASE_DIR: '.',
@@ -17,12 +19,14 @@ export function getDefaultConfig(): PluginsServerConfig {
         WORKER_CONCURRENCY: 0, // use all cores
         TASKS_PER_WORKER: 10,
         LOG_LEVEL: LogLevel.Info,
+        STATSD_HOST: null,
         STATSD_PORT: 8125,
         STATSD_PREFIX: '',
+        SENTRY_DSN: null,
     }
 }
 
-export function getConfigHelp(): Record<PluginsServerConfigKey, string> {
+export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
     return {
         CELERY_DEFAULT_QUEUE: 'celery outgoing queue',
         DATABASE_URL: 'url for postgres',
@@ -41,6 +45,7 @@ export function getConfigHelp(): Record<PluginsServerConfigKey, string> {
         STATSD_PREFIX: 'StatsD prefix',
         KAFKA_HOSTS: 'comma-delimited Kafka hosts',
         EE_ENABLED: 'whether Enterprise Edition backend (Kafka + ClickHouse) is enabled',
+        SENTRY_DSN: 'sentry ingestion url',
     }
 }
 
@@ -49,8 +54,9 @@ export function overrideWithEnv(
     env: Record<string, string | undefined> = process.env
 ): PluginsServerConfig {
     const defaultConfig = getDefaultConfig()
-    const newConfig: Record<string, any> = { ...config }
-    for (const key of Object.keys(defaultConfig) as PluginsServerConfigKey[]) {
+
+    const newConfig: PluginsServerConfig = { ...config }
+    for (const key of Object.keys(config)) {
         if (typeof env[key] !== 'undefined') {
             if (typeof defaultConfig[key] === 'number') {
                 newConfig[key] = env[key]?.indexOf('.') ? parseFloat(env[key]!) : parseInt(env[key]!)

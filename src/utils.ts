@@ -277,3 +277,9 @@ export function castTimestampOrNow(timestamp?: DateTime | string | null): string
 
     return timestamp.toFormat('yyyy-MM-dd HH:mm:ss.u')
 }
+
+export function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms)
+    })
+}
