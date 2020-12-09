@@ -136,13 +136,13 @@ export interface PropertyUsage {
     volume: number | null
 }
 
-export type Data = {
-    event: string
-    properties: Properties
+export interface EventData extends PluginEvent {
+    properties?: Properties
     timestamp?: string
     $set?: Properties
     offset?: number
 }
+
 export type Properties = Record<string, any>
 
 export interface Team {

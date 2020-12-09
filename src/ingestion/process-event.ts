@@ -1,6 +1,6 @@
 import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from 'node-rdkafka'
 import { DateTime, Duration } from 'luxon'
-import { PluginsServer, Data, Properties, Element, Team, Person, PersonDistinctId, CohortPeople } from 'types'
+import { PluginsServer, EventData, Properties, Element, Team, Person, PersonDistinctId, CohortPeople } from 'types'
 import { castTimestampOrNow, UUID, UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { elements_to_string } from './element'
@@ -15,6 +15,9 @@ export class EventsProcessor {
     kafkaProducerStreamSessionRecording: ProducerStream
 
     constructor(pluginsServer: PluginsServer) {
+        if (!pluginsServer.KAFKA_HOSTS) {
+            throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
+        }
         this.pluginsServer = pluginsServer
         this.kafkaConsumer = this.buildKafkaConsumer()
         this.kafkaProducerStreamEvent = Producer.createWriteStream(
@@ -40,7 +43,7 @@ export class EventsProcessor {
     buildKafkaConsumer(): KafkaConsumer {
         const kafkaConsumer = new KafkaConsumer(
             {
-                'metadata.broker.list': this.pluginsServer.KAFKA_HOSTS,
+                'metadata.broker.list': this.pluginsServer.KAFKA_HOSTS!,
             },
             {
                 'auto.offset.reset': 'earliest',
@@ -101,7 +104,7 @@ export class EventsProcessor {
         distinct_id: string,
         ip: string,
         site_url: string,
-        data: Data,
+        data: EventData,
         team_id: number,
         now: DateTime,
         sent_at: DateTime | null
@@ -141,7 +144,7 @@ export class EventsProcessor {
         }
     }
 
-    handle_timestamp(data: Data, now: DateTime, sent_at: DateTime | null): DateTime {
+    handle_timestamp(data: EventData, now: DateTime, sent_at: DateTime | null): DateTime {
         if (data['timestamp']) {
             if (sent_at) {
                 // sent_at - timestamp == now - x
@@ -156,7 +159,7 @@ export class EventsProcessor {
             }
             return DateTime.fromISO(data['timestamp'])
         }
-        if (!data['offset']) {
+        if (data['offset']) {
             return now.minus(Duration.fromMillis(data['offset']))
         }
         return now
