@@ -6,7 +6,7 @@ import * as Sentry from '@sentry/node'
 require('@sentry/tracing')
 
 // Code that runs on app start, in both the main and worker threads
-export function initApp(config: PluginsServerConfig) {
+export function initApp(config: PluginsServerConfig): void {
     setLogLevel(config.LOG_LEVEL)
 
     if (config.SENTRY_DSN) {
