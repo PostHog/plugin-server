@@ -178,6 +178,7 @@ test('cloneObject', async () => {
     expect(cloneObject(o5)).toEqual(o5)
     expect(cloneObject(o5) === o5).toBe(true)
 })
+
 describe('UUID', () => {
     describe('#constructor', () => {
         it('works with a valid string', () => {
