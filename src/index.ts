@@ -6,7 +6,7 @@ import { defaultConfig, configHelp } from './config'
 import { initApp } from './init'
 
 type Argv = {
-    configJson: string
+    config: string
     disableWeb: boolean
     webPort: number
     webHostname: string
@@ -16,7 +16,7 @@ type Argv = {
 let app: any = yargs
     .wrap(yargs.terminalWidth())
     .scriptName('posthog-plugins')
-    .option('config-json', { alias: ['c', 'config'], describe: 'Config options JSON.', type: 'string' })
+    .option('config', { alias: ['c'], describe: 'Config options JSON.', type: 'string' })
 
 for (const [key, value] of Object.entries(defaultConfig)) {
     app = app.option(key.toLowerCase().split('_').join('-'), {
@@ -25,9 +25,9 @@ for (const [key, value] of Object.entries(defaultConfig)) {
     })
 }
 
-const { configJson: configJsonArg, ...otherArgs }: Argv = app.help().argv
+const { config: configArg, ...otherArgs }: Argv = app.help().argv
 
-const configJson = configJsonArg || process.env.CONFIG_JSON
+const configJson = configArg || process.env.CONFIG
 
 const config: PluginsServerConfig = { ...defaultConfig, ...(configJson ? JSON.parse(configJson) : {}) }
 for (const [key, value] of Object.entries(otherArgs)) {
