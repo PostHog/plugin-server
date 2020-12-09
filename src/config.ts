@@ -40,7 +40,7 @@ export function getConfigHelp(): Record<PluginsServerConfigKey, string> {
         STATSD_PORT: 'StatsD port',
         STATSD_PREFIX: 'StatsD prefix',
         KAFKA_HOSTS: 'comma-delimited Kafka hosts',
-        EE_ENABLED: 'whether EE features Kafka + ClickHouse are enabled',
+        EE_ENABLED: 'whether Enterprise Edition backend (Kafka + ClickHouse) is enabled',
     }
 }
 
@@ -49,18 +49,17 @@ export function overrideWithEnv(
     env: Record<string, string | undefined> = process.env
 ): PluginsServerConfig {
     const defaultConfig = getDefaultConfig()
-
-    const newConfig: Record<PluginsServerConfigKey, any> = { ...config }
-    for (const key of Object.keys(config) as PluginsServerConfigKey[]) {
+    const newConfig: Record<string, any> = { ...config }
+    for (const key of Object.keys(defaultConfig) as PluginsServerConfigKey[]) {
         if (typeof env[key] !== 'undefined') {
             if (typeof defaultConfig[key] === 'number') {
                 newConfig[key] = env[key]?.indexOf('.') ? parseFloat(env[key]!) : parseInt(env[key]!)
             } else if (typeof defaultConfig[key] === 'boolean') {
-                newConfig[key] = env[key] === 'true' || env[key] === 'True' || env[key] === '1'
+                newConfig[key] = env[key]?.toLowerCase() === 'true' || env[key] === '1'
             } else {
                 newConfig[key] = env[key]
             }
         }
     }
-    return newConfig
+    return newConfig as PluginsServerConfig
 }
