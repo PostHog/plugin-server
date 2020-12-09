@@ -88,10 +88,10 @@ describe('UUID', () => {
         })
     })
 
-    describe('#toNumber', () => {
+    describe('#valueOf', () => {
         it('returns the right big integer', () => {
             const uuid = new UUID('99aBcDeF-1234-4321-0000-dcba87654321')
-            expect(uuid.toNumber()).toStrictEqual(0x99abcdef123443210000dcba87654321n)
+            expect(uuid.valueOf()).toStrictEqual(0x99abcdef123443210000dcba87654321n)
         })
     })
 

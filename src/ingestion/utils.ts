@@ -36,7 +36,7 @@ export class UUID {
     }
 
     /** Convert to 128-bit BigInt. */
-    toNumber(): BigInt {
+    valueOf(): BigInt {
         let value = 0n
         for (const byte of this.array) {
             value <<= 8n
@@ -103,8 +103,7 @@ export class UUIDT extends UUID {
     static currentSeriesPerMs: Map<number, number> = new Map()
 
     /** Get per-millisecond series integer in range [0-65536). */
-    static getSeries(unixTimeMs: number | bigint): number {
-        unixTimeMs = Number(unixTimeMs)
+    static getSeries(unixTimeMs: number): number {
         const series = UUIDT.currentSeriesPerMs.get(unixTimeMs)
         if (UUIDT.currentSeriesPerMs.size > 10_000) {
             // Clear class dict periodically
@@ -115,19 +114,19 @@ export class UUIDT extends UUID {
         return nextSeries
     }
 
-    constructor(unixTimeMs?: number | bigint) {
+    constructor(unixTimeMs?: number) {
         if (!unixTimeMs) {
             unixTimeMs = DateTime.utc().toMillis()
         }
-        unixTimeMs = BigInt(unixTimeMs)
+        let unixTimeMsBig = BigInt(unixTimeMs)
         let series = UUIDT.getSeries(unixTimeMs)
         // 64 bits (8 bytes) total
         const array = new Uint8Array(16)
         // 48 bits for time, WILL FAIL in 10 895 CE
         // XXXXXXXX-XXXX-****-****-************
         for (let i = 5; i >= 0; i--) {
-            array[i] = Number(unixTimeMs & 0xffn) // use last 8 binary digits to set UUID 2 hexadecimal digits
-            unixTimeMs >>= 8n // remove these last 8 binary digits
+            array[i] = Number(unixTimeMsBig & 0xffn) // use last 8 binary digits to set UUID 2 hexadecimal digits
+            unixTimeMsBig >>= 8n // remove these last 8 binary digits
         }
         // 16 bits for series
         // ********-****-XXXX-****-************
