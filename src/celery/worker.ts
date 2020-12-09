@@ -184,11 +184,11 @@ export class Worker extends Base {
             console.info(
                 `⌛ ${taskCount} ${taskCount === 1 ? 'task' : 'tasks'} in progress, waiting for ${
                     taskCount === 1 ? 'it' : 'them'
-                } to finish before cleaning Celery up...`
+                } to finish before cleaning up Celery...`
             )
             await this.whenCurrentJobsFinished()
         } else {
-            console.info(`👍 No tasks in progress, cleaning Celery up...`)
+            console.info(`👍 No tasks in progress, cleaning up Celery...`)
         }
         await this.disconnect()
         console.info(`🛑 Celery worker cleaned up!`)
