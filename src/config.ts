@@ -1,4 +1,4 @@
-import { LogLevel, PluginsServerConfig, PluginsServerConfigKey } from './types'
+import { LogLevel, PluginsServerConfig } from './types'
 
 export const defaultConfig = overrideWithEnv(getDefaultConfig())
 export const configHelp = getConfigHelp()
@@ -20,7 +20,7 @@ export function getDefaultConfig(): PluginsServerConfig {
     }
 }
 
-export function getConfigHelp(): Record<PluginsServerConfigKey, string> {
+export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
     return {
         CELERY_DEFAULT_QUEUE: 'celery outgoing queue',
         DATABASE_URL: 'url for postgres',
@@ -43,8 +43,8 @@ export function overrideWithEnv(
 ): PluginsServerConfig {
     const defaultConfig = getDefaultConfig()
 
-    const newConfig: Record<PluginsServerConfigKey, any> = { ...config }
-    for (const key of Object.keys(config) as PluginsServerConfigKey[]) {
+    const newConfig: PluginsServerConfig = { ...config }
+    for (const key of Object.keys(config)) {
         if (typeof env[key] !== 'undefined') {
             if (typeof defaultConfig[key] === 'number') {
                 newConfig[key] = env[key]?.indexOf('.') ? parseFloat(env[key]!) : parseInt(env[key]!)
