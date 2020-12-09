@@ -16,7 +16,7 @@ type Argv = {
 let app: any = yargs
     .wrap(yargs.terminalWidth())
     .scriptName('posthog-plugins')
-    .option('config', { alias: ['c'], describe: 'Config options JSON.', type: 'string' })
+    .option('config', { alias: 'c', describe: 'Config options JSON.', type: 'string' })
 
 for (const [key, value] of Object.entries(defaultConfig)) {
     app = app.option(key.toLowerCase().split('_').join('-'), {
