@@ -136,6 +136,15 @@ export interface PropertyUsage {
     volume: number | null
 }
 
+export type Data = {
+    event: string
+    properties: Properties
+    timestamp?: string
+    $set?: Properties
+    offset?: number
+}
+export type Properties = Record<string, any>
+
 export interface Team {
     id: number
     name: string
@@ -155,9 +164,6 @@ export interface Team {
     ingested_event: boolean
 }
 
-export type Data = Record<string, any>
-export type Properties = Record<string, any>
-
 export interface Element {
     text: string
     tag_name: string
@@ -169,7 +175,7 @@ export interface Element {
     attributes: Record<string, string>
 }
 
-export type User = Record<string, any> // not really typed as not needed so far
+export type User = Record<string, any> // not really typed as not needed so far, only a placeholder for Person.is_user
 
 export interface Person {
     id: number
