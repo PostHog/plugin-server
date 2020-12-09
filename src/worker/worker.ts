@@ -1,4 +1,3 @@
-
 import { runPlugins, runPluginsOnBatch, setupPlugins } from '../plugins'
 import { cloneObject, setLogLevel } from '../utils'
 import { createServer } from '../server'
