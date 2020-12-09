@@ -84,6 +84,9 @@ export async function startPluginsServer(
         }
         await piscina?.destroy()
         await closeServer()
+
+        // wait an extra second for any misc async task to finish
+        await new Promise((resolve) => setTimeout(resolve, 1000))
     }
 
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
@@ -128,7 +131,9 @@ export async function startPluginsServer(
     } catch (error) {
         Sentry.captureException(error)
         console.error(`💥 Launchpad failure!\n${error.stack}`)
+        Sentry.flush().then(() => true) // flush in the background
         await closeJobs()
+
         process.exit(1)
     }
 }
