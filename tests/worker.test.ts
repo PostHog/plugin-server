@@ -138,7 +138,9 @@ test('piscina worker test', async () => {
                 for (let i = 0; i < rounds; i++) {
                     await processCountEvents(piscina, events / batchSize, batchSize)
                 }
-                result[`${threads} thread${threads === 1 ? '' : 's'}`] = Math.round(startTime - performance.now())
+                result[`${threads} thread${threads === 1 ? '' : 's'}`] = Math.round(
+                    1000 / ((startTime - performance.now()) / events / rounds)
+                )
 
                 await piscina.destroy()
             }
