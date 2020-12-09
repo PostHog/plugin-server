@@ -103,7 +103,8 @@ export class UUIDT extends UUID {
     static currentSeriesPerMs: Map<number, number> = new Map()
 
     /** Get per-millisecond series integer in range [0-65536). */
-    static getSeries(unixTimeMs: number): number {
+    static getSeries(unixTimeMs: number | bigint): number {
+        unixTimeMs = Number(unixTimeMs)
         const series = UUIDT.currentSeriesPerMs.get(unixTimeMs)
         if (UUIDT.currentSeriesPerMs.size > 10_000) {
             // Clear class dict periodically
@@ -114,19 +115,19 @@ export class UUIDT extends UUID {
         return nextSeries
     }
 
-    constructor(unixTimeMs?: number) {
+    constructor(unixTimeMs?: number | bigint) {
         if (!unixTimeMs) {
             unixTimeMs = DateTime.utc().toMillis()
         }
+        unixTimeMs = BigInt(unixTimeMs)
         let series = UUIDT.getSeries(unixTimeMs)
         // 64 bits (8 bytes) total
         const array = new Uint8Array(16)
         // 48 bits for time, WILL FAIL in 10 895 CE
         // XXXXXXXX-XXXX-****-****-************
-        // TODO: why the hell are the two leftmost octets (first four hexadecimal chars) always zero?
         for (let i = 5; i >= 0; i--) {
-            array[i] = unixTimeMs & 0xff // use last 8 binary digits to set UUID 2 hexadecimal digits
-            unixTimeMs >>>= 8 // remove these last 8 binary digits
+            array[i] = Number(unixTimeMs & 0xffn) // use last 8 binary digits to set UUID 2 hexadecimal digits
+            unixTimeMs >>= 8n // remove these last 8 binary digits
         }
         // 16 bits for series
         // ********-****-XXXX-****-************
