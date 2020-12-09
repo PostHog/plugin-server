@@ -194,8 +194,7 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
                 errored = true
                 await processError(server, pluginConfig, error, returnedEvent)
             }
-            const ms = Math.round((performance.now() - startTime) * 1000) / 1000
-            logTime(pluginConfig.plugin?.name || 'noname', ms, errored)
+            logTime(pluginConfig.plugin?.name || 'noname', startTime - performance.now(), errored)
 
             if (!returnedEvent) {
                 return null
@@ -235,8 +234,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
                     errored = true
                     await processError(server, pluginConfig, error, returnedEvents[0])
                 }
-                const ms = Math.round((performance.now() - startTime) * 1000) / 1000
-                logTime(pluginConfig.plugin?.name || 'noname', ms, errored)
+                logTime(pluginConfig.plugin?.name || 'noname', startTime - performance.now(), errored)
             }
         }
 
