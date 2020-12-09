@@ -4,7 +4,7 @@ import { PluginEvent } from 'posthog-plugins/src/types'
 import { performance } from 'perf_hooks'
 import { mockJestWithIndex } from './helpers/plugins'
 import * as os from 'os'
-import { LogLevel, PluginsServerConfig } from '../src/types'
+import { LogLevel } from '../src/types'
 
 jest.mock('../src/sql')
 jest.setTimeout(600000) // 600 sec timeout
@@ -68,7 +68,7 @@ function setupPiscina(workers: number, code: string, tasksPerWorker: number) {
         TASKS_PER_WORKER: tasksPerWorker,
         LOG_LEVEL: LogLevel.Log,
         __jestMock: mockJestWithIndex(code),
-    } as PluginsServerConfig)
+    })
 }
 
 test('piscina worker test', async () => {
