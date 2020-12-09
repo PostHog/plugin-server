@@ -1,7 +1,7 @@
 import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from 'node-rdkafka'
 import { DateTime, Duration } from 'luxon'
 import { PluginsServer, Data, Properties, Element, Team, Person, PersonDistinctId, CohortPeople } from 'types'
-import { castTimestampOrNow, UUID, UUIDT } from './utils'
+import { castTimestampOrNow, UUID, UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { elements_to_string } from './element'
 import { runPlugins } from '../plugins'
