@@ -19,8 +19,8 @@ export interface PluginsServerConfig extends Record<string, any> {
     TASKS_PER_WORKER: number
     CELERY_DEFAULT_QUEUE: string
     DATABASE_URL: string
-    KAFKA_HOSTS?: string
-    EE_ENABLED?: boolean
+    KAFKA_HOSTS: string | null
+    EE_ENABLED: boolean
     PLUGINS_CELERY_QUEUE: string
     REDIS_URL: string
     BASE_DIR: string
@@ -28,7 +28,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     DISABLE_WEB: boolean
     WEB_PORT: number
     WEB_HOSTNAME: string
-    STATSD_HOST?: string
+    STATSD_HOST: string | null
     STATSD_PORT: number
     STATSD_PREFIX: string
     LOG_LEVEL: LogLevel
