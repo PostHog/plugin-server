@@ -73,6 +73,7 @@ function setupPiscina(workers: number, code: string, tasksPerWorker: number) {
 
 test('piscina worker test', async () => {
     // Uncomment this to become a 10x developer and make the test run just as fast!
+    // Reduces events by 10x and limits threads to max 8
     const isDevRun = false
 
     const coreCount = os.cpus().length
