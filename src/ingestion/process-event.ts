@@ -32,7 +32,7 @@ export class EventsProcessor implements Queue {
         this.db = pluginsServer.db
         this.kafkaConsumer = new KafkaConsumer(
             {
-                'group.id': 'whatever', // TODO: make this something meaningful other than "whatever"? I don't know
+                'group.id': 'plugin-ingestion',
                 'metadata.broker.list': this.pluginsServer.KAFKA_HOSTS!,
             },
             {

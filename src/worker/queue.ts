@@ -6,7 +6,7 @@ import Worker from '../celery/worker'
 import Client from '../celery/client'
 import { EventData, PluginsServer, Queue } from '../types'
 import { EventsProcessor } from '../ingestion/process-event'
-import { KAFKA_EVENTS_HANDOFF } from '../ingestion/topics'
+import { KAFKA_EVENTS_WAL } from '../ingestion/topics'
 
 function startQueueRedis(
     server: PluginsServer,
@@ -59,11 +59,11 @@ function startQueueKafka(
     const eventsProcessor = new EventsProcessor(server)
 
     eventsProcessor.kafkaConsumer.on('ready', () => {
-        eventsProcessor.kafkaConsumer.subscribe([KAFKA_EVENTS_HANDOFF])
+        eventsProcessor.kafkaConsumer.subscribe([KAFKA_EVENTS_WAL])
         // consume event messages in batches of 100 every 100 ms
         setInterval(() => {
             eventsProcessor.kafkaConsumer.consume(
-                100,
+                10000,
                 async (error: LibrdKafkaError, messages: Message[]): Promise<void> => {
                     if (messages?.length) {
                         console.info(
@@ -99,7 +99,7 @@ function startQueueKafka(
                 }
             )
         }, 100)
-        console.info(`✅ Kafka consumer ready and subscribed to topic ${KAFKA_EVENTS_HANDOFF}!`)
+        console.info(`✅ Kafka consumer ready and subscribed to topic ${KAFKA_EVENTS_WAL}!`)
     })
 
     eventsProcessor.connectKafkaConsumer()
