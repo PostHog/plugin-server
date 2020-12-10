@@ -15,7 +15,8 @@ import { delay } from './utils'
 import { StatsD } from 'hot-shots'
 
 export async function createServer(
-    config: Partial<PluginsServerConfig> = {}
+    config: Partial<PluginsServerConfig> = {},
+    threadId: number | null
 ): Promise<[PluginsServer, () => Promise<void>]> {
     const serverConfig: PluginsServerConfig = {
         ...defaultConfig,
@@ -34,13 +35,17 @@ export async function createServer(
         connectionString: serverConfig.DATABASE_URL,
     })
 
-    const statsd = serverConfig.STATSD_HOST
-        ? new StatsD({
-              port: serverConfig.STATSD_PORT,
-              host: serverConfig.STATSD_HOST,
-              prefix: serverConfig.STATSD_PREFIX,
-          })
-        : null
+    const statsd = new StatsD({
+        port: serverConfig.STATSD_PORT,
+        host: serverConfig.STATSD_HOST,
+        prefix: serverConfig.STATSD_PREFIX,
+    })
+    // don't repeat the same info in each thread
+    if (threadId === null) {
+        console.info(
+            `🪵 Sending metrics to statsd at ${serverConfig.STATSD_HOST}:${serverConfig.STATSD_PORT}, prefix: "${serverConfig.STATSD_PREFIX}"`
+        )
+    }
 
     const server: PluginsServer = {
         ...serverConfig,
@@ -113,7 +118,7 @@ export async function startPluginsServer(
             ...defaultConfig,
             ...config,
         }
-        ;[server, closeServer] = await createServer(serverConfig)
+        ;[server, closeServer] = await createServer(serverConfig, null)
 
         piscina = makePiscina(serverConfig)
         const processEvent = (event: PluginEvent) => piscina!.runTask({ task: 'processEvent', args: { event } })

@@ -18,9 +18,9 @@ export function getDefaultConfig(): PluginsServerConfig {
         TASKS_PER_WORKER: 10,
         LOG_LEVEL: LogLevel.Info,
         SENTRY_DSN: null,
-        STATSD_HOST: null,
+        STATSD_HOST: '0.0.0.0',
         STATSD_PORT: 8125,
-        STATSD_PREFIX: '',
+        STATSD_PREFIX: 'plugin-server.',
     }
 }
 

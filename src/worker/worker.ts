@@ -11,7 +11,7 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
 
     initApp(config)
 
-    const [server, closeServer] = await createServer(config)
+    const [server, closeServer] = await createServer(config, threadId)
     await setupPlugins(server)
 
     const closeJobs = async () => {
@@ -38,7 +38,7 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
             // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
             response = cloneObject(processedEvents as any[])
         }
-        server.statsd?.timing(`${server.STATSD_PREFIX}_task_${task}`, timer)
+        server.statsd?.timing(`piscina_task.${task}`, timer)
         return response
     }
 }
