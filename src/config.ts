@@ -39,7 +39,7 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         TASKS_PER_WORKER: 'number of parallel tasks per worker thread',
         LOG_LEVEL: 'minimum log level',
         SENTRY_DSN: 'sentry ingestion url',
-        STATSD_HOST: 'StatsD host - integration disabled if not provided',
+        STATSD_HOST: 'StatsD host',
         STATSD_PORT: 'StatsD port',
         STATSD_PREFIX: 'StatsD prefix',
     }
