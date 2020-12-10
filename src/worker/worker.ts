@@ -22,18 +22,23 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
     }
 
     return async ({ task, args }) => {
+        const timer = new Date()
+        let response
+
         if (task === 'hello') {
-            return `hello ${args[0]}!`
+            response = `hello ${args[0]}!`
         }
         if (task === 'processEvent') {
             const processedEvent = await runPlugins(server, args.event)
             // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
-            return cloneObject(processedEvent as Record<string, any>)
+            response = cloneObject(processedEvent as Record<string, any>)
         }
         if (task === 'processEventBatch') {
             const processedEvents = await runPluginsOnBatch(server, args.batch)
             // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
-            return cloneObject(processedEvents as any[])
+            response = cloneObject(processedEvents as any[])
         }
+        server.statsd?.timing(`${server.STATSD_PREFIX}_task_${task}`, timer)
+        return response
     }
 }
