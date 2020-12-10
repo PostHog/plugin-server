@@ -16,7 +16,7 @@ import { StatsD } from 'hot-shots'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
-    threadId: number | null
+    threadId: number | null = null
 ): Promise<[PluginsServer, () => Promise<void>]> {
     const serverConfig: PluginsServerConfig = {
         ...defaultConfig,
