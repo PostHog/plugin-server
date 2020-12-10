@@ -53,6 +53,10 @@ export interface PluginsServer extends PluginsServerConfig {
     defaultConfigs: PluginConfig[]
 }
 
+export interface Queue {
+    stop: () => void
+}
+
 export type PluginId = number
 export type PluginConfigId = number
 export type TeamId = number

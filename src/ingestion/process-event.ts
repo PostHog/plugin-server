@@ -1,13 +1,22 @@
-import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from '@posthog/node-rdkafka'
+import { KafkaConsumer, Producer, ProducerStream } from '@posthog/node-rdkafka'
 import { DateTime, Duration } from 'luxon'
-import { PluginsServer, EventData, Properties, Element, Team, Person, PersonDistinctId, CohortPeople } from 'types'
+import {
+    PluginsServer,
+    EventData,
+    Properties,
+    Element,
+    Team,
+    Person,
+    PersonDistinctId,
+    CohortPeople,
+    Queue,
+} from 'types'
 import { castTimestampOrNow, UUID, UUIDT } from '../utils'
-import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
+import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { elements_to_string } from './element'
-import { runPlugins } from '../plugins'
 import { Event as EventProto } from '../idl/protos'
 
-export class EventsProcessor {
+export class EventsProcessor implements Queue {
     pluginsServer: PluginsServer
     kafkaConsumer: KafkaConsumer
     kafkaProducerStreamEvent: ProducerStream
@@ -18,7 +27,16 @@ export class EventsProcessor {
             throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
         }
         this.pluginsServer = pluginsServer
-        this.kafkaConsumer = this.buildKafkaConsumer()
+        this.kafkaConsumer = new KafkaConsumer(
+            {
+                'metadata.broker.list': this.pluginsServer.KAFKA_HOSTS!,
+            },
+            {
+                'auto.offset.reset': 'earliest',
+            }
+        ).on('disconnected', () => {
+            console.info(`🛑 Kafka consumer disconnected!`)
+        })
         this.kafkaProducerStreamEvent = Producer.createWriteStream(
             {
                 'metadata.broker.list': pluginsServer.KAFKA_HOSTS,
@@ -37,54 +55,6 @@ export class EventsProcessor {
                 topic: KAFKA_SESSION_RECORDING_EVENTS,
             }
         )
-    }
-
-    buildKafkaConsumer(): KafkaConsumer {
-        const kafkaConsumer = new KafkaConsumer(
-            {
-                'metadata.broker.list': this.pluginsServer.KAFKA_HOSTS!,
-            },
-            {
-                'auto.offset.reset': 'earliest',
-            }
-        )
-
-        const processBatch = async (error: LibrdKafkaError, messages: Message[]): Promise<void> => {
-            if (error) {
-                throw error // TODO: handle errors in a smarter way
-            }
-            for (const message of messages) {
-                const timer = new Date()
-                let event: EventData | null = JSON.parse(message.value!.toString()) as EventData
-                event = await runPlugins(this.pluginsServer, event)
-                if (event) {
-                    await this.process_event_ee(
-                        event.distinct_id,
-                        event.ip,
-                        event.site_url,
-                        event,
-                        event.team_id,
-                        DateTime.fromISO(event.now),
-                        event.sent_at ? DateTime.fromISO(event.sent_at) : null
-                    )
-                }
-                this.pluginsServer.statsd?.timing(`${this.pluginsServer.STATSD_PREFIX}_posthog_cloud`, timer)
-            }
-            kafkaConsumer.commit()
-        }
-
-        kafkaConsumer
-            .on('ready', () => {
-                kafkaConsumer.subscribe([KAFKA_EVENTS_WAL])
-                // consume event messages in batches of 100
-                kafkaConsumer.consume(100, processBatch)
-                console.info(`✅ Kafka consumer ready and subscribed to topic ${KAFKA_EVENTS_WAL}!`)
-            })
-            .on('disconnected', () => {
-                console.info(`🛑 Kafka consumer disconnected!`)
-            })
-
-        return kafkaConsumer
     }
 
     /** This must be ran to start consuming events put into Kafka by external web server. */

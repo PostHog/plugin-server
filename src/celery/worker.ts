@@ -1,9 +1,10 @@
+import { Queue } from 'types'
 import Base from './base'
 import { Message } from './message'
 
 type Handler = (...args: any[]) => Promise<void>
 
-export class Worker extends Base {
+export class Worker extends Base implements Queue {
     handlers: Record<string, Handler> = {}
     activeTasks: Set<Promise<any>> = new Set()
 

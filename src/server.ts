@@ -2,17 +2,15 @@ import { Pool } from 'pg'
 import * as schedule from 'node-schedule'
 import Redis from 'ioredis'
 import { FastifyInstance } from 'fastify'
-import { PluginsServer, PluginsServerConfig } from './types'
+import { PluginsServer, PluginsServerConfig, Queue } from './types'
 import { startQueue } from './worker/queue'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
-import { Worker } from 'celery/worker'
 import { version } from '../package.json'
 import { PluginEvent } from 'posthog-plugins'
 import { defaultConfig } from './config'
 import Piscina from 'piscina'
 import { StatsD } from 'hot-shots'
 import * as Sentry from '@sentry/node'
-import { EventsProcessor } from './ingestion/process-event'
 import { delay } from './utils'
 
 export async function createServer(
@@ -70,11 +68,10 @@ export async function startPluginsServer(
     let serverConfig: PluginsServerConfig | undefined
     let pubSub: Redis.Redis | undefined
     let server: PluginsServer | undefined
-    let eventsProcessor: EventsProcessor | undefined
     let fastifyInstance: FastifyInstance | undefined
     let job: schedule.Job | undefined
     let piscina: Piscina | undefined
-    let queue: Worker | undefined
+    let queue: Queue | undefined
     let closeServer: () => Promise<void> | undefined
 
     let shuttingDown = false
@@ -84,7 +81,6 @@ export async function startPluginsServer(
             return
         }
         shuttingDown = true
-        eventsProcessor?.stop()
         if (fastifyInstance && !serverConfig?.DISABLE_WEB) {
             await stopFastifyInstance(fastifyInstance!)
         }
@@ -113,11 +109,6 @@ export async function startPluginsServer(
 
         piscina = makePiscina(serverConfig)
         const processEvent = (event: PluginEvent) => piscina!.runTask({ task: 'processEvent', args: { event } })
-
-        if (serverConfig.EE_ENABLED) {
-            eventsProcessor = new EventsProcessor(server)
-            eventsProcessor.connectKafkaConsumer()
-        }
 
         if (!serverConfig.DISABLE_WEB) {
             fastifyInstance = await startFastifyInstance(server)
