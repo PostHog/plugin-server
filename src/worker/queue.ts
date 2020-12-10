@@ -6,7 +6,7 @@ import Worker from '../celery/worker'
 import Client from '../celery/client'
 import { EventData, PluginsServer, Queue } from '../types'
 import { EventsProcessor } from '../ingestion/process-event'
-import { KAFKA_EVENTS_WAL } from '../ingestion/topics'
+import { KAFKA_EVENTS_HANDOFF } from '../ingestion/topics'
 
 function startQueueRedis(
     server: PluginsServer,
@@ -57,44 +57,49 @@ function startQueueKafka(
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
 ): Queue {
     const eventsProcessor = new EventsProcessor(server)
-    eventsProcessor.connectKafkaConsumer()
 
     eventsProcessor.kafkaConsumer.on('ready', () => {
-        console.info(`✅ Kafka consumer ready!`)
-        eventsProcessor.kafkaConsumer.subscribe([KAFKA_EVENTS_WAL])
-        // consume event messages in batches of 100
-        eventsProcessor.kafkaConsumer.consume(
-            100,
-            async (error: LibrdKafkaError, messages: Message[]): Promise<void> => {
-                if (error) {
-                    Sentry.captureException(error)
-                }
-                try {
-                    for (const message of messages) {
-                        const timer = new Date()
-                        const event = JSON.parse(message.value!.toString()) as EventData
-                        const processedEvent = await processEvent(event)
-                        if (processedEvent) {
-                            const { distinct_id, ip, site_url, team_id, now, sent_at } = processedEvent
-                            await eventsProcessor.process_event_ee(
-                                distinct_id,
-                                ip,
-                                site_url,
-                                processedEvent,
-                                team_id,
-                                DateTime.fromISO(now),
-                                sent_at ? DateTime.fromISO(sent_at) : null
-                            )
-                        }
-                        server.statsd?.timing(`${server.STATSD_PREFIX}_posthog_cloud`, timer)
+        eventsProcessor.kafkaConsumer.subscribe([KAFKA_EVENTS_HANDOFF])
+        // consume event messages in batches of 100 every 100 ms
+        setInterval(() => {
+            eventsProcessor.kafkaConsumer.consume(
+                100,
+                async (error: LibrdKafkaError, messages: Message[]): Promise<void> => {
+                    if (messages.length) {
+                        console.info(
+                            `${messages.length} ${messages.length === 1 ? 'message' : 'messages'} consumed from Kafka`
+                        )
                     }
-                    eventsProcessor.kafkaConsumer.commit()
-                } catch (error) {
-                    Sentry.captureException(error)
+                    if (error) {
+                        Sentry.captureException(error)
+                    }
+                    try {
+                        for (const message of messages) {
+                            const timer = new Date()
+                            const event = JSON.parse(message.value!.toString()) as EventData
+                            const processedEvent = await processEvent(event)
+                            if (processedEvent) {
+                                const { distinct_id, ip, site_url, team_id, now, sent_at } = processedEvent
+                                await eventsProcessor.process_event_ee(
+                                    distinct_id,
+                                    ip,
+                                    site_url,
+                                    processedEvent,
+                                    team_id,
+                                    DateTime.fromISO(now),
+                                    sent_at ? DateTime.fromISO(sent_at) : null
+                                )
+                            }
+                            server.statsd?.timing(`${server.STATSD_PREFIX}_posthog_cloud`, timer)
+                        }
+                        eventsProcessor.kafkaConsumer.commit()
+                    } catch (error) {
+                        Sentry.captureException(error)
+                    }
                 }
-            }
-        )
-        console.info(`✅ Kafka consumer ready and subscribed to topic ${KAFKA_EVENTS_WAL}!`)
+            )
+        }, 100)
+        console.info(`✅ Kafka consumer ready and subscribed to topic ${KAFKA_EVENTS_HANDOFF}!`)
     })
 
     eventsProcessor.connectKafkaConsumer()

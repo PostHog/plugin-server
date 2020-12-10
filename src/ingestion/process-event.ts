@@ -29,6 +29,7 @@ export class EventsProcessor implements Queue {
         this.pluginsServer = pluginsServer
         this.kafkaConsumer = new KafkaConsumer(
             {
+                'group.id': 'whatever', // TODO: make this something meaningful other than "whatever"? I don't know
                 'metadata.broker.list': this.pluginsServer.KAFKA_HOSTS!,
             },
             {
@@ -59,7 +60,7 @@ export class EventsProcessor implements Queue {
 
     /** This must be ran to start consuming events put into Kafka by external web server. */
     connectKafkaConsumer(): void {
-        console.info(`⏬ Connecting Kafka consumer...`)
+        console.info(`⏬ Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
         this.kafkaConsumer.connect()
     }
 
