@@ -38,6 +38,7 @@ export async function createServer(
         ? new StatsD({
               port: serverConfig.STATSD_PORT,
               host: serverConfig.STATSD_HOST,
+              prefix: serverConfig.STATSD_PREFIX,
           })
         : null
 
