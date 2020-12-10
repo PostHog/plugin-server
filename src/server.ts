@@ -67,13 +67,17 @@ export async function startPluginsServer(
     let queue: Worker | undefined
     let closeServer: () => Promise<void> | undefined
 
-    let shuttingDown = false
+    let shutdownStatus = 0
 
-    async function closeJobs() {
-        if (shuttingDown) {
-            return
+    async function closeJobs(): Promise<void> {
+        shutdownStatus += 1
+        if (shutdownStatus === 2) {
+            return console.info('🔁 Try again to exit process forcibly')
         }
-        shuttingDown = true
+        if (shutdownStatus >= 3) {
+            console.info('❗️ Exiting process forcibly!')
+            process.exit()
+        }
         console.info()
         if (fastifyInstance && !serverConfig?.DISABLE_WEB) {
             await stopFastifyInstance(fastifyInstance!)
