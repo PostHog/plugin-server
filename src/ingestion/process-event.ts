@@ -15,9 +15,11 @@ import { castTimestampOrNow, UUID, UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { elements_to_string } from './element'
 import { Event as EventProto } from '../idl/protos'
+import { Pool } from 'pg'
 
 export class EventsProcessor implements Queue {
     pluginsServer: PluginsServer
+    db: Pool
     kafkaConsumer: KafkaConsumer
     kafkaProducerStreamEvent: ProducerStream
     kafkaProducerStreamSessionRecording: ProducerStream
@@ -27,6 +29,7 @@ export class EventsProcessor implements Queue {
             throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
         }
         this.pluginsServer = pluginsServer
+        this.db = pluginsServer.db
         this.kafkaConsumer = new KafkaConsumer(
             {
                 'group.id': 'whatever', // TODO: make this something meaningful other than "whatever"? I don't know
@@ -157,7 +160,7 @@ export class EventsProcessor implements Queue {
     async _set_is_identified(team_id: number, distinct_id: string, is_identified = true): Promise<void> {
         let personFound: Person | undefined
         personFound = (
-            await this.pluginsServer.db.query(
+            await this.db.query(
                 'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
                 [team_id, distinct_id]
             )
@@ -169,7 +172,7 @@ export class EventsProcessor implements Queue {
                 // Catch race condition where in between getting and creating, another request already created this person
             } catch {
                 personFound = (
-                    await this.pluginsServer.db.query(
+                    await this.db.query(
                         'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
                         [team_id, distinct_id]
                     )
@@ -177,16 +180,14 @@ export class EventsProcessor implements Queue {
             }
         }
         if (personFound && !personFound.is_identified) {
-            await this.pluginsServer.db.query('UPDATE posthog_person SET is_identified = 1 WHERE id = $1', [
-                personFound.id,
-            ])
+            await this.db.query('UPDATE posthog_person SET is_identified = 1 WHERE id = $1', [personFound.id])
         }
     }
 
     async _update_person_properties(team_id: number, distinct_id: string, properties: Properties): Promise<void> {
         let personFound: Person | undefined
         personFound = (
-            await this.pluginsServer.db.query(
+            await this.db.query(
                 'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
                 [team_id, distinct_id]
             )
@@ -205,7 +206,7 @@ export class EventsProcessor implements Queue {
                 // Catch race condition where in between getting and creating, another request already created this person
             } catch {
                 personFound = (
-                    await this.pluginsServer.db.query(
+                    await this.db.query(
                         'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
                         [team_id, distinct_id]
                     )
@@ -213,7 +214,7 @@ export class EventsProcessor implements Queue {
             }
         }
         if (personFound) {
-            this.pluginsServer.db.query('UPDATE posthog_person SET properties = $1 WHERE id = $2', [
+            this.db.query('UPDATE posthog_person SET properties = $1 WHERE id = $2', [
                 { ...personFound.properties, ...properties },
                 personFound.id,
             ])
@@ -227,14 +228,14 @@ export class EventsProcessor implements Queue {
         retry_if_failed = true
     ): Promise<void> {
         const old_person: Person | undefined = (
-            await this.pluginsServer.db.query(
+            await this.db.query(
                 'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
                 [team_id, previous_distinct_id]
             )
         ).rows[0]
 
         const new_person: Person | undefined = (
-            await this.pluginsServer.db.query(
+            await this.db.query(
                 'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
                 [team_id, distinct_id]
             )
@@ -301,7 +302,7 @@ export class EventsProcessor implements Queue {
             }
         }
 
-        await this.pluginsServer.db.query('UPDATE posthog_person SET created_at = $1 WHERE id = $2', [
+        await this.db.query('UPDATE posthog_person SET created_at = $1 WHERE id = $2', [
             first_seen.toISO(),
             merge_into.id,
         ])
@@ -309,31 +310,29 @@ export class EventsProcessor implements Queue {
         // merge the distinct_ids
         for (const other_person of people_to_merge) {
             const other_person_distinct_ids: PersonDistinctId[] = (
-                await this.pluginsServer.db.query(
-                    'SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2',
-                    [other_person, merge_into.team_id]
-                )
+                await this.db.query('SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2', [
+                    other_person,
+                    merge_into.team_id,
+                ])
             ).rows
             for (const person_distinct_id of other_person_distinct_ids) {
-                await this.pluginsServer.db.query('UPDATE posthog_persondistinctid SET person_id = $1 WHERE id = $2', [
+                await this.db.query('UPDATE posthog_persondistinctid SET person_id = $1 WHERE id = $2', [
                     merge_into.id,
                     person_distinct_id.id,
                 ])
             }
 
             const other_person_cohort_ids: CohortPeople[] = (
-                await this.pluginsServer.db.query('SELECT * FROM posthog_cohortpeople WHERE person_id = $1', [
-                    other_person.id,
-                ])
+                await this.db.query('SELECT * FROM posthog_cohortpeople WHERE person_id = $1', [other_person.id])
             ).rows
             for (const person_cohort_id of other_person_cohort_ids) {
-                await this.pluginsServer.db.query('UPDATE posthog_cohortpeople SET person_id = $1 WHERE id = $2', [
+                await this.db.query('UPDATE posthog_cohortpeople SET person_id = $1 WHERE id = $2', [
                     merge_into.id,
                     person_cohort_id.id,
                 ])
             }
 
-            await this.pluginsServer.db.query('DELETE FROM posthog_person WHERE id = $1', [other_person.id])
+            await this.db.query('DELETE FROM posthog_person WHERE id = $1', [other_person.id])
         }
     }
 
@@ -368,7 +367,7 @@ export class EventsProcessor implements Queue {
             rows: [team],
         }: {
             rows: Team[]
-        } = await this.pluginsServer.db.query(
+        } = await this.db.query(
             'SELECT slack_incoming_webhook, event_names, event_properties, event_names_with_usage, event_properties_with_usage, anonymize_ips FROM posthog_team WHERE id = $1',
             [team_id]
         )
@@ -383,7 +382,7 @@ export class EventsProcessor implements Queue {
             rows: [{ pdiCount }],
         }: {
             rows: { pdiCount: number }[]
-        } = await this.pluginsServer.db.query(
+        } = await this.db.query(
             'SELECT COUNT(*) AS pdiCount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
             [team_id, distinct_id]
         )
@@ -432,7 +431,7 @@ export class EventsProcessor implements Queue {
             }
         }
         if (save) {
-            await this.pluginsServer.db.query(
+            await this.db.query(
                 'UPDATE posthog_team SET ingested_event = $1, event_names = $2, event_names_with_usage = $3, event_properties = $4, event_properties_with_usage = $5, event_properties_numerical = $6 WHERE id = $7',
                 [
                     team.ingested_event,
@@ -456,7 +455,7 @@ export class EventsProcessor implements Queue {
         uuid: UUID | string
     ): Promise<Person> {
         return (
-            await this.pluginsServer.db.query(
+            await this.db.query(
                 'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6)',
                 [created_at.toISO(), properties, team_id, is_user_id, is_identified, uuid.toString()]
             )
@@ -464,7 +463,7 @@ export class EventsProcessor implements Queue {
     }
 
     async add_distinct_id(person: Person, distinct_id: string): Promise<void> {
-        await this.pluginsServer.db.query(
+        await this.db.query(
             'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3)',
             [distinct_id, person.id, person.team_id]
         )

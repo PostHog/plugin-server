@@ -65,7 +65,7 @@ function startQueueKafka(
             eventsProcessor.kafkaConsumer.consume(
                 100,
                 async (error: LibrdKafkaError, messages: Message[]): Promise<void> => {
-                    if (messages.length) {
+                    if (messages?.length) {
                         console.info(
                             `${messages.length} ${messages.length === 1 ? 'message' : 'messages'} consumed from Kafka`
                         )

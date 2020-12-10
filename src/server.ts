@@ -24,7 +24,7 @@ export async function createServer(
     const redis = new Redis(serverConfig.REDIS_URL, { maxRetriesPerRequest: -1 })
     redis.on('error', (error) => {
         Sentry.captureException(error)
-        console.error('🔴 Redis error! Trying to reconnect.')
+        console.error('🔴 Redis error! Trying to reconnect...')
         console.error(error)
     })
     await redis.info()
@@ -130,8 +130,8 @@ export async function startPluginsServer(
 
         // every 5 sec set a @posthog-plugin-server/ping redis key
         job = schedule.scheduleJob('*/5 * * * * *', () => {
-            server!.redis!.set('@posthog-plugin-server/ping', new Date().toISOString())
-            server!.redis!.expire('@posthog-plugin-server/ping', 60)
+            server!.redis.set('@posthog-plugin-server/ping', new Date().toISOString())
+            server!.redis.expire('@posthog-plugin-server/ping', 60)
         })
         console.info(`🚀 All systems go.`)
     } catch (error) {
