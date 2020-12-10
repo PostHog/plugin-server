@@ -154,7 +154,7 @@ export async function startPluginsServer(
         // every 10 seconds sends stuff to statsd
         statsJob = schedule.scheduleJob('*/10 * * * * *', () => {
             if (piscina) {
-                server!.statsd.gauge(`piscina.utilization`, piscina?.utilization)
+                server!.statsd.gauge(`piscina.utilization`, (piscina?.utilization || 0) * 100)
                 server!.statsd.gauge(`piscina.threads`, piscina?.threads.length)
                 server!.statsd.gauge(`piscina.queue_size`, piscina?.queueSize)
             }
