@@ -12,6 +12,7 @@ import { defaultConfig } from './config'
 import Piscina from 'piscina'
 import * as Sentry from '@sentry/node'
 import { delay } from './utils'
+import { StatsD } from 'hot-shots'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {}
@@ -33,10 +34,18 @@ export async function createServer(
         connectionString: serverConfig.DATABASE_URL,
     })
 
+    const statsd = serverConfig.STATSD_HOST
+        ? new StatsD({
+              port: serverConfig.STATSD_PORT,
+              host: serverConfig.STATSD_HOST,
+          })
+        : null
+
     const server: PluginsServer = {
         ...serverConfig,
         db,
         redis,
+        statsd,
 
         plugins: new Map(),
         pluginConfigs: new Map(),
