@@ -35,16 +35,19 @@ export async function createServer(
         connectionString: serverConfig.DATABASE_URL,
     })
 
-    const statsd = new StatsD({
-        port: serverConfig.STATSD_PORT,
-        host: serverConfig.STATSD_HOST,
-        prefix: serverConfig.STATSD_PREFIX,
-    })
-    // don't repeat the same info in each thread
-    if (threadId === null) {
-        console.info(
-            `🪵 Sending metrics to statsd at ${serverConfig.STATSD_HOST}:${serverConfig.STATSD_PORT}, prefix: "${serverConfig.STATSD_PREFIX}"`
-        )
+    let statsd: StatsD | undefined
+    if (serverConfig.STATSD_HOST) {
+        const statsd = new StatsD({
+            port: serverConfig.STATSD_PORT,
+            host: serverConfig.STATSD_HOST,
+            prefix: serverConfig.STATSD_PREFIX,
+        })
+        // don't repeat the same info in each thread
+        if (threadId === null) {
+            console.info(
+                `🪵 Sending metrics to statsd at ${serverConfig.STATSD_HOST}:${serverConfig.STATSD_PORT}, prefix: "${serverConfig.STATSD_PREFIX}"`
+            )
+        }
     }
 
     const server: PluginsServer = {
@@ -154,9 +157,9 @@ export async function startPluginsServer(
         // every 10 seconds sends stuff to statsd
         statsJob = schedule.scheduleJob('*/10 * * * * *', () => {
             if (piscina) {
-                server!.statsd.gauge(`piscina.utilization`, (piscina?.utilization || 0) * 100)
-                server!.statsd.gauge(`piscina.threads`, piscina?.threads.length)
-                server!.statsd.gauge(`piscina.queue_size`, piscina?.queueSize)
+                server!.statsd?.gauge(`piscina.utilization`, (piscina?.utilization || 0) * 100)
+                server!.statsd?.gauge(`piscina.threads`, piscina?.threads.length)
+                server!.statsd?.gauge(`piscina.queue_size`, piscina?.queueSize)
             }
         })
         console.info(`🚀 All systems go.`)

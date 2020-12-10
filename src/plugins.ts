@@ -195,7 +195,7 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
                 errored = true
                 await processError(server, pluginConfig, error, returnedEvent)
             }
-            server.statsd?.timing(`process_event.${pluginConfig.plugin?.name}`, timer)
+            server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.process_event`, timer)
 
             if (!returnedEvent) {
                 return null
@@ -236,7 +236,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
                     errored = true
                     await processError(server, pluginConfig, error, returnedEvents[0])
                 }
-                server.statsd?.timing(`process_event_batch.${pluginConfig.plugin?.name}`, timer)
+                server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.process_event_batch`, timer)
             }
         }
 
