@@ -55,7 +55,7 @@ test('empty plugins', async () => {
     const libJs = ''
     const vm = createPluginConfigVM(mockServer, mockConfig, indexJs, libJs)
 
-    expect(Object.keys(vm).sort()).toEqual(['methods', 'schedule', 'vm'])
+    expect(Object.keys(vm).sort()).toEqual(['methods', 'tasks', 'vm'])
     expect(Object.keys(vm.methods).sort()).toEqual(['processEvent', 'processEventBatch'])
     expect(vm.methods.processEvent).toEqual(undefined)
     expect(vm.methods.processEventBatch).toEqual(undefined)
