@@ -200,14 +200,12 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
         if (pluginConfig.vm?.methods?.processEvent) {
             const timer = new Date()
 
-            let errored = false
             const { processEvent } = pluginConfig.vm.methods
-            const startTime = performance.now()
             try {
                 returnedEvent = (await processEvent(returnedEvent)) || null
             } catch (error) {
-                errored = true
                 await processError(server, pluginConfig, error, returnedEvent)
+                server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.process_event.ERROR`)
             }
             server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.process_event`, timer)
 
@@ -242,13 +240,11 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
             const timer = new Date()
             const { processEventBatch } = pluginConfig.vm?.methods || {}
             if (processEventBatch && returnedEvents.length > 0) {
-                const startTime = performance.now()
-                let errored = false
                 try {
                     returnedEvents = (await processEventBatch(returnedEvents)) || []
                 } catch (error) {
-                    errored = true
                     await processError(server, pluginConfig, error, returnedEvents[0])
+                    server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.process_event_batch.ERROR`)
                 }
                 server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.process_event_batch`, timer)
             }
@@ -261,10 +257,17 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
 }
 
 export async function runPluginTask(server: PluginsServer, taskName: string, pluginConfigId: number): Promise<any> {
-    const startTime = performance.now()
-    const pluginConfig = server.pluginConfigs.get(pluginConfigId)
-    const task = pluginConfig?.vm?.tasks[taskName]
-    const response = await task?.exec()
+    const timer = new Date()
+    let response
+    try {
+        const pluginConfig = server.pluginConfigs.get(pluginConfigId)
+        const task = pluginConfig?.vm?.tasks[taskName]
+        response = await task?.exec()
+    } catch (error) {
+        await processError(server, pluginConfigId, error)
+        server.statsd?.increment(`plugin.task.${taskName}.${pluginConfigId}.ERROR`)
+    }
+    server.statsd?.timing(`plugin.task.${taskName}.${pluginConfigId}`, timer)
     return response
 }
 
