@@ -24,15 +24,11 @@ export function createPostHog(server: PluginsServer, pluginConfig: PluginConfig)
                 },
             }
 
-            client.sendTask('posthog.tasks.process_event.process_event', [], {
-                distinct_id: state.distinctId,
-                ip: null,
-                site_url: null,
-                data,
-                team_id: pluginConfig.team_id,
-                now: new Date(),
-                sent_at: new Date(),
-            })
+            client.sendTask(
+                'posthog.tasks.process_event.process_event_with_plugins',
+                [state.distinctId, null, null, data, pluginConfig.team_id, new Date(), new Date()],
+                {}
+            )
         },
     }
 }
