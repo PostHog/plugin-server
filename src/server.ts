@@ -22,11 +22,15 @@ export async function createServer(
     }
 
     const redis = new Redis(serverConfig.REDIS_URL, { maxRetriesPerRequest: -1 })
-    redis.on('error', (error) => {
-        Sentry.captureException(error)
-        console.error('🔴 Redis error! Trying to reconnect...')
-        console.error(error)
-    })
+    redis
+        .on('error', (error) => {
+            Sentry.captureException(error)
+            console.error('🔴 Redis error encountered! Trying to reconnect...')
+            console.error(error)
+        })
+        .on('ready', () => {
+            console.info(`✅ Connected to Redis at ${serverConfig.REDIS_URL}!`)
+        })
     await redis.info()
 
     const db = new Pool({
