@@ -41,10 +41,9 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
         if (task === 'getPluginSchedule') {
             response = cloneObject(server.pluginSchedule)
         }
-        if (task.startsWith('tasks.')) {
-            const taskName = task.substring(6)
+        if (task.startsWith('runEvery')) {
             const { pluginConfigId } = args
-            response = cloneObject(await runPluginTask(server, taskName, pluginConfigId))
+            response = cloneObject(await runPluginTask(server, task, pluginConfigId))
         }
         server.statsd?.timing(`piscina_task.${task}`, timer)
         return response

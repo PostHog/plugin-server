@@ -68,15 +68,12 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
     for (const [id, pluginConfig] of server.pluginConfigs) {
         if (!foundPluginConfigs.has(id)) {
             server.pluginConfigs.delete(id)
-            return
-        }
-
-        if (!pluginConfig.vm) {
+        } else if (!pluginConfig.vm) {
             await loadPlugin(server, pluginConfig)
         }
     }
 
-    // gather runEvery tasks into a schedule
+    // gather runEvery* tasks into a schedule
     server.pluginSchedule = { runEveryMinute: [], runEveryHour: [], runEveryDay: [] }
     for (const [id, pluginConfig] of server.pluginConfigs) {
         if (pluginConfig.vm?.tasks && Object.keys(pluginConfig.vm?.tasks).length > 0) {
