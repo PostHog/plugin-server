@@ -61,3 +61,26 @@ test('runTasksDebounced', async () => {
     await piscina.destroy()
     await waitForTasksToFinish(server)
 })
+
+test('runTasksDebounced exception', async () => {
+    const workerThreads = 2
+    const testCode = `
+        async function runEveryMinute (meta) {
+            throw new Error('lol')
+        }
+    `
+    const piscina = setupPiscina(workerThreads, testCode, 10)
+
+    const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
+    const [server] = await createServer({ LOG_LEVEL: LogLevel.Log })
+    server.pluginSchedule = await getPluginSchedule()
+
+    runTasksDebounced(server, piscina, 'runEveryMinute')
+
+    await waitForTasksToFinish(server)
+
+    // nothing bad should have happened. the error is in SQL via setError, but that ran in another worker (can't mock)
+    // and we're not testing it E2E so we can't check the DB either...
+
+    await piscina.destroy()
+})
