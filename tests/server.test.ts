@@ -4,6 +4,8 @@ import { LogLevel } from '../src/types'
 import { delay } from '../src/utils'
 import { PluginEvent } from 'posthog-plugins/src/types'
 
+jest.setTimeout(60000) // 60 sec timeout
+
 function createEvent(index = 0): PluginEvent {
     return {
         distinct_id: 'my_id',
@@ -58,8 +60,8 @@ test('runTasksDebounced', async () => {
     const event3 = await processEvent(createEvent())
     expect(event3.properties['counter']).toBe(1)
 
-    await piscina.destroy()
     await waitForTasksToFinish(server)
+    await piscina.destroy()
     await closeServer()
 })
 
