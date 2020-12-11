@@ -1,5 +1,5 @@
 import { setupPiscina } from './helpers/worker'
-import { createServer, runTasksDebounced } from '../src/server'
+import { createServer, runTasksDebounced, waitForTasksToFinish } from '../src/server'
 import { LogLevel } from '../src/types'
 import { delay } from '../src/utils'
 import { PluginEvent } from 'posthog-plugins/src/types'
@@ -35,8 +35,6 @@ test('runTasksDebounced', async () => {
     `
     const piscina = setupPiscina(workerThreads, testCode, 10)
 
-    const runEveryDay = (pluginConfigId: number) =>
-        piscina.runTask({ task: 'tasks.runEveryDay', args: { pluginConfigId } })
     const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
 
@@ -61,4 +59,5 @@ test('runTasksDebounced', async () => {
     expect(event3.properties['counter']).toBe(1)
 
     await piscina.destroy()
+    await waitForTasksToFinish(server)
 })

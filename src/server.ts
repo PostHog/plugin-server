@@ -115,6 +115,7 @@ export async function startPluginsServer(
         runEveryDayJob && schedule.cancelJob(runEveryDayJob)
         runEveryHourJob && schedule.cancelJob(runEveryHourJob)
         runEveryMinuteJob && schedule.cancelJob(runEveryMinuteJob)
+        await waitForTasksToFinish(server!)
         await stopPiscina(piscina!)
         await closeServer()
 
@@ -148,6 +149,7 @@ export async function startPluginsServer(
             if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
                 console.info('⚡ Reloading plugins!')
                 await queue?.stop()
+                await waitForTasksToFinish(server!)
                 await stopPiscina(piscina!)
                 piscina = makePiscina(serverConfig!)
                 queue = startQueue(server!, processEvent)
@@ -221,4 +223,8 @@ export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskN
                 server.pluginSchedulePromises[taskName][pluginConfigId] = null
             })
     }
+}
+
+export async function waitForTasksToFinish(server: PluginsServer) {
+    return Promise.all(Object.values(server.pluginSchedulePromises).flatMap(Object.values))
 }
