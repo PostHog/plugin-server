@@ -38,7 +38,7 @@ test('runTasksDebounced', async () => {
     const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
 
-    const [server] = await createServer({ LOG_LEVEL: LogLevel.Log })
+    const [server, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
     server.pluginSchedule = await getPluginSchedule()
     expect(server.pluginSchedule).toEqual({ runEveryDay: [], runEveryHour: [], runEveryMinute: [39] })
 
@@ -60,6 +60,7 @@ test('runTasksDebounced', async () => {
 
     await piscina.destroy()
     await waitForTasksToFinish(server)
+    await closeServer()
 })
 
 test('runTasksDebounced exception', async () => {
@@ -72,7 +73,7 @@ test('runTasksDebounced exception', async () => {
     const piscina = setupPiscina(workerThreads, testCode, 10)
 
     const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
-    const [server] = await createServer({ LOG_LEVEL: LogLevel.Log })
+    const [server, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
     server.pluginSchedule = await getPluginSchedule()
 
     runTasksDebounced(server, piscina, 'runEveryMinute')
@@ -83,4 +84,5 @@ test('runTasksDebounced exception', async () => {
     // and we're not testing it E2E so we can't check the DB either...
 
     await piscina.destroy()
+    await closeServer()
 })
