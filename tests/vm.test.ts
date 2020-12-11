@@ -4,6 +4,9 @@ import { PluginEvent } from 'posthog-plugins'
 import { createServer } from '../src/server'
 import * as fetch from 'node-fetch'
 import { delay } from '../src/utils'
+import Client from '../src/celery/client'
+
+jest.mock('../src/celery/client')
 
 const defaultEvent = {
     distinct_id: 'my_id',
@@ -42,6 +45,7 @@ const mockConfig: PluginConfig = {
 }
 
 beforeEach(async () => {
+    ;(Client as any).mockClear()
     mockServer = (await createServer())[0]
 })
 
@@ -614,4 +618,54 @@ test('runEvery must be a function', async () => {
     expect(Object.values(vm.tasks).map((v) => v?.name)).toEqual(['runEveryMinute'])
     expect(Object.values(vm.tasks).map((v) => v?.type)).toEqual(['runEvery'])
     expect(Object.values(vm.tasks).map((v) => typeof v?.exec)).toEqual(['function'])
+})
+
+test('posthog in runEvery', async () => {
+    const indexJs = `
+        function runEveryMinute(meta) {
+            posthog.capture('my-new-event', { random: 'properties' })
+            return 'haha'
+        }
+    `
+    const vm = createPluginConfigVM(mockServer, mockConfig, indexJs)
+
+    expect(Client).not.toHaveBeenCalled
+
+    const response = await vm.tasks.runEveryMinute.exec()
+    expect(response).toBe('haha')
+
+    expect(Client).toHaveBeenCalledTimes(1)
+    expect((Client as any).mock.calls[0][1]).toEqual(mockServer.PLUGINS_CELERY_QUEUE)
+
+    const mockClientInstance = (Client as any).mock.instances[0]
+    const mockSendTask = mockClientInstance.sendTask
+
+    expect(mockSendTask.mock.calls[0][0]).toEqual('posthog.tasks.process_event.process_event')
+    expect(mockSendTask.mock.calls[0][1]).toEqual([])
+    const sentEvent = mockSendTask.mock.calls[0][2]
+    expect(Object.keys(sentEvent).sort()).toEqual([
+        'data',
+        'distinct_id',
+        'ip',
+        'now',
+        'sent_at',
+        'site_url',
+        'team_id',
+    ])
+    expect(Object.keys(sentEvent.data).sort()).toEqual(['distinct_id', 'event', 'properties', 'timestamp'])
+    expect(Object.keys(sentEvent.data.properties).sort()).toEqual(['$lib', '$lib_version', 'random'])
+    console.log(sentEvent)
+    expect(sentEvent).toEqual(
+        expect.objectContaining({
+            data: expect.objectContaining({
+                distinct_id: 'mock-plugin (4)',
+                event: 'my-new-event',
+                properties: expect.objectContaining({ $lib: 'posthog-plugin-server', random: 'properties' }),
+            }),
+            distinct_id: 'mock-plugin (4)',
+            ip: null,
+            site_url: null,
+            team_id: 2,
+        })
+    )
 })
