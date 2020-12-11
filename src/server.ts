@@ -151,7 +151,7 @@ export async function startPluginsServer(
                 await stopPiscina(piscina!)
                 piscina = makePiscina(serverConfig!)
                 queue = startQueue(server!, processEvent)
-                server!.pluginSchedule = await piscina.runTask('getPluginSchedule')
+                server!.pluginSchedule = await piscina.runTask({ task: 'getPluginSchedule' })
             }
         })
 
@@ -170,7 +170,7 @@ export async function startPluginsServer(
             }
         })
 
-        server.pluginSchedule = await piscina.runTask('getPluginSchedule')
+        server.pluginSchedule = await piscina.runTask({ task: 'getPluginSchedule' })
 
         runEveryMinuteJob = schedule.scheduleJob('* * * * * *', () => {
             runTasksDebounced(server!, piscina!, 'runEveryMinute')
