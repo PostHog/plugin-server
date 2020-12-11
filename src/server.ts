@@ -12,7 +12,6 @@ import Piscina from 'piscina'
 import { StatsD } from 'hot-shots'
 import * as Sentry from '@sentry/node'
 import { delay } from './utils'
-import { StatsD } from 'hot-shots'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},

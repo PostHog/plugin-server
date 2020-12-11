@@ -28,9 +28,6 @@ export interface PluginsServerConfig extends Record<string, any> {
     DISABLE_WEB: boolean
     WEB_PORT: number
     WEB_HOSTNAME: string
-    STATSD_HOST: string | null
-    STATSD_PORT: number
-    STATSD_PREFIX: string
     LOG_LEVEL: LogLevel
     SENTRY_DSN: string | null
     STATSD_HOST: string | null
