@@ -45,7 +45,12 @@ test('piscina worker test', async () => {
 
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
     const processEventBatch = (batch: PluginEvent[]) => piscina.runTask({ task: 'processEventBatch', args: { batch } })
-    const runEveryDay = () => piscina.runTask({ task: 'tasks.runEveryDay', args: { pluginConfigId: 39 } })
+    const runEveryDay = (pluginConfigId: number) =>
+        piscina.runTask({ task: 'tasks.runEveryDay', args: { pluginConfigId } })
+    const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
+
+    const pluginSchedule = await getPluginSchedule()
+    expect(pluginSchedule).toEqual({ runEveryDay: [39], runEveryHour: [], runEveryMinute: [] })
 
     const event = await processEvent(createEvent())
     expect(event.properties['somewhere']).toBe('over the rainbow')
@@ -53,7 +58,42 @@ test('piscina worker test', async () => {
     const eventBatch = await processEventBatch([createEvent()])
     expect(eventBatch[0]!.properties['somewhere']).toBe('over the rainbow')
 
-    const everyDayReturn = await runEveryDay()
+    const everyDayReturn = await runEveryDay(39)
+    expect(everyDayReturn).toBe(4)
+
+    await piscina.destroy()
+})
+
+test('scheduled task test', async () => {
+    const workerThreads = 2
+    const testCode = `
+        function processEvent (event, meta) {
+            event.properties["somewhere"] = "over the rainbow";
+            return event
+        }
+        async function runEveryDay (meta) {
+            console.log('ran daily!')
+            return 4
+        } 
+    `
+    const piscina = setupPiscina(workerThreads, testCode, 10)
+
+    const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
+    const processEventBatch = (batch: PluginEvent[]) => piscina.runTask({ task: 'processEventBatch', args: { batch } })
+    const runEveryDay = (pluginConfigId: number) =>
+        piscina.runTask({ task: 'tasks.runEveryDay', args: { pluginConfigId } })
+    const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
+
+    const pluginSchedule = await getPluginSchedule()
+    expect(pluginSchedule).toEqual({ runEveryDay: [39], runEveryHour: [], runEveryMinute: [] })
+
+    const event = await processEvent(createEvent())
+    expect(event.properties['somewhere']).toBe('over the rainbow')
+
+    const eventBatch = await processEventBatch([createEvent()])
+    expect(eventBatch[0]!.properties['somewhere']).toBe('over the rainbow')
+
+    const everyDayReturn = await runEveryDay(39)
     expect(everyDayReturn).toBe(4)
 
     await piscina.destroy()

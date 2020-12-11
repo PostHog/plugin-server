@@ -38,10 +38,13 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
             // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
             response = cloneObject(processedEvents as any[])
         }
+        if (task === 'getPluginSchedule') {
+            response = cloneObject(server.pluginSchedule)
+        }
         if (task.startsWith('tasks.')) {
             const taskName = task.substring(6)
             const { pluginConfigId } = args
-            response = await runPluginTask(server, taskName, pluginConfigId)
+            response = cloneObject(await runPluginTask(server, taskName, pluginConfigId))
         }
         server.statsd?.timing(`piscina_task.${task}`, timer)
         return response

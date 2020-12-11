@@ -82,10 +82,7 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         if (pluginConfig.vm?.tasks && Object.keys(pluginConfig.vm?.tasks).length > 0) {
             for (const [taskName, task] of Object.entries(pluginConfig.vm.tasks)) {
                 if (task && taskName in server.pluginSchedule) {
-                    server.pluginSchedule[taskName].push({
-                        pluginConfig,
-                        task,
-                    })
+                    server.pluginSchedule[taskName].push(pluginConfig.id)
                 }
             }
         }

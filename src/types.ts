@@ -49,12 +49,8 @@ export interface PluginsServer extends PluginsServerConfig {
     pluginConfigs: Map<PluginConfigId, PluginConfig>
     pluginConfigsPerTeam: Map<TeamId, PluginConfig[]>
     defaultConfigs: PluginConfig[]
-    pluginSchedule: Record<string, PluginTaskContainer[]>
-}
-
-export type PluginTaskContainer = {
-    pluginConfig: PluginConfig
-    task: PluginTask
+    pluginSchedule: Record<string, PluginConfigId[]>
+    pluginSchedulePromises: Record<string, Record<PluginConfigId, Promise<any> | null>>
 }
 
 export type PluginId = number
