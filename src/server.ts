@@ -200,7 +200,7 @@ export async function stopPiscina(piscina: Piscina): Promise<void> {
     await piscina.destroy()
 }
 
-function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskName: string) {
+export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskName: string) {
     const runTask = (pluginConfigId: PluginConfigId) =>
         piscina!.runTask({ task: `tasks.${taskName}`, args: { pluginConfigId } })
 
@@ -218,7 +218,7 @@ function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskName: st
                 server.pluginSchedulePromises[taskName][pluginConfigId] = null
             })
             .catch(async (error) => {
-                await processError(server, server.pluginConfigs.get(pluginConfigId)!, error)
+                await processError(server, pluginConfigId, error)
                 server.pluginSchedulePromises[taskName][pluginConfigId] = null
             })
     }
