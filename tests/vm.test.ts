@@ -366,8 +366,11 @@ test('meta.config', async () => {
 
 test('meta.cache set/get', async () => {
     const indexJs = `
+        async function setupPlugin (meta) {
+            await meta.cache.set('counter', 0)
+        }
         async function processEvent (event, meta) {
-            const counter = await meta.cache.get('counter', 0)
+            const counter = await meta.cache.get('counter', 999)
             meta.cache.set('counter', counter + 1)
             event.properties['counter'] = counter + 1
             return event
