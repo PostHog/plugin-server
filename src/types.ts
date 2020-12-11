@@ -33,6 +33,9 @@ export interface PluginsServerConfig extends Record<string, any> {
     STATSD_PREFIX: string
     LOG_LEVEL: LogLevel
     SENTRY_DSN: string | null
+    STATSD_HOST: string | null
+    STATSD_PORT: number
+    STATSD_PREFIX: string
 
     __jestMock?: {
         getPluginRows: Plugin[]
@@ -45,7 +48,8 @@ export interface PluginsServer extends PluginsServerConfig {
     // active connections to postgres and redis
     db: Pool
     redis: Redis
-    statsd: StatsD | null
+    statsd: StatsD | undefined
+
     // currently enabled plugin status
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>

@@ -23,6 +23,9 @@ export function getDefaultConfig(): PluginsServerConfig {
         STATSD_PORT: 8125,
         STATSD_PREFIX: '',
         SENTRY_DSN: null,
+        STATSD_HOST: null,
+        STATSD_PORT: 8125,
+        STATSD_PREFIX: 'plugin-server.',
     }
 }
 
@@ -46,6 +49,9 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         KAFKA_HOSTS: 'comma-delimited Kafka hosts',
         EE_ENABLED: 'whether Enterprise Edition backend (Kafka + ClickHouse) is enabled',
         SENTRY_DSN: 'sentry ingestion url',
+        STATSD_HOST: 'StatsD host - integration disabled if not provided',
+        STATSD_PORT: 'StatsD port',
+        STATSD_PREFIX: 'StatsD prefix',
     }
 }
 
