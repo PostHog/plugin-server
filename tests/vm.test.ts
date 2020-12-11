@@ -575,3 +575,23 @@ test('attachments', async () => {
 
     expect(event.properties).toEqual(attachments)
 })
+
+test('schedule', async () => {
+    const indexJs = `
+        function runEveryMinute(meta) {
+            
+        }
+        function runEveryHour(meta) {
+            
+        }
+        function runEveryDay(meta) {
+            
+        }
+    `
+    const vm = createPluginConfigVM(mockServer, mockConfig, indexJs)
+
+    expect(Object.keys(vm.schedule)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
+    expect(Object.values(vm.schedule).map((v) => v?.key)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
+    expect(Object.values(vm.schedule).map((v) => v?.type)).toEqual(['runEvery', 'runEvery', 'runEvery'])
+    expect(Object.values(vm.schedule).map((v) => typeof v?.exec)).toEqual(['function', 'function', 'function'])
+})

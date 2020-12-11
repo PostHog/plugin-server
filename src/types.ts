@@ -107,11 +107,10 @@ export interface PluginAttachmentDB {
     contents: Buffer | null
 }
 
-export interface PluginScript {
-    plugin: Plugin
-    script: VMScript
-    processEvent: boolean
-    setupTeam: boolean
+export interface PluginTask {
+    key: string
+    type: 'runEvery'
+    exec: () => Promise<void>
 }
 
 export interface PluginConfigVMReponse {
@@ -119,5 +118,10 @@ export interface PluginConfigVMReponse {
     methods: {
         processEvent: (event: PluginEvent) => Promise<PluginEvent>
         processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
+    }
+    schedule: {
+        runEveryMinute?: PluginTask
+        runEveryHour?: PluginTask
+        runEveryDay?: PluginTask
     }
 }
