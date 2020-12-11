@@ -10,7 +10,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         KAFKA_HOSTS: null,
         EE_ENABLED: false,
         PLUGINS_CELERY_QUEUE: 'posthog-plugins',
-        REDIS_URL: 'redis://localhost/',
+        REDIS_URL: 'redis://127.0.0.1',
         BASE_DIR: '.',
         PLUGINS_RELOAD_PUBSUB_CHANNEL: 'reload-plugins',
         DISABLE_WEB: true,
