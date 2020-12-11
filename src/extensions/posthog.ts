@@ -3,15 +3,13 @@ import { version } from '../../package.json'
 import Client from '../celery/client'
 
 export function createPostHog(server: PluginsServer, pluginConfig: PluginConfig) {
-    const state = {
-        distinctId: `${pluginConfig.plugin?.name} (${pluginConfig.id})`,
-    }
+    const distinctId = pluginConfig.plugin?.name || `Plugin ${pluginConfig.plugin_id}`
 
     function sendEvent(event: string, properties: Record<string, any> = {}) {
         const client = new Client(server.redis, server.PLUGINS_CELERY_QUEUE)
 
         const data = {
-            distinct_id: state.distinctId,
+            distinct_id: distinctId,
             event,
             timestamp: new Date(),
             properties: {
@@ -23,14 +21,12 @@ export function createPostHog(server: PluginsServer, pluginConfig: PluginConfig)
 
         client.sendTask(
             'posthog.tasks.process_event.process_event_with_plugins',
-            [state.distinctId, null, null, data, pluginConfig.team_id, new Date(), new Date()],
+            [distinctId, null, null, data, pluginConfig.team_id, new Date(), new Date()],
             {}
         )
     }
+
     return {
-        init(distinctId: string) {
-            state.distinctId = distinctId
-        },
         capture(event: string, properties: Record<string, any> = {}) {
             sendEvent(event, properties)
         },
