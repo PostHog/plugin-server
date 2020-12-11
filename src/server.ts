@@ -226,5 +226,9 @@ export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskN
 }
 
 export async function waitForTasksToFinish(server: PluginsServer) {
-    return Promise.all(Object.values(server.pluginSchedulePromises).flatMap(Object.values))
+    const activePromises = Object.values(server.pluginSchedulePromises)
+        .map(Object.values)
+        .flat()
+        .filter((a) => a)
+    return Promise.all(activePromises)
 }
