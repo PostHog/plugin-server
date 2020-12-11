@@ -60,10 +60,10 @@ function startQueueKafka(
 
     eventsProcessor.kafkaConsumer.on('ready', () => {
         eventsProcessor.kafkaConsumer.subscribe([KAFKA_EVENTS_WAL])
-        // consume event messages in batches of 100 every 100 ms
+        // consume event messages in batches of 1000 every 50 ms
         setInterval(() => {
             eventsProcessor.kafkaConsumer.consume(
-                10000,
+                1000,
                 async (error: LibrdKafkaError, messages: Message[]): Promise<void> => {
                     if (messages?.length) {
                         console.info(
@@ -98,7 +98,7 @@ function startQueueKafka(
                     }
                 }
             )
-        }, 100)
+        }, 50)
         console.info(`✅ Kafka consumer ready and subscribed to topic ${KAFKA_EVENTS_WAL}!`)
     })
 
