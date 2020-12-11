@@ -58,10 +58,10 @@ export type TeamId = number
 export interface Plugin {
     id: PluginId
     name: string
-    description: string
-    url: string
+    description?: string
+    url?: string
     config_schema: Record<string, PluginConfigSchema> | PluginConfigSchema[]
-    tag: string
+    tag?: string
     archive: Buffer | null
     error?: PluginError
 }

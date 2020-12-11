@@ -93,7 +93,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
     }
 
     try {
-        if (plugin.url.startsWith('file:')) {
+        if (plugin.url?.startsWith('file:')) {
             const pluginPath = path.resolve(server.BASE_DIR, plugin.url.substring(5))
             const configPath = path.resolve(pluginPath, 'plugin.json')
 
@@ -170,7 +170,11 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                 await processError(server, pluginConfig, `Could not load index.js for plugin "${plugin.name}"!`)
             }
         } else {
-            await processError(server, pluginConfig, 'Un-downloaded remote plugins not supported!')
+            await processError(
+                server,
+                pluginConfig,
+                `Un-downloaded remote plugins not supported! Plugin: "${plugin.name}"`
+            )
         }
     } catch (error) {
         await processError(server, pluginConfig, error)
