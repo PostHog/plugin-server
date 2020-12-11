@@ -24,7 +24,6 @@ test('piscina worker test', async () => {
             return event
         }
         async function runEveryDay (meta) {
-            console.log('ran daily!')
             return 4
         } 
     `
@@ -32,8 +31,7 @@ test('piscina worker test', async () => {
 
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
     const processEventBatch = (batch: PluginEvent[]) => piscina.runTask({ task: 'processEventBatch', args: { batch } })
-    const runEveryDay = (pluginConfigId: number) =>
-        piscina.runTask({ task: 'tasks.runEveryDay', args: { pluginConfigId } })
+    const runEveryDay = (pluginConfigId: number) => piscina.runTask({ task: 'runEveryDay', args: { pluginConfigId } })
     const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
 
     const pluginSchedule = await getPluginSchedule()
@@ -59,7 +57,6 @@ test('scheduled task test', async () => {
             return event
         }
         async function runEveryDay (meta) {
-            console.log('ran daily!')
             return 4
         } 
     `
@@ -67,8 +64,7 @@ test('scheduled task test', async () => {
 
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
     const processEventBatch = (batch: PluginEvent[]) => piscina.runTask({ task: 'processEventBatch', args: { batch } })
-    const runEveryDay = (pluginConfigId: number) =>
-        piscina.runTask({ task: 'tasks.runEveryDay', args: { pluginConfigId } })
+    const runEveryDay = (pluginConfigId: number) => piscina.runTask({ task: 'runEveryDay', args: { pluginConfigId } })
     const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
 
     const pluginSchedule = await getPluginSchedule()
