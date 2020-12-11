@@ -202,12 +202,12 @@ export async function stopPiscina(piscina: Piscina): Promise<void> {
 
 export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskName: string) {
     const runTask = (pluginConfigId: PluginConfigId) =>
-        piscina!.runTask({ task: `tasks.${taskName}`, args: { pluginConfigId } })
+        piscina.runTask({ task: `tasks.${taskName}`, args: { pluginConfigId } })
 
     for (const pluginConfigId of server.pluginSchedule[taskName]) {
         // last task still running? skip rerunning!
-        if (server!.pluginSchedulePromises[pluginConfigId]) {
-            break
+        if (server.pluginSchedulePromises[taskName][pluginConfigId]) {
+            continue
         }
 
         const promise = runTask(pluginConfigId)
