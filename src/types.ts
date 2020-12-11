@@ -49,6 +49,12 @@ export interface PluginsServer extends PluginsServerConfig {
     pluginConfigs: Map<PluginConfigId, PluginConfig>
     pluginConfigsPerTeam: Map<TeamId, PluginConfig[]>
     defaultConfigs: PluginConfig[]
+    pluginSchedule: Record<string, PluginTaskContainer[]>
+}
+
+export type PluginTaskContainer = {
+    pluginConfig: PluginConfig
+    task: PluginTask
 }
 
 export type PluginId = number
@@ -108,7 +114,7 @@ export interface PluginAttachmentDB {
 }
 
 export interface PluginTask {
-    key: string
+    name: string
     type: 'runEvery'
     exec: () => Promise<void>
 }
@@ -119,7 +125,7 @@ export interface PluginConfigVMReponse {
         processEvent: (event: PluginEvent) => Promise<PluginEvent>
         processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
     }
-    schedule: {
+    tasks: {
         runEveryMinute?: PluginTask
         runEveryHour?: PluginTask
         runEveryDay?: PluginTask

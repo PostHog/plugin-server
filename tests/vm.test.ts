@@ -55,7 +55,7 @@ test('empty plugins', async () => {
     const libJs = ''
     const vm = createPluginConfigVM(mockServer, mockConfig, indexJs, libJs)
 
-    expect(Object.keys(vm).sort()).toEqual(['methods', 'vm'])
+    expect(Object.keys(vm).sort()).toEqual(['methods', 'schedule', 'vm'])
     expect(Object.keys(vm.methods).sort()).toEqual(['processEvent', 'processEventBatch'])
     expect(vm.methods.processEvent).toEqual(undefined)
     expect(vm.methods.processEventBatch).toEqual(undefined)
@@ -576,7 +576,7 @@ test('attachments', async () => {
     expect(event.properties).toEqual(attachments)
 })
 
-test('schedule', async () => {
+test('runEvery', async () => {
     const indexJs = `
         function runEveryMinute(meta) {
             
@@ -590,8 +590,24 @@ test('schedule', async () => {
     `
     const vm = createPluginConfigVM(mockServer, mockConfig, indexJs)
 
-    expect(Object.keys(vm.schedule)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
-    expect(Object.values(vm.schedule).map((v) => v?.key)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
-    expect(Object.values(vm.schedule).map((v) => v?.type)).toEqual(['runEvery', 'runEvery', 'runEvery'])
-    expect(Object.values(vm.schedule).map((v) => typeof v?.exec)).toEqual(['function', 'function', 'function'])
+    expect(Object.keys(vm.tasks)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
+    expect(Object.values(vm.tasks).map((v) => v?.name)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
+    expect(Object.values(vm.tasks).map((v) => v?.type)).toEqual(['runEvery', 'runEvery', 'runEvery'])
+    expect(Object.values(vm.tasks).map((v) => typeof v?.exec)).toEqual(['function', 'function', 'function'])
+})
+
+test('runEvery must be a function', async () => {
+    const indexJs = `
+        function runEveryMinute(meta) {
+            
+        }
+        const runEveryHour = false
+        const runEveryDay = { some: 'object' }
+    `
+    const vm = createPluginConfigVM(mockServer, mockConfig, indexJs)
+
+    expect(Object.keys(vm.tasks)).toEqual(['runEveryMinute'])
+    expect(Object.values(vm.tasks).map((v) => v?.name)).toEqual(['runEveryMinute'])
+    expect(Object.values(vm.tasks).map((v) => v?.type)).toEqual(['runEvery'])
+    expect(Object.values(vm.tasks).map((v) => typeof v?.exec)).toEqual(['function'])
 })

@@ -96,13 +96,13 @@ export function createPluginConfigVM(
             processEventBatch: __bindMeta('processEventBatch')
         };
         
-        // parse the runEveryX commands and export in __schedule
-        const __schedule = {};
+        // gather the runEveryX commands and export in __tasks
+        const __tasks = {};
         for (const exportDestination of __getExportDestinations().reverse()) {
-            for (const [key, value] of Object.entries(exportDestination)) {
-                if (key.startsWith("runEvery") && typeof value === 'function') {
-                    __schedule[key] = {
-                        key: key,
+            for (const [name, value] of Object.entries(exportDestination)) {
+                if (name.startsWith("runEvery") && typeof value === 'function') {
+                    __tasks[name] = {
+                        name: name,
                         type: 'runEvery',
                         exec: __bindMeta(value)
                     }
@@ -115,6 +115,6 @@ export function createPluginConfigVM(
     return {
         vm,
         methods: vm.run('__methods'),
-        schedule: vm.run('__schedule'),
+        tasks: vm.run('__tasks'),
     }
 }

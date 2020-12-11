@@ -60,6 +60,7 @@ export async function createServer(
         pluginConfigs: new Map(),
         pluginConfigsPerTeam: new Map(),
         defaultConfigs: [],
+        pluginSchedule: { runEveryMinute: [], runEveryHour: [], runEveryDay: [] },
     }
 
     const closeServer = async () => {

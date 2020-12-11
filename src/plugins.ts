@@ -1,7 +1,7 @@
 import * as path from 'path'
 import * as fs from 'fs'
 import { createPluginConfigVM } from './vm'
-import { PluginsServer, PluginConfig, PluginJsonConfig, TeamId } from './types'
+import { PluginsServer, PluginConfig, PluginJsonConfig, TeamId, PluginTask } from './types'
 import { PluginEvent, PluginAttachment } from 'posthog-plugins'
 import { clearError, processError } from './error'
 import { getFileFromArchive } from './utils'
@@ -68,8 +68,26 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
     for (const [id, pluginConfig] of server.pluginConfigs) {
         if (!foundPluginConfigs.has(id)) {
             server.pluginConfigs.delete(id)
-        } else if (!pluginConfig.vm) {
+            return
+        }
+
+        if (!pluginConfig.vm) {
             await loadPlugin(server, pluginConfig)
+        }
+    }
+
+    // gather runEvery tasks into a schedule
+    server.pluginSchedule = { runEveryMinute: [], runEveryHour: [], runEveryDay: [] }
+    for (const [id, pluginConfig] of server.pluginConfigs) {
+        if (pluginConfig.vm?.tasks && Object.keys(pluginConfig.vm?.tasks).length > 0) {
+            for (const [taskName, task] of Object.entries(pluginConfig.vm.tasks)) {
+                if (task && taskName in server.pluginSchedule) {
+                    server.pluginSchedule[taskName].push({
+                        pluginConfig,
+                        task,
+                    })
+                }
+            }
         }
     }
 
