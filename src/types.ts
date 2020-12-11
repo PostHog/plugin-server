@@ -116,7 +116,7 @@ export interface PluginAttachmentDB {
 export interface PluginTask {
     name: string
     type: 'runEvery'
-    exec: () => Promise<void>
+    exec: () => Promise<any>
 }
 
 export interface PluginConfigVMReponse {
@@ -125,9 +125,5 @@ export interface PluginConfigVMReponse {
         processEvent: (event: PluginEvent) => Promise<PluginEvent>
         processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
     }
-    tasks: {
-        runEveryMinute?: PluginTask
-        runEveryHour?: PluginTask
-        runEveryDay?: PluginTask
-    }
+    tasks: Record<string, PluginTask>
 }

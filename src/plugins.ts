@@ -268,6 +268,14 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
     return allReturnedEvents
 }
 
+export async function runPluginTask(server: PluginsServer, taskName: string, pluginConfigId: number): Promise<any> {
+    const startTime = performance.now()
+    const pluginConfig = server.pluginConfigs.get(pluginConfigId)
+    const task = pluginConfig?.vm?.tasks[taskName]
+    const response = await task?.exec()
+    return response
+}
+
 function getPluginsForTeam(server: PluginsServer, teamId: number): PluginConfig[] {
     return server.pluginConfigsPerTeam.get(teamId) || server.defaultConfigs
 }

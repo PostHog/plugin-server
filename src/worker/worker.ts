@@ -1,4 +1,4 @@
-import { runPlugins, runPluginsOnBatch, setupPlugins } from '../plugins'
+import { runPlugins, runPluginsOnBatch, runPluginTask, setupPlugins } from '../plugins'
 import { cloneObject } from '../utils'
 import { createServer } from '../server'
 import { PluginsServerConfig } from '../types'
@@ -37,6 +37,11 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
             const processedEvents = await runPluginsOnBatch(server, args.batch)
             // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
             response = cloneObject(processedEvents as any[])
+        }
+        if (task.startsWith('tasks.')) {
+            const taskName = task.substring(6)
+            const { pluginConfigId } = args
+            response = await runPluginTask(server, taskName, pluginConfigId)
         }
         server.statsd?.timing(`piscina_task.${task}`, timer)
         return response
