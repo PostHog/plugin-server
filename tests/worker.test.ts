@@ -1,8 +1,5 @@
-import { makePiscina } from '../src/worker/piscina'
-import { defaultConfig } from '../src/config'
 import { PluginEvent } from 'posthog-plugins/src/types'
-import { mockJestWithIndex } from './helpers/plugins'
-import { LogLevel } from '../src/types'
+import { setupPiscina } from './helpers/worker'
 
 jest.mock('../src/sql')
 jest.setTimeout(600000) // 600 sec timeout
@@ -17,16 +14,6 @@ function createEvent(index = 0): PluginEvent {
         event: 'default event',
         properties: { key: 'value', index },
     }
-}
-
-function setupPiscina(workers: number, code: string, tasksPerWorker: number) {
-    return makePiscina({
-        ...defaultConfig,
-        WORKER_CONCURRENCY: workers,
-        TASKS_PER_WORKER: tasksPerWorker,
-        LOG_LEVEL: LogLevel.Log,
-        __jestMock: mockJestWithIndex(code),
-    })
 }
 
 test('piscina worker test', async () => {
