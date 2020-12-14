@@ -10,7 +10,7 @@ import { PluginEvent } from 'posthog-plugins'
 import { defaultConfig } from './config'
 import Piscina from 'piscina'
 import * as Sentry from '@sentry/node'
-import { delay } from './utils'
+import { areWeTestingWithJest, delay } from './utils'
 import { processError } from './error'
 import { StatsD } from 'hot-shots'
 
@@ -31,7 +31,9 @@ export async function createServer(
             console.error(error)
         })
         .on('ready', () => {
-            console.info(`✅ Connected to Redis at ${serverConfig.REDIS_URL}!`)
+            if (!areWeTestingWithJest()) {
+                console.info(`✅ Connected to Redis at ${serverConfig.REDIS_URL}!`)
+            }
         })
     await redis.info()
 

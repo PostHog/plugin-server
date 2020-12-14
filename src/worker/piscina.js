@@ -1,4 +1,5 @@
 const Sentry = require('@sentry/node')
+const { areWeTestingWithJest } = require('utils')
 
 const { isMainThread, threadId } = require('worker_threads')
 
@@ -24,8 +25,4 @@ if (isMainThread) {
     const { createWorker } = require('./worker')
     const { workerData } = require('piscina')
     module.exports = createWorker(workerData.serverConfig, threadId)
-}
-
-function areWeTestingWithJest() {
-    return process.env.JEST_WORKER_ID !== undefined
 }

@@ -4,10 +4,7 @@ import { createConsole } from './extensions/console'
 import { createCache } from './extensions/cache'
 import { createPosthog } from './extensions/posthog'
 import { PluginsServer, PluginConfig, PluginConfigVMReponse } from './types'
-
-function areWeTestingWithJest() {
-    return process.env.JEST_WORKER_ID !== undefined
-}
+import { areWeTestingWithJest } from 'utils'
 
 export function createPluginConfigVM(
     server: PluginsServer,
