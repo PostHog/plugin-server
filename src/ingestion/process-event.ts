@@ -56,35 +56,6 @@ export class EventsProcessor implements Queue {
         const person_uuid = new UUIDT()
         const event_uuid = new UUIDT()
 
-        console.info('EE ingestion not operational yet, discarded event')
-
-        /* TODO: unlock in next PR
-        const ts = this.handle_timestamp(data, now, sent_at)
-        this.handle_identify_or_alias(data['event'], properties, distinct_id, team_id)
-
-        if (data['event'] === '$snapshot') {
-            this.create_session_recording_event(
-                event_uuid,
-                team_id,
-                distinct_id,
-                properties['$session_id'],
-                ts,
-                properties['$snapshot_data']
-            )
-        } else {
-            await this._capture_ee(
-                event_uuid,
-                person_uuid,
-                ip,
-                site_url,
-                team_id,
-                data['event'],
-                distinct_id,
-                properties,
-                ts,
-                sent_at
-            )
-        }
-        */
+        console.info(`EE ingestion not operational yet, discarded event ${data.event}`)
     }
 }
