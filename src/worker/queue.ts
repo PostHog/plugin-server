@@ -61,7 +61,7 @@ function startQueueKafka(
     eventsProcessor.kafkaConsumer.on('ready', () => {
         eventsProcessor.kafkaConsumer.subscribe([KAFKA_EVENTS_WAL])
         // consume event messages in batches of 1000 every 50 ms
-        setInterval(() => {
+        const consumptionInterval = setInterval(() => {
             eventsProcessor.kafkaConsumer.consume(
                 1000,
                 async (error: LibrdKafkaError, messages: Message[]): Promise<void> => {
@@ -99,6 +99,9 @@ function startQueueKafka(
                 }
             )
         }, 50)
+        for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+            process.on(signal, () => clearInterval(consumptionInterval))
+        }
         console.info(`✅ Kafka consumer ready and subscribed to topic ${KAFKA_EVENTS_WAL}!`)
     })
 
