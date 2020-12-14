@@ -135,13 +135,21 @@ export async function startPluginsServer(
         ;[server, closeServer] = await createServer(serverConfig, null)
 
         piscina = makePiscina(serverConfig)
-        const processEvent = (event: PluginEvent) => piscina!.runTask({ task: 'processEvent', args: { event } })
+        const processEvent = (event: PluginEvent) => {
+            if ((piscina?.queueSize || 0) > (server?.WORKER_CONCURRENCY || 4) * (server?.WORKER_CONCURRENCY || 4)) {
+                queue?.pause()
+            }
+            return piscina!.runTask({ task: 'processEvent', args: { event } })
+        }
 
         if (!server.DISABLE_WEB) {
             fastifyInstance = await startFastifyInstance(server)
         }
 
         queue = startQueue(server, processEvent)
+        piscina.on('drain', () => {
+            queue?.resume()
+        })
 
         pubSub = new Redis(server.REDIS_URL)
         pubSub.subscribe(server.PLUGINS_RELOAD_PUBSUB_CHANNEL)
