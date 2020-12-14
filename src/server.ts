@@ -11,8 +11,8 @@ import { defaultConfig } from './config'
 import Piscina from 'piscina'
 import * as Sentry from '@sentry/node'
 import { delay } from './utils'
-import { StatsD } from 'hot-shots'
 import { processError } from './error'
+import { StatsD } from 'hot-shots'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
@@ -139,7 +139,7 @@ export async function startPluginsServer(
         piscina = makePiscina(serverConfig)
         const processEvent = (event: PluginEvent) => piscina!.runTask({ task: 'processEvent', args: { event } })
 
-        if (!serverConfig.DISABLE_WEB) {
+        if (!server.DISABLE_WEB) {
             fastifyInstance = await startFastifyInstance(server)
         }
 

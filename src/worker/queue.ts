@@ -8,6 +8,14 @@ import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from '../ty
 import { EventsProcessor } from '../ingestion/process-event'
 import { KAFKA_EVENTS_WAL } from '../ingestion/topics'
 
+export function startQueue(
+    server: PluginsServer,
+    processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
+): Queue {
+    const relevantStartQueue = server.EE_ENABLED ? startQueueKafka : startQueueRedis
+    return relevantStartQueue(server, processEvent)
+}
+
 function startQueueRedis(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
@@ -130,15 +138,7 @@ function startQueueKafka(
         console.info(`✅ Kafka consumer ready and subscribed to topic ${KAFKA_EVENTS_WAL}!`)
     })
 
-    eventsProcessor.connectKafkaConsumer()
+    eventsProcessor.start()
 
     return eventsProcessor
-}
-
-export function startQueue(
-    server: PluginsServer,
-    processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
-): Queue {
-    const relevantStartQueue = server.EE_ENABLED ? startQueueKafka : startQueueRedis
-    return relevantStartQueue(server, processEvent)
 }

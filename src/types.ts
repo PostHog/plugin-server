@@ -57,6 +57,7 @@ export interface PluginsServer extends PluginsServerConfig {
 }
 
 export interface Queue {
+    start: () => void
     stop: () => void
 }
 
@@ -133,18 +134,6 @@ export interface PluginConfigVMReponse {
     tasks: Record<string, PluginTask>
 }
 
-export interface EventUsage {
-    event: string
-    usage_count: number | null
-    volume: number | null
-}
-
-export interface PropertyUsage {
-    key: string
-    usage_count: number | null
-    volume: number | null
-}
-
 // received via Kafka
 interface EventMessage {
     distinct_id: string
@@ -173,58 +162,3 @@ export interface EventData extends PluginEvent {
 }
 
 export type Properties = Record<string, any>
-
-export interface Team {
-    id: number
-    name: string
-    anonymize_ips: boolean
-    api_token: string
-    app_urls: string[]
-    completed_snippet_onboarding: boolean
-    event_names: string[]
-    event_properties: string[]
-    event_properties_numerical: string[]
-    event_names_with_usage: EventUsage[]
-    event_properties_with_usage: PropertyUsage[]
-    opt_out_capture: boolean
-    slack_incoming_webhook: string
-    session_recording_opt_in: boolean
-    plugins_opt_in: boolean
-    ingested_event: boolean
-}
-
-export interface Element {
-    text: string
-    tag_name: string
-    href: string
-    attr_class: string[]
-    attr_id: string
-    nth_child: number
-    nth_of_type: number
-    attributes: Record<string, string>
-}
-
-export type User = Record<string, any> // not really typed as not needed so far, only a placeholder for Person.is_user
-
-export interface Person {
-    id: number
-    created_at: DateTime
-    team_id: number
-    properties: Properties
-    is_user: User
-    is_identified: boolean
-    uuid: string
-}
-
-export interface PersonDistinctId {
-    id: number
-    team_id: number
-    person_id: number
-    distinct_id: string
-}
-
-export interface CohortPeople {
-    id: number
-    cohort_id: number
-    person_id: number
-}
