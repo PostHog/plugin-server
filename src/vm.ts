@@ -2,7 +2,7 @@ import { VM } from 'vm2'
 import fetch from 'node-fetch'
 import { createConsole } from './extensions/console'
 import { createCache } from './extensions/cache'
-import { createPostHog } from './extensions/posthog'
+import { createPosthog } from './extensions/posthog'
 import { PluginsServer, PluginConfig, PluginConfigVMReponse } from './types'
 
 function areWeTestingWithJest() {
@@ -20,7 +20,7 @@ export function createPluginConfigVM(
     })
     vm.freeze(createConsole(), 'console')
     vm.freeze(fetch, 'fetch')
-    vm.freeze(createPostHog(server, pluginConfig), 'posthog')
+    vm.freeze(createPosthog(server, pluginConfig), 'posthog')
 
     if (areWeTestingWithJest()) {
         vm.freeze(setTimeout, '__jestSetTimeout')

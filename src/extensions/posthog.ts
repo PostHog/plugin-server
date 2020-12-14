@@ -2,8 +2,12 @@ import { PluginsServer, PluginConfig } from 'types'
 import { version } from '../../package.json'
 import Client from '../celery/client'
 
-export function createPostHog(server: PluginsServer, pluginConfig: PluginConfig) {
-    const distinctId = pluginConfig.plugin?.name || `Plugin ${pluginConfig.plugin_id}`
+export interface DummyPostHog {
+    capture(event: string, properties?: Record<string, any>): void
+}
+
+export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig): DummyPostHog {
+    const distinctId = pluginConfig.plugin?.name || `plugin-id-${pluginConfig.plugin_id}`
 
     function sendEvent(event: string, properties: Record<string, any> = {}) {
         const client = new Client(server.redis, server.PLUGINS_CELERY_QUEUE)
@@ -27,7 +31,7 @@ export function createPostHog(server: PluginsServer, pluginConfig: PluginConfig)
     }
 
     return {
-        capture(event: string, properties: Record<string, any> = {}) {
+        capture(event, properties = {}) {
             sendEvent(event, properties)
         },
     }
