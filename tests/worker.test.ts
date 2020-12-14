@@ -115,3 +115,36 @@ test('assume that the workerThreads and tasksPerWorker values behave as expected
 
     await piscina.destroy()
 })
+
+test('assume that the workerThreads and tasksPerWorker values behave as expected', async () => {
+    const workerThreads = 2
+    const tasksPerWorker = 3
+    const testCode = `
+        async function processEvent (event, meta) {
+            await new Promise(resolve => __jestSetTimeout(resolve, 300))
+            return event
+        }
+    `
+    const piscina = setupPiscina(workerThreads, testCode, tasksPerWorker)
+    const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
+    const promises = []
+
+    // warmup 2x
+    await Promise.all([processEvent(createEvent()), processEvent(createEvent())])
+
+    // process 10 events in parallel and ignore the result
+    for (let i = 0; i < 10; i++) {
+        promises.push(processEvent(createEvent()))
+    }
+    await delay(100)
+    expect(piscina.queueSize).toBe(10 - workerThreads * tasksPerWorker)
+    expect(piscina.completed).toBe(0 + 2)
+    await delay(300)
+    expect(piscina.queueSize).toBe(0)
+    expect(piscina.completed).toBe(workerThreads * tasksPerWorker + 2)
+    await delay(300)
+    expect(piscina.queueSize).toBe(0)
+    expect(piscina.completed).toBe(10 + 2)
+
+    await piscina.destroy()
+})
