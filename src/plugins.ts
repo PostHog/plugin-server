@@ -39,7 +39,6 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
     const pluginConfigRows = await getPluginConfigRows(server)
     const foundPluginConfigs = new Map<number, boolean>()
     server.pluginConfigsPerTeam.clear()
-    server.defaultConfigs = []
     for (const row of pluginConfigRows) {
         const plugin = server.plugins.get(row.plugin_id)
         if (!plugin) {
@@ -55,15 +54,16 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         server.pluginConfigs.set(row.id, pluginConfig)
 
         if (!row.team_id) {
-            server.defaultConfigs.push(row)
-        } else {
-            let teamConfigs = server.pluginConfigsPerTeam.get(row.team_id)
-            if (!teamConfigs) {
-                teamConfigs = []
-                server.pluginConfigsPerTeam.set(row.team_id, teamConfigs)
-            }
-            teamConfigs.push(pluginConfig)
+            console.error('🔴 PluginConfig without team not supported!')
+            continue
         }
+
+        let teamConfigs = server.pluginConfigsPerTeam.get(row.team_id)
+        if (!teamConfigs) {
+            teamConfigs = []
+            server.pluginConfigsPerTeam.set(row.team_id, teamConfigs)
+        }
+        teamConfigs.push(pluginConfig)
     }
     for (const [id, pluginConfig] of server.pluginConfigs) {
         if (!foundPluginConfigs.has(id)) {
@@ -80,17 +80,6 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
             if (task && taskName in server.pluginSchedule) {
                 server.pluginSchedule[taskName].push(pluginConfig.id)
             }
-        }
-    }
-
-    if (server.defaultConfigs.length > 0) {
-        server.defaultConfigs.sort((a, b) => a.order - b.order)
-        for (const teamId of Object.keys(server.pluginConfigsPerTeam).map((key: string) => parseInt(key))) {
-            server.pluginConfigsPerTeam.set(teamId, [
-                ...(server.pluginConfigsPerTeam.get(teamId) || []),
-                ...server.defaultConfigs,
-            ])
-            server.pluginConfigsPerTeam.get(teamId)?.sort((a, b) => a.id - b.id)
         }
     }
 }
