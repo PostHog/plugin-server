@@ -67,5 +67,5 @@ export function overrideWithEnv(
             }
         }
     }
-    return newConfig as PluginsServerConfig
+    return newConfig
 }
