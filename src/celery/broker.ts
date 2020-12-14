@@ -1,6 +1,9 @@
 import * as Redis from 'ioredis'
 import { v4 } from 'uuid'
 import { Message } from './message'
+import { Pausable } from './pausable'
+
+type BrokerSubscription = { queue: string; callback: (message: Message) => any }
 
 class RedisMessage extends Message {
     private raw: Record<string, any>
@@ -18,10 +21,12 @@ class RedisMessage extends Message {
     }
 }
 
-export default class RedisBroker {
+export default class RedisBroker implements Pausable {
     redis: Redis.Redis
+    subsciptions: BrokerSubscription[] = []
     channels: Promise<void>[] = []
     closing = false
+    paused = false
 
     /**
      * Redis broker class
@@ -78,18 +83,37 @@ export default class RedisBroker {
     }
 
     /**
+     * Pause execution of queue. Wait until all channel promises have been exhausted.
+     * @method RedisBroker#pause
+     *
+     * @returns {Promise}
+     */
+    public async pause(): Promise<void> {
+        const oldChannels = this.channels
+        this.paused = true
+        this.channels = []
+        await Promise.all(oldChannels)
+    }
+
+    public resume(): void {
+        if (!this.paused) {
+            return
+        }
+        this.paused = false
+        for (const { queue, callback } of this.subsciptions) {
+            this.channels.push(new Promise((resolve) => this.receive(resolve, queue, callback)))
+        }
+    }
+
+    /**
      * @method RedisBroker#subscribe
      * @param {string} queue
      * @param {Function} callback
      * @returns {Promise}
      */
     public subscribe(queue: string, callback: (message: Message) => any): Promise<any[]> {
-        const promiseCount = 1
-
-        for (let index = 0; index < promiseCount; index += 1) {
-            this.channels.push(new Promise((resolve) => this.receive(index, resolve, queue, callback)))
-        }
-
+        this.subsciptions.push({ queue, callback })
+        this.channels.push(new Promise((resolve) => this.receive(resolve, queue, callback)))
         return Promise.all(this.channels)
     }
 
@@ -100,8 +124,8 @@ export default class RedisBroker {
      * @param {string} queue
      * @param {Function} callback
      */
-    private receive(index: number, resolve: () => void, queue: string, callback: (message: Message) => any): void {
-        process.nextTick(() => this.recieveOneOnNextTick(index, resolve, queue, callback))
+    private receive(resolve: () => void, queue: string, callback: (message: Message) => any): void {
+        process.nextTick(() => this.recieveOneOnNextTick(resolve, queue, callback))
     }
 
     /**
@@ -113,12 +137,11 @@ export default class RedisBroker {
      * @returns {Promise}
      */
     private async recieveOneOnNextTick(
-        index: number,
         resolve: () => void,
         queue: string,
         callback: (message: Message) => any
     ): Promise<void> {
-        if (this.closing) {
+        if (this.closing || this.paused) {
             resolve()
             return
         }
@@ -130,7 +153,7 @@ export default class RedisBroker {
                 }
                 Promise.resolve()
             })
-            .then(() => this.receive(index, resolve, queue, callback))
+            .then(() => this.receive(resolve, queue, callback))
             .catch((err) => console.error(err))
     }
 
