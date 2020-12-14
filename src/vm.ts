@@ -4,7 +4,7 @@ import { createConsole } from './extensions/console'
 import { createCache } from './extensions/cache'
 import { createPosthog } from './extensions/posthog'
 import { PluginsServer, PluginConfig, PluginConfigVMReponse } from './types'
-import { areWeTestingWithJest } from 'utils'
+import { areWeTestingWithJest } from './utils'
 
 export function createPluginConfigVM(
     server: PluginsServer,
