@@ -1,7 +1,6 @@
 const Sentry = require('@sentry/node')
-const { areWeTestingWithJest } = require('utils')
-
 const { isMainThread, threadId } = require('worker_threads')
+const { areWeTestingWithJest } = require('./utils')
 
 if (isMainThread) {
     const Piscina = require('piscina')
