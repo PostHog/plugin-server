@@ -113,7 +113,7 @@ function startQueueKafka(
                             } else {
                                 console.info(`Discarding event ${parsedEventMessage.data.event}`)
                             }
-                            server.statsd?.timing(`${server.STATSD_PREFIX}_posthog_cloud`, timer)
+                            server.statsd?.timing(`posthog_cloud`, timer)
                         }
                         eventsProcessor.kafkaConsumer.commit()
                     } catch (error) {
