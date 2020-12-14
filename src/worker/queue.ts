@@ -4,7 +4,7 @@ import { LibrdKafkaError, Message } from '@posthog/node-rdkafka'
 import { DateTime } from 'luxon'
 import Worker from '../celery/worker'
 import Client from '../celery/client'
-import { EventData, PluginsServer, Queue } from '../types'
+import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from '../types'
 import { EventsProcessor } from '../ingestion/process-event'
 import { KAFKA_EVENTS_WAL } from '../ingestion/topics'
 
@@ -65,20 +65,40 @@ function startQueueKafka(
             eventsProcessor.kafkaConsumer.consume(
                 1000,
                 async (error: LibrdKafkaError, messages: Message[]): Promise<void> => {
+                    if (error) {
+                        console.error('⚠️ Error while consuming!')
+                        console.error(error)
+                        Sentry.captureException(error)
+                    }
                     if (messages?.length) {
                         console.info(
-                            `${messages.length} ${messages.length === 1 ? 'message' : 'messages'} consumed from Kafka`
+                            `🍕 ${Date.now()} ${messages.length} ${
+                                messages.length === 1 ? 'message' : 'messages'
+                            } consumed from Kafka`
                         )
-                    }
-                    if (error) {
-                        Sentry.captureException(error)
+                    } else {
+                        return
                     }
                     try {
                         for (const message of messages) {
                             const timer = new Date()
-                            const event = JSON.parse(message.value!.toString()) as EventData
-                            const processedEvent = await processEvent(event)
+                            const rawEventMessage = JSON.parse(message.value!.toString()) as RawEventMessage
+                            const parsedEventMessage: ParsedEventMessage = {
+                                ...rawEventMessage,
+                                data: JSON.parse(rawEventMessage.data),
+                                now: DateTime.fromISO(rawEventMessage.now),
+                                sent_at: rawEventMessage.sent_at ? DateTime.fromISO(rawEventMessage.sent_at) : null,
+                            }
+                            console.info(`Processing event ${parsedEventMessage.data.event} from WAL`)
+                            const processedEvent = await processEvent({
+                                ...parsedEventMessage,
+                                event: parsedEventMessage.data.event,
+                                properties: parsedEventMessage.data.properties,
+                                now: rawEventMessage.now,
+                                sent_at: rawEventMessage.sent_at,
+                            })
                             if (processedEvent) {
+                                console.info(`Ingesting event ${parsedEventMessage.data.event}`)
                                 const { distinct_id, ip, site_url, team_id, now, sent_at } = processedEvent
                                 await eventsProcessor.process_event_ee(
                                     distinct_id,
@@ -89,11 +109,16 @@ function startQueueKafka(
                                     DateTime.fromISO(now),
                                     sent_at ? DateTime.fromISO(sent_at) : null
                                 )
+                                console.info(`Ingested event ${parsedEventMessage.data.event}!`)
+                            } else {
+                                console.info(`Discarding event ${parsedEventMessage.data.event}`)
                             }
                             server.statsd?.timing(`${server.STATSD_PREFIX}_posthog_cloud`, timer)
                         }
                         eventsProcessor.kafkaConsumer.commit()
                     } catch (error) {
+                        console.error('⚠️ Error while processing batch of event messages!')
+                        console.error(error)
                         Sentry.captureException(error)
                     }
                 }

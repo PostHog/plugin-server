@@ -68,6 +68,7 @@ export class EventsProcessor implements Queue {
     }
 
     stop(): void {
+        console.info(`⏳ Stopping event processing...`)
         this.kafkaConsumer.disconnect()
         this.kafkaProducerStreamEvent.destroy()
         this.kafkaProducerStreamSessionRecording.destroy()
@@ -363,6 +364,7 @@ export class EventsProcessor implements Queue {
                 attributes: Object.fromEntries(Object.entries(el).filter(([key]) => key.startsWith('attr__'))),
             }))
         }
+
         const {
             rows: [team],
         }: {

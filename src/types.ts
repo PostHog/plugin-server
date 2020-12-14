@@ -141,6 +141,26 @@ export interface PropertyUsage {
     volume: number | null
 }
 
+// received via Kafka
+interface EventMessage {
+    distinct_id: string
+    ip: string
+    site_url: string
+    team_id: number
+}
+
+export interface RawEventMessage extends EventMessage {
+    data: string
+    now: string
+    sent_at: string // may be an empty string
+}
+
+export interface ParsedEventMessage extends EventMessage {
+    data: EventData
+    now: DateTime
+    sent_at: DateTime | null
+}
+
 export interface EventData extends PluginEvent {
     properties?: Properties
     timestamp?: string
