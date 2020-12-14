@@ -106,6 +106,7 @@ export async function startPluginsServer(
         }
         if (shutdownStatus >= 3) {
             console.info('❗️ Shutting down forcibly!')
+            piscina?.destroy()
             process.exit()
         }
         console.info('💤 Shutting down gracefully…')
