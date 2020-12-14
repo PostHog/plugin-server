@@ -82,7 +82,7 @@ function startQueueKafka(
                         console.info(
                             `🍕 ${messages.length} ${
                                 messages.length === 1 ? 'message' : 'messages'
-                            } consumed from Kafka`
+                            } consumed from Kafka at ${Date.now()}`
                         )
                     } else {
                         return
