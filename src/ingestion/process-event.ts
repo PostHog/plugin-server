@@ -9,6 +9,7 @@ export class EventsProcessor implements Queue {
     pluginsServer: PluginsServer
     db: Pool
     kafkaConsumer: KafkaConsumer
+    consumptionInterval: NodeJS.Timeout | null
 
     constructor(pluginsServer: PluginsServer) {
         if (!pluginsServer.KAFKA_HOSTS) {
@@ -27,6 +28,7 @@ export class EventsProcessor implements Queue {
         ).on('disconnected', () => {
             console.info(`🛑 Kafka consumer disconnected!`)
         })
+        this.consumptionInterval = null
     }
 
     start(): void {
@@ -37,6 +39,9 @@ export class EventsProcessor implements Queue {
     stop(): void {
         console.info(`⏳ Stopping event processing...`)
         this.kafkaConsumer.disconnect()
+        if (this.consumptionInterval) {
+            clearInterval(this.consumptionInterval)
+        }
     }
 
     async process_event_ee(
@@ -56,6 +61,6 @@ export class EventsProcessor implements Queue {
         const person_uuid = new UUIDT()
         const event_uuid = new UUIDT()
 
-        console.info(`EE ingestion not operational yet, discarded event ${data.event}`)
+        console.info(`EE ingestion not operational yet!`)
     }
 }
