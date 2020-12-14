@@ -162,7 +162,7 @@ export class EventsProcessor implements Queue {
         let personFound: Person | undefined
         personFound = (
             await this.db.query(
-                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
                 [team_id, distinct_id]
             )
         ).rows[0]
@@ -174,7 +174,7 @@ export class EventsProcessor implements Queue {
             } catch {
                 personFound = (
                     await this.db.query(
-                        'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                        'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
                         [team_id, distinct_id]
                     )
                 ).rows[0]
@@ -189,7 +189,7 @@ export class EventsProcessor implements Queue {
         let personFound: Person | undefined
         personFound = (
             await this.db.query(
-                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
                 [team_id, distinct_id]
             )
         ).rows[0]
@@ -208,7 +208,7 @@ export class EventsProcessor implements Queue {
             } catch {
                 personFound = (
                     await this.db.query(
-                        'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                        'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
                         [team_id, distinct_id]
                     )
                 ).rows[0]
@@ -230,14 +230,14 @@ export class EventsProcessor implements Queue {
     ): Promise<void> {
         const old_person: Person | undefined = (
             await this.db.query(
-                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
                 [team_id, previous_distinct_id]
             )
         ).rows[0]
 
         const new_person: Person | undefined = (
             await this.db.query(
-                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE team_id = $1 AND persondistinctid__team_id = $1 AND persondistinctid__distinct_id = $2',
+                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
                 [team_id, distinct_id]
             )
         ).rows[0]
@@ -416,18 +416,22 @@ export class EventsProcessor implements Queue {
             team.ingested_event = true
             save = true
         }
-        if (!(event in team.event_names)) {
+        if (team.event_names && !(event in team.event_names)) {
             save = true
             team.event_names.push(event)
             team.event_names_with_usage.push({ event: event, usage_count: null, volume: null })
         }
         for (const [key, value] of Object.entries(properties)) {
-            if (!(key in team.event_properties)) {
+            if (team.event_properties && !(key in team.event_properties)) {
                 team.event_properties.push(key)
                 team.event_properties_with_usage.push({ key: key, usage_count: null, volume: null })
                 save = true
             }
-            if (typeof value === 'number' && !(key in team.event_properties_numerical)) {
+            if (
+                typeof value === 'number' &&
+                team.event_properties_numerical &&
+                !(key in team.event_properties_numerical)
+            ) {
                 team.event_properties_numerical.push(key)
                 save = true
             }
@@ -437,11 +441,11 @@ export class EventsProcessor implements Queue {
                 'UPDATE posthog_team SET ingested_event = $1, event_names = $2, event_names_with_usage = $3, event_properties = $4, event_properties_with_usage = $5, event_properties_numerical = $6 WHERE id = $7',
                 [
                     team.ingested_event,
-                    team.event_names,
-                    team.event_names_with_usage,
-                    team.event_properties,
-                    team.event_names_with_usage,
-                    team.event_properties_numerical,
+                    JSON.stringify(team.event_names),
+                    JSON.stringify(team.event_names_with_usage),
+                    JSON.stringify(team.event_properties),
+                    JSON.stringify(team.event_names_with_usage),
+                    JSON.stringify(team.event_properties_numerical),
                     team.id,
                 ]
             )
