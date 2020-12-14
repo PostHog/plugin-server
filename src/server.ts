@@ -32,7 +32,7 @@ export async function createServer(
         })
         .on('ready', () => {
             if (!areWeTestingWithJest()) {
-                console.info(`✅ Connected to Redis at ${serverConfig.REDIS_URL}!`)
+                console.info(`✅ Connected to Redis!`)
             }
         })
     await redis.info()
