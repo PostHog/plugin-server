@@ -78,6 +78,7 @@ function startQueueKafka(
                         console.error(error)
                         Sentry.captureException(error)
                     }
+                    eventsProcessor.kafkaConsumer.commit()
                     if (messages?.length) {
                         console.info(
                             `🍕 ${messages.length} ${
@@ -123,7 +124,6 @@ function startQueueKafka(
                             }
                             server.statsd?.timing(`posthog-plugin-server-ingestion`, timer)
                         }
-                        eventsProcessor.kafkaConsumer.commit()
                     } catch (error) {
                         console.error('⚠️ Error while processing batch of event messages!')
                         console.error(error)
