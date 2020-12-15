@@ -1,9 +1,9 @@
-import { KafkaConsumer, Producer, ProducerStream } from '@posthog/node-rdkafka'
+import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from '@posthog/node-rdkafka'
 import { DateTime } from 'luxon'
 import * as Sentry from '@sentry/node'
 import { PluginsServer, EventData, Properties, Queue } from 'types'
 import { UUIDT } from '../utils'
-import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
+import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { Pool } from 'pg'
 
 export class EventsProcessor implements Queue {
@@ -11,8 +11,14 @@ export class EventsProcessor implements Queue {
     db: Pool
     kafkaConsumer: KafkaConsumer
     consumptionInterval: NodeJS.Timeout | null
+    batchCallback: (messages: Message[]) => Promise<void>
 
-    constructor(pluginsServer: PluginsServer) {
+    constructor(
+        pluginsServer: PluginsServer,
+        batchSize: number,
+        intervalMs: number,
+        batchCallback: (messages: Message[]) => Promise<void>
+    ) {
         if (!pluginsServer.KAFKA_HOSTS) {
             throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
         }
@@ -58,11 +64,42 @@ export class EventsProcessor implements Queue {
             })
             .on('ready', () => {
                 console.info(`✅ Kafka consumer ready!`)
+                this.kafkaConsumer.subscribe([KAFKA_EVENTS_WAL])
+                // consume event messages in batches of 1000 every 50 ms
+                this.consumptionInterval = setInterval(() => {
+                    this.kafkaConsumer.consume(batchSize, (...args) => this.processBatchRaw(...args))
+                }, intervalMs)
             })
             .on('disconnected', () => {
                 console.info(`🛑 Kafka consumer disconnected!`)
             })
         this.consumptionInterval = null
+        this.batchCallback = batchCallback
+    }
+
+    processBatchRaw(error: LibrdKafkaError, messages: Message[]): void {
+        if (error) {
+            console.error('⚠️ Kafka consumption error inside callback!')
+            console.error(error)
+            Sentry.captureException(error)
+        }
+        if (messages?.length) {
+            console.info(
+                `🍕 ${messages.length} ${
+                    messages.length === 1 ? 'message' : 'messages'
+                } consumed from Kafka at ${Date.now()}`
+            )
+        } else {
+            return
+        }
+        try {
+            this.batchCallback(messages)
+            this.kafkaConsumer.commit()
+        } catch (error) {
+            console.error('⚠️ Error while processing batch of event messages!')
+            console.error(error)
+            Sentry.captureException(error)
+        }
     }
 
     start(): void {
@@ -74,6 +111,7 @@ export class EventsProcessor implements Queue {
         console.info(`⏳ Stopping event processing...`)
         this.kafkaConsumer.unsubscribe()
         this.kafkaConsumer.disconnect()
+        this.kafkaConsumer.emit('disconnected')
         if (this.consumptionInterval) {
             clearInterval(this.consumptionInterval)
         }
@@ -96,6 +134,6 @@ export class EventsProcessor implements Queue {
         const person_uuid = new UUIDT()
         const event_uuid = new UUIDT()
 
-        console.info(`EE ingestion not operational yet!`)
+        // No-op currently
     }
 }
