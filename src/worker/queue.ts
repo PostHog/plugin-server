@@ -8,20 +8,23 @@ import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from '../ty
 import { EventsProcessor } from '../ingestion/process-event'
 import { KAFKA_EVENTS_WAL } from '../ingestion/topics'
 import { KafkaQueue } from '../ingestion/kafka-queue'
+import Piscina from 'piscina'
 
 export function startQueue(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
-    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
+    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>,
+    piscina?: Piscina
 ): Queue {
     const relevantStartQueue = server.EE_ENABLED ? startQueueKafka : startQueueRedis
-    return relevantStartQueue(server, processEvent, processEventBatch)
+    return relevantStartQueue(server, processEvent, processEventBatch, piscina!)
 }
 
 function startQueueRedis(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
-    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
+    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>,
+    piscina?: Piscina
 ): Queue {
     const worker = new Worker(server.redis, server.PLUGINS_CELERY_QUEUE)
     const client = new Client(server.redis, server.CELERY_DEFAULT_QUEUE)
@@ -66,10 +69,11 @@ function startQueueRedis(
 function startQueueKafka(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
-    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
+    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>,
+    piscina: Piscina
 ): Queue {
     const eventsProcessor = new EventsProcessor(server)
-    const kafkaQueue = new KafkaQueue(server, 1000, 50, async (messages) => {
+    const kafkaQueue = new KafkaQueue(server, 1000, 50, piscina, async (messages) => {
         const batchProcessingTimer = new Date()
         const processableEvents: PluginEvent[] = messages.map((message) => {
             const rawEventMessage = JSON.parse(message.value!.toString()) as RawEventMessage

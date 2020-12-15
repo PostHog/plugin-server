@@ -5,6 +5,7 @@ import { PluginsServer, Properties, Queue } from 'types'
 import { UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { Pool } from 'pg'
+import Piscina from 'piscina'
 
 export type BatchCallback = (messages: Message[]) => Promise<void>
 
@@ -12,9 +13,17 @@ export class KafkaQueue implements Queue {
     private pluginsServer: PluginsServer
     private kafkaConsumer: KafkaConsumer
     private consumptionInterval: NodeJS.Timeout | null
+    private piscina: Piscina
     private batchCallback: BatchCallback
+    isPaused: boolean
 
-    constructor(pluginsServer: PluginsServer, batchSize: number, intervalMs: number, batchCallback: BatchCallback) {
+    constructor(
+        pluginsServer: PluginsServer,
+        batchSize: number,
+        intervalMs: number,
+        piscina: Piscina,
+        batchCallback: BatchCallback
+    ) {
         if (!pluginsServer.KAFKA_HOSTS) {
             throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
         }
@@ -40,7 +49,7 @@ export class KafkaQueue implements Queue {
                 console.info(`✅ Kafka consumer subscribed to topic ${topics.map(String).join(' and ')}!`)
             })
             .on('unsubscribed', () => {
-                console.info(`🔌 Kafka consumer unsubscribed from topics!`)
+                console.info(`🔌 Kafka consumer unsubscribed from all topics!`)
             })
             .on('connection.failure', (error) => {
                 console.error('⚠️ Kafka consumer connection failure!')
@@ -61,15 +70,27 @@ export class KafkaQueue implements Queue {
                 console.info(`✅ Kafka consumer ready!`)
                 this.kafkaConsumer.subscribe([KAFKA_EVENTS_WAL])
                 // consume event messages in batches of 1000 every 50 ms
+                this.piscina.on('drain', () => {
+                    this.isPaused = false
+                })
                 this.consumptionInterval = setInterval(() => {
+                    if (this.isPaused) {
+                        return
+                    }
                     this.kafkaConsumer.consume(batchSize, (...args) => this.processBatchRaw(...args))
+                    if (this.piscina.queueSize >= this.piscina.options.maxQueue) {
+                        console.info('⏸ Piscina queue full, Kafka consumption on pause')
+                        this.isPaused = true
+                    }
                 }, intervalMs)
             })
             .on('disconnected', () => {
                 console.info(`🛑 Kafka consumer disconnected!`)
             })
         this.consumptionInterval = null
+        this.piscina = piscina
         this.batchCallback = batchCallback
+        this.isPaused = false
     }
 
     processBatchRaw(error: LibrdKafkaError, messages: Message[]): void {

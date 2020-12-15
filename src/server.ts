@@ -149,7 +149,7 @@ export async function startPluginsServer(
             fastifyInstance = await startFastifyInstance(server)
         }
 
-        queue = startQueue(server, processEvent, processEventBatch)
+        queue = startQueue(server, processEvent, processEventBatch, piscina)
 
         pubSub = new Redis(server.REDIS_URL)
         pubSub.subscribe(server.PLUGINS_RELOAD_PUBSUB_CHANNEL)
@@ -160,7 +160,7 @@ export async function startPluginsServer(
                 await waitForTasksToFinish(server!)
                 await stopPiscina(piscina!)
                 piscina = makePiscina(serverConfig!)
-                queue = startQueue(server!, processEvent, processEventBatch)
+                queue = startQueue(server!, processEvent, processEventBatch, piscina)
                 server!.pluginSchedule = await piscina.runTask({ task: 'getPluginSchedule' })
             }
         })
