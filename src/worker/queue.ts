@@ -1,4 +1,4 @@
-import { PluginEvent } from 'posthog-plugins'
+import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import { LibrdKafkaError, Message } from '@posthog/node-rdkafka'
 import { DateTime } from 'luxon'

@@ -1,7 +1,7 @@
 import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from '@posthog/node-rdkafka'
 import { DateTime } from 'luxon'
 import * as Sentry from '@sentry/node'
-import { PluginsServer, EventData, Properties, Queue } from 'types'
+import { PluginsServer, Properties, Queue } from 'types'
 import { UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { Pool } from 'pg'
@@ -106,7 +106,6 @@ export class KafkaQueue implements Queue {
         console.info(`⏳ Stopping event processing...`)
         this.kafkaConsumer.unsubscribe()
         this.kafkaConsumer.disconnect()
-        this.kafkaConsumer.emit('disconnected')
         if (this.consumptionInterval) {
             clearInterval(this.consumptionInterval)
         }

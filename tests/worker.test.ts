@@ -1,4 +1,4 @@
-import { PluginEvent } from 'posthog-plugins/src/types'
+import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import { setupPiscina } from './helpers/worker'
 
 jest.mock('../src/sql')

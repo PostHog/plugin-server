@@ -2,7 +2,7 @@ import { setupPiscina } from './helpers/worker'
 import { createServer, runTasksDebounced, waitForTasksToFinish } from '../src/server'
 import { LogLevel } from '../src/types'
 import { delay } from '../src/utils'
-import { PluginEvent } from 'posthog-plugins/src/types'
+import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 
 jest.setTimeout(60000) // 60 sec timeout
 

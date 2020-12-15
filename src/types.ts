@@ -1,6 +1,6 @@
 import { Pool } from 'pg'
 import { Redis } from 'ioredis'
-import { PluginEvent, PluginAttachment, PluginConfigSchema } from 'posthog-plugins'
+import { PluginEvent, PluginAttachment, PluginConfigSchema } from '@posthog/plugin-scaffold'
 import { VM, VMScript } from 'vm2'
 import { DateTime } from 'luxon'
 import { StatsD } from 'hot-shots'
@@ -149,16 +149,9 @@ export interface RawEventMessage extends EventMessage {
 }
 
 export interface ParsedEventMessage extends EventMessage {
-    data: EventData
+    data: PluginEvent
     now: DateTime
     sent_at: DateTime | null
-}
-
-export interface EventData extends PluginEvent {
-    properties?: Properties
-    timestamp?: string
-    $set?: Properties
-    offset?: number
 }
 
 export type Properties = Record<string, any>

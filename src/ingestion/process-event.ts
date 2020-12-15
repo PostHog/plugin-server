@@ -1,12 +1,12 @@
 import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from '@posthog/node-rdkafka'
 import { DateTime } from 'luxon'
 import * as Sentry from '@sentry/node'
-import { PluginsServer, EventData, Properties, Queue } from 'types'
+import { PluginsServer, Properties, Queue } from 'types'
 import { UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { KafkaQueue } from './kafka-queue'
-
 import { Pool } from 'pg'
+import { PluginEvent } from '@posthog/plugin-scaffold'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
@@ -19,7 +19,7 @@ export class EventsProcessor {
         distinct_id: string,
         ip: string,
         site_url: string,
-        data: EventData,
+        data: PluginEvent,
         team_id: number,
         now: DateTime,
         sent_at: DateTime | null

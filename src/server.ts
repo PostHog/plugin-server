@@ -6,7 +6,7 @@ import { PluginConfigId, PluginsServer, PluginsServerConfig, Queue } from './typ
 import { startQueue } from './worker/queue'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { version } from '../package.json'
-import { PluginEvent } from 'posthog-plugins'
+import { PluginEvent } from '@posthog/plugin-scaffold'
 import { defaultConfig } from './config'
 import Piscina from 'piscina'
 import * as Sentry from '@sentry/node'
