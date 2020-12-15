@@ -74,10 +74,15 @@ export async function createServer(
     return [server, closeServer]
 }
 
+// TODO: refactor this into a class, removing the need for many different Servers
+type ServerInstance = {
+    stop: () => Promise<void>
+}
+
 export async function startPluginsServer(
-    config: PluginsServerConfig,
+    config: Partial<PluginsServerConfig>,
     makePiscina: (config: PluginsServerConfig) => Piscina
-): Promise<void> {
+): Promise<ServerInstance> {
     console.info(`⚡ posthog-plugin-server v${version}`)
 
     let serverConfig: PluginsServerConfig | undefined
@@ -200,6 +205,10 @@ export async function startPluginsServer(
         await closeJobs()
 
         process.exit(1)
+    }
+
+    return {
+        stop: closeJobs,
     }
 }
 
