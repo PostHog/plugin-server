@@ -101,7 +101,7 @@ export default class RedisBroker implements Pausable {
         }
         this.paused = false
         for (const { queue, callback } of this.subsciptions) {
-            this.channels.push(new Promise((resolve) => this.receive(resolve, queue, callback)))
+            this.channels.push(new Promise((resolve) => this.receiveFast(resolve, queue, callback)))
         }
     }
 
@@ -113,24 +113,34 @@ export default class RedisBroker implements Pausable {
      */
     public subscribe(queue: string, callback: (message: Message) => any): Promise<any[]> {
         this.subsciptions.push({ queue, callback })
-        this.channels.push(new Promise((resolve) => this.receive(resolve, queue, callback)))
+        this.channels.push(new Promise((resolve) => this.receiveFast(resolve, queue, callback)))
         return Promise.all(this.channels)
     }
 
     /**
+     * Ask for the next event the next chance we get.
      * @private
-     * @param {number} index
      * @param {Fucntion} resolve
      * @param {string} queue
      * @param {Function} callback
      */
-    private receive(resolve: () => void, queue: string, callback: (message: Message) => any): void {
+    private receiveFast(resolve: () => void, queue: string, callback: (message: Message) => any): void {
         process.nextTick(() => this.recieveOneOnNextTick(resolve, queue, callback))
     }
 
     /**
+     * Pause 50ms before asking for another event. Used if no event was returned the last time.
      * @private
-     * @param {number} index
+     * @param {Fucntion} resolve
+     * @param {string} queue
+     * @param {Function} callback
+     */
+    private receiveSlow(resolve: () => void, queue: string, callback: (message: Message) => any): void {
+        setTimeout(() => this.recieveOneOnNextTick(resolve, queue, callback), 50)
+    }
+
+    /**
+     * @private
      * @param {Function} resolve
      * @param {String} queue
      * @param {Function} callback
@@ -152,8 +162,15 @@ export default class RedisBroker implements Pausable {
                     callback(body)
                 }
                 Promise.resolve()
+                return body
             })
-            .then(() => this.receive(resolve, queue, callback))
+            .then((body) => {
+                if (body) {
+                    this.receiveFast(resolve, queue, callback)
+                } else {
+                    this.receiveSlow(resolve, queue, callback)
+                }
+            })
             .catch((err) => console.error(err))
     }
 
