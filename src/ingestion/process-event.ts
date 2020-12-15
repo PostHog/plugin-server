@@ -31,7 +31,5 @@ export class EventsProcessor {
 
         const person_uuid = new UUIDT()
         const event_uuid = new UUIDT()
-
-        console.log(`ClickHouse ingestion not implemented yet - discarding event ${data.event}`)
     }
 }

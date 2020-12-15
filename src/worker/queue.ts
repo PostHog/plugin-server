@@ -90,7 +90,6 @@ function startQueueKafka(
         ) as PluginEvent[]
         for (const event of processedEvents) {
             const singleIngestionTimer = new Date()
-            console.info(`Ingesting event ${event.event}`)
             const { distinct_id, ip, site_url, team_id, now, sent_at } = event
             await eventsProcessor.process_event_ee(
                 distinct_id,
@@ -101,7 +100,6 @@ function startQueueKafka(
                 DateTime.fromISO(now),
                 sent_at ? DateTime.fromISO(sent_at) : null
             )
-            console.info(`Ingested event ${event.event}!`)
             server.statsd?.timing('single-ingestion', singleIngestionTimer)
         }
         server.statsd?.timing('batch-processing', batchProcessingTimer)

@@ -100,15 +100,6 @@ export class KafkaQueue implements Queue {
             console.error(error)
             Sentry.captureException(error)
         }
-        if (messages?.length) {
-            console.info(
-                `🍕 ${messages.length} ${
-                    messages.length === 1 ? 'message' : 'messages'
-                } consumed from Kafka at ${Date.now()}`
-            )
-        } else {
-            return
-        }
         try {
             this.batchCallback(messages)
             this.kafkaConsumer.commit()
