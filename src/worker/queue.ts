@@ -7,6 +7,7 @@ import Client from '../celery/client'
 import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from '../types'
 import { EventsProcessor } from '../ingestion/process-event'
 import { KAFKA_EVENTS_WAL } from '../ingestion/topics'
+import { KafkaQueue } from '../ingestion/kafka-queue'
 
 export function startQueue(
     server: PluginsServer,
@@ -67,7 +68,8 @@ function startQueueKafka(
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
     processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
 ): Queue {
-    const eventsProcessor = new EventsProcessor(server, 1000, 50, async (messages) => {
+    const eventsProcessor = new EventsProcessor(server)
+    const kafkaQueue = new KafkaQueue(server, 1000, 50, async (messages) => {
         const batchProcessingTimer = new Date()
         const processableEvents: PluginEvent[] = messages.map((message) => {
             const rawEventMessage = JSON.parse(message.value!.toString()) as RawEventMessage
@@ -101,7 +103,7 @@ function startQueueKafka(
         server.statsd?.timing('batch-processing', batchProcessingTimer)
     })
 
-    eventsProcessor.start()
+    kafkaQueue.start()
 
-    return eventsProcessor
+    return kafkaQueue
 }
