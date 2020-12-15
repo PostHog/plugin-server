@@ -71,6 +71,7 @@ export class KafkaQueue implements Queue {
                 this.kafkaConsumer.subscribe([KAFKA_EVENTS_WAL])
                 // consume event messages in batches of 1000 every 50 ms
                 this.piscina.on('drain', () => {
+                    console.info('▶️ Piscina queue drained, Kafka consumption on play')
                     this.isPaused = false
                 })
                 this.consumptionInterval = setInterval(() => {
