@@ -23,7 +23,7 @@ class RedisMessage extends Message {
 
 export default class RedisBroker implements Pausable {
     redis: Redis.Redis
-    subsciptions: BrokerSubscription[] = []
+    subscriptions: BrokerSubscription[] = []
     channels: Promise<void>[] = []
     closing = false
     paused = false
@@ -103,7 +103,7 @@ export default class RedisBroker implements Pausable {
             return
         }
         this.paused = false
-        for (const { queue, callback } of this.subsciptions) {
+        for (const { queue, callback } of this.subscriptions) {
             this.channels.push(new Promise((resolve) => this.receiveFast(resolve, queue, callback)))
         }
     }
@@ -115,7 +115,7 @@ export default class RedisBroker implements Pausable {
      * @returns {Promise}
      */
     public subscribe(queue: string, callback: (message: Message) => any): Promise<any[]> {
-        this.subsciptions.push({ queue, callback })
+        this.subscriptions.push({ queue, callback })
         this.channels.push(new Promise((resolve) => this.receiveFast(resolve, queue, callback)))
         return Promise.all(this.channels)
     }
