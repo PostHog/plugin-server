@@ -64,6 +64,16 @@ export class Worker extends Base implements Pausable {
     }
 
     /**
+     * Is the worker paused
+     * @method Worker#isPaused
+     *
+     * @returns {boolean}
+     */
+    public isPaused(): boolean {
+        return this.broker.paused
+    }
+
+    /**
      * @method Worker#run
      * @private
      *

@@ -76,6 +76,9 @@ export async function createServer(
 
 // TODO: refactor this into a class, removing the need for many different Servers
 type ServerInstance = {
+    server: PluginsServer
+    piscina: Piscina
+    queue: Worker
     stop: () => Promise<void>
 }
 
@@ -208,6 +211,9 @@ export async function startPluginsServer(
     }
 
     return {
+        server,
+        piscina,
+        queue,
         stop: closeJobs,
     }
 }

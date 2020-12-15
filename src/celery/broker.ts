@@ -89,6 +89,9 @@ export default class RedisBroker implements Pausable {
      * @returns {Promise}
      */
     public async pause(): Promise<void> {
+        if (this.paused) {
+            return
+        }
         const oldChannels = this.channels
         this.paused = true
         this.channels = []
