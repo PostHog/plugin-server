@@ -9,12 +9,12 @@ function areWeTestingWithJest() {
     return process.env.JEST_WORKER_ID !== undefined
 }
 
-export function createPluginConfigVM(
+export async function createPluginConfigVM(
     server: PluginsServer,
     pluginConfig: PluginConfig, // NB! might have team_id = 0
     indexJs: string,
     libJs = ''
-): PluginConfigVMReponse {
+): Promise<PluginConfigVMReponse> {
     const vm = new VM({
         sandbox: {},
     })
@@ -65,9 +65,6 @@ export function createPluginConfigVM(
             if (func) return func(...args); 
         }
         
-        // run the plugin setup script, if present
-        __callWithMeta('setupPlugin');
-        
         // we have processEvent, but not processEventBatch
         if (!__getExported('processEventBatch') && __getExported('processEvent')) {
             exports.processEventBatch = async function processEventBatch (batch, meta) {
@@ -109,8 +106,13 @@ export function createPluginConfigVM(
                 }
             }
         }
+        
+        // run the plugin setup script, if present
+        const __setupPlugin = async () => __callWithMeta('setupPlugin');
         `
     )
+
+    await vm.run('__setupPlugin')()
 
     return {
         vm,
