@@ -61,7 +61,7 @@ test('runTasksDebounced', async () => {
     expect(event3.properties['counter']).toBe(1)
 
     await waitForTasksToFinish(server)
-    await piscina.destroy()
+    // await piscina.destroy()
     await closeServer()
 })
 
