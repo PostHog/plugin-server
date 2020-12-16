@@ -1,7 +1,5 @@
 import { VM } from 'vm2'
 import fetch from 'node-fetch'
-import atob from 'atob'
-import btoa from 'btoa'
 import { createConsole } from './extensions/console'
 import { createCache } from './extensions/cache'
 import { createPosthog } from './extensions/posthog'
