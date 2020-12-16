@@ -12,7 +12,7 @@ import { defaultConfig } from './config'
 import Piscina from 'piscina'
 import * as Sentry from '@sentry/node'
 import { delay } from './utils'
-import { StatsD } from 'hot-shots'
+import { StatsD } from '@posthog/hot-shots'
 import { processError } from './error'
 
 export async function createServer(

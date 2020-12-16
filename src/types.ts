@@ -1,8 +1,8 @@
 import { Pool } from 'pg'
 import { Redis } from 'ioredis'
 import { PluginEvent, PluginAttachment, PluginConfigSchema } from 'posthog-plugins'
-import { VM, VMScript } from 'vm2'
-import { StatsD } from 'hot-shots'
+import { VM } from 'vm2'
+import { StatsD } from '@posthog/hot-shots'
 
 export enum LogLevel {
     Debug = 'debug',
