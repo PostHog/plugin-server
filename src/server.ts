@@ -14,7 +14,6 @@ import { areWeTestingWithJest, delay } from './utils'
 import { processError } from './error'
 import { StatsD } from 'hot-shots'
 import { EventsProcessor } from './ingestion/process-event'
-import { KafkaQueue } from './ingestion/kafka-queue'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
@@ -107,7 +106,6 @@ export async function startPluginsServer(
     let runEveryMinuteJob: schedule.Job | undefined
     let piscina: Piscina | undefined
     let queue: Queue | undefined
-    let kafkaQueue: KafkaQueue | undefined
     let closeServer: () => Promise<void> | undefined
 
     let shutdownStatus = 0
