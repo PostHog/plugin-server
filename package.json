@@ -28,7 +28,7 @@
     "license": "MIT",
     "dependencies": {
         "@google-cloud/bigquery": "^5.5.0",
-        "@posthog/hot-shots": "^8.2.1-posthog",
+        "@posthog/hot-shots": "8.2.1-posthog",
         "@sentry/node": "^5.29.0",
         "@sentry/tracing": "^5.29.0",
         "adm-zip": "^0.4.16",

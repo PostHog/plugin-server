@@ -1238,10 +1238,10 @@
     "@nodelib/fs.scandir" "2.1.3"
     fastq "^1.6.0"
 
-"@posthog/hot-shots@^8.2.1-posthog":
-  version "8.2.1"
-  resolved "https://registry.yarnpkg.com/@posthog/hot-shots/-/hot-shots-8.2.1.tgz#f33ad78f90607555e8e49f7ad9741e9afa0385b6"
-  integrity sha512-PjlQMo9pLrtoPALgN0CUjDBsVBsd0QxPr0qGyO9+UugbG3GKDOlSoznV2ySQ+Mgpgj+WY5MlVU8YbE3DOL1b8g==
+"@posthog/hot-shots@8.2.1-posthog":
+  version "8.2.1-posthog"
+  resolved "https://registry.yarnpkg.com/@posthog/hot-shots/-/hot-shots-8.2.1-posthog.tgz#55b8a70f65cf918b9521779025f99772efdc2e30"
+  integrity sha512-+QoVlFZ7YOirXOBVgfj4g1ujMb44U1uiW9Wyt59in1gT9qhecpKw+JJbH4KiyLB8FPITPd7Cud8ov3cPP5MJYw==
 
 "@sentry/core@5.29.0":
   version "5.29.0"
