@@ -1,7 +1,7 @@
-import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from '@posthog/node-rdkafka'
+import { KafkaConsumer, LibrdKafkaError, Message } from '@posthog/node-rdkafka'
 import * as Sentry from '@sentry/node'
-import { PluginsServer, Properties, Queue, RawEventMessage } from 'types'
-import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
+import { PluginsServer, Queue } from 'types'
+import { KAFKA_EVENTS_WAL } from './topics'
 
 export type BatchCallback = (messages: Message[]) => Promise<void>
 

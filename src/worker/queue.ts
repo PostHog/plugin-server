@@ -1,10 +1,9 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
-import { LibrdKafkaError, Message } from '@posthog/node-rdkafka'
 import { DateTime } from 'luxon'
 import Worker from '../celery/worker'
 import Client from '../celery/client'
-import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from '../types'
+import { PluginsServer, Queue, RawEventMessage } from '../types'
 import { KafkaQueue } from '../ingestion/kafka-queue'
 
 export function startQueue(
