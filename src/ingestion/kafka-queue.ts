@@ -1,12 +1,7 @@
 import { KafkaConsumer, LibrdKafkaError, Message, Producer, ProducerStream } from '@posthog/node-rdkafka'
-import { DateTime } from 'luxon'
 import * as Sentry from '@sentry/node'
 import { PluginsServer, Properties, Queue, RawEventMessage } from 'types'
-import { UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_EVENTS_WAL, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { Pool } from 'pg'
-import Piscina from 'piscina'
-import { PluginEvent } from '@posthog/plugin-scaffold'
 
 export type BatchCallback = (messages: Message[]) => Promise<void>
 
@@ -14,11 +9,10 @@ export class KafkaQueue implements Queue {
     private pluginsServer: PluginsServer
     private consumer: KafkaConsumer
     private consumptionInterval: NodeJS.Timeout | null
-    private piscina: Piscina
     private batchCallback: BatchCallback
-    isPaused: boolean
+    private isPausedState: boolean
 
-    constructor(pluginsServer: PluginsServer, piscina: Piscina) {
+    constructor(pluginsServer: PluginsServer) {
         if (!pluginsServer.KAFKA_HOSTS) {
             throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
         }
@@ -71,9 +65,8 @@ export class KafkaQueue implements Queue {
                 console.info(`🛑 Kafka consumer disconnected!`)
             })
         this.consumptionInterval = null
-        this.piscina = piscina
         this.batchCallback = async () => console.error('batchCallback not set for KafkaQueue!')
-        this.isPaused = false
+        this.isPausedState = false
     }
 
     processBatchRaw(error: LibrdKafkaError, messages: Message[]): void {
@@ -97,19 +90,11 @@ export class KafkaQueue implements Queue {
         this.consumer.on('ready', () => {
             console.info(`✅ Kafka consumer ready!`)
             this.consumer.subscribe([KAFKA_EVENTS_WAL])
-            this.piscina.on('drain', () => {
-                console.info('▶️ Piscina queue drained, Kafka consumption on play')
-                this.isPaused = false
-            })
             this.consumptionInterval = setInterval(() => {
-                if (this.isPaused) {
+                if (this.isPausedState) {
                     return
                 }
                 this.consumer.consume(batchSize, (...args) => this.processBatchRaw(...args))
-                if (this.piscina.queueSize >= this.piscina.options.maxQueue) {
-                    console.info('⏸ Piscina queue full, Kafka consumption on pause')
-                    this.isPaused = true
-                }
             }, intervalMs)
         })
     }
@@ -117,6 +102,18 @@ export class KafkaQueue implements Queue {
     start(): void {
         console.info(`⏬ Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
         this.consumer.connect()
+    }
+
+    async pause(): Promise<void> {
+        this.isPausedState = true
+    }
+
+    resume(): void {
+        this.isPausedState = false
+    }
+
+    isPaused(): boolean {
+        return this.isPausedState
     }
 
     stop(): void {

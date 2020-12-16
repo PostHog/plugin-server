@@ -86,7 +86,7 @@ export async function createServer(
 type ServerInstance = {
     server: PluginsServer
     piscina: Piscina
-    queue: Worker
+    queue: Queue
     stop: () => Promise<void>
 }
 
@@ -171,7 +171,7 @@ export async function startPluginsServer(
             fastifyInstance = await startFastifyInstance(server)
         }
 
-        queue = startQueue(server, processEvent, processEventBatch, piscina)
+        queue = startQueue(server, processEvent, processEventBatch)
         piscina.on('drain', () => {
             queue?.resume()
         })
@@ -185,7 +185,7 @@ export async function startPluginsServer(
                 await waitForTasksToFinish(server!)
                 await stopPiscina(piscina!)
                 piscina = makePiscina(serverConfig!)
-                queue = startQueue(server!, processEvent, processEventBatch, piscina)
+                queue = startQueue(server!, processEvent, processEventBatch)
                 server!.pluginSchedule = await piscina.runTask({ task: 'getPluginSchedule' })
             }
         })

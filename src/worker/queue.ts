@@ -5,26 +5,21 @@ import { DateTime } from 'luxon'
 import Worker from '../celery/worker'
 import Client from '../celery/client'
 import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from '../types'
-import { EventsProcessor } from '../ingestion/process-event'
-import { KAFKA_EVENTS_WAL } from '../ingestion/topics'
 import { KafkaQueue } from '../ingestion/kafka-queue'
-import Piscina from 'piscina'
 
 export function startQueue(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
-    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>,
-    piscina?: Piscina
+    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
 ): Queue {
     const relevantStartQueue = server.EE_ENABLED ? startQueueKafka : startQueueRedis
-    return relevantStartQueue(server, processEvent, processEventBatch, piscina!)
+    return relevantStartQueue(server, processEvent, processEventBatch)
 }
 
 function startQueueRedis(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
-    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>,
-    piscina?: Piscina
+    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
 ): Queue {
     const worker = new Worker(server.redis, server.PLUGINS_CELERY_QUEUE)
     const client = new Client(server.redis, server.CELERY_DEFAULT_QUEUE)
@@ -69,10 +64,9 @@ function startQueueRedis(
 function startQueueKafka(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
-    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>,
-    piscina: Piscina
+    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
 ): Queue {
-    const kafkaQueue = new KafkaQueue(server, piscina)
+    const kafkaQueue = new KafkaQueue(server)
 
     kafkaQueue.consume(1000, 50, async (messages) => {
         const batchProcessingTimer = new Date()

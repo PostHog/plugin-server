@@ -58,7 +58,13 @@ export interface PluginsServer extends PluginsServerConfig {
     eventsProcessor: EventsProcessor
 }
 
-export interface Queue {
+export interface Pausable {
+    pause: () => Promise<void>
+    resume: () => void
+    isPaused: () => boolean
+}
+
+export interface Queue extends Pausable {
     start: () => void
     stop: () => void
 }

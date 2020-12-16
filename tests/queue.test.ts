@@ -186,7 +186,11 @@ test('pause and resume queue', async () => {
     expect((await mockServer.redis.get(mockServer.PLUGINS_CELERY_QUEUE))!.length).toBe(6)
     expect(await mockServer.redis.get(mockServer.CELERY_DEFAULT_QUEUE)).toBe(null)
 
-    const queue = startQueue(mockServer, (event) => runPlugins(mockServer, event))
+    const queue = startQueue(
+        mockServer,
+        (event) => runPlugins(mockServer, event),
+        (events) => Promise.all(events.map((event) => runPlugins(mockServer, event)))
+    )
     await advanceOneTick()
 
     expect((await mockServer.redis.get(mockServer.PLUGINS_CELERY_QUEUE))!.length).toBe(5)

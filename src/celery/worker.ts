@@ -70,7 +70,7 @@ export class Worker extends Base implements Queue {
      * @returns {boolean}
      */
     public isPaused(): boolean {
-        return this.broker.paused
+        return this.broker.isPaused()
     }
 
     /**
