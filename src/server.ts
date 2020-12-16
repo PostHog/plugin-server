@@ -49,7 +49,7 @@ export async function createServer(
         // don't repeat the same info in each thread
         if (threadId === null) {
             console.info(
-                `🪵 Sending metrics to statsd at ${serverConfig.STATSD_HOST}:${serverConfig.STATSD_PORT}, prefix: "${serverConfig.STATSD_PREFIX}"`
+                `🪵 Sending metrics to StatsD at ${serverConfig.STATSD_HOST}:${serverConfig.STATSD_PORT}, prefix: "${serverConfig.STATSD_PREFIX}"`
             )
         }
     }
@@ -76,10 +76,18 @@ export async function createServer(
     return [server, closeServer]
 }
 
+// TODO: refactor this into a class, removing the need for many different Servers
+type ServerInstance = {
+    server: PluginsServer
+    piscina: Piscina
+    queue: Worker
+    stop: () => Promise<void>
+}
+
 export async function startPluginsServer(
-    config: PluginsServerConfig,
+    config: Partial<PluginsServerConfig>,
     makePiscina: (config: PluginsServerConfig) => Piscina
-): Promise<void> {
+): Promise<ServerInstance> {
     console.info(`⚡ posthog-plugin-server v${version}`)
 
     let serverConfig: PluginsServerConfig | undefined
@@ -137,13 +145,21 @@ export async function startPluginsServer(
         ;[server, closeServer] = await createServer(serverConfig, null)
 
         piscina = makePiscina(serverConfig)
-        const processEvent = (event: PluginEvent) => piscina!.runTask({ task: 'processEvent', args: { event } })
+        const processEvent = (event: PluginEvent) => {
+            if ((piscina?.queueSize || 0) > (server?.WORKER_CONCURRENCY || 4) * (server?.WORKER_CONCURRENCY || 4)) {
+                queue?.pause()
+            }
+            return piscina!.runTask({ task: 'processEvent', args: { event } })
+        }
 
-        if (!serverConfig.DISABLE_WEB) {
+        if (!server.DISABLE_WEB) {
             fastifyInstance = await startFastifyInstance(server)
         }
 
         queue = startQueue(server, processEvent)
+        piscina.on('drain', () => {
+            queue?.resume()
+        })
 
         pubSub = new Redis(server.REDIS_URL)
         pubSub.subscribe(server.PLUGINS_RELOAD_PUBSUB_CHANNEL)
@@ -159,13 +175,13 @@ export async function startPluginsServer(
             }
         })
 
-        // every 5 sec set a @posthog-plugin-server/ping redis key
+        // every 5 seconds set a @posthog-plugin-server/ping Redis key
         pingJob = schedule.scheduleJob('*/5 * * * * *', () => {
             server!.redis!.set('@posthog-plugin-server/ping', new Date().toISOString())
             server!.redis!.expire('@posthog-plugin-server/ping', 60)
         })
 
-        // every 10 seconds sends stuff to statsd
+        // every 10 seconds sends stuff to StatsD
         statsJob = schedule.scheduleJob('*/10 * * * * *', () => {
             if (piscina) {
                 server!.statsd?.gauge(`piscina.utilization`, (piscina?.utilization || 0) * 100)
@@ -195,6 +211,13 @@ export async function startPluginsServer(
 
         process.exit(1)
     }
+
+    return {
+        server,
+        piscina,
+        queue,
+        stop: closeJobs,
+    }
 }
 
 export async function stopPiscina(piscina: Piscina): Promise<void> {
@@ -204,7 +227,7 @@ export async function stopPiscina(piscina: Piscina): Promise<void> {
     await piscina.destroy()
 }
 
-export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskName: string) {
+export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskName: string): void {
     const runTask = (pluginConfigId: PluginConfigId) => piscina.runTask({ task: taskName, args: { pluginConfigId } })
 
     for (const pluginConfigId of server.pluginSchedule[taskName]) {
@@ -227,7 +250,7 @@ export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskN
     }
 }
 
-export async function waitForTasksToFinish(server: PluginsServer) {
+export async function waitForTasksToFinish(server: PluginsServer): Promise<any[]> {
     const activePromises = Object.values(server.pluginSchedulePromises)
         .map(Object.values)
         .flat()

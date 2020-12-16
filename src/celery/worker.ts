@@ -48,6 +48,32 @@ export class Worker extends Base implements Queue {
     }
 
     /**
+     * Pause the worker. await the response to be sure all pending `processNextTick` events have finished.
+     * @method Worker#pause
+     */
+    public pause(): Promise<void> {
+        return this.broker.pause()
+    }
+
+    /**
+     * Resume the worker
+     * @method Worker#pause
+     */
+    public resume(): void {
+        this.broker.resume()
+    }
+
+    /**
+     * Is the worker paused
+     * @method Worker#isPaused
+     *
+     * @returns {boolean}
+     */
+    public isPaused(): boolean {
+        return this.broker.paused
+    }
+
+    /**
      * @method Worker#run
      * @private
      *

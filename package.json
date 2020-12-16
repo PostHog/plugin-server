@@ -6,7 +6,7 @@
     "main": "dist/src/index.js",
     "scripts": {
         "test": "jest --testPathIgnorePatterns='benchmarks/'",
-        "benchmark": "jest --runInBand benchmarks/",
+        "benchmark": "node --expose-gc node_modules/.bin/jest --runInBand benchmarks/",
         "start": "yarn start:dev",
         "start:dist": "node dist/src/index.js --base-dir ../posthog",
         "start:dev": "ts-node-dev --exit-child src/index.ts --base-dir ../posthog",
@@ -29,6 +29,7 @@
     "repository": "https://github.com/PostHog/posthog-plugin-server",
     "license": "MIT",
     "dependencies": {
+        "@google-cloud/bigquery": "^5.5.0",
         "@posthog/node-rdkafka": "2.10.0-6.831-worker-context",
         "@sentry/node": "^5.29.0",
         "@sentry/tracing": "^5.29.0",
