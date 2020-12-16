@@ -13,6 +13,8 @@ import * as Sentry from '@sentry/node'
 import { areWeTestingWithJest, delay } from './utils'
 import { processError } from './error'
 import { StatsD } from 'hot-shots'
+import { EventsProcessor } from './ingestion/process-event'
+import { KafkaQueue } from './ingestion/kafka-queue'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
@@ -56,7 +58,7 @@ export async function createServer(
         }
     }
 
-    const server: PluginsServer = {
+    const server: Omit<PluginsServer, 'eventsProcessor'> = {
         ...serverConfig,
         db,
         redis,
@@ -70,12 +72,14 @@ export async function createServer(
         pluginSchedulePromises: { runEveryMinute: {}, runEveryHour: {}, runEveryDay: {} },
     }
 
+    server.eventsProcessor = new EventsProcessor(server as PluginsServer)
+
     const closeServer = async () => {
         await server.redis.quit()
         await server.db.end()
     }
 
-    return [server, closeServer]
+    return [server as PluginsServer, closeServer]
 }
 
 export async function startPluginsServer(
@@ -95,6 +99,7 @@ export async function startPluginsServer(
     let runEveryMinuteJob: schedule.Job | undefined
     let piscina: Piscina | undefined
     let queue: Queue | undefined
+    let kafkaQueue: KafkaQueue | undefined
     let closeServer: () => Promise<void> | undefined
 
     let shutdownStatus = 0

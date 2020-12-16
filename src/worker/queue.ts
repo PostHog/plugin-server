@@ -72,8 +72,9 @@ function startQueueKafka(
     processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>,
     piscina: Piscina
 ): Queue {
-    const eventsProcessor = new EventsProcessor(server)
-    const kafkaQueue = new KafkaQueue(server, 1000, 50, piscina, async (messages) => {
+    const kafkaQueue = new KafkaQueue(server, piscina)
+
+    kafkaQueue.consume(1000, 50, async (messages) => {
         const batchProcessingTimer = new Date()
         const processableEvents: PluginEvent[] = messages.map((message) => {
             const rawEventMessage = JSON.parse(message.value!.toString()) as RawEventMessage
@@ -91,7 +92,7 @@ function startQueueKafka(
         for (const event of processedEvents) {
             const singleIngestionTimer = new Date()
             const { distinct_id, ip, site_url, team_id, now, sent_at } = event
-            await eventsProcessor.process_event_ee(
+            await server.eventsProcessor.process_event_ee(
                 distinct_id,
                 ip,
                 site_url,

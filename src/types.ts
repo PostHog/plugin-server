@@ -4,6 +4,7 @@ import { PluginEvent, PluginAttachment, PluginConfigSchema } from '@posthog/plug
 import { VM, VMScript } from 'vm2'
 import { DateTime } from 'luxon'
 import { StatsD } from 'hot-shots'
+import { EventsProcessor } from 'ingestion/process-event'
 
 export enum LogLevel {
     Debug = 'debug',
@@ -54,6 +55,7 @@ export interface PluginsServer extends PluginsServerConfig {
     defaultConfigs: PluginConfig[]
     pluginSchedule: Record<string, PluginConfigId[]>
     pluginSchedulePromises: Record<string, Record<PluginConfigId, Promise<any> | null>>
+    eventsProcessor: EventsProcessor
 }
 
 export interface Queue {
