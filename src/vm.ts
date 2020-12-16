@@ -1,8 +1,11 @@
 import { VM } from 'vm2'
 import fetch from 'node-fetch'
+import atob from 'atob'
+import btoa from 'btoa'
 import { createConsole } from './extensions/console'
 import { createCache } from './extensions/cache'
 import { createPosthog } from './extensions/posthog'
+import { createGoogle } from './extensions/google'
 import { PluginsServer, PluginConfig, PluginConfigVMReponse } from './types'
 
 function areWeTestingWithJest() {
@@ -18,9 +21,14 @@ export async function createPluginConfigVM(
     const vm = new VM({
         sandbox: {},
     })
+
+    // our own stuff
     vm.freeze(createConsole(), 'console')
-    vm.freeze(fetch, 'fetch')
     vm.freeze(createPosthog(server, pluginConfig), 'posthog')
+
+    // exported node packages
+    vm.freeze(fetch, 'fetch')
+    vm.freeze(createGoogle(), 'google')
 
     if (areWeTestingWithJest()) {
         vm.freeze(setTimeout, '__jestSetTimeout')
