@@ -28,6 +28,7 @@
     "license": "MIT",
     "dependencies": {
         "@posthog/node-rdkafka": "2.10.0-6.831-worker-context",
+        "@google-cloud/bigquery": "^5.5.0",
         "@sentry/node": "^5.29.0",
         "@sentry/tracing": "^5.29.0",
         "@types/luxon": "^1.25.0",
