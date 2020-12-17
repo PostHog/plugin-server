@@ -5,7 +5,7 @@ import * as schedule from 'node-schedule'
 import Redlock from 'redlock'
 import * as Sentry from '@sentry/node'
 
-const lockedResource = 'plugin-server:locks:schedule'
+const LOCKED_RESOURCE = 'plugin-server:locks:schedule'
 
 export async function startSchedule(
     server: PluginsServer,
@@ -39,7 +39,7 @@ export async function startSchedule(
 
     const tryToGetTheLock = async () => {
         try {
-            lock = await redlock.lock(lockedResource, lockTTL)
+            lock = await redlock.lock(LOCKED_RESOURCE, lockTTL)
             weHaveTheLock = true
 
             console.info(`🔒 Scheduler lock acquired!`)
