@@ -11,7 +11,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         REDIS_URL: 'redis://localhost/',
         BASE_DIR: '.',
         PLUGINS_RELOAD_PUBSUB_CHANNEL: 'reload-plugins',
-        DISABLE_WEB: false,
+        DISABLE_WEB: true,
         WEB_PORT: 3008,
         WEB_HOSTNAME: '0.0.0.0',
         WORKER_CONCURRENCY: 0, // use all cores
