@@ -97,7 +97,7 @@ export async function startPluginsServer(
     let piscina: Piscina | undefined
     let queue: Worker | undefined
     let closeServer: () => Promise<void> | undefined
-    let closeSchedule: () => Promise<void> | undefined
+    let stopSchedule: () => Promise<void> | undefined
 
     let shutdownStatus = 0
 
@@ -118,7 +118,7 @@ export async function startPluginsServer(
         pubSub?.disconnect()
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
-        await closeSchedule?.()
+        await stopSchedule?.()
         await stopPiscina(piscina!)
         await closeServer()
 
@@ -160,11 +160,11 @@ export async function startPluginsServer(
             if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
                 console.info('⚡ Reloading plugins!')
                 await queue?.stop()
-                await closeSchedule?.()
+                await stopSchedule?.()
                 await stopPiscina(piscina!)
                 piscina = makePiscina(serverConfig!)
                 queue = startQueue(server!, processEvent)
-                closeSchedule = await startSchedule(server!, piscina)
+                stopSchedule = await startSchedule(server!, piscina)
             }
         })
 
@@ -183,7 +183,7 @@ export async function startPluginsServer(
             }
         })
 
-        closeSchedule = await startSchedule(server, piscina)
+        stopSchedule = await startSchedule(server, piscina)
 
         console.info(`🚀 All systems go.`)
     } catch (error) {
