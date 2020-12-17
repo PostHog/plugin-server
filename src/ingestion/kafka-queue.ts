@@ -1,127 +1,137 @@
-import { KafkaConsumer, LibrdKafkaError, Message } from '@posthog/node-rdkafka'
 import * as Sentry from '@sentry/node'
-import { PluginsServer, Queue } from 'types'
+import { Kafka, Consumer, Message } from 'kafkajs'
+import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from 'types'
 import { KAFKA_EVENTS_WAL } from './topics'
+import { version } from '../../package.json'
+import { PluginEvent } from '@posthog/plugin-scaffold'
+import { DateTime } from 'luxon'
 
 export type BatchCallback = (messages: Message[]) => Promise<void>
 
 export class KafkaQueue implements Queue {
     private pluginsServer: PluginsServer
-    private consumer: KafkaConsumer
-    private consumptionInterval: NodeJS.Timeout | null
-    private batchCallback: BatchCallback
-    private isPausedState: boolean
+    private kafka: Kafka
+    private consumer: Consumer
+    private wasConsumerRan: boolean
+    private processEventBatch: (batch: PluginEvent[]) => Promise<any>
+    private saveEvent: (event: PluginEvent) => Promise<void>
 
-    constructor(pluginsServer: PluginsServer) {
-        if (!pluginsServer.KAFKA_HOSTS) {
-            throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
-        }
+    constructor(
+        pluginsServer: PluginsServer,
+        processEventBatch: (batch: PluginEvent[]) => Promise<any>,
+        saveEvent: (event: PluginEvent) => Promise<void>
+    ) {
         this.pluginsServer = pluginsServer
-        this.consumer = new KafkaConsumer(
-            {
-                'group.id': 'plugin-ingestion',
-                'metadata.broker.list': this.pluginsServer.KAFKA_HOSTS!,
-                'enable.auto.commit': false,
-            },
-            {
-                'auto.offset.reset': 'earliest',
-            }
-        )
-            .on('offset.commit', (error, topicPartitions) => {
-                if (error) {
-                    console.error('⚠️ Kafka consumer offset commit error!')
-                    console.error(error)
-                    Sentry.captureException(error)
-                } else {
-                    console.info(
-                        `📌 Kafka consumer commited offset ${topicPartitions
-                            .map((entry) => `${entry.offset} for topic ${entry.topic} (parition ${entry.partition})`)
-                            .join(', ')}!`
-                    )
-                }
-            })
-            .on('subscribed', (topics) => {
-                console.info(`✅ Kafka consumer subscribed to topic ${topics.map(String).join(' and ')}!`)
-            })
-            .on('unsubscribed', () => {
-                console.info(`🔌 Kafka consumer unsubscribed from all topics!`)
-            })
-            .on('connection.failure', (error) => {
-                console.error('⚠️ Kafka consumer connection failure!')
-                console.error(error)
-                Sentry.captureException(error)
-            })
-            .on('rebalance.error', (error) => {
-                console.error('⚠️ Kafka consumer rebalancing error!')
-                console.error(error)
-                Sentry.captureException(error)
-            })
-            .on('event.error', (error) => {
-                console.error('⚠️ Kafka consumer event error!')
-                console.error(error)
-                Sentry.captureException(error)
-            })
-            .on('disconnected', () => {
-                console.info(`🛑 Kafka consumer disconnected!`)
-            })
-        this.consumptionInterval = null
-        this.batchCallback = async () => console.error('batchCallback not set for KafkaQueue!')
-        this.isPausedState = false
+        this.kafka = pluginsServer.kafka!
+        this.consumer = KafkaQueue.buildConsumer(this.kafka)
+        this.wasConsumerRan = false
+        this.processEventBatch = processEventBatch
+        this.saveEvent = saveEvent
     }
 
-    processBatchRaw(error: LibrdKafkaError, messages: Message[]): void {
-        if (error) {
-            console.error('⚠️ Kafka consumption error inside callback!')
-            console.error(error)
-            Sentry.captureException(error)
-        }
-        try {
-            this.batchCallback(messages)
-            this.consumer.commit()
-        } catch (error) {
-            console.error('⚠️ Error while processing batch of event messages!')
-            console.error(error)
-            Sentry.captureException(error)
-        }
-    }
-
-    consume(batchSize: number, intervalMs: number, batchCallback: BatchCallback): void {
-        this.batchCallback = batchCallback
-        this.consumer.on('ready', () => {
-            console.info(`✅ Kafka consumer ready!`)
-            this.consumer.subscribe([KAFKA_EVENTS_WAL])
-            this.consumptionInterval = setInterval(() => {
-                if (this.isPausedState) {
-                    return
-                }
-                this.consumer.consume(batchSize, (...args) => this.processBatchRaw(...args))
-            }, intervalMs)
-        })
-    }
-
-    start(): void {
+    async start(): Promise<void> {
         console.info(`⏬ Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
-        this.consumer.connect()
+        await this.consumer.subscribe({ topic: KAFKA_EVENTS_WAL })
+        // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
+        await this.consumer.run({
+            // TODO: eachBatchAutoResolve: false, // don't autoresolve whole batch in case we exit it early
+            // The issue is right now we'd miss some messages and not resolve them as processEventBatch COMPETELY
+            // discards some events, leaving us with no kafka_offset to resolve when in fact it should be resolved.
+            autoCommitInterval: 500, // autocommit every 500 ms…
+            autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
+            eachBatch: async ({
+                batch,
+                resolveOffset,
+                heartbeat,
+                commitOffsetsIfNecessary,
+                uncommittedOffsets,
+                isRunning,
+                isStale,
+            }) => {
+                const rawEvents: RawEventMessage[] = batch.messages.map((message) => ({
+                    ...JSON.parse(message.value!.toString()),
+                    kafka_offset: message.offset,
+                }))
+                const parsedEvents = rawEvents.map((rawEvent) => ({
+                    ...rawEvent,
+                    data: JSON.parse(rawEvent.data),
+                }))
+                const pluginEvents: PluginEvent[] = parsedEvents.map((parsedEvent) => ({
+                    ...parsedEvent,
+                    event: parsedEvent.data.event,
+                    properties: parsedEvent.data.properties,
+                }))
+                const processedEvents: PluginEvent[] = (
+                    await this.processEventBatch(pluginEvents)
+                ).filter((event: PluginEvent[] | false | null | undefined) => Boolean(event))
+                for (const event of processedEvents) {
+                    if (!isRunning()) {
+                        console.info('😮 Consumer not running anymore, canceling batch processing!')
+                        return
+                    }
+                    if (isStale()) {
+                        console.info('😮 Batch stale, canceling batch processing!')
+                        return
+                    }
+                    await this.saveEvent(event)
+                    resolveOffset(event.kafka_offset!)
+                    await heartbeat()
+                    await commitOffsetsIfNecessary()
+                }
+            },
+        })
+        this.wasConsumerRan = true
     }
 
     async pause(): Promise<void> {
-        this.isPausedState = true
+        if (!this.wasConsumerRan || this.isPaused()) {
+            return
+        }
+        console.error('⏳ Pausing Kafka consumer...')
+        await this.consumer.pause([{ topic: KAFKA_EVENTS_WAL }])
+        console.error('⏸ Kafka consumer paused!')
     }
 
-    resume(): void {
-        this.isPausedState = false
+    async resume(): Promise<void> {
+        if (!this.wasConsumerRan || !this.isPaused()) {
+            return
+        }
+        console.error('⏳ Resuming Kafka consumer...')
+        await this.consumer.resume([{ topic: KAFKA_EVENTS_WAL }])
+        console.error('▶️ Kafka consumer resumed!')
     }
 
     isPaused(): boolean {
-        return this.isPausedState
+        return this.consumer.paused().some(({ topic }) => topic === KAFKA_EVENTS_WAL)
     }
 
-    stop(): void {
-        console.info(`⏳ Stopping event processing...`)
-        this.consumer.unsubscribe()
-        this.consumer.disconnect()
-        if (this.consumptionInterval) {
-            clearInterval(this.consumptionInterval)
-        }
+    async stop(): Promise<void> {
+        console.info(`⏳ Stopping Kafka queue...`)
+        await this.consumer.stop()
+        console.error('⏹ Kafka consumer stopped!')
+        await this.consumer.disconnect()
+    }
+
+    private static buildConsumer(kafka: Kafka): Consumer {
+        const consumer = kafka.consumer({
+            groupId: 'plugin-server',
+            readUncommitted: false,
+        })
+        const { GROUP_JOIN, CRASH, CONNECT, DISCONNECT } = consumer.events
+        consumer.on(GROUP_JOIN, ({ payload: { groupId } }) => {
+            console.info(`✅ Kafka consumer joined group ${groupId}!`)
+        })
+        consumer.on(CRASH, ({ payload: { error, groupId } }) => {
+            console.error(`⚠️ Kafka consumer group ${groupId} crashed!`)
+            console.error(error)
+            Sentry.captureException(error)
+        })
+        consumer.on(CONNECT, () => {
+            console.info(`✅ Kafka consumer connected!`)
+        })
+        consumer.on(DISCONNECT, () => {
+            console.info(`🛑 Kafka consumer disconnected!`)
+        })
+        return consumer
     }
 }

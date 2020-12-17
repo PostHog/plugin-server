@@ -65,38 +65,19 @@ function startQueueKafka(
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
     processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
 ): Queue {
-    const kafkaQueue = new KafkaQueue(server)
-
-    kafkaQueue.consume(1000, 50, async (messages) => {
-        const batchProcessingTimer = new Date()
-        const processableEvents: PluginEvent[] = messages.map((message) => {
-            const rawEventMessage = JSON.parse(message.value!.toString()) as RawEventMessage
-            const data = JSON.parse(rawEventMessage.data)
-            return {
-                ...rawEventMessage,
-                data,
-                event: data.event,
-                properties: data.properties,
-            }
-        })
-        const processedEvents = (await processEventBatch(processableEvents)).filter((event) =>
-            Boolean(event)
-        ) as PluginEvent[]
-        for (const event of processedEvents) {
-            const singleIngestionTimer = new Date()
-            const { distinct_id, ip, site_url, team_id, now, sent_at } = event
-            await server.eventsProcessor.process_event_ee(
-                distinct_id,
-                ip,
-                site_url,
-                event,
-                team_id,
-                DateTime.fromISO(now),
-                sent_at ? DateTime.fromISO(sent_at) : null
-            )
-            server.statsd?.timing('single-ingestion', singleIngestionTimer)
-        }
-        server.statsd?.timing('batch-processing', batchProcessingTimer)
+    const kafkaQueue = new KafkaQueue(server, processEventBatch, async (event: PluginEvent) => {
+        const singleIngestionTimer = new Date()
+        const { distinct_id, ip, site_url, team_id, now, sent_at } = event
+        await server.eventsProcessor.process_event_ee(
+            distinct_id,
+            ip,
+            site_url,
+            event,
+            team_id,
+            DateTime.fromISO(now),
+            sent_at ? DateTime.fromISO(sent_at) : null
+        )
+        server.statsd?.timing('single-ingestion', singleIngestionTimer)
     })
 
     kafkaQueue.start()

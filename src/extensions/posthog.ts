@@ -1,9 +1,9 @@
-import { Producer, ProducerStream } from '@posthog/node-rdkafka'
 import { KAFKA_EVENTS_WAL } from '../ingestion/topics'
 import { DateTime } from 'luxon'
 import { PluginsServer, PluginConfig, RawEventMessage } from 'types'
 import { version } from '../../package.json'
 import Client from '../celery/client'
+import { UUIDT } from '../utils'
 
 export interface DummyPostHog {
     capture(event: string, properties?: Record<string, any>): void
@@ -12,20 +12,12 @@ export interface DummyPostHog {
 export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig): DummyPostHog {
     const distinctId = pluginConfig.plugin?.name || `plugin-id-${pluginConfig.plugin_id}`
 
-    const producerStream: ProducerStream | null = !server.EE_ENABLED
-        ? null
-        : Producer.createWriteStream(
-              {
-                  'metadata.broker.list': server.KAFKA_HOSTS!,
-              },
-              {},
-              {
-                  topic: KAFKA_EVENTS_WAL,
-              }
-          )
+    const producer = server.EE_ENABLED ? server.kafka!.producer() : null
+    producer?.connect()
 
     const sendEvent = server.EE_ENABLED
         ? (event: string, properties: Record<string, any> = {}) => {
+              const uuid = new UUIDT().toString()
               const utcNow = DateTime.utc().toISO()
               const data = {
                   distinct_id: distinctId,
@@ -38,17 +30,24 @@ export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig)
                   },
               }
 
-              producerStream!.write(
-                  JSON.stringify({
-                      distinct_id: distinctId,
-                      ip: '',
-                      site_url: '',
-                      data: JSON.stringify(data),
-                      team_id: pluginConfig.team_id,
-                      now: utcNow,
-                      sent_at: utcNow,
-                  } as RawEventMessage)
-              )
+              producer!.send({
+                  topic: KAFKA_EVENTS_WAL,
+                  messages: [
+                      {
+                          key: uuid,
+                          value: JSON.stringify({
+                              distinct_id: distinctId,
+                              ip: '',
+                              site_url: '',
+                              data: JSON.stringify(data),
+                              team_id: pluginConfig.team_id,
+                              now: utcNow,
+                              sent_at: utcNow,
+                              uuid,
+                          } as RawEventMessage),
+                      },
+                  ],
+              })
           }
         : (event: string, properties: Record<string, any> = {}) => {
               const utcNow = DateTime.utc().toISO()

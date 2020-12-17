@@ -1,1 +1,1 @@
-jest.mock('@posthog/node-rdkafka')
+jest.mock('kafkajs')

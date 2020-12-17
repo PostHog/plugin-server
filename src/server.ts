@@ -1,6 +1,7 @@
 import { Pool } from 'pg'
 import * as schedule from 'node-schedule'
 import Redis from 'ioredis'
+import { Kafka, logLevel } from 'kafkajs'
 import { FastifyInstance } from 'fastify'
 import { PluginConfigId, PluginsServer, PluginsServerConfig, Queue } from './types'
 import { startQueue } from './worker/queue'
@@ -42,6 +43,18 @@ export async function createServer(
         connectionString: serverConfig.DATABASE_URL,
     })
 
+    let kafka: Kafka | undefined
+    if (serverConfig.EE_ENABLED) {
+        if (!serverConfig.KAFKA_HOSTS) {
+            throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
+        }
+        kafka = new Kafka({
+            clientId: `plugin-server-v${version}`,
+            brokers: serverConfig.KAFKA_HOSTS.split(','),
+            logLevel: logLevel.NOTHING,
+        })
+    }
+
     let statsd: StatsD | undefined
     if (serverConfig.STATSD_HOST) {
         statsd = new StatsD({
@@ -61,6 +74,7 @@ export async function createServer(
         ...serverConfig,
         db,
         redis,
+        kafka,
         statsd,
         plugins: new Map(),
         pluginConfigs: new Map(),

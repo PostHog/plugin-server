@@ -1,10 +1,12 @@
 import { Pool } from 'pg'
 import { Redis } from 'ioredis'
+import { Kafka } from 'kafkajs'
 import { PluginEvent, PluginAttachment, PluginConfigSchema } from '@posthog/plugin-scaffold'
-import { VM, VMScript } from 'vm2'
+import { VM } from 'vm2'
 import { DateTime } from 'luxon'
 import { StatsD } from 'hot-shots'
 import { EventsProcessor } from 'ingestion/process-event'
+import { UUID } from './utils'
 
 export enum LogLevel {
     Debug = 'debug',
@@ -43,11 +45,11 @@ export interface PluginsServerConfig extends Record<string, any> {
 }
 
 export interface PluginsServer extends PluginsServerConfig {
-    // active connections to postgres and redis
+    // active connections to Postgres, Redis, Kafka, StatsD
     db: Pool
     redis: Redis
+    kafka: Kafka | undefined
     statsd: StatsD | undefined
-
     // currently enabled plugin status
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>
@@ -154,12 +156,14 @@ export interface RawEventMessage extends EventMessage {
     data: string
     now: string
     sent_at: string // may be an empty string
+    uuid: string
 }
 
 export interface ParsedEventMessage extends EventMessage {
     data: PluginEvent
     now: DateTime
     sent_at: DateTime | null
+    uuid: UUID
 }
 
 export type Properties = Record<string, any>
