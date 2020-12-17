@@ -33,7 +33,7 @@ export async function startSchedule(
         if (stopped) {
             return
         }
-        console.error('🔴 RedLock clientError', error)
+        console.error('🔴 Redlock clientError', error)
         Sentry.captureException(error)
     })
 
@@ -52,7 +52,7 @@ export async function startSchedule(
                     lock = await lock.extend(lockTTL)
                     lockTimeout = setTimeout(extendLock, extendDelay)
                 } catch (error) {
-                    console.error('🔴 RedLock can not extend lock!', error)
+                    console.error('🔴 Redlock can not extend lock!', error)
                     Sentry.captureException(error)
                     weHaveTheLock = false
                     lockTimeout = setTimeout(tryToGetTheLock, 0)
