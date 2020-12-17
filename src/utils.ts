@@ -60,7 +60,6 @@ export async function getFileFromTGZ(archive: Buffer, file: string): Promise<str
         })
 
         extract.on('finish', function () {
-            unzipStream.close()
             resolve(fileData)
         })
 
