@@ -139,5 +139,6 @@ test('redlock', async () => {
         await stopSchedule3()
     }
 
+    await piscina.destroy()
     await closeServer()
 })
