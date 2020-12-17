@@ -142,3 +142,35 @@ test('redlock', async () => {
     await piscina.destroy()
     await closeServer()
 })
+
+test('unobtained redlock does not leave itself hanging', async () => {
+    const workerThreads = 2
+    const testCode = `
+        async function runEveryMinute (meta) {
+            throw new Error('lol')
+        }
+    `
+    const [server, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log, SCHEDULE_LOCK_TTL: 3 })
+    const piscina = setupPiscina(workerThreads, testCode, 10)
+
+    let lock1 = false
+    let lock2 = false
+
+    const stopSchedule1 = await startSchedule(server, piscina, () => {
+        lock1 = true
+    })
+    const stopSchedule2 = await startSchedule(server, piscina, () => {
+        lock2 = true
+    })
+
+    await delay(1500)
+
+    expect(lock1).toBe(true)
+    expect(lock2).toBe(false)
+
+    await stopSchedule1()
+    await stopSchedule2()
+
+    await piscina.destroy()
+    await closeServer()
+})
