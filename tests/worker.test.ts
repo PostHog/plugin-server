@@ -121,7 +121,7 @@ test('assume that the workerThreads and tasksPerWorker values behave as expected
     await piscina.destroy()
 })
 
-test.skip('pause the queue if too many tasks', async () => {
+test('pause the queue if too many tasks', async () => {
     const testCode = `
         async function processEvent (event) {
             await new Promise(resolve => __jestSetTimeout(resolve, 1000))

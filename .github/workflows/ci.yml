@@ -46,11 +46,59 @@ jobs:
             - name: Lint with ESLint
               run: yarn lint
 
-            - name: Test with Jest
+            - name: Test with Jest (config.test.ts)
               env:
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres'
                   REDIS_URL: 'redis://localhost'
-              run: yarn task:db-init && yarn test --forceExit
+              run: yarn task:db-init && yarn test tests/config.test.ts
+
+            - name: Test with Jest (plugins.test.ts)
+              env:
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres'
+                  REDIS_URL: 'redis://localhost'
+              run: yarn task:db-init && yarn test tests/plugins.test.ts
+
+            - name: Test with Jest (queue.test.ts)
+              env:
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres'
+                  REDIS_URL: 'redis://localhost'
+              run: yarn task:db-init && yarn test tests/queue.test.ts
+
+            - name: Test with Jest (schedule.test.ts)
+              env:
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres'
+                  REDIS_URL: 'redis://localhost'
+              run: yarn task:db-init && yarn test tests/schedule.test.ts
+
+            - name: Test with Jest (server.test.ts)
+              env:
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres'
+                  REDIS_URL: 'redis://localhost'
+              run: yarn task:db-init && yarn test tests/server.test.ts
+
+            - name: Test with Jest (sql.test.ts)
+              env:
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres'
+                  REDIS_URL: 'redis://localhost'
+              run: yarn task:db-init && yarn test tests/sql.test.ts
+
+            - name: Test with Jest (utils.test.ts)
+              env:
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres'
+                  REDIS_URL: 'redis://localhost'
+              run: yarn task:db-init && yarn test tests/utils.test.ts
+
+            - name: Test with Jest (vm.test.ts)
+              env:
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres'
+                  REDIS_URL: 'redis://localhost'
+              run: yarn task:db-init && yarn test tests/vm.test.ts
+
+            - name: Test with Jest (worker.test.ts)
+              env:
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres'
+                  REDIS_URL: 'redis://localhost'
+              run: yarn task:db-init && yarn test tests/worker.test.ts
 
             - name: Run benchmarks
               env:
