@@ -52,7 +52,7 @@ export async function createServer(
             clientId: `plugin-server-v${version}`,
             brokers: serverConfig.KAFKA_HOSTS.split(','),
             logLevel: logLevel.NOTHING,
-            ssl: process.env.KAFKA_CLIENT_CERT_KEY_B64
+            ssl: process.env.KAFKA_CLIENT_CERT_B64
                 ? {
                       cert: Buffer.from(process.env.KAFKA_CLIENT_CERT_B64!, 'base64'),
                       key: Buffer.from(process.env.KAFKA_CLIENT_CERT_KEY_B64!, 'base64'),
