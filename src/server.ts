@@ -52,6 +52,13 @@ export async function createServer(
             clientId: `plugin-server-v${version}`,
             brokers: serverConfig.KAFKA_HOSTS.split(','),
             logLevel: logLevel.NOTHING,
+            ssl: process.env.KAFKA_CLIENT_CERT_KEY_B64
+                ? {
+                      cert: atob(process.env.KAFKA_CLIENT_CERT_B64!),
+                      key: atob(process.env.KAFKA_CLIENT_CERT_KEY_B64!),
+                      ca: atob(process.env.KAFKA_TRUSTED_CERT_B64!),
+                  }
+                : undefined,
         })
     }
 
