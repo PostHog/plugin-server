@@ -1,3 +1,4 @@
+import { redisFactory } from './helpers/redis'
 import { PluginEvent } from 'posthog-plugins/src/types'
 import { setupPiscina } from './helpers/worker'
 import { delay } from '../src/utils'
@@ -7,6 +8,7 @@ import { mockJestWithIndex } from './helpers/plugins'
 import { makePiscina } from '../src/worker/piscina'
 import Client from '../src/celery/client'
 
+jest.mock('ioredis', () => redisFactory())
 jest.mock('../src/sql')
 jest.setTimeout(600000) // 600 sec timeout
 
@@ -132,6 +134,8 @@ test('pause the queue if too many tasks', async () => {
         {
             WORKER_CONCURRENCY: 2,
             TASKS_PER_WORKER: 3,
+            PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
+            CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
             LOG_LEVEL: LogLevel.Debug,
             __jestMock: mockJestWithIndex(testCode),
         },
@@ -160,7 +164,7 @@ test('pause the queue if too many tasks', async () => {
     await delay(100)
 
     expect(pluginsServer.piscina.queueSize).toBe(0)
-    expect(pluginsServer.piscina.completed).toBe(baseCompleted) // runPluginS
+    expect(pluginsServer.piscina.completed).toBe(baseCompleted)
     expect(pluginsServer.queue.isPaused()).toBe(false)
 
     await delay(400)
@@ -177,8 +181,8 @@ test('pause the queue if too many tasks', async () => {
 
     await delay(50)
 
-    expect((await pluginsServer.server.redis.get(pluginsServer.server.PLUGINS_CELERY_QUEUE))!.length).toBe(88)
-    expect((await pluginsServer.server.redis.get(pluginsServer.server.CELERY_DEFAULT_QUEUE))!.length).toBe(2)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(88)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(2)
 
     expect(pluginsServer.queue.isPaused()).toBe(true)
     expect(pluginsServer.piscina.queueSize).toBe(6)
@@ -186,8 +190,8 @@ test('pause the queue if too many tasks', async () => {
 
     await delay(400)
 
-    expect((await pluginsServer.server.redis.get(pluginsServer.server.PLUGINS_CELERY_QUEUE))!.length).toBe(82)
-    expect((await pluginsServer.server.redis.get(pluginsServer.server.CELERY_DEFAULT_QUEUE))!.length).toBe(8)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(82)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(8)
 
     expect(pluginsServer.queue.isPaused()).toBe(true)
     expect(pluginsServer.piscina.queueSize).toBe(6)
@@ -195,8 +199,8 @@ test('pause the queue if too many tasks', async () => {
 
     await delay(400)
 
-    expect((await pluginsServer.server.redis.get(pluginsServer.server.PLUGINS_CELERY_QUEUE))!.length).toBe(76)
-    expect((await pluginsServer.server.redis.get(pluginsServer.server.CELERY_DEFAULT_QUEUE))!.length).toBe(14)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(76)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(14)
 
     expect(pluginsServer.queue.isPaused()).toBe(true)
     expect(pluginsServer.piscina.queueSize).toBe(6)
@@ -208,8 +212,8 @@ test('pause the queue if too many tasks', async () => {
     expect(pluginsServer.piscina.queueSize).toBe(0)
     expect(pluginsServer.piscina.completed).toBe(baseCompleted + 102)
 
-    expect((await pluginsServer.server.redis.get(pluginsServer.server.PLUGINS_CELERY_QUEUE))!.length).toBe(0)
-    expect((await pluginsServer.server.redis.get(pluginsServer.server.CELERY_DEFAULT_QUEUE))!.length).toBe(102)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(0)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(102)
 
     await pluginsServer.stop()
 })
