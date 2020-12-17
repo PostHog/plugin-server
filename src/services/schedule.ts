@@ -17,61 +17,66 @@ export async function startSchedule(
     let stopped = false
     let weHaveTheLock = false
     let lock: Redlock.Lock
-    let lockExtender: NodeJS.Timeout
+    let lockTimeout: NodeJS.Timeout
 
-    const lockTTL = server.SCHEDULE_LOCK_TTL * 1000
+    const lockTTL = server.SCHEDULE_LOCK_TTL * 1000 // 60 sec
+    const retryDelay = lockTTL / 10 // 6 sec
+    const extendDelay = lockTTL / 2 // 30 sec
+
     const redlock = new Redlock([server.redis], {
-        driftFactor: 0.01, // multiplied by lock ttl to determine drift time
-        retryDelay: lockTTL / 10, // time in ms
-        retryJitter: lockTTL / 30, // time in ms
+        // we handle retires ourselves to have a way to cancel the promises on quit
+        // without this, the `await redlock.lock()` code will remain inflight and cause issues
+        retryCount: 0,
     })
-    redlock.retryCount = -1 // retry forever, will be changed to 0 when exiting
+
     redlock.on('clientError', (error) => {
         if (stopped) {
             return
         }
-        console.error('RedLock clientError', error)
+        console.error('🔴 RedLock clientError', error)
         Sentry.captureException(error)
     })
 
-    const tryToGetTheLock = () => {
-        redlock
-            .lock(lockedResource, lockTTL)
-            .then((acquiredLock) => {
+    const tryToGetTheLock = async () => {
+        try {
+            lock = await redlock.lock(lockedResource, lockTTL)
+            weHaveTheLock = true
+
+            console.info(`🔒 Scheduler lock acquired!`)
+
+            const extendLock = async () => {
                 if (stopped) {
                     return
                 }
-                console.info(`🔒 Scheduler lock acquired!`)
-                weHaveTheLock = true
-                lock = acquiredLock
-
-                lockExtender = setInterval(async () => {
-                    if (stopped) {
-                        return
-                    }
-                    try {
-                        lock = await lock.extend(lockTTL)
-                    } catch (error) {
-                        console.error('RedLock can not extend lock!', error)
-                        Sentry.captureException(error)
-                        clearInterval(lockExtender)
-                        weHaveTheLock = false
-                        setTimeout(tryToGetTheLock, 0)
-                    }
-                }, lockTTL / 2)
-
-                onLock?.()
-            })
-            .catch((err) => {
-                if (stopped) {
-                    return
+                try {
+                    lock = await lock.extend(lockTTL)
+                    lockTimeout = setTimeout(extendLock, extendDelay)
+                } catch (error) {
+                    console.error('🔴 RedLock can not extend lock!', error)
+                    Sentry.captureException(error)
+                    weHaveTheLock = false
+                    lockTimeout = setTimeout(tryToGetTheLock, 0)
                 }
-                Sentry.captureException(err)
-                console.error(err)
-            })
+            }
+
+            lockTimeout = setTimeout(extendLock, extendDelay)
+
+            onLock?.()
+        } catch (error) {
+            if (stopped) {
+                return
+            }
+            weHaveTheLock = false
+            if (error instanceof Redlock.LockError) {
+                lockTimeout = setTimeout(tryToGetTheLock, retryDelay)
+            } else {
+                Sentry.captureException(error)
+                console.error('🔴 Redlock Error', error)
+            }
+        }
     }
 
-    tryToGetTheLock()
+    lockTimeout = setTimeout(tryToGetTheLock, 0)
 
     server.pluginSchedule = await piscina.runTask({ task: 'getPluginSchedule' })
 
@@ -87,8 +92,7 @@ export async function startSchedule(
 
     const stopSchedule = async () => {
         stopped = true
-        redlock.retryCount = 0 // make it crash on the next retry since redis will probably be stopped
-        lockExtender && clearInterval(lockExtender)
+        lockTimeout && clearTimeout(lockTimeout)
         runEveryDayJob && schedule.cancelJob(runEveryDayJob)
         runEveryHourJob && schedule.cancelJob(runEveryHourJob)
         runEveryMinuteJob && schedule.cancelJob(runEveryMinuteJob)
