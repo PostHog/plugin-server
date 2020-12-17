@@ -115,7 +115,7 @@ test('redlock', async () => {
         lock3 = true
     })
 
-    await delay(1000)
+    await delay(1500)
 
     expect(lock1).toBe(true)
     expect(lock2).toBe(false)
@@ -123,7 +123,7 @@ test('redlock', async () => {
 
     await stopSchedule1()
 
-    await delay(1000)
+    await delay(1500)
 
     expect(lock2 || lock3).toBe(true)
 
