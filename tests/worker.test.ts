@@ -1,4 +1,3 @@
-import { redisFactory } from './helpers/redis'
 import { PluginEvent } from 'posthog-plugins/src/types'
 import { setupPiscina } from './helpers/worker'
 import { delay } from '../src/utils'
@@ -8,7 +7,6 @@ import { mockJestWithIndex } from './helpers/plugins'
 import { makePiscina } from '../src/worker/piscina'
 import Client from '../src/celery/client'
 
-jest.mock('ioredis', () => redisFactory())
 jest.mock('../src/sql')
 jest.setTimeout(600000) // 600 sec timeout
 
@@ -141,6 +139,8 @@ test('pause the queue if too many tasks', async () => {
         },
         makePiscina
     )
+    await pluginsServer.server.redis.del(pluginsServer.server.PLUGINS_CELERY_QUEUE)
+    await pluginsServer.server.redis.del(pluginsServer.server.CELERY_DEFAULT_QUEUE)
     const kwargs = {
         distinct_id: 'my-id',
         ip: '127.0.0.1',
@@ -161,13 +161,15 @@ test('pause the queue if too many tasks', async () => {
     for (let i = 0; i < 2; i++) {
         client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
     }
-    await delay(100)
+    await delay(200)
 
     expect(pluginsServer.piscina.queueSize).toBe(0)
     expect(pluginsServer.piscina.completed).toBe(baseCompleted)
     expect(pluginsServer.queue.isPaused()).toBe(false)
 
-    await delay(400)
+    pluginsServer.queue.resume()
+
+    await delay(4000)
 
     expect(pluginsServer.piscina.queueSize).toBe(0)
     expect(pluginsServer.piscina.completed).toBe(baseCompleted + 2)
@@ -179,7 +181,7 @@ test('pause the queue if too many tasks', async () => {
         client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
     }
 
-    await delay(50)
+    await delay(1100)
 
     expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(88)
     expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(2)
