@@ -59,7 +59,6 @@ export interface PluginsServer extends PluginsServerConfig {
     pluginSchedule: Record<string, PluginConfigId[]>
     pluginSchedulePromises: Record<string, Record<PluginConfigId, Promise<any> | null>>
     eventsProcessor: EventsProcessor
-    shuttingDown: boolean
 }
 
 export interface Pausable {

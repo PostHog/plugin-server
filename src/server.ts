@@ -28,11 +28,9 @@ export async function createServer(
     const redis = new Redis(serverConfig.REDIS_URL, { maxRetriesPerRequest: -1 })
     redis
         .on('error', (error) => {
-            if (!server?.shuttingDown) {
-                Sentry.captureException(error)
-                console.error('🔴 Redis error encountered! Trying to reconnect...')
-                console.error(error)
-            }
+            Sentry.captureException(error)
+            console.error('🔴 Redis error encountered! Trying to reconnect...')
+            console.error(error)
         })
         .on('ready', () => {
             if (!areWeTestingWithJest()) {
@@ -85,7 +83,6 @@ export async function createServer(
 
         pluginSchedule: { runEveryMinute: [], runEveryHour: [], runEveryDay: [] },
         pluginSchedulePromises: { runEveryMinute: {}, runEveryHour: {}, runEveryDay: {} },
-        shuttingDown: false,
     }
 
     server.eventsProcessor = new EventsProcessor(server as PluginsServer)
@@ -126,7 +123,6 @@ export async function startPluginsServer(
     let shutdownStatus = 0
 
     async function closeJobs(): Promise<void> {
-        server!.shuttingDown = true
         shutdownStatus += 1
         if (shutdownStatus === 2) {
             console.info('🔁 Try again to shut down forcibly')
