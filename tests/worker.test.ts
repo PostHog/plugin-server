@@ -124,14 +124,14 @@ test('assume that the workerThreads and tasksPerWorker values behave as expected
 test('pause the queue if too many tasks', async () => {
     const testCode = `
         async function processEvent (event) {
-            await new Promise(resolve => __jestSetTimeout(resolve, 300))
+            await new Promise(resolve => __jestSetTimeout(resolve, 1000))
             return event
         }
     `
     const pluginsServer = await startPluginsServer(
         {
             WORKER_CONCURRENCY: 2,
-            TASKS_PER_WORKER: 3,
+            TASKS_PER_WORKER: 2,
             PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
             CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
             LOG_LEVEL: LogLevel.Debug,
@@ -157,65 +157,74 @@ test('pause the queue if too many tasks', async () => {
 
     const baseCompleted = pluginsServer.piscina.completed
 
+    expect(pluginsServer.piscina.queueSize).toBe(0)
+
     const client = new Client(pluginsServer.server.redis, pluginsServer.server.PLUGINS_CELERY_QUEUE)
     for (let i = 0; i < 2; i++) {
         client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
     }
-    await delay(200)
+
+    await delay(100)
 
     expect(pluginsServer.piscina.queueSize).toBe(0)
     expect(pluginsServer.piscina.completed).toBe(baseCompleted)
     expect(pluginsServer.queue.isPaused()).toBe(false)
 
-    pluginsServer.queue.resume()
-
-    await delay(4000)
+    await delay(3000)
 
     expect(pluginsServer.piscina.queueSize).toBe(0)
     expect(pluginsServer.piscina.completed).toBe(baseCompleted + 2)
     expect(pluginsServer.queue.isPaused()).toBe(false)
 
-    // 3 tasks * 2 threads = 6 active
+    // 2 tasks * 2 threads = 4 active
     // 2 threads * 2 threads = 4 queue excess
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 50; i++) {
         client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
     }
 
-    await delay(1100)
+    for (let i = 0; i < 50; i++) {
+        if ((await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)) === 50) {
+            await delay(100)
+        }
+    }
 
-    expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(88)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(40)
     expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(2)
 
     expect(pluginsServer.queue.isPaused()).toBe(true)
     expect(pluginsServer.piscina.queueSize).toBe(6)
     expect(pluginsServer.piscina.completed).toBe(baseCompleted + 2)
 
-    await delay(400)
+    for (let i = 0; i < 50; i++) {
+        if ((await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)) === 40) {
+            await delay(100)
+        }
+    }
 
-    expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(82)
-    expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(8)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(32)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(10)
 
     expect(pluginsServer.queue.isPaused()).toBe(true)
     expect(pluginsServer.piscina.queueSize).toBe(6)
-    expect(pluginsServer.piscina.completed).toBe(baseCompleted + 8)
+    expect(pluginsServer.piscina.completed).toBe(baseCompleted + 10)
 
-    await delay(400)
+    await delay(1000)
 
-    expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(76)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(32)
     expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(14)
 
     expect(pluginsServer.queue.isPaused()).toBe(true)
-    expect(pluginsServer.piscina.queueSize).toBe(6)
+    expect(pluginsServer.piscina.queueSize).toBe(2)
     expect(pluginsServer.piscina.completed).toBe(baseCompleted + 14)
 
-    await delay(5000)
+    await delay(10000)
 
     expect(pluginsServer.queue.isPaused()).toBe(false)
     expect(pluginsServer.piscina.queueSize).toBe(0)
-    expect(pluginsServer.piscina.completed).toBe(baseCompleted + 102)
+    expect(pluginsServer.piscina.completed).toBe(baseCompleted + 52)
 
     expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(0)
-    expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(102)
+    expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(52)
 
     await pluginsServer.stop()
 })
