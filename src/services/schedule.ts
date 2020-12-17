@@ -55,7 +55,7 @@ export async function startSchedule(
                     console.error('🔴 Redlock can not extend lock!', error)
                     Sentry.captureException(error)
                     weHaveTheLock = false
-                    lockTimeout = setTimeout(tryToGetTheLock, 0)
+                    process.nextTick(tryToGetTheLock)
                 }
             }
 
