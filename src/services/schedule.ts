@@ -27,6 +27,9 @@ export async function startSchedule(
         retryJitter: lockTTL / 30, // time in ms
     })
     redlock.on('clientError', (error) => {
+        if (stopped) {
+            return
+        }
         console.error('RedLock clientError', error)
         Sentry.captureException(error)
     })
