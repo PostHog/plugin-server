@@ -11,8 +11,7 @@ export const redisFactory = (): any => {
     // second mock for our code
     return function (...args: any[]) {
         const redis = new Redis(args)
-        // adapted from copy/paste - our own b
-        // rpop function!
+        // adapted from copy/paste - our own brpop function!
         redis.brpop = async (...args: any[]) => {
             args.pop()
             return [args[0], await redis.rpop(...args)]
