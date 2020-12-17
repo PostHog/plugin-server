@@ -19,7 +19,7 @@ function createEvent(index = 0): PluginEvent {
     }
 }
 
-test('startPluginsServer', async () => {
+test.skip('startPluginsServer', async () => {
     const testCode = `
         async function processEvent (event) {
             return event
