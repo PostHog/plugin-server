@@ -30,6 +30,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     STATSD_HOST: string | null
     STATSD_PORT: number
     STATSD_PREFIX: string
+    SCHEDULE_LOCK_TTL: number
 
     __jestMock?: {
         getPluginRows: Plugin[]

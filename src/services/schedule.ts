@@ -2,29 +2,71 @@ import { PluginConfigId, PluginsServer } from '../types'
 import Piscina from 'piscina'
 import { processError } from '../error'
 import * as schedule from 'node-schedule'
+import Redlock from 'redlock'
+import * as Sentry from '@sentry/node'
+
+const lockedResource = 'plugin-server:locks:schedule'
 
 export async function startSchedule(server: PluginsServer, piscina: Piscina): Promise<() => Promise<void>> {
     console.info(`⏰ Starting scheduling service`)
 
+    let weHaveTheLock = false
+    let lock: Redlock.Lock
+    let lockExtender: NodeJS.Timeout
+
+    const lockTTL = server.SCHEDULE_LOCK_TTL
+    const redlock = new Redlock([server.redis], {
+        driftFactor: 0.01, // multiplied by lock ttl to determine drift time
+        retryCount: -1, // retry forever
+        retryDelay: lockTTL / 10, // time in ms
+        retryJitter: lockTTL / 30, // time in ms
+    })
+    redlock.on('clientError', Sentry.captureException)
+
+    const tryToGetTheLock = () => {
+        redlock.lock(lockedResource, lockTTL).then((acquiredLock) => {
+            console.info(`🔒 Scheduler lock acquired!`)
+            weHaveTheLock = true
+            lock = acquiredLock
+
+            lockExtender = setInterval(async () => {
+                try {
+                    lock = await lock.extend(lockTTL)
+                } catch (error) {
+                    Sentry.captureException(error)
+                    clearInterval(lockExtender)
+                    weHaveTheLock = false
+                    window.setTimeout(tryToGetTheLock, 0)
+                }
+            }, lockTTL / 2)
+        })
+    }
+
+    tryToGetTheLock()
+
     server.pluginSchedule = await piscina.runTask({ task: 'getPluginSchedule' })
 
     const runEveryMinuteJob = schedule.scheduleJob('* * * * *', () => {
-        runTasksDebounced(server!, piscina!, 'runEveryMinute')
+        weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryMinute')
     })
     const runEveryHourJob = schedule.scheduleJob('0 * * * *', () => {
-        runTasksDebounced(server!, piscina!, 'runEveryHour')
+        weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryHour')
     })
     const runEveryDayJob = schedule.scheduleJob('0 0 * * *', () => {
-        runTasksDebounced(server!, piscina!, 'runEveryDay')
+        weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryDay')
     })
 
-    return async () => {
+    const stopSchedule = async () => {
+        lockExtender && clearInterval(lockExtender)
         runEveryDayJob && schedule.cancelJob(runEveryDayJob)
         runEveryHourJob && schedule.cancelJob(runEveryHourJob)
         runEveryMinuteJob && schedule.cancelJob(runEveryMinuteJob)
 
+        await lock?.unlock().catch(Sentry.captureException)
         await waitForTasksToFinish(server!)
     }
+
+    return stopSchedule
 }
 
 export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskName: string): void {

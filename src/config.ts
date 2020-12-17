@@ -21,6 +21,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         STATSD_HOST: null,
         STATSD_PORT: 8125,
         STATSD_PREFIX: 'plugin-server.',
+        SCHEDULE_LOCK_TTL: 60000,
     }
 }
 
@@ -42,6 +43,7 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         STATSD_HOST: 'StatsD host - integration disabled if this is not provided',
         STATSD_PORT: 'StatsD port',
         STATSD_PREFIX: 'StatsD prefix',
+        SCHEDULE_LOCK_TTL: 'How long to hold the lock for the schedule',
     }
 }
 
