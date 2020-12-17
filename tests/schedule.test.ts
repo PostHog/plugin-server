@@ -1,6 +1,6 @@
 import { setupPiscina } from './helpers/worker'
 import { createServer } from '../src/server'
-import { runTasksDebounced, waitForTasksToFinish } from '../src/services/schedule'
+import { runTasksDebounced, startSchedule, waitForTasksToFinish } from '../src/services/schedule'
 import { LogLevel } from '../src/types'
 import { delay } from '../src/utils'
 import { PluginEvent } from 'posthog-plugins/src/types'
@@ -88,5 +88,56 @@ test('runTasksDebounced exception', async () => {
     // and we're not testing it E2E so we can't check the DB either...
 
     await piscina.destroy()
+    await closeServer()
+})
+
+test('redlock', async () => {
+    const workerThreads = 2
+    const testCode = `
+        async function runEveryMinute (meta) {
+            throw new Error('lol')
+        }
+    `
+    const piscina = setupPiscina(workerThreads, testCode, 10)
+    const [server, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log, SCHEDULE_LOCK_TTL: 3 })
+
+    let lock1 = false
+    let lock2 = false
+    let lock3 = false
+
+    const stopSchedule1 = await startSchedule(server, piscina, () => {
+        lock1 = true
+    })
+    const stopSchedule2 = await startSchedule(server, piscina, () => {
+        lock2 = true
+    })
+    const stopSchedule3 = await startSchedule(server, piscina, () => {
+        lock3 = true
+    })
+
+    await delay(1000)
+
+    expect(lock1).toBe(true)
+    expect(lock2).toBe(false)
+    expect(lock3).toBe(false)
+
+    await stopSchedule1()
+
+    await delay(1000)
+
+    expect(lock2 || lock3).toBe(true)
+
+    if (lock3) {
+        await stopSchedule3()
+        await delay(1000)
+        expect(lock2).toBe(true)
+        await stopSchedule2()
+    } else {
+        await stopSchedule2()
+        await delay(1000)
+        expect(lock3).toBe(true)
+        await stopSchedule3()
+    }
+
     await closeServer()
 })

@@ -7,39 +7,62 @@ import * as Sentry from '@sentry/node'
 
 const lockedResource = 'plugin-server:locks:schedule'
 
-export async function startSchedule(server: PluginsServer, piscina: Piscina): Promise<() => Promise<void>> {
+export async function startSchedule(
+    server: PluginsServer,
+    piscina: Piscina,
+    onLock?: () => void
+): Promise<() => Promise<void>> {
     console.info(`⏰ Starting scheduling service`)
 
+    let stopped = false
     let weHaveTheLock = false
     let lock: Redlock.Lock
     let lockExtender: NodeJS.Timeout
 
-    const lockTTL = server.SCHEDULE_LOCK_TTL
+    const lockTTL = server.SCHEDULE_LOCK_TTL * 1000
     const redlock = new Redlock([server.redis], {
         driftFactor: 0.01, // multiplied by lock ttl to determine drift time
         retryCount: -1, // retry forever
         retryDelay: lockTTL / 10, // time in ms
         retryJitter: lockTTL / 30, // time in ms
     })
-    redlock.on('clientError', Sentry.captureException)
+    redlock.on('clientError', (error) => {
+        console.error('RedLock clientError', error)
+        Sentry.captureException(error)
+    })
 
     const tryToGetTheLock = () => {
-        redlock.lock(lockedResource, lockTTL).then((acquiredLock) => {
-            console.info(`🔒 Scheduler lock acquired!`)
-            weHaveTheLock = true
-            lock = acquiredLock
-
-            lockExtender = setInterval(async () => {
-                try {
-                    lock = await lock.extend(lockTTL)
-                } catch (error) {
-                    Sentry.captureException(error)
-                    clearInterval(lockExtender)
-                    weHaveTheLock = false
-                    window.setTimeout(tryToGetTheLock, 0)
+        redlock
+            .lock(lockedResource, lockTTL)
+            .then((acquiredLock) => {
+                if (stopped) {
+                    return
                 }
-            }, lockTTL / 2)
-        })
+                console.info(`🔒 Scheduler lock acquired!`)
+                weHaveTheLock = true
+                lock = acquiredLock
+
+                lockExtender = setInterval(async () => {
+                    if (stopped) {
+                        return
+                    }
+                    try {
+                        lock = await lock.extend(lockTTL)
+                    } catch (error) {
+                        console.error('RedLock can not extend lock!', error)
+                        Sentry.captureException(error)
+                        clearInterval(lockExtender)
+                        weHaveTheLock = false
+                        setTimeout(tryToGetTheLock, 0)
+                    }
+                }, lockTTL / 2)
+
+                onLock?.()
+            })
+            .catch((err) => {
+                Sentry.captureException(err)
+                console.error(err)
+            })
     }
 
     tryToGetTheLock()
@@ -47,16 +70,17 @@ export async function startSchedule(server: PluginsServer, piscina: Piscina): Pr
     server.pluginSchedule = await piscina.runTask({ task: 'getPluginSchedule' })
 
     const runEveryMinuteJob = schedule.scheduleJob('* * * * *', () => {
-        weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryMinute')
+        !stopped && weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryMinute')
     })
     const runEveryHourJob = schedule.scheduleJob('0 * * * *', () => {
-        weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryHour')
+        !stopped && weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryHour')
     })
     const runEveryDayJob = schedule.scheduleJob('0 0 * * *', () => {
-        weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryDay')
+        !stopped && weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryDay')
     })
 
     const stopSchedule = async () => {
+        stopped = true
         lockExtender && clearInterval(lockExtender)
         runEveryDayJob && schedule.cancelJob(runEveryDayJob)
         runEveryHourJob && schedule.cancelJob(runEveryHourJob)
