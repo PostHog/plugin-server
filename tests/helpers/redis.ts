@@ -1,5 +1,5 @@
 // Adapted from https://github.com/stipsan/ioredis-mock/issues/568#issuecomment-492558489
-export const redisFactory = () => {
+export const redisFactory = (): any => {
     const Redis = require('ioredis-mock')
     if (typeof Redis === 'object') {
         // the first mock is an ioredis shim because ioredis-mock depends on it
