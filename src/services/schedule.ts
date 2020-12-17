@@ -22,10 +22,10 @@ export async function startSchedule(
     const lockTTL = server.SCHEDULE_LOCK_TTL * 1000
     const redlock = new Redlock([server.redis], {
         driftFactor: 0.01, // multiplied by lock ttl to determine drift time
-        retryCount: -1, // retry forever
         retryDelay: lockTTL / 10, // time in ms
         retryJitter: lockTTL / 30, // time in ms
     })
+    redlock.retryCount = -1
     redlock.on('clientError', (error) => {
         if (stopped) {
             return
@@ -63,6 +63,9 @@ export async function startSchedule(
                 onLock?.()
             })
             .catch((err) => {
+                if (stopped) {
+                    return
+                }
                 Sentry.captureException(err)
                 console.error(err)
             })
@@ -84,6 +87,7 @@ export async function startSchedule(
 
     const stopSchedule = async () => {
         stopped = true
+        redlock.retryCount = 0
         lockExtender && clearInterval(lockExtender)
         runEveryDayJob && schedule.cancelJob(runEveryDayJob)
         runEveryHourJob && schedule.cancelJob(runEveryHourJob)
