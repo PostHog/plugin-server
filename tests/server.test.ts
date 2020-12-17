@@ -1,6 +1,6 @@
 import { startPluginsServer } from '../src/server'
 import { LogLevel } from '../src/types'
-import { PluginEvent } from 'posthog-plugins/src/types'
+import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import { makePiscina } from '../src/worker/piscina'
 import { mockJestWithIndex } from './helpers/plugins'
 
