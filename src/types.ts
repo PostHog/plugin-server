@@ -22,8 +22,11 @@ export interface PluginsServerConfig extends Record<string, any> {
     TASKS_PER_WORKER: number
     CELERY_DEFAULT_QUEUE: string
     DATABASE_URL: string
+    KAFKA_ENABLED: boolean
     KAFKA_HOSTS: string | null
-    EE_ENABLED: boolean
+    KAFKA_CLIENT_CERT_B64: string | null
+    KAFKA_CLIENT_CERT_KEY_B64: string | null
+    KAFKA_TRUSTED_CERT_B64: string | null
     PLUGINS_CELERY_QUEUE: string
     REDIS_URL: string
     BASE_DIR: string
@@ -36,6 +39,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     STATSD_HOST: string | null
     STATSD_PORT: number
     STATSD_PREFIX: string
+    SCHEDULE_LOCK_TTL: number
 
     __jestMock?: {
         getPluginRows: Plugin[]
