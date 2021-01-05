@@ -1,10 +1,5 @@
 import { PluginConfig, PluginsServer } from '../types'
-// import { StorageExtension } from '@posthog/plugin-scaffold'
-
-export interface StorageExtension {
-    set: (key: string, value: unknown) => Promise<void>
-    get: (key: string, defaultValue: unknown) => Promise<unknown>
-}
+import { StorageExtension } from '@posthog/plugin-scaffold'
 
 export function createStorage(server: PluginsServer, pluginConfig: PluginConfig): StorageExtension {
     const get = async function (key: string, defaultValue: unknown): Promise<unknown> {
