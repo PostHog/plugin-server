@@ -2,7 +2,7 @@ import { startPluginsServer } from '../src/server'
 import { LogLevel } from '../src/types'
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import { makePiscina } from '../src/worker/piscina'
-import { mockJestWithIndex } from './helpers/plugins'
+import { resetTestDatabase } from './helpers/sql'
 
 jest.mock('../src/sql')
 jest.setTimeout(60000) // 60 sec timeout
@@ -25,11 +25,11 @@ test('startPluginsServer', async () => {
             return event
         }
     `
+    await resetTestDatabase(testCode)
     const pluginsServer = await startPluginsServer(
         {
             WORKER_CONCURRENCY: 2,
             LOG_LEVEL: LogLevel.Debug,
-            __jestMock: mockJestWithIndex(testCode),
         },
         makePiscina
     )
