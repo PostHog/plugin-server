@@ -720,11 +720,11 @@ test('posthog in runEvery', async () => {
 
     expect(mockSendTask.mock.calls[0][0]).toEqual('posthog.tasks.process_event.process_event_with_plugins')
     expect(mockSendTask.mock.calls[0][1]).toEqual([
-        'mock-plugin',
+        'plugin-id-60',
         null,
         null,
         expect.objectContaining({
-            distinct_id: 'mock-plugin',
+            distinct_id: 'plugin-id-60',
             event: 'my-new-event',
             properties: expect.objectContaining({ $lib: 'posthog-plugin-server', random: 'properties' }),
         }),
