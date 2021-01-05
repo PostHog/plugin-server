@@ -26,6 +26,7 @@ export async function resetTestDatabase(code: string): Promise<void> {
         await insertRow(db, 'posthog_pluginattachment', pluginAttachment)
     }
     await delay(400)
+    await db.end()
 }
 
 async function insertRow(db: Pool, table: string, object: Record<string, any>): Promise<void> {

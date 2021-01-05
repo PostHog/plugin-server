@@ -7,18 +7,6 @@ import { resetTestDatabase } from './helpers/sql'
 jest.mock('../src/sql')
 jest.setTimeout(60000) // 60 sec timeout
 
-function createEvent(index = 0): PluginEvent {
-    return {
-        distinct_id: 'my_id',
-        ip: '127.0.0.1',
-        site_url: 'http://localhost',
-        team_id: 2,
-        now: new Date().toISOString(),
-        event: 'default event',
-        properties: { key: 'value', index },
-    }
-}
-
 test('startPluginsServer', async () => {
     const testCode = `
         async function processEvent (event) {
