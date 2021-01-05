@@ -108,20 +108,13 @@ const createPluginStorage = `
         plugin_config_id integer      not null
             constraint posthog_pluginstorag_plugin_config_id_6744363a_fk_posthog_p
                 references posthog_pluginconfig
-                deferrable initially deferred,
-        team_id          integer
-            constraint posthog_pluginstorage_team_id_b5b5e2b5_fk_posthog_team_id
-                references posthog_team
                 deferrable initially deferred
     );
     
     create index posthog_pluginstorage_plugin_config_id_6744363a
         on posthog_pluginstorage (plugin_config_id);
     
-    create index posthog_pluginstorage_team_id_b5b5e2b5
-        on posthog_pluginstorage (team_id);
-
-    CREATE UNIQUE INDEX posthog_unique_plugin_storage_key ON posthog_pluginstorage(team_id int4_ops,plugin_config_id int4_ops,key text_ops);
+    CREATE UNIQUE INDEX posthog_unique_plugin_storage_key ON posthog_pluginstorage(plugin_config_id int4_ops,key text_ops);
 `
 
 task()
