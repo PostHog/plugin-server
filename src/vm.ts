@@ -6,6 +6,7 @@ import { createPosthog } from './extensions/posthog'
 import { createGoogle } from './extensions/google'
 import { PluginsServer, PluginConfig, PluginConfigVMReponse } from './types'
 import { areWeTestingWithJest } from './utils'
+import { createStorage } from './extensions/storage'
 
 export async function createPluginConfigVM(
     server: PluginsServer,
@@ -37,6 +38,7 @@ export async function createPluginConfigVM(
             ),
             config: pluginConfig.config,
             attachments: pluginConfig.attachments,
+            storage: createStorage(server, pluginConfig),
         },
         '__pluginHostMeta'
     )

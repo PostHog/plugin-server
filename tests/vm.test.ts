@@ -429,6 +429,44 @@ test('meta.cache set/get', async () => {
     expect(event.properties!['counter']).toEqual(3)
 })
 
+test('meta.storage set/get', async () => {
+    const indexJs = `
+        async function setupPlugin (meta) {
+            await meta.storage.set('counter', -1)
+            const c = await meta.storage.get('counter')
+            if (c === -1) {
+                await meta.storage.set('counter', null)
+            }
+            const c2 = await meta.storage.get('counter')
+            if (typeof c === 'undefined') {
+                await meta.storage.set('counter', 0)
+            }
+        }
+        async function processEvent (event, meta) {
+            const counter = await meta.storage.get('counter', 999)
+            await meta.storage.set('counter', counter + 1)
+            event.properties['counter'] = counter + 1
+            return event
+        }
+    `
+    await resetTestDatabase(indexJs)
+    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'original event',
+        properties: {},
+    }
+
+    await vm.methods.processEvent(event)
+    expect(event.properties!['counter']).toEqual(1)
+
+    await vm.methods.processEvent(event)
+    expect(event.properties!['counter']).toEqual(2)
+
+    await vm.methods.processEvent(event)
+    expect(event.properties!['counter']).toEqual(3)
+})
+
 test('meta.cache expire', async () => {
     const indexJs = `
         async function setupPlugin(meta) {
