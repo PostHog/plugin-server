@@ -16,18 +16,15 @@ export function createStorage(server: PluginsServer, pluginConfig: PluginConfig)
                 [pluginConfig.team_id, pluginConfig.id, key]
             )
         } else {
-            const existingValue = await get(key, undefined)
-            if (typeof existingValue !== 'undefined') {
-                await server.db.query(
-                    'UPDATE posthog_pluginstorage SET "value"=$1 WHERE "team_id"=$2 AND "plugin_config_id"=$3 AND "key"=$4',
-                    [JSON.stringify(value), pluginConfig.team_id, pluginConfig.id, key]
-                )
-            } else {
-                await server.db.query(
-                    'INSERT INTO posthog_pluginstorage ("team_id", "plugin_config_id", "key", "value") VALUES ($1, $2, $3, $4)',
-                    [pluginConfig.team_id, pluginConfig.id, key, JSON.stringify(value)]
-                )
-            }
+            await server.db.query(
+                `
+                    INSERT INTO posthog_pluginstorage ("team_id", "plugin_config_id", "key", "value") 
+                    VALUES ($1, $2, $3, $4)
+                    ON CONFLICT ("team_id", "plugin_config_id", "key") 
+                    DO UPDATE SET value = $4
+                `,
+                [pluginConfig.team_id, pluginConfig.id, key, JSON.stringify(value)]
+            )
         }
     }
 

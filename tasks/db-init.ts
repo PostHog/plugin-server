@@ -120,6 +120,8 @@ const createPluginStorage = `
     
     create index posthog_pluginstorage_team_id_b5b5e2b5
         on posthog_pluginstorage (team_id);
+
+    CREATE UNIQUE INDEX posthog_unique_plugin_storage_key ON posthog_pluginstorage(team_id int4_ops,plugin_config_id int4_ops,key text_ops);
 `
 
 task()
