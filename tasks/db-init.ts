@@ -98,23 +98,17 @@ const createPluginConfig = `
 `
 
 const createPluginStorage = `
-    create table posthog_pluginstorage
-    (
-        id               serial       not null
-            constraint posthog_pluginstorage_pkey
-                primary key,
-        key              varchar(200) not null,
-        value            text,
-        plugin_config_id integer      not null
-            constraint posthog_pluginstorag_plugin_config_id_6744363a_fk_posthog_p
-                references posthog_pluginconfig
-                deferrable initially deferred
+    CREATE TABLE posthog_pluginstorage (
+        id serial NOT NULL CONSTRAINT posthog_pluginstorage_pkey PRIMARY KEY,
+        key varchar(200) NOT NULL,
+        value text,
+        plugin_config_id integer NOT NULL CONSTRAINT posthog_pluginstorag_plugin_config_id_6744363a_fk_posthog_p
+        REFERENCES posthog_pluginconfig DEFERRABLE INITIALLY DEFERRED
     );
-    
-    create index posthog_pluginstorage_plugin_config_id_6744363a
-        on posthog_pluginstorage (plugin_config_id);
-    
-    CREATE UNIQUE INDEX posthog_unique_plugin_storage_key ON posthog_pluginstorage(plugin_config_id int4_ops,key text_ops);
+
+    CREATE INDEX posthog_pluginstorage_plugin_config_id_6744363a ON posthog_pluginstorage (plugin_config_id);
+
+    CREATE UNIQUE INDEX posthog_unique_plugin_storage_key ON posthog_pluginstorage (plugin_config_id int4_ops, KEY text_ops);
 `
 
 task()
