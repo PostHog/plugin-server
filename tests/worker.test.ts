@@ -34,7 +34,7 @@ test('piscina worker test', async () => {
         } 
     `
     await resetTestDatabase(testCode)
-    const piscina = await setupPiscina(workerThreads, 10)
+    const piscina = setupPiscina(workerThreads, 10)
 
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
     const processEventBatch = (batch: PluginEvent[]) => piscina.runTask({ task: 'processEventBatch', args: { batch } })
@@ -66,7 +66,7 @@ test('assume that the workerThreads and tasksPerWorker values behave as expected
         }
     `
     await resetTestDatabase(testCode)
-    const piscina = await setupPiscina(workerThreads, tasksPerWorker)
+    const piscina = setupPiscina(workerThreads, tasksPerWorker)
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
     const promises = []
 

@@ -39,7 +39,7 @@ test('runTasksDebounced', async () => {
         }
     `
     await resetTestDatabase(testCode)
-    const piscina = await setupPiscina(workerThreads, 10)
+    const piscina = setupPiscina(workerThreads, 10)
     const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
 
@@ -76,7 +76,7 @@ test('runTasksDebounced exception', async () => {
         }
     `
     await resetTestDatabase(testCode)
-    const piscina = await setupPiscina(workerThreads, 10)
+    const piscina = setupPiscina(workerThreads, 10)
 
     const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
     const [server, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
@@ -101,7 +101,7 @@ test('redlock', async () => {
         }
     `
     await resetTestDatabase(testCode)
-    const piscina = await setupPiscina(workerThreads, 10)
+    const piscina = setupPiscina(workerThreads, 10)
     const [server, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log, SCHEDULE_LOCK_TTL: 3 })
 
     let lock1 = false
@@ -155,7 +155,7 @@ test('unobtained redlock does not leave itself hanging', async () => {
     `
     await resetTestDatabase(testCode)
     const [server, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log, SCHEDULE_LOCK_TTL: 3 })
-    const piscina = await setupPiscina(workerThreads, 10)
+    const piscina = setupPiscina(workerThreads, 10)
 
     let lock1 = false
     let lock2 = false

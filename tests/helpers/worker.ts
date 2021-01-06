@@ -3,7 +3,7 @@ import { makePiscina } from '../../src/worker/piscina'
 import { defaultConfig } from '../../src/config'
 import { LogLevel } from '../../src/types'
 
-export async function setupPiscina(workers: number, tasksPerWorker: number): Promise<Piscina> {
+export function setupPiscina(workers: number, tasksPerWorker: number): Piscina {
     return makePiscina({
         ...defaultConfig,
         WORKER_CONCURRENCY: workers,
