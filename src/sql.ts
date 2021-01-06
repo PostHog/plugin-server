@@ -1,8 +1,4 @@
-import { areWeTestingWithJest } from './utils'
 import { Plugin, PluginAttachmentDB, PluginConfig, PluginConfigId, PluginError, PluginsServer } from './types'
-
-// This nice "mocking" system with areWeTestingWithJest is used since we want to mock data in worker threads.
-// Jest mocks don't penetrate that far. Improvements welcome.
 
 export async function getPluginRows(server: PluginsServer): Promise<Plugin[]> {
     const { rows: pluginRows }: { rows: Plugin[] } = await server.db.query(
