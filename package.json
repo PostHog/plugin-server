@@ -18,7 +18,7 @@
         "prettier": "prettier --write .",
         "prettier:check": "prettier --check .",
         "prepublishOnly": "yarn test && yarn build",
-        "task:db-init": "NODE_ENV=test ts-node ./tasks/db-init.ts"
+        "task:init-test-db": "NODE_ENV=test ts-node ./tasks/init-test-db.ts"
     },
     "bin": {
         "posthog-plugin-server": "bin/posthog-plugin-server"
