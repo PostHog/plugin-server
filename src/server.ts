@@ -35,7 +35,7 @@ export async function createServer(
         })
         .on('ready', () => {
             if (process.env.NODE_ENV !== 'test') {
-                status.info(`✅ Connected to Redis!`)
+                status.info('✅', 'Connected to Redis!')
             }
         })
     await redis.info()
