@@ -1,16 +1,24 @@
-import { PluginEvent } from 'posthog-plugins'
+import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
-import { LibrdKafkaError, Message } from '@posthog/node-rdkafka'
 import { DateTime } from 'luxon'
 import Worker from '../celery/worker'
 import Client from '../celery/client'
-import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from '../types'
-import { EventsProcessor } from '../ingestion/process-event'
-import { KAFKA_EVENTS_WAL } from '../ingestion/topics'
+import { PluginsServer, Queue, RawEventMessage } from '../types'
+import { KafkaQueue } from '../ingestion/kafka-queue'
+
+export function startQueue(
+    server: PluginsServer,
+    processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
+    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
+): Queue {
+    const relevantStartQueue = server.KAFKA_ENABLED ? startQueueKafka : startQueueRedis
+    return relevantStartQueue(server, processEvent, processEventBatch)
+}
 
 function startQueueRedis(
     server: PluginsServer,
-    processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
+    processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
+    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
 ): Queue {
     const worker = new Worker(server.redis, server.PLUGINS_CELERY_QUEUE)
     const client = new Client(server.redis, server.CELERY_DEFAULT_QUEUE)
@@ -54,91 +62,25 @@ function startQueueRedis(
 
 function startQueueKafka(
     server: PluginsServer,
-    processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
+    processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
+    processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
 ): Queue {
-    const eventsProcessor = new EventsProcessor(server)
-
-    eventsProcessor.kafkaConsumer.on('ready', () => {
-        eventsProcessor.kafkaConsumer.subscribe([KAFKA_EVENTS_WAL])
-        // consume event messages in batches of 1000 every 50 ms
-        const consumptionInterval = setInterval(() => {
-            eventsProcessor.kafkaConsumer.consume(
-                1000,
-                async (error: LibrdKafkaError, messages: Message[]): Promise<void> => {
-                    if (error) {
-                        console.error('⚠️ Error while consuming!')
-                        console.error(error)
-                        Sentry.captureException(error)
-                    }
-                    if (messages?.length) {
-                        console.info(
-                            `🍕 ${Date.now()} ${messages.length} ${
-                                messages.length === 1 ? 'message' : 'messages'
-                            } consumed from Kafka`
-                        )
-                    } else {
-                        return
-                    }
-                    try {
-                        for (const message of messages) {
-                            const timer = new Date()
-                            const rawEventMessage = JSON.parse(message.value!.toString()) as RawEventMessage
-                            const parsedEventMessage: ParsedEventMessage = {
-                                ...rawEventMessage,
-                                data: JSON.parse(rawEventMessage.data),
-                                now: DateTime.fromISO(rawEventMessage.now),
-                                sent_at: rawEventMessage.sent_at ? DateTime.fromISO(rawEventMessage.sent_at) : null,
-                            }
-                            console.info(`Processing event ${parsedEventMessage.data.event} from WAL`)
-                            const processedEvent = await processEvent({
-                                ...parsedEventMessage,
-                                event: parsedEventMessage.data.event,
-                                properties: parsedEventMessage.data.properties,
-                                now: rawEventMessage.now,
-                                sent_at: rawEventMessage.sent_at,
-                            })
-                            if (processedEvent) {
-                                console.info(`Ingesting event ${parsedEventMessage.data.event}`)
-                                const { distinct_id, ip, site_url, team_id, now, sent_at } = processedEvent
-                                await eventsProcessor.process_event_ee(
-                                    distinct_id,
-                                    ip,
-                                    site_url,
-                                    processedEvent,
-                                    team_id,
-                                    DateTime.fromISO(now),
-                                    sent_at ? DateTime.fromISO(sent_at) : null
-                                )
-                                console.info(`Ingested event ${parsedEventMessage.data.event}!`)
-                            } else {
-                                console.info(`Discarding event ${parsedEventMessage.data.event}`)
-                            }
-                            server.statsd?.timing(`posthog_cloud`, timer)
-                        }
-                        eventsProcessor.kafkaConsumer.commit()
-                    } catch (error) {
-                        console.error('⚠️ Error while processing batch of event messages!')
-                        console.error(error)
-                        Sentry.captureException(error)
-                    }
-                }
-            )
-        }, 50)
-        for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-            process.on(signal, () => clearInterval(consumptionInterval))
-        }
-        console.info(`✅ Kafka consumer ready and subscribed to topic ${KAFKA_EVENTS_WAL}!`)
+    const kafkaQueue = new KafkaQueue(server, processEventBatch, async (event: PluginEvent) => {
+        const singleIngestionTimer = new Date()
+        const { distinct_id, ip, site_url, team_id, now, sent_at } = event
+        await server.eventsProcessor.process_event_ee(
+            distinct_id,
+            ip,
+            site_url,
+            event,
+            team_id,
+            DateTime.fromISO(now),
+            sent_at ? DateTime.fromISO(sent_at) : null
+        )
+        server.statsd?.timing('single-ingestion', singleIngestionTimer)
     })
 
-    eventsProcessor.connectKafkaConsumer()
+    kafkaQueue.start()
 
-    return eventsProcessor
-}
-
-export function startQueue(
-    server: PluginsServer,
-    processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
-): Queue {
-    const relevantStartQueue = server.EE_ENABLED ? startQueueKafka : startQueueRedis
-    return relevantStartQueue(server, processEvent)
+    return kafkaQueue
 }

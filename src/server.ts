@@ -1,18 +1,21 @@
 import { Pool } from 'pg'
 import * as schedule from 'node-schedule'
 import Redis from 'ioredis'
+import { Kafka, logLevel } from 'kafkajs'
 import { FastifyInstance } from 'fastify'
-import { PluginConfigId, PluginsServer, PluginsServerConfig, Queue } from './types'
+import { PluginsServer, PluginsServerConfig, Queue } from './types'
 import { startQueue } from './worker/queue'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { version } from '../package.json'
-import { PluginEvent } from 'posthog-plugins'
+import { PluginEvent } from '@posthog/plugin-scaffold'
 import { defaultConfig } from './config'
 import Piscina from 'piscina'
 import * as Sentry from '@sentry/node'
-import { delay } from './utils'
+import { areWeTestingWithJest, delay } from './utils'
 import { StatsD } from 'hot-shots'
-import { processError } from './error'
+import { EventsProcessor } from './ingestion/process-event'
+import { status } from './status'
+import { startSchedule } from './services/schedule'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
@@ -31,13 +34,37 @@ export async function createServer(
             console.error(error)
         })
         .on('ready', () => {
-            console.info(`✅ Connected to Redis at ${serverConfig.REDIS_URL}!`)
+            if (!areWeTestingWithJest()) {
+                status.info('✅', 'Connected to Redis!')
+            }
         })
     await redis.info()
 
     const db = new Pool({
         connectionString: serverConfig.DATABASE_URL,
     })
+
+    let kafka: Kafka | undefined
+    if (serverConfig.KAFKA_ENABLED) {
+        if (!serverConfig.KAFKA_HOSTS) {
+            throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
+        }
+        kafka = new Kafka({
+            clientId: `plugin-server-v${version}`,
+            brokers: serverConfig.KAFKA_HOSTS.split(','),
+            logLevel: logLevel.NOTHING,
+            ssl:
+                serverConfig.KAFKA_CLIENT_CERT_B64 &&
+                serverConfig.KAFKA_CLIENT_CERT_KEY_B64 &&
+                serverConfig.KAFKA_TRUSTED_CERT_B64
+                    ? {
+                          cert: Buffer.from(serverConfig.KAFKA_CLIENT_CERT_B64, 'base64'),
+                          key: Buffer.from(serverConfig.KAFKA_CLIENT_CERT_KEY_B64, 'base64'),
+                          ca: Buffer.from(serverConfig.KAFKA_TRUSTED_CERT_B64, 'base64'),
+                      }
+                    : undefined,
+        })
+    }
 
     let statsd: StatsD | undefined
     if (serverConfig.STATSD_HOST) {
@@ -48,16 +75,18 @@ export async function createServer(
         })
         // don't repeat the same info in each thread
         if (threadId === null) {
-            console.info(
-                `🪵 Sending metrics to StatsD at ${serverConfig.STATSD_HOST}:${serverConfig.STATSD_PORT}, prefix: "${serverConfig.STATSD_PREFIX}"`
+            status.info(
+                '🪵',
+                `Sending metrics to StatsD at ${serverConfig.STATSD_HOST}:${serverConfig.STATSD_PORT}, prefix: "${serverConfig.STATSD_PREFIX}"`
             )
         }
     }
 
-    const server: PluginsServer = {
+    const server: Omit<PluginsServer, 'eventsProcessor'> = {
         ...serverConfig,
         db,
         redis,
+        kafka,
         statsd,
         plugins: new Map(),
         pluginConfigs: new Map(),
@@ -68,19 +97,21 @@ export async function createServer(
         pluginSchedulePromises: { runEveryMinute: {}, runEveryHour: {}, runEveryDay: {} },
     }
 
+    server.eventsProcessor = new EventsProcessor(server as PluginsServer)
+
     const closeServer = async () => {
         await server.redis.quit()
         await server.db.end()
     }
 
-    return [server, closeServer]
+    return [server as PluginsServer, closeServer]
 }
 
 // TODO: refactor this into a class, removing the need for many different Servers
 type ServerInstance = {
     server: PluginsServer
     piscina: Piscina
-    queue: Worker
+    queue: Queue
     stop: () => Promise<void>
 }
 
@@ -88,7 +119,7 @@ export async function startPluginsServer(
     config: Partial<PluginsServerConfig>,
     makePiscina: (config: PluginsServerConfig) => Piscina
 ): Promise<ServerInstance> {
-    console.info(`⚡ posthog-plugin-server v${version}`)
+    status.info('⚡', `posthog-plugin-server v${version}`)
 
     let serverConfig: PluginsServerConfig | undefined
     let pubSub: Redis.Redis | undefined
@@ -96,25 +127,25 @@ export async function startPluginsServer(
     let fastifyInstance: FastifyInstance | undefined
     let pingJob: schedule.Job | undefined
     let statsJob: schedule.Job | undefined
-    let runEveryDayJob: schedule.Job | undefined
-    let runEveryHourJob: schedule.Job | undefined
-    let runEveryMinuteJob: schedule.Job | undefined
     let piscina: Piscina | undefined
     let queue: Queue | undefined
     let closeServer: () => Promise<void> | undefined
+    let stopSchedule: () => Promise<void> | undefined
 
     let shutdownStatus = 0
 
     async function closeJobs(): Promise<void> {
         shutdownStatus += 1
         if (shutdownStatus === 2) {
-            return console.info('🔁 Try again to shut down forcibly')
+            status.info('🔁', 'Try again to shut down forcibly')
+            return
         }
         if (shutdownStatus >= 3) {
-            console.info('❗️ Shutting down forcibly!')
+            status.info('❗️', 'Shutting down forcibly!')
+            piscina?.destroy()
             process.exit()
         }
-        console.info('💤 Shutting down gracefully…')
+        status.info('💤', ' Shutting down gracefully...')
         if (fastifyInstance && !serverConfig?.DISABLE_WEB) {
             await stopFastifyInstance(fastifyInstance!)
         }
@@ -122,10 +153,7 @@ export async function startPluginsServer(
         pubSub?.disconnect()
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
-        runEveryDayJob && schedule.cancelJob(runEveryDayJob)
-        runEveryHourJob && schedule.cancelJob(runEveryHourJob)
-        runEveryMinuteJob && schedule.cancelJob(runEveryMinuteJob)
-        await waitForTasksToFinish(server!)
+        await stopSchedule?.()
         await stopPiscina(piscina!)
         await closeServer()
 
@@ -151,12 +179,18 @@ export async function startPluginsServer(
             }
             return piscina!.runTask({ task: 'processEvent', args: { event } })
         }
+        const processEventBatch = (batch: PluginEvent[]) => {
+            if ((piscina?.queueSize || 0) > (server?.WORKER_CONCURRENCY || 4) * (server?.WORKER_CONCURRENCY || 4)) {
+                queue?.pause()
+            }
+            return piscina!.runTask({ task: 'processEventBatch', args: { batch } })
+        }
 
         if (!server.DISABLE_WEB) {
             fastifyInstance = await startFastifyInstance(server)
         }
 
-        queue = startQueue(server, processEvent)
+        queue = startQueue(server, processEvent, processEventBatch)
         piscina.on('drain', () => {
             queue?.resume()
         })
@@ -165,13 +199,13 @@ export async function startPluginsServer(
         pubSub.subscribe(server.PLUGINS_RELOAD_PUBSUB_CHANNEL)
         pubSub.on('message', async (channel: string, message) => {
             if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
-                console.info('⚡ Reloading plugins!')
+                status.info('⚡', 'Reloading plugins!')
                 await queue?.stop()
-                await waitForTasksToFinish(server!)
+                await stopSchedule?.()
                 await stopPiscina(piscina!)
                 piscina = makePiscina(serverConfig!)
-                queue = startQueue(server!, processEvent)
-                server!.pluginSchedule = await piscina.runTask({ task: 'getPluginSchedule' })
+                queue = startQueue(server!, processEvent, processEventBatch)
+                stopSchedule = await startSchedule(server!, piscina)
             }
         })
 
@@ -190,19 +224,9 @@ export async function startPluginsServer(
             }
         })
 
-        server.pluginSchedule = await piscina.runTask({ task: 'getPluginSchedule' })
+        stopSchedule = await startSchedule(server, piscina)
 
-        runEveryMinuteJob = schedule.scheduleJob('* * * * *', () => {
-            runTasksDebounced(server!, piscina!, 'runEveryMinute')
-        })
-        runEveryHourJob = schedule.scheduleJob('0 * * * *', () => {
-            runTasksDebounced(server!, piscina!, 'runEveryHour')
-        })
-        runEveryDayJob = schedule.scheduleJob('0 0 * * *', () => {
-            runTasksDebounced(server!, piscina!, 'runEveryDay')
-        })
-
-        console.info(`🚀 All systems go.`)
+        status.info('🚀', 'All systems go.')
     } catch (error) {
         Sentry.captureException(error)
         console.error(`💥 Launchpad failure!\n${error.stack}`)
@@ -225,35 +249,4 @@ export async function stopPiscina(piscina: Piscina): Promise<void> {
     // TODO: better "wait until everything is done"
     await delay(2000)
     await piscina.destroy()
-}
-
-export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskName: string): void {
-    const runTask = (pluginConfigId: PluginConfigId) => piscina.runTask({ task: taskName, args: { pluginConfigId } })
-
-    for (const pluginConfigId of server.pluginSchedule[taskName]) {
-        // last task still running? skip rerunning!
-        if (server.pluginSchedulePromises[taskName][pluginConfigId]) {
-            continue
-        }
-
-        const promise = runTask(pluginConfigId)
-        server.pluginSchedulePromises[taskName][pluginConfigId] = promise
-
-        promise
-            .then(() => {
-                server.pluginSchedulePromises[taskName][pluginConfigId] = null
-            })
-            .catch(async (error) => {
-                await processError(server, pluginConfigId, error)
-                server.pluginSchedulePromises[taskName][pluginConfigId] = null
-            })
-    }
-}
-
-export async function waitForTasksToFinish(server: PluginsServer): Promise<any[]> {
-    const activePromises = Object.values(server.pluginSchedulePromises)
-        .map(Object.values)
-        .flat()
-        .filter((a) => a)
-    return Promise.all(activePromises)
 }

@@ -1,6 +1,6 @@
 import { createPluginConfigVM } from '../src/vm'
 import { PluginConfig, PluginsServer, Plugin } from '../src/types'
-import { PluginEvent } from 'posthog-plugins'
+import { PluginEvent } from '@posthog/plugin-scaffold'
 import { createServer } from '../src/server'
 import * as fetch from 'node-fetch'
 import { delay } from '../src/utils'
@@ -431,6 +431,9 @@ test('meta.cache set/get', async () => {
 
 test('meta.cache expire', async () => {
     const indexJs = `
+        async function setupPlugin(meta) {
+            await meta.cache.set('counter', 0)
+        }
         async function processEvent (event, meta) {
             const counter = await meta.cache.get('counter', 0)
             await meta.cache.set('counter', counter + 1)
@@ -460,6 +463,9 @@ test('meta.cache expire', async () => {
 
 test('meta.cache set ttl', async () => {
     const indexJs = `
+        async function setupPlugin(meta) {
+            await meta.cache.set('counter', 0)
+        }
         async function processEvent (event, meta) {
             const counter = await meta.cache.get('counter', 0)
             await meta.cache.set('counter', counter + 1, 1)
@@ -488,6 +494,9 @@ test('meta.cache set ttl', async () => {
 
 test('meta.cache incr', async () => {
     const indexJs = `
+        async function setupPlugin(meta) {
+            await meta.cache.set('counter', 0)
+        }
         async function processEvent (event, meta) {
             const counter = await meta.cache.incr('counter')
             event.properties['counter'] = counter

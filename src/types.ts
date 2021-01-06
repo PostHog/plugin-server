@@ -1,9 +1,12 @@
 import { Pool } from 'pg'
 import { Redis } from 'ioredis'
-import { PluginEvent, PluginAttachment, PluginConfigSchema } from 'posthog-plugins'
-import { VM, VMScript } from 'vm2'
+import { Kafka } from 'kafkajs'
+import { PluginEvent, PluginAttachment, PluginConfigSchema } from '@posthog/plugin-scaffold'
+import { VM } from 'vm2'
 import { DateTime } from 'luxon'
 import { StatsD } from 'hot-shots'
+import { EventsProcessor } from 'ingestion/process-event'
+import { UUID } from './utils'
 
 export enum LogLevel {
     Debug = 'debug',
@@ -19,8 +22,11 @@ export interface PluginsServerConfig extends Record<string, any> {
     TASKS_PER_WORKER: number
     CELERY_DEFAULT_QUEUE: string
     DATABASE_URL: string
+    KAFKA_ENABLED: boolean
     KAFKA_HOSTS: string | null
-    EE_ENABLED: boolean
+    KAFKA_CLIENT_CERT_B64: string | null
+    KAFKA_CLIENT_CERT_KEY_B64: string | null
+    KAFKA_TRUSTED_CERT_B64: string | null
     PLUGINS_CELERY_QUEUE: string
     REDIS_URL: string
     BASE_DIR: string
@@ -33,6 +39,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     STATSD_HOST: string | null
     STATSD_PORT: number
     STATSD_PREFIX: string
+    SCHEDULE_LOCK_TTL: number
 
     __jestMock?: {
         getPluginRows: Plugin[]
@@ -42,11 +49,11 @@ export interface PluginsServerConfig extends Record<string, any> {
 }
 
 export interface PluginsServer extends PluginsServerConfig {
-    // active connections to postgres and redis
+    // active connections to Postgres, Redis, Kafka, StatsD
     db: Pool
     redis: Redis
+    kafka: Kafka | undefined
     statsd: StatsD | undefined
-
     // currently enabled plugin status
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>
@@ -54,6 +61,18 @@ export interface PluginsServer extends PluginsServerConfig {
     defaultConfigs: PluginConfig[]
     pluginSchedule: Record<string, PluginConfigId[]>
     pluginSchedulePromises: Record<string, Record<PluginConfigId, Promise<any> | null>>
+    eventsProcessor: EventsProcessor
+}
+
+export interface Pausable {
+    pause: () => Promise<void>
+    resume: () => void
+    isPaused: () => boolean
+}
+
+export interface Queue extends Pausable {
+    start: () => void
+    stop: () => void
 }
 
 export interface Queue {
@@ -157,6 +176,7 @@ export interface RawEventMessage extends EventMessage {
     data: string
     now: string
     sent_at: string // may be an empty string
+    uuid: string
 }
 
 export interface ParsedEventMessage extends EventMessage {
@@ -227,4 +247,11 @@ export interface CohortPeople {
     id: number
     cohort_id: number
     person_id: number
+}
+
+export interface ParsedEventMessage extends EventMessage {
+    data: PluginEvent
+    now: DateTime
+    sent_at: DateTime | null
+    uuid: UUID
 }

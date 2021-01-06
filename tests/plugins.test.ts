@@ -1,7 +1,7 @@
 import { runPlugins, setupPlugins } from '../src/plugins'
 import { createServer } from '../src/server'
 import { LogLevel, PluginsServer } from '../src/types'
-import { PluginEvent } from 'posthog-plugins/src/types'
+import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import {
     mockPluginTempFolder,
     mockPluginWithArchive,
@@ -13,8 +13,12 @@ import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows, setError }
 jest.mock('../src/sql')
 
 let mockServer: PluginsServer
+let closeServer: () => Promise<void>
 beforeEach(async () => {
-    ;[mockServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
+    ;[mockServer, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
+})
+afterEach(() => {
+    closeServer()
 })
 
 test('setupPlugins and runPlugins', async () => {
