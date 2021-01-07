@@ -117,12 +117,18 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                     try {
                         configUpdate = JSON.parse(rawConfigUpdate)
                     } catch {
-                        await processError(server, pluginConfig, `File ${jsonFileName} contains is not valid JSON`)
+                        await processError(server, pluginConfig, `File ${jsonFileName} is not valid JSON`)
                         return false
                     }
-                    if (!configUpdate.config && configUpdate['posthog-plugin-config']) {
+                    if (configUpdate['posthog-plugin-config']) {
+                        // plugin.json has `config`, but in package.json we prefer `posthog-plugin-config` for clarity
                         configUpdate.config = configUpdate['posthog-plugin-config']
                         delete configUpdate['posthog-plugin-config']
+                    }
+                    if (configUpdate.homepage) {
+                        // plugin.json has `url`, but in package.json we prefer the conventional `homepage`
+                        configUpdate.url = configUpdate.homepage
+                        delete configUpdate['homepage']
                     }
                     config = { ...config, ...configUpdate }
                     wasConfigLoaded = true
