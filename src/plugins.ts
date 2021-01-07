@@ -105,21 +105,39 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
     try {
         if (plugin.url?.startsWith('file:')) {
             const pluginPath = path.resolve(server.BASE_DIR, plugin.url.substring(5))
-            const configPath = path.resolve(pluginPath, 'plugin.json')
 
             let config: PluginJsonConfig = {}
-            if (fs.existsSync(configPath)) {
+            let wasConfigLoaded = false
+
+            for (const jsonFileName of ['package.json', 'plugin.json']) {
+                const configPath = path.resolve(pluginPath, jsonFileName)
                 try {
-                    const jsonBuffer = fs.readFileSync(configPath)
-                    config = JSON.parse(jsonBuffer.toString())
-                } catch (e) {
-                    await processError(
-                        server,
-                        pluginConfig,
-                        `Could not load posthog config at "${configPath}" for plugin "${plugin.name}"`
-                    )
-                    return false
+                    const rawConfigUpdate = fs.readFileSync(configPath).toString()
+                    let configUpdate: any
+                    try {
+                        configUpdate = JSON.parse(rawConfigUpdate)
+                    } catch {
+                        await processError(server, pluginConfig, `File ${jsonFileName} contains is not valid JSON`)
+                        return false
+                    }
+                    if (!configUpdate.config && configUpdate['posthog-plugin-config']) {
+                        configUpdate.config = configUpdate['posthog-plugin-config']
+                        delete configUpdate['posthog-plugin-config']
+                    }
+                    config = { ...config, ...configUpdate }
+                    wasConfigLoaded = true
+                } catch {
+                    continue
                 }
+            }
+
+            if (!wasConfigLoaded) {
+                await processError(
+                    server,
+                    pluginConfig,
+                    `Could not load package.json nor plugin.json for plugin "${plugin.name}"`
+                )
+                return false
             }
 
             if (!config['main'] && !fs.existsSync(path.resolve(pluginPath, 'index.js'))) {
