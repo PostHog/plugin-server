@@ -15,7 +15,7 @@ jobs:
             - name: Checkout the repository
               uses: actions/checkout@v2
               with:
-                fetch-depth: 0
+                  fetch-depth: 0
 
             - name: Get package version
               id: version
