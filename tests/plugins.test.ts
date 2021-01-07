@@ -213,7 +213,7 @@ test('local plugin with broken plugin.json does not do much', async () => {
 
     expect(setError).toHaveBeenCalled()
     expect(setError.mock.calls[0][0]).toEqual(mockServer)
-    expect(setError.mock.calls[0][1]!.message).toContain('Could not load posthog config at ')
+    expect(setError.mock.calls[0][1]!.message).toContain('File plugin.json is not valid JSON')
     expect(setError.mock.calls[0][1]!.time).toBeDefined()
     expect(pluginConfigs.get(39)!.vm).toEqual(null)
 
