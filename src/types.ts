@@ -1,6 +1,6 @@
 import { Pool } from 'pg'
 import { Redis } from 'ioredis'
-import { Kafka } from 'kafkajs'
+import { Kafka, Producer } from 'kafkajs'
 import { PluginEvent, PluginAttachment, PluginConfigSchema } from '@posthog/plugin-scaffold'
 import { VM } from 'vm2'
 import { DateTime } from 'luxon'
@@ -53,6 +53,7 @@ export interface PluginsServer extends PluginsServerConfig {
     db: Pool
     redis: Redis
     kafka: Kafka | undefined
+    kafkaProducer: Producer | undefined
     statsd: StatsD | undefined
     // currently enabled plugin status
     plugins: Map<PluginId, Plugin>

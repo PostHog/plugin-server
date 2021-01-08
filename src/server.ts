@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
 import * as schedule from 'node-schedule'
 import Redis from 'ioredis'
-import { Kafka, logLevel } from 'kafkajs'
+import { Kafka, logLevel, Producer } from 'kafkajs'
 import { FastifyInstance } from 'fastify'
 import { PluginsServer, PluginsServerConfig, Queue } from './types'
 import { startQueue } from './worker/queue'
@@ -45,6 +45,7 @@ export async function createServer(
     })
 
     let kafka: Kafka | undefined
+    let kafkaProducer: Producer | undefined
     if (serverConfig.KAFKA_ENABLED) {
         if (!serverConfig.KAFKA_HOSTS) {
             throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
@@ -64,6 +65,7 @@ export async function createServer(
                       }
                     : undefined,
         })
+        kafkaProducer = kafka.producer()
     }
 
     let statsd: StatsD | undefined
@@ -87,6 +89,7 @@ export async function createServer(
         db,
         redis,
         kafka,
+        kafkaProducer,
         statsd,
         plugins: new Map(),
         pluginConfigs: new Map(),
@@ -128,6 +131,7 @@ export async function startPluginsServer(
     let pingJob: schedule.Job | undefined
     let statsJob: schedule.Job | undefined
     let piscina: Piscina | undefined
+    let kafkaProducer: Producer | undefined
     let queue: Queue | undefined
     let closeServer: () => Promise<void> | undefined
     let stopSchedule: () => Promise<void> | undefined
@@ -150,6 +154,7 @@ export async function startPluginsServer(
             await stopFastifyInstance(fastifyInstance!)
         }
         await queue?.stop()
+        await kafkaProducer?.disconnect()
         pubSub?.disconnect()
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
@@ -171,6 +176,8 @@ export async function startPluginsServer(
             ...config,
         }
         ;[server, closeServer] = await createServer(serverConfig, null)
+
+        await server.kafkaProducer?.connect()
 
         piscina = makePiscina(serverConfig)
         const processEvent = (event: PluginEvent) => {
