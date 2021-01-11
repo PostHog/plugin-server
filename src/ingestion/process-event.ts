@@ -446,7 +446,7 @@ export class EventsProcessor {
         console.log(`Producing ${event}`)
         await this.kafkaProducer.send({
             topic: KAFKA_EVENTS,
-            messages: [{ key: eventUuidString, value: Buffer.from(EventProto.encode(message).finish()) }],
+            messages: [{ value: EventProto.encodeDelimited(message).finish() as Buffer }],
         })
 
         return eventUuidString
@@ -475,7 +475,7 @@ export class EventsProcessor {
 
         await this.kafkaProducer.send({
             topic: KAFKA_SESSION_RECORDING_EVENTS,
-            messages: [{ key: uuidString, value: Buffer.from(JSON.stringify(data)) }],
+            messages: [{ value: Buffer.from(JSON.stringify(data)) }],
         })
 
         return uuidString
