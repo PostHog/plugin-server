@@ -26,7 +26,8 @@ export class EventsProcessor {
         data: PluginEvent,
         team_id: number,
         now: DateTime,
-        sent_at: DateTime | null
+        sent_at: DateTime | null,
+        event_uuid: UUID
     ): Promise<void> {
         const properties: Properties = data.properties ?? {}
         if (data['$set']) {
@@ -34,7 +35,7 @@ export class EventsProcessor {
         }
 
         const person_uuid = new UUIDT()
-        const event_uuid = new UUIDT()
+
         const ts = this.handle_timestamp(data, now, sent_at)
         this.handle_identify_or_alias(data['event'], properties, distinct_id, team_id)
         console.log(`Processing ${data.event}`)
@@ -446,7 +447,7 @@ export class EventsProcessor {
         console.log(`Producing ${event}`)
         await this.kafkaProducer.send({
             topic: KAFKA_EVENTS,
-            messages: [{ value: EventProto.encodeDelimited(message).finish() as Buffer }],
+            messages: [{ key: eventUuidString, value: EventProto.encodeDelimited(message).finish() as Buffer }],
         })
 
         return eventUuidString
@@ -475,7 +476,7 @@ export class EventsProcessor {
 
         await this.kafkaProducer.send({
             topic: KAFKA_SESSION_RECORDING_EVENTS,
-            messages: [{ value: Buffer.from(JSON.stringify(data)) }],
+            messages: [{ key: uuidString, value: Buffer.from(JSON.stringify(data)) }],
         })
 
         return uuidString

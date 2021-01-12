@@ -3,8 +3,9 @@ import * as Sentry from '@sentry/node'
 import { DateTime } from 'luxon'
 import Worker from '../celery/worker'
 import Client from '../celery/client'
-import { PluginsServer, Queue, RawEventMessage } from '../types'
+import { PluginsServer, Queue } from '../types'
 import { KafkaQueue } from '../ingestion/kafka-queue'
+import { UUID } from '../utils'
 
 export function startQueue(
     server: PluginsServer,
@@ -67,7 +68,7 @@ function startQueueKafka(
 ): Queue {
     const kafkaQueue = new KafkaQueue(server, processEventBatch, async (event: PluginEvent) => {
         const singleIngestionTimer = new Date()
-        const { distinct_id, ip, site_url, team_id, now, sent_at } = event
+        const { distinct_id, ip, site_url, team_id, now, sent_at, uuid } = event
         await server.eventsProcessor.process_event_ee(
             distinct_id,
             ip,
@@ -75,7 +76,8 @@ function startQueueKafka(
             event,
             team_id,
             DateTime.fromISO(now),
-            sent_at ? DateTime.fromISO(sent_at) : null
+            sent_at ? DateTime.fromISO(sent_at) : null,
+            new UUID(uuid!)
         )
         server.statsd?.timing('single-ingestion', singleIngestionTimer)
     })
