@@ -69,7 +69,7 @@ function startQueueKafka(
     const kafkaQueue = new KafkaQueue(server, processEventBatch, async (event: PluginEvent) => {
         const singleIngestionTimer = new Date()
         const { distinct_id, ip, site_url, team_id, now, sent_at, uuid } = event
-        await server.eventsProcessor.process_event_ee(
+        await server.eventsProcessor.processEventEE(
             distinct_id,
             ip,
             site_url,
