@@ -38,7 +38,7 @@ export class EventsProcessor {
 
         const ts = this.handle_timestamp(data, now, sent_at)
         this.handle_identify_or_alias(data['event'], properties, distinct_id, team_id)
-        console.log(`Processing ${data.event}`)
+
         if (data['event'] === '$snapshot') {
             await this.create_session_recording_event(
                 event_uuid,
@@ -414,7 +414,7 @@ export class EventsProcessor {
             elementsChain,
             createdAt: timestampString,
         })
-        console.log(`Producing ${event}`)
+
         await this.kafkaProducer.send({
             topic: KAFKA_EVENTS,
             messages: [{ key: eventUuidString, value: EventProto.encodeDelimited(message).finish() as Buffer }],
