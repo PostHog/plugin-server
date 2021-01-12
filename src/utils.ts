@@ -267,7 +267,9 @@ export class UUIDT extends UUID {
 }
 
 export function castTimestampOrNow(timestamp?: DateTime | string | null): string {
-    timestamp ||= DateTime.utc()
+    if (!timestamp) {
+        timestamp = DateTime.utc()
+    }
     // ClickHouse-specific formatting
     timestamp = typeof timestamp === 'string' ? DateTime.fromISO(timestamp) : timestamp.toUTC()
     return timestamp.toFormat('yyyy-MM-dd HH:mm:ss.u')
