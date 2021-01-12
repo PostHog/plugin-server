@@ -230,14 +230,13 @@ export class UUIDT extends UUID {
 
     /** Get per-millisecond series integer in range [0-65536). */
     static getSeries(unixTimeMs: number): number {
-        const series = UUIDT.currentSeriesPerMs.get(unixTimeMs)
+        const series = UUIDT.currentSeriesPerMs.get(unixTimeMs) ?? 0
         if (UUIDT.currentSeriesPerMs.size > 10_000) {
             // Clear class dict periodically
             UUIDT.currentSeriesPerMs.clear()
         }
-        const nextSeries = typeof series === 'number' ? (series + 1) % 65_536 : 0
-        UUIDT.currentSeriesPerMs.set(unixTimeMs, nextSeries)
-        return nextSeries
+        UUIDT.currentSeriesPerMs.set(unixTimeMs, (series + 1) % 65_536)
+        return series
     }
 
     constructor(unixTimeMs?: number) {
