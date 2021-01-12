@@ -19,7 +19,7 @@ export class EventsProcessor {
         this.kafkaProducer = pluginsServer.kafkaProducer!
     }
 
-    async process_event_ee(
+    public async process_event_ee(
         distinct_id: string,
         ip: string,
         site_url: string,
@@ -64,7 +64,7 @@ export class EventsProcessor {
         }
     }
 
-    handle_timestamp(data: EventData, now: DateTime, sent_at: DateTime | null): DateTime {
+    private handle_timestamp(data: EventData, now: DateTime, sent_at: DateTime | null): DateTime {
         if (data['timestamp']) {
             if (sent_at) {
                 // sent_at - timestamp == now - x
@@ -85,7 +85,7 @@ export class EventsProcessor {
         return now
     }
 
-    async handle_identify_or_alias(
+    private async handle_identify_or_alias(
         event: string,
         properties: Properties,
         distinct_id: string,
@@ -104,41 +104,37 @@ export class EventsProcessor {
         }
     }
 
-    async _set_is_identified(team_id: number, distinct_id: string, is_identified = true): Promise<void> {
-        let personFound: Person | undefined
-        personFound = (
-            await this.db.query(
-                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
-                [team_id, distinct_id]
-            )
-        ).rows[0]
+    private async _set_is_identified(team_id: number, distinct_id: string, is_identified = true): Promise<void> {
+        let personFound = await this.fetchPerson(team_id, distinct_id)
         if (!personFound) {
             try {
                 const personCreated = await this.create_person(DateTime.utc(), {}, team_id, null, true, new UUIDT())
                 this.add_distinct_id(personCreated, distinct_id)
-                // Catch race condition where in between getting and creating, another request already created this person
             } catch {
-                personFound = (
-                    await this.db.query(
-                        'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
-                        [team_id, distinct_id]
-                    )
-                ).rows[0]
+                // Catch race condition where in between getting and creating,
+                // another request already created this person
+                personFound = await this.fetchPerson(team_id, distinct_id)
             }
         }
         if (personFound && !personFound.is_identified) {
-            await this.db.query('UPDATE posthog_person SET is_identified = 1 WHERE id = $1', [personFound.id])
+            await this.db.query('UPDATE posthog_person SET is_identified = TRUE WHERE id = $1', [personFound.id])
         }
     }
 
-    async _update_person_properties(team_id: number, distinct_id: string, properties: Properties): Promise<void> {
-        let personFound: Person | undefined
-        personFound = (
-            await this.db.query(
-                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
-                [team_id, distinct_id]
-            )
-        ).rows[0]
+    private async fetchPerson(teamId: number, distinctId: string): Promise<Person | undefined> {
+        const selectResult = await this.db.query(
+            'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
+            [teamId, distinctId]
+        )
+        return selectResult.rows[0]
+    }
+
+    private async _update_person_properties(
+        team_id: number,
+        distinct_id: string,
+        properties: Properties
+    ): Promise<void> {
+        let personFound = await this.fetchPerson(team_id, distinct_id)
         if (!personFound) {
             try {
                 const personCreated = await this.create_person(
@@ -150,14 +146,10 @@ export class EventsProcessor {
                     new UUIDT()
                 )
                 await this.add_distinct_id(personCreated, distinct_id)
-                // Catch race condition where in between getting and creating, another request already created this person
             } catch {
-                personFound = (
-                    await this.db.query(
-                        'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
-                        [team_id, distinct_id]
-                    )
-                ).rows[0]
+                // Catch race condition where in between getting and creating,
+                // another request already created this person
+                personFound = await this.fetchPerson(team_id, distinct_id)
             }
         }
         if (personFound) {
@@ -168,25 +160,14 @@ export class EventsProcessor {
         }
     }
 
-    async _alias(
+    private async _alias(
         previous_distinct_id: string,
         distinct_id: string,
         team_id: number,
         retry_if_failed = true
     ): Promise<void> {
-        const old_person: Person | undefined = (
-            await this.db.query(
-                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
-                [team_id, previous_distinct_id]
-            )
-        ).rows[0]
-
-        const new_person: Person | undefined = (
-            await this.db.query(
-                'SELECT posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id, posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id FROM posthog_person JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id) WHERE posthog_person.team_id = $1 AND posthog_persondistinctid.team_id = $1 AND posthog_persondistinctid.distinct_id = $2',
-                [team_id, distinct_id]
-            )
-        ).rows[0]
+        const old_person = await this.fetchPerson(team_id, previous_distinct_id)
+        const new_person = await this.fetchPerson(team_id, distinct_id)
 
         if (old_person && !new_person) {
             try {
@@ -221,11 +202,11 @@ export class EventsProcessor {
                 const personCreated = await this.create_person(DateTime.utc(), {}, team_id, null, false, new UUIDT())
                 this.add_distinct_id(personCreated, distinct_id)
                 this.add_distinct_id(personCreated, previous_distinct_id)
-                // Catch race condition where in between getting and creating, another request already created this user.
             } catch {
-                // integrity error
+                // Catch race condition where in between getting and creating,
+                // another request already created this person
                 if (retry_if_failed) {
-                    // try once more, probably one of the two persons exists now
+                    // Try once more, probably one of the two persons exists now
                     this._alias(previous_distinct_id, distinct_id, team_id, false)
                 }
             }
@@ -237,7 +218,7 @@ export class EventsProcessor {
         }
     }
 
-    async merge_people(merge_into: Person, people_to_merge: Person[]): Promise<void> {
+    private async merge_people(merge_into: Person, people_to_merge: Person[]): Promise<void> {
         let first_seen = merge_into.created_at
 
         // merge the properties
@@ -283,7 +264,7 @@ export class EventsProcessor {
         }
     }
 
-    async _capture_ee(
+    private async _capture_ee(
         event_uuid: UUID,
         person_uuid: UUID,
         ip: string,
@@ -311,14 +292,7 @@ export class EventsProcessor {
             }))
         }
 
-        const {
-            rows: [team],
-        }: {
-            rows: Team[]
-        } = await this.db.query(
-            'SELECT slack_incoming_webhook, event_names, event_properties, event_names_with_usage, event_properties_with_usage, anonymize_ips FROM posthog_team WHERE id = $1',
-            [team_id]
-        )
+        const team: Team = (await this.db.query('SELECT * FROM posthog_team WHERE id = $1', [team_id])).rows[0]
 
         if (!team.anonymize_ips && !('$ip' in properties)) {
             properties['$ip'] = ip
@@ -326,14 +300,11 @@ export class EventsProcessor {
 
         this.store_names_and_properties(team, event, properties)
 
-        const {
-            rows: [{ pdiCount }],
-        }: {
-            rows: { pdiCount: number }[]
-        } = await this.db.query(
-            'SELECT COUNT(*) AS pdiCount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
+        const pdiSelectResult = await this.db.query(
+            'SELECT COUNT(*) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
             [team_id, distinct_id]
         )
+        const pdiCount = parseInt(pdiSelectResult.rows[0].pdicount)
 
         if (!pdiCount) {
             // Catch race condition where in between getting and creating, another request already created this user
@@ -353,7 +324,7 @@ export class EventsProcessor {
         await this.create_event(event_uuid, event, team, distinct_id, properties, timestamp, elements_list)
     }
 
-    async store_names_and_properties(team: Team, event: string, properties: Properties): Promise<void> {
+    private async store_names_and_properties(team: Team, event: string, properties: Properties): Promise<void> {
         // In _capture we only prefetch a couple of fields in Team to avoid fetching too much data
         let save = false
         if (!team.ingested_event) {
@@ -398,7 +369,7 @@ export class EventsProcessor {
         }
     }
 
-    async create_person(
+    private async create_person(
         created_at: DateTime,
         properties: Properties,
         team_id: number,
@@ -406,22 +377,21 @@ export class EventsProcessor {
         is_identified: boolean,
         uuid: UUID | string
     ): Promise<Person> {
-        return (
-            await this.db.query(
-                'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6)',
-                [created_at.toISO(), properties, team_id, is_user_id, is_identified, uuid.toString()]
-            )
-        ).rows[0]
+        const insertResult = await this.db.query(
+            'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [created_at.toISO(), properties, team_id, is_user_id, is_identified, uuid.toString()]
+        )
+        return insertResult.rows[0]
     }
 
-    async add_distinct_id(person: Person, distinct_id: string): Promise<void> {
+    private async add_distinct_id(person: Person, distinct_id: string): Promise<void> {
         await this.db.query(
-            'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3)',
+            'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3) RETURNING *',
             [distinct_id, person.id, person.team_id]
         )
     }
 
-    async create_event(
+    private async create_event(
         event_uuid: UUID,
         event: string,
         team: Team,
@@ -453,7 +423,7 @@ export class EventsProcessor {
         return eventUuidString
     }
 
-    async create_session_recording_event(
+    private async create_session_recording_event(
         uuid: UUID,
         team_id: number,
         distinct_id: string,
