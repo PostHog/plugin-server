@@ -4,6 +4,7 @@ import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from 'types
 import { KAFKA_EVENTS_WAL } from './topics'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import { status } from '../status'
+import { SpanStatus } from '@sentry/tracing'
 
 export type BatchCallback = (messages: Message[]) => Promise<void>
 
@@ -47,6 +48,11 @@ export class KafkaQueue implements Queue {
                 isRunning,
                 isStale,
             }) => {
+                const batchTransaction = Sentry.startTransaction({
+                    op: 'event-batch-kafka',
+                    name: 'Event batch processed from Kafka',
+                    tags: { size: batch.messages.length },
+                })
                 const rawEvents: RawEventMessage[] = batch.messages.map((message) => ({
                     ...JSON.parse(message.value!.toString()),
                     kafka_offset: message.offset,
@@ -64,19 +70,36 @@ export class KafkaQueue implements Queue {
                     await this.processEventBatch(pluginEvents)
                 ).filter((event: PluginEvent[] | false | null | undefined) => Boolean(event))
                 for (const event of processedEvents) {
+                    const eventTransaction = batchTransaction.startChild({
+                        op: 'event-single-clickhouse',
+                        name: 'Single event saved to ClickHouse',
+                        tags: { uuid: event.uuid, name: event.event, now: event.now },
+                    })
                     if (!isRunning()) {
                         status.info('😮', 'Consumer not running anymore, canceling batch processing!')
+                        eventTransaction.setStatus(SpanStatus.Cancelled)
+                        eventTransaction.finish()
+                        batchTransaction.setStatus(SpanStatus.Cancelled)
+                        batchTransaction.finish()
                         return
                     }
                     if (isStale()) {
                         status.info('😮', 'Batch stale, canceling batch processing!')
+                        eventTransaction.setStatus(SpanStatus.OutOfRange)
+                        eventTransaction.finish()
+                        batchTransaction.setStatus(SpanStatus.OutOfRange)
+                        batchTransaction.finish()
                         return
                     }
                     await this.saveEvent(event)
                     resolveOffset(event.kafka_offset!)
                     await heartbeat()
                     await commitOffsetsIfNecessary()
+                    eventTransaction.setStatus(SpanStatus.Ok)
+                    eventTransaction.finish()
                 }
+                batchTransaction.setStatus(SpanStatus.Ok)
+                batchTransaction.finish()
             },
         })
         this.wasConsumerRan = true

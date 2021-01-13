@@ -12,9 +12,7 @@ export function initApp(config: PluginsServerConfig): void {
     if (config.SENTRY_DSN) {
         Sentry.init({
             dsn: config.SENTRY_DSN,
-            // We recommend adjusting this value in production, or using tracesSampler for finer control
-            tracesSampleRate: 1.0,
-            debug: true,
+            tracesSampleRate: 0.05, // Only trace 5% of events
         })
     }
 }
