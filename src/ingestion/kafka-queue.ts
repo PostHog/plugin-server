@@ -51,6 +51,7 @@ export class KafkaQueue implements Queue {
                 const batchTransaction = Sentry.startTransaction({
                     op: 'event-batch-kafka',
                     name: 'Event batch processed from Kafka',
+                    description: 'The batch is plugin-processed in bulk and then each event is saved individually.',
                     tags: { size: batch.messages.length },
                 })
                 const rawEvents: RawEventMessage[] = batch.messages.map((message) => ({
@@ -72,7 +73,7 @@ export class KafkaQueue implements Queue {
                 for (const event of processedEvents) {
                     const eventTransaction = batchTransaction.startChild({
                         op: 'event-single-clickhouse',
-                        name: 'Single event saved to ClickHouse',
+                        description: 'Single event saved to ClickHouse via Kafka.',
                         tags: { uuid: event.uuid, name: event.event, now: event.now },
                     })
                     if (!isRunning()) {
