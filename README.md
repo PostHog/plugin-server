@@ -11,11 +11,11 @@ Let's get you developing the plugin server in no time:
 
 1. Install dependencies and prepare for takeoff by running command `yarn`.
 
-1. Start a development instance of [PostHog](/PostHog/posthog). After all, this is the _PostHog_ Plugin Server and it works in conjuction with the main server. To avoid interference, disable the plugin server there.
+1. Start a development instance of [PostHog](/PostHog/posthog). After all, this is the _PostHog_ Plugin Server, and it works in conjuction with the main server. To avoid interference, disable the plugin server there.
 
-1. Make sure that the plugin server is configured correctly (see [Configuration](#Configuration)). Two settings that you MUST get right are DATABASE_URL and REDIS_URL.
+1. Make sure that the plugin server is configured correctly (see [Configuration](#Configuration)). Two settings that you MUST get right are DATABASE_URL and REDIS_URL - they need to be identical between the plugin server and the main server.
 
-1. If developing the enterprise Kafka + ClickHouse pipeline, export `KAFKA_ENABLED=true` and also provide KAFKA_HOSTS.
+1. If developing the enterprise Kafka + ClickHouse pipeline, set KAFKA_ENABLED to `true` and provide KAFKA_HOSTS.
 
     Otherwise if developing the basic Redis + Postgres pipeline, skip ahead.
 
@@ -25,7 +25,7 @@ Let's get you developing the plugin server in no time:
 
 ## Configuration
 
-There's a multitude of settings you can use to control the plugin server. The recommended way is to export them as environment variables.
+There's a multitude of settings you can use to control the plugin server. Use them as environment variables.
 
 | Name                          | Description                                                | Default value                         |
 | ----------------------------- | ---------------------------------------------------------- | ------------------------------------- |
