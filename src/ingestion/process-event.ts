@@ -2,7 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold'
 import { DateTime, Duration } from 'luxon'
 import { PluginsServer, EventData, Properties, Element, Team, Person, PersonDistinctId, CohortPeople } from 'types'
 import { castTimestampOrNow, UUID, UUIDT } from '../utils'
-import { elements_to_string } from './element'
+import { elementsToString } from './element'
 import { Event as EventProto } from '../idl/protos'
 import { Pool } from 'pg'
 import { Producer } from 'kafkajs'
@@ -413,7 +413,7 @@ export class EventsProcessor {
         elements?: Element[]
     ): Promise<string> {
         const timestampString = castTimestampOrNow(timestamp)
-        const elementsChain = elements && elements.length ? elements_to_string(elements) : ''
+        const elementsChain = elements && elements.length ? elementsToString(elements) : ''
         const eventUuidString = event_uuid.toString()
 
         const message = EventProto.create({

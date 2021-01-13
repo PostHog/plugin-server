@@ -1,10 +1,10 @@
 import { Element } from 'types'
 
-function _escape(input: string): string {
+function escapeQuotes(input: string): string {
     return input.replace(/"/g, '\\"')
 }
 
-export function elements_to_string(elements: Element[]): string {
+export function elementsToString(elements: Element[]): string {
     const ret = elements.map((element) => {
         let el_string = ''
         if (element.tag_name) {
@@ -27,7 +27,7 @@ export function elements_to_string(elements: Element[]): string {
         attributes = Object.fromEntries(
             Object.entries(attributes)
                 .sort(([a], [b]) => a.localeCompare(b))
-                .map(([key, value]) => [_escape(key.toString()), _escape(value.toString())])
+                .map(([key, value]) => [escapeQuotes(key.toString()), escapeQuotes(value.toString())])
         )
         el_string += ':'
         el_string += Object.entries(attributes)

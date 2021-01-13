@@ -211,14 +211,17 @@ export interface Team {
 }
 
 export interface Element {
-    text: string
-    tag_name: string
-    href: string
-    attr_class: string[]
-    attr_id: string
-    nth_child: number
-    nth_of_type: number
-    attributes: Record<string, string>
+    text?: string
+    tag_name?: string
+    href?: string
+    attr_id?: string
+    attr_class?: string[]
+    nth_child?: number
+    nth_of_type?: number
+    attributes: Record<string, any>
+    event_id?: number
+    order?: number
+    group_id?: number
 }
 
 export type User = Record<string, any> // not really typed as not needed so far, only a placeholder for Person.is_user
