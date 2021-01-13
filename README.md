@@ -15,11 +15,11 @@ Let's get you developing the plugin server in no time:
 
 1. Make sure that the plugin server is configured correctly (see [Configuration](#Configuration)). Two settings that you MUST get right are DATABASE_URL and REDIS_URL.
 
-1. If developing the enterprise Kafka + ClickHouse, export `KAFKA_ENABLED=true` and also provide KAFKA_HOSTS.
+1. If developing the enterprise Kafka + ClickHouse pipeline, export `KAFKA_ENABLED=true` and also provide KAFKA_HOSTS.
 
     Otherwise if developing the basic Redis + Postgres pipeline, skip ahead.
 
-1. Start the plugin server in autoreload mode with `yarn start`, or in compiled mode with `yarn compile && yarn start:dist`, and develop away!
+1. Start the plugin server in autoreload mode with `yarn start`, or in compiled mode with `yarn build && yarn start:dist`, and develop away!
 
 1. Run tests with `yarn test`. Run benchmarks with `yarn benchmark`.
 
