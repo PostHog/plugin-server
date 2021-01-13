@@ -19,6 +19,7 @@
         "lint:fix": "eslint --fix .",
         "prettier": "prettier --write .",
         "prettier:check": "prettier --check .",
+        "prepare": "yarn compile:protobuf",
         "prepublishOnly": "yarn test && yarn build",
         "task:init-test-db": "NODE_ENV=test ts-node ./tasks/init-test-db.ts"
     },
