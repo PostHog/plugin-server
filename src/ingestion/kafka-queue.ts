@@ -113,7 +113,7 @@ export class KafkaQueue implements Queue {
 
     private static buildConsumer(kafka: Kafka): Consumer {
         const consumer = kafka.consumer({
-            groupId: 'plugin-server',
+            groupId: 'group1',
             readUncommitted: false,
         })
         const { GROUP_JOIN, CRASH, CONNECT, DISCONNECT } = consumer.events
