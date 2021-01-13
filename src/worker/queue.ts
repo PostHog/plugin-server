@@ -6,6 +6,7 @@ import Client from '../celery/client'
 import { PluginsServer, Queue } from '../types'
 import { KafkaQueue } from '../ingestion/kafka-queue'
 import { UUID } from '../utils'
+import { status } from '../status'
 
 export function startQueue(
     server: PluginsServer,
@@ -56,7 +57,10 @@ function startQueueRedis(
         }
     )
 
-    worker.start()
+    worker.start().catch((reason) => {
+        status.error('💥', `Failed to start Redis queue:\n${reason}`)
+        process.exit(1)
+    })
 
     return worker
 }
@@ -82,7 +86,10 @@ function startQueueKafka(
         server.statsd?.timing('single-ingestion', singleIngestionTimer)
     })
 
-    kafkaQueue.start()
+    kafkaQueue.start().catch((reason) => {
+        status.error('💥', `Failed to start Kafka queue:\n${reason}`)
+        process.exit(1)
+    })
 
     return kafkaQueue
 }
