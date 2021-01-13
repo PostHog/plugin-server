@@ -7,20 +7,20 @@ import { PluginsServer, Queue } from '../types'
 import { KafkaQueue } from '../ingestion/kafka-queue'
 import { UUID } from '../utils'
 
-export async function startQueue(
+export function startQueue(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
     processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
-): Promise<Queue> {
+): Queue {
     const relevantStartQueue = server.KAFKA_ENABLED ? startQueueKafka : startQueueRedis
-    return await relevantStartQueue(server, processEvent, processEventBatch)
+    return relevantStartQueue(server, processEvent, processEventBatch)
 }
 
-async function startQueueRedis(
+function startQueueRedis(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
     processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
-): Promise<Queue> {
+): Queue {
     const worker = new Worker(server.redis, server.PLUGINS_CELERY_QUEUE)
     const client = new Client(server.redis, server.CELERY_DEFAULT_QUEUE)
 
@@ -56,16 +56,16 @@ async function startQueueRedis(
         }
     )
 
-    await worker.start()
+    worker.start()
 
     return worker
 }
 
-async function startQueueKafka(
+function startQueueKafka(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
     processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
-): Promise<Queue> {
+): Queue {
     const kafkaQueue = new KafkaQueue(server, processEventBatch, async (event: PluginEvent) => {
         const singleIngestionTimer = new Date()
         const { distinct_id, ip, site_url, team_id, now, sent_at, uuid } = event
@@ -82,7 +82,7 @@ async function startQueueKafka(
         server.statsd?.timing('single-ingestion', singleIngestionTimer)
     })
 
-    await kafkaQueue.start()
+    kafkaQueue.start()
 
     return kafkaQueue
 }
