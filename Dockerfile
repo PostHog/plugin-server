@@ -8,4 +8,4 @@ RUN yarn install --frozen-lockfile
 COPY ./ ./
 RUN yarn compile:typescript
 
-CMD ["bin/posthog-plugin-server"]
+CMD [ "node", "dist/src/index.js" ]

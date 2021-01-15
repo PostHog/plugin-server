@@ -3,6 +3,5 @@
 !yarn.lock
 !tsconfig.json
 !src
-!bin
 !.eslintrc.js
 !.prettierrc
