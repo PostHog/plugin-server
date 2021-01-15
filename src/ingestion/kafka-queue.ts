@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/node'
 import { Kafka, Consumer, Message } from 'kafkajs'
 import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from 'types'
-import { KAFKA_EVENTS_WAL } from './topics'
+import { KAFKA_EVENTS_INGESTION_HANDOFF } from './topics'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import { status } from '../status'
 
@@ -30,7 +30,7 @@ export class KafkaQueue implements Queue {
 
     async start(): Promise<void> {
         status.info('⏬', `Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
-        await this.consumer.subscribe({ topic: KAFKA_EVENTS_WAL })
+        await this.consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
         // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
         await this.consumer.run({
             // TODO: eachBatchAutoResolve: false, // don't autoresolve whole batch in case we exit it early
@@ -87,7 +87,7 @@ export class KafkaQueue implements Queue {
             return
         }
         console.error('⏳ Pausing Kafka consumer...')
-        await this.consumer.pause([{ topic: KAFKA_EVENTS_WAL }])
+        await this.consumer.pause([{ topic: KAFKA_EVENTS_INGESTION_HANDOFF }])
         console.error('⏸ Kafka consumer paused!')
     }
 
@@ -96,12 +96,12 @@ export class KafkaQueue implements Queue {
             return
         }
         console.error('⏳ Resuming Kafka consumer...')
-        await this.consumer.resume([{ topic: KAFKA_EVENTS_WAL }])
+        await this.consumer.resume([{ topic: KAFKA_EVENTS_INGESTION_HANDOFF }])
         console.error('▶️ Kafka consumer resumed!')
     }
 
     isPaused(): boolean {
-        return this.consumer.paused().some(({ topic }) => topic === KAFKA_EVENTS_WAL)
+        return this.consumer.paused().some(({ topic }) => topic === KAFKA_EVENTS_INGESTION_HANDOFF)
     }
 
     async stop(): Promise<void> {

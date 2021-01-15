@@ -1,4 +1,4 @@
-import { KAFKA_EVENTS_WAL } from '../ingestion/topics'
+import { KAFKA_EVENTS_INGESTION_HANDOFF } from '../ingestion/topics'
 import { DateTime } from 'luxon'
 import { PluginsServer, PluginConfig, RawEventMessage } from 'types'
 import { version } from '../../package.json'
@@ -51,7 +51,7 @@ export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig)
         }
 
         producer!.send({
-            topic: KAFKA_EVENTS_WAL,
+            topic: KAFKA_EVENTS_INGESTION_HANDOFF,
             messages: [
                 {
                     key: uuid,
