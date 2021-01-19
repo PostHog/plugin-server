@@ -112,6 +112,7 @@ export async function createServer(
         ...serverConfig,
         db,
         redis,
+        clickhouse,
         kafka,
         kafkaProducer,
         statsd,

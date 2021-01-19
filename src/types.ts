@@ -7,6 +7,7 @@ import { DateTime } from 'luxon'
 import { StatsD } from 'hot-shots'
 import { EventsProcessor } from 'ingestion/process-event'
 import { UUID } from './utils'
+import { ClickHouse } from 'clickhouse'
 
 export enum LogLevel {
     Debug = 'debug',
@@ -50,12 +51,13 @@ export interface PluginsServerConfig extends Record<string, any> {
 }
 
 export interface PluginsServer extends PluginsServerConfig {
-    // active connections to Postgres, Redis, Kafka, StatsD
+    // active connections to Postgres, Redis, ClickHouse, Kafka, StatsD
     db: Pool
     redis: Redis
-    kafka: Kafka | undefined
-    kafkaProducer: Producer | undefined
-    statsd: StatsD | undefined
+    clickhouse?: ClickHouse
+    kafka?: Kafka
+    kafkaProducer?: Producer
+    statsd?: StatsD
     // currently enabled plugin status
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>
