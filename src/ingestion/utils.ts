@@ -64,5 +64,5 @@ export function sanitizeEventName(eventName: any): string {
             eventName = String(eventName)
         }
     }
-    return eventName.substr(0, 2)
+    return eventName.substr(0, 200)
 }
