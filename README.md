@@ -38,6 +38,12 @@ There's a multitude of settings you can use to control the plugin server. Use th
 | CELERY_DEFAULT_QUEUE          | Celery outgoing queue                                      | `'celery'`                            |
 | PLUGINS_CELERY_QUEUE          | Celery incoming queue                                      | `'posthog-plugins'`                   |
 | PLUGINS_RELOAD_PUBSUB_CHANNEL | Redis channel for reload events                            | `'reload-plugins'`                    |
+| CLICKHOUSE_HOST | ClickHouse host | `'localhost'` |
+| CLICKHOUSE_DATABASE | ClickHouse database | `'default'` |
+| CLICKHOUSE_USERNAME | ClickHouse username | `'default'` |
+| CLICKHOUSE_PASSWORD | ClickHouse password | `null` |
+| CLICKHOUSE_CA | ClickHouse CA certs | `null` |
+| CLICKHOUSE_SECURE | Secure ClickHouse connection | `false` |
 | KAFKA_ENABLED                 | use Kafka instead of Celery to ingest events               | `false`                               |
 | KAFKA_HOSTS                   | comma-delimited Kafka hosts                                | `null`                                |
 | KAFKA_CLIENT_CERT_B64         | Kafka certificate in Base64                                | `null`                                |
