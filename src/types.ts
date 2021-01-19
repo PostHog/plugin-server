@@ -22,6 +22,13 @@ export interface PluginsServerConfig extends Record<string, any> {
     TASKS_PER_WORKER: number
     CELERY_DEFAULT_QUEUE: string
     DATABASE_URL: string
+    CLICKHOUSE_HOST: string
+    CLICKHOUSE_DATABASE: string
+    CLICKHOUSE_USERNAME: string
+    CLICKHOUSE_PASSWORD: string | null
+    CLICKHOUSE_CA: string | null
+    CLICKHOUSE_SECURE: boolean
+    CLICKHOUSE_VERIFY: boolean
     KAFKA_ENABLED: boolean
     KAFKA_HOSTS: string | null
     KAFKA_CLIENT_CERT_B64: string | null

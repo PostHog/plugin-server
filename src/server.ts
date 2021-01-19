@@ -5,6 +5,7 @@ import { Kafka, logLevel, Producer } from 'kafkajs'
 import { FastifyInstance } from 'fastify'
 import { PluginsServer, PluginsServerConfig, Queue } from './types'
 import { startQueue } from './worker/queue'
+import { ClickHouse } from 'clickhouse'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { version } from '../package.json'
 import { PluginEvent } from '@posthog/plugin-scaffold'
@@ -64,12 +65,24 @@ export async function createServer(
         }
     }
 
+    let clickhouse: ClickHouse | undefined
     let kafka: Kafka | undefined
     let kafkaProducer: Producer | undefined
     if (serverConfig.KAFKA_ENABLED) {
         if (!serverConfig.KAFKA_HOSTS) {
             throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
         }
+        clickhouse = new ClickHouse({
+            url: `http${serverConfig.CLICKHOUSE_SECURE ? 's' : ''}://$${serverConfig.CLICKHOUSE_HOST}`,
+            port: serverConfig.CLICKHOUSE_SECURE ? 8443 : 8123,
+            basicAuth: {
+                username: serverConfig.CLICKHOUSE_USERNAME,
+                password: serverConfig.CLICKHOUSE_PASSWORD,
+            },
+            config: {
+                database: serverConfig.CLICKHOUSE_DATABASE,
+            },
+        })
         kafka = new Kafka({
             clientId: `plugin-server-v${version}`,
             brokers: serverConfig.KAFKA_HOSTS.split(','),

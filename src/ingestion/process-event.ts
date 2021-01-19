@@ -405,7 +405,8 @@ export class EventsProcessor {
             'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
             [createdAt.toISO(), properties, teamId, isUserId, isIdentified, uuid.toString()]
         )
-        return insertResult.rows[0]
+        const personCreated = insertResult.rows[0] as Person
+        return personCreated
     }
 
     private async addDistinctId(person: Person, distinctId: string): Promise<void> {
