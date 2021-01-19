@@ -120,10 +120,10 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                         await processError(server, pluginConfig, `File ${jsonFileName} is not valid JSON`)
                         return false
                     }
-                    if (configUpdate['posthog-plugin-config']) {
-                        // plugin.json has `config`, but in package.json we prefer `posthog-plugin-config` for clarity
-                        configUpdate.config = configUpdate['posthog-plugin-config']
-                        delete configUpdate['posthog-plugin-config']
+                    if (configUpdate['configSchema']) {
+                        // plugin.json has `config`, but in package.json we prefer `configSchema`
+                        configUpdate.config = configUpdate['configSchema']
+                        delete configUpdate['configSchema']
                     }
                     if (configUpdate.homepage) {
                         // plugin.json has `url`, but in package.json we prefer the conventional `homepage`
