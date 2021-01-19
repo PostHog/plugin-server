@@ -81,7 +81,7 @@ function startQueueKafka(
             team_id,
             DateTime.fromISO(now),
             sent_at ? DateTime.fromISO(sent_at) : null,
-            new UUID(uuid!)
+            uuid!
         )
         server.statsd?.timing('single-ingestion', singleIngestionTimer)
     })

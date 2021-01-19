@@ -1,9 +1,10 @@
 import * as Sentry from '@sentry/node'
 import { Kafka, Consumer, Message } from 'kafkajs'
-import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from 'types'
+import { RawEventMessage, EventMessage, PluginsServer, Queue } from 'types'
 import { KAFKA_EVENTS_INGESTION_HANDOFF } from './topics'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import { status } from '../status'
+import { parseRawEventMessage } from './utils'
 
 export type BatchCallback = (messages: Message[]) => Promise<void>
 
@@ -51,12 +52,11 @@ export class KafkaQueue implements Queue {
                     ...JSON.parse(message.value!.toString()),
                     kafka_offset: message.offset,
                 }))
-                const parsedEvents = rawEvents.map((rawEvent) => ({
-                    ...rawEvent,
-                    data: JSON.parse(rawEvent.data),
-                }))
+                const parsedEvents = rawEvents.map(parseRawEventMessage)
                 const pluginEvents: PluginEvent[] = parsedEvents.map((parsedEvent) => ({
                     ...parsedEvent,
+                    now: parsedEvent.now.toISO(),
+                    sent_at: parsedEvent.now.toISO(),
                     event: parsedEvent.data.event,
                     properties: parsedEvent.data.properties,
                 }))
@@ -105,10 +105,12 @@ export class KafkaQueue implements Queue {
     }
 
     async stop(): Promise<void> {
-        status.info('⏳', 'Stopping Kafka queue...')
-        await this.consumer.stop()
-        status.error('⏹', 'Kafka consumer stopped!')
-        await this.consumer.disconnect()
+        try {
+            status.info('⏳', 'Stopping Kafka queue...')
+            await this.consumer.stop()
+            status.error('⏹', 'Kafka consumer stopped!')
+            await this.consumer.disconnect()
+        } catch {}
     }
 
     private static buildConsumer(kafka: Kafka): Consumer {

@@ -6,7 +6,6 @@ import { VM } from 'vm2'
 import { DateTime } from 'luxon'
 import { StatsD } from 'hot-shots'
 import { EventsProcessor } from 'ingestion/process-event'
-import { UUID } from './utils'
 import { ClickHouse } from 'clickhouse'
 
 export enum LogLevel {
@@ -170,23 +169,28 @@ export interface PropertyUsage {
     volume: number | null
 }
 
-// received via Kafka
-interface EventMessage {
+/** Properties shared by RawEventMessage and EventMessage. */
+export interface BaseEventMessage {
     distinct_id: string
     ip: string
     site_url: string
     team_id: number
-}
-
-export interface RawEventMessage extends EventMessage {
-    data: string
-    now: string
-    sent_at: string // may be an empty string
     uuid: string
 }
 
-export interface ParsedEventMessage extends EventMessage {
-    data: EventData
+/** Raw event message as received via Kafka. */
+export interface RawEventMessage extends BaseEventMessage {
+    /** JSON-encoded object. */
+    data: string
+    /** ISO-formatted datetime. */
+    now: string
+    /** ISO-formatted datetime. May be empty! */
+    sent_at: string
+}
+
+/** Usable event message. */
+export interface EventMessage extends BaseEventMessage {
+    data: PluginEvent
     now: DateTime
     sent_at: DateTime | null
 }
@@ -198,8 +202,10 @@ export interface EventData extends PluginEvent {
     offset?: number
 }
 
+/** Any kind of properties field. */
 export type Properties = Record<string, any>
 
+/** Usable Team model. */
 export interface Team {
     id: number
     name: string
@@ -219,6 +225,7 @@ export interface Team {
     ingested_event: boolean
 }
 
+/** Usable Element model. */
 export interface Element {
     text?: string
     tag_name?: string
@@ -233,18 +240,27 @@ export interface Element {
     group_id?: number
 }
 
-export type User = Record<string, any> // not really typed as not needed so far, only a placeholder for Person.is_user
-
-export interface Person {
+/** Properties shared by RawPerson and Person. */
+export interface BasePerson {
     id: number
-    created_at: DateTime
     team_id: number
     properties: Properties
-    is_user: User
+    is_user_id: number
     is_identified: boolean
     uuid: string
 }
 
+/** Raw Person row from database. */
+export interface RawPerson extends BasePerson {
+    created_at: string
+}
+
+/** Usable Person model. */
+export interface Person extends BasePerson {
+    created_at: DateTime
+}
+
+/** Usable PersonDistinctId model. */
 export interface PersonDistinctId {
     id: number
     team_id: number
@@ -252,15 +268,9 @@ export interface PersonDistinctId {
     distinct_id: string
 }
 
+/** Usable CohortPeople model. */
 export interface CohortPeople {
     id: number
     cohort_id: number
     person_id: number
-}
-
-export interface ParsedEventMessage extends EventMessage {
-    data: PluginEvent
-    now: DateTime
-    sent_at: DateTime | null
-    uuid: UUID
 }

@@ -1,21 +1,34 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import { DateTime, Duration } from 'luxon'
-import { PluginsServer, EventData, Properties, Element, Team, Person, PersonDistinctId, CohortPeople } from '../types'
-import { castTimestampOrNow, UUID, UUIDT } from '../utils'
+import {
+    PluginsServer,
+    EventData,
+    Properties,
+    Element,
+    Team,
+    Person,
+    PersonDistinctId,
+    CohortPeople,
+    RawPerson,
+} from '../types'
+import { castTimestampOrNow, UUIDT } from '../utils'
 import { Event as EventProto } from '../idl/protos'
 import { Pool } from 'pg'
 import { Producer } from 'kafkajs'
-import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { sanitizeEventName, elementsToString } from './utils'
+import { KAFKA_EVENTS, KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
+import { sanitizeEventName, elementsToString, unparsePersonPartial } from './utils'
+import { ClickHouse } from 'clickhouse'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
     db: Pool
+    clickhouse: ClickHouse
     kafkaProducer: Producer
 
     constructor(pluginsServer: PluginsServer) {
         this.pluginsServer = pluginsServer
         this.db = pluginsServer.db
+        this.clickhouse = pluginsServer.clickhouse!
         this.kafkaProducer = pluginsServer.kafkaProducer!
     }
 
@@ -27,7 +40,7 @@ export class EventsProcessor {
         teamId: number,
         now: DateTime,
         sentAt: DateTime | null,
-        eventUuid: UUID
+        eventUuid: string
     ): Promise<void> {
         const properties: Properties = data.properties ?? {}
         if (data['$set']) {
@@ -37,7 +50,7 @@ export class EventsProcessor {
             properties['$set_once'] = data['$set_once']
         }
 
-        const personUuid = new UUIDT()
+        const personUuid = new UUIDT().toString()
 
         const ts = this.handleTimestamp(data, now, sentAt)
         this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
@@ -115,7 +128,14 @@ export class EventsProcessor {
         let personFound = await this.fetchPerson(teamId, distinctId)
         if (!personFound) {
             try {
-                const personCreated = await this.createPerson(DateTime.utc(), {}, teamId, null, true, new UUIDT())
+                const personCreated = await this.createPerson(
+                    DateTime.utc(),
+                    {},
+                    teamId,
+                    null,
+                    true,
+                    new UUIDT().toString()
+                )
                 this.addDistinctId(personCreated, distinctId)
             } catch {
                 // Catch race condition where in between getting and creating,
@@ -146,7 +166,7 @@ export class EventsProcessor {
                     teamId,
                     null,
                     false,
-                    new UUIDT()
+                    new UUIDT().toString()
                 )
                 await this.addDistinctId(personCreated, distinctId)
             } catch {
@@ -156,7 +176,9 @@ export class EventsProcessor {
             }
         }
         this.db.query('UPDATE posthog_person SET properties = $1 WHERE id = $2', [
-            setOnce ? { ...properties, ...personFound!.properties } : { ...personFound!.properties, ...properties },
+            JSON.stringify(
+                setOnce ? { ...properties, ...personFound!.properties } : { ...personFound!.properties, ...properties }
+            ),
             personFound!.id,
         ])
     }
@@ -200,7 +222,14 @@ export class EventsProcessor {
 
         if (!oldPerson && !newPerson) {
             try {
-                const personCreated = await this.createPerson(DateTime.utc(), {}, teamId, null, false, new UUIDT())
+                const personCreated = await this.createPerson(
+                    DateTime.utc(),
+                    {},
+                    teamId,
+                    null,
+                    false,
+                    new UUIDT().toString()
+                )
                 this.addDistinctId(personCreated, distinctId)
                 this.addDistinctId(personCreated, previousDistinctId)
             } catch {
@@ -231,10 +260,7 @@ export class EventsProcessor {
             }
         }
 
-        await this.db.query('UPDATE posthog_person SET created_at = $1 WHERE id = $2', [
-            first_seen.toISO(),
-            mergeInto.id,
-        ])
+        await this.updatePerson(mergeInto, { created_at: first_seen })
 
         // merge the distinct_ids
         for (const other_person of peopleToMerge) {
@@ -261,13 +287,13 @@ export class EventsProcessor {
                 ])
             }
 
-            await this.db.query('DELETE FROM posthog_person WHERE id = $1', [other_person.id])
+            await this.deletePerson(other_person.id)
         }
     }
 
     private async captureEE(
-        eventUuid: UUID,
-        personUuid: UUID,
+        eventUuid: string,
+        personUuid: string,
         ip: string,
         siteUrl: string,
         teamId: number,
@@ -364,11 +390,11 @@ export class EventsProcessor {
                 WHERE id = $7`,
                 [
                     team.ingested_event,
-                    team.event_names,
-                    team.event_names_with_usage,
-                    team.event_properties,
-                    team.event_names_with_usage,
-                    team.event_properties_numerical,
+                    JSON.stringify(team.event_names),
+                    JSON.stringify(team.event_names_with_usage),
+                    JSON.stringify(team.event_properties),
+                    JSON.stringify(team.event_names_with_usage),
+                    JSON.stringify(team.event_properties_numerical),
                     team.id,
                 ]
             )
@@ -390,7 +416,8 @@ export class EventsProcessor {
                 AND posthog_persondistinctid.distinct_id = $2`,
             [teamId, distinctId]
         )
-        return selectResult.rows[0]
+        const rawPerson: RawPerson = selectResult.rows[0]
+        return { ...rawPerson, created_at: DateTime.fromISO(rawPerson.created_at) }
     }
 
     private async createPerson(
@@ -399,25 +426,99 @@ export class EventsProcessor {
         teamId: number,
         isUserId: number | null,
         isIdentified: boolean,
-        uuid: UUID | string
+        uuid: string
     ): Promise<Person> {
         const insertResult = await this.db.query(
             'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [createdAt.toISO(), properties, teamId, isUserId, isIdentified, uuid.toString()]
+            [createdAt.toISO(), JSON.stringify(properties), teamId, isUserId, isIdentified, uuid]
         )
         const personCreated = insertResult.rows[0] as Person
+        if (this.pluginsServer.KAFKA_ENABLED) {
+            const data = {
+                created_at: castTimestampOrNow(createdAt),
+                properties: JSON.stringify(properties),
+                team_id: teamId,
+                is_identified: isIdentified,
+                id: uuid,
+            }
+            await this.kafkaProducer.send({
+                topic: KAFKA_PERSON,
+                messages: [{ value: Buffer.from(JSON.stringify(data)) }],
+            })
+        }
         return personCreated
     }
 
-    private async addDistinctId(person: Person, distinctId: string): Promise<void> {
+    private async updatePerson(person: Person, update: Partial<Person>): Promise<Person> {
+        const updatedPerson: Person = { ...person, ...update }
         await this.db.query(
+            `UPDATE posthog_person SET ${Object.keys(update).map(
+                (field, index) => field + ' = $' + (index + 1)
+            )} WHERE id = $${Object.values(update).length + 1}`,
+            [...Object.values(unparsePersonPartial(update)), person.id]
+        )
+        if (this.pluginsServer.KAFKA_ENABLED) {
+            const data = {
+                created_at: castTimestampOrNow(updatedPerson.created_at),
+                properties: JSON.stringify(updatedPerson.properties),
+                team_id: updatedPerson.team_id,
+                is_identified: updatedPerson.is_identified,
+                id: updatedPerson.uuid.toString(),
+            }
+            await this.kafkaProducer.send({
+                topic: KAFKA_PERSON,
+                messages: [{ value: Buffer.from(JSON.stringify(data)) }],
+            })
+        }
+        return updatedPerson
+    }
+
+    private async deletePerson(personId: number): Promise<void> {
+        await this.db.query('DELETE FROM person_distinct_id WHERE person_id = $1', [personId])
+        await this.db.query('DELETE FROM posthog_person WHERE id = $1', [personId])
+        if (this.pluginsServer.KAFKA_ENABLED) {
+            await this.clickhouse.query(`ALTER TABLE person DELETE WHERE id = ${personId}`).toPromise()
+            await this.clickhouse
+                .query(`ALTER TABLE person_distinct_id DELETE WHERE person_id = ${personId}`)
+                .toPromise()
+        }
+    }
+
+    private async addDistinctId(person: Person, distinctId: string): Promise<void> {
+        const insertResult = await this.db.query(
             'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3) RETURNING *',
             [distinctId, person.id, person.team_id]
         )
+        const personDistinctIdCreated = insertResult.rows[0] as PersonDistinctId
+        if (this.pluginsServer.KAFKA_ENABLED) {
+            await this.kafkaProducer.send({
+                topic: KAFKA_PERSON_UNIQUE_ID,
+                messages: [{ value: Buffer.from(JSON.stringify(personDistinctIdCreated)) }],
+            })
+        }
+    }
+
+    private async updateDistinctId(
+        personDistinctId: PersonDistinctId,
+        update: Partial<PersonDistinctId>
+    ): Promise<void> {
+        const updatedPersonDistinctId: PersonDistinctId = { ...personDistinctId, ...update }
+        await this.db.query(
+            `UPDATE posthog_persondistinctid SET ${Object.keys(update).map(
+                (field, index) => field + ' = $' + (index + 1)
+            )} WHERE id = $${Object.values(update).length + 1}`,
+            [...Object.values(update), personDistinctId.id]
+        )
+        if (this.pluginsServer.KAFKA_ENABLED) {
+            await this.kafkaProducer.send({
+                topic: KAFKA_PERSON_UNIQUE_ID,
+                messages: [{ value: Buffer.from(JSON.stringify(updatedPersonDistinctId)) }],
+            })
+        }
     }
 
     private async createEvent(
-        event_uuid: UUID,
+        uuid: string,
         event: string,
         team: Team,
         distinctId: string,
@@ -427,10 +528,9 @@ export class EventsProcessor {
     ): Promise<string> {
         const timestampString = castTimestampOrNow(timestamp)
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
-        const eventUuidString = event_uuid.toString()
 
         const message = EventProto.create({
-            uuid: eventUuidString,
+            uuid,
             event,
             properties: JSON.stringify(properties ?? {}),
             timestamp: timestampString,
@@ -442,14 +542,14 @@ export class EventsProcessor {
 
         await this.kafkaProducer.send({
             topic: KAFKA_EVENTS,
-            messages: [{ key: eventUuidString, value: EventProto.encodeDelimited(message).finish() as Buffer }],
+            messages: [{ key: uuid, value: EventProto.encodeDelimited(message).finish() as Buffer }],
         })
 
-        return eventUuidString
+        return uuid
     }
 
     private async createSessionRecordingEvent(
-        eventUuid: UUID,
+        uuid: string,
         team_id: number,
         distinct_id: string,
         session_id: string,
@@ -457,10 +557,9 @@ export class EventsProcessor {
         snapshot_data: Record<any, any>
     ): Promise<string> {
         const timestampString = castTimestampOrNow(timestamp)
-        const eventUuidString = eventUuid.toString()
 
         const data = {
-            uuid: eventUuidString,
+            uuid,
             team_id: team_id,
             distinct_id: distinct_id,
             session_id: session_id,
@@ -471,9 +570,9 @@ export class EventsProcessor {
 
         await this.kafkaProducer.send({
             topic: KAFKA_SESSION_RECORDING_EVENTS,
-            messages: [{ key: eventUuidString, value: Buffer.from(JSON.stringify(data)) }],
+            messages: [{ key: uuid, value: Buffer.from(JSON.stringify(data)) }],
         })
 
-        return eventUuidString
+        return uuid
     }
 }

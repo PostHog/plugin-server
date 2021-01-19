@@ -1,4 +1,22 @@
-import { Element } from 'types'
+import { DateTime } from 'luxon'
+import { Element, BaseEventMessage, RawEventMessage, EventMessage, BasePerson, RawPerson, Person } from '../types'
+
+export function parseRawEventMessage(message: RawEventMessage): EventMessage {
+    return {
+        ...(message as BaseEventMessage),
+        data: JSON.parse(message.data),
+        now: DateTime.fromISO(message.now),
+        sent_at: DateTime.fromISO(message.sent_at),
+    }
+}
+
+export function parseRawPerson(rawPerson: RawPerson): Person {
+    return { ...(rawPerson as BasePerson), created_at: DateTime.fromISO(rawPerson.created_at) }
+}
+
+export function unparsePersonPartial(person: Partial<Person>): Partial<RawPerson> {
+    return { ...(person as BasePerson), ...(person.created_at ? { created_at: person.created_at.toISO() } : {}) }
+}
 
 export function escapeQuotes(input: string): string {
     return input.replace(/"/g, '\\"')
