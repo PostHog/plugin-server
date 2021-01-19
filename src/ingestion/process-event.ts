@@ -1,12 +1,12 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import { DateTime, Duration } from 'luxon'
-import { PluginsServer, EventData, Properties, Element, Team, Person, PersonDistinctId, CohortPeople } from 'types'
+import { PluginsServer, EventData, Properties, Element, Team, Person, PersonDistinctId, CohortPeople } from '../types'
 import { castTimestampOrNow, UUID, UUIDT } from '../utils'
-import { elementsToString } from './element'
 import { Event as EventProto } from '../idl/protos'
 import { Pool } from 'pg'
 import { Producer } from 'kafkajs'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
+import { sanitizeEventName, elementsToString } from './utils'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
@@ -32,6 +32,9 @@ export class EventsProcessor {
         const properties: Properties = data.properties ?? {}
         if (data['$set']) {
             properties['$set'] = data['$set']
+        }
+        if (data['$set_once']) {
+            properties['$set_once'] = data['$set_once']
         }
 
         const personUuid = new UUIDT()
@@ -97,8 +100,12 @@ export class EventsProcessor {
             if (properties['$anon_distinct_id']) {
                 await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
             }
+            // TODO: roll the two updatePersonProperties calls into one to `UPDATE posthog_person` only once
             if (properties['$set']) {
                 this.updatePersonProperties(teamId, distinctId, properties['$set'])
+            }
+            if (properties['$set_once']) {
+                this.updatePersonProperties(teamId, distinctId, properties['$set_once'], true)
             }
             this.setIsIdentified(teamId, distinctId)
         }
@@ -124,7 +131,12 @@ export class EventsProcessor {
         }
     }
 
-    private async updatePersonProperties(teamId: number, distinctId: string, properties: Properties): Promise<void> {
+    private async updatePersonProperties(
+        teamId: number,
+        distinctId: string,
+        properties: Properties,
+        setOnce = false
+    ): Promise<void> {
         let personFound = await this.fetchPerson(teamId, distinctId)
         if (!personFound) {
             try {
@@ -143,12 +155,10 @@ export class EventsProcessor {
                 personFound = await this.fetchPerson(teamId, distinctId)
             }
         }
-        if (personFound) {
-            this.db.query('UPDATE posthog_person SET properties = $1 WHERE id = $2', [
-                { ...personFound.properties, ...properties },
-                personFound.id,
-            ])
-        }
+        this.db.query('UPDATE posthog_person SET properties = $1 WHERE id = $2', [
+            setOnce ? { ...properties, ...personFound!.properties } : { ...personFound!.properties, ...properties },
+            personFound!.id,
+        ])
     }
 
     private async alias(
@@ -267,6 +277,8 @@ export class EventsProcessor {
         timestamp: DateTime,
         sentAt: DateTime | null
     ): Promise<void> {
+        event = sanitizeEventName(event)
+
         const elements: Record<string, any>[] | undefined = properties['$elements']
         let elements_list: Element[] = []
         if (elements && elements.length) {
@@ -352,11 +364,11 @@ export class EventsProcessor {
                 WHERE id = $7`,
                 [
                     team.ingested_event,
-                    JSON.stringify(team.event_names),
-                    JSON.stringify(team.event_names_with_usage),
-                    JSON.stringify(team.event_properties),
-                    JSON.stringify(team.event_names_with_usage),
-                    JSON.stringify(team.event_properties_numerical),
+                    team.event_names,
+                    team.event_names_with_usage,
+                    team.event_properties,
+                    team.event_names_with_usage,
+                    team.event_properties_numerical,
                     team.id,
                 ]
             )

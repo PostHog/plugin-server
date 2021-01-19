@@ -1,6 +1,6 @@
 import { Element } from 'types'
 
-function escapeQuotes(input: string): string {
+export function escapeQuotes(input: string): string {
     return input.replace(/"/g, '\\"')
 }
 
@@ -36,4 +36,15 @@ export function elementsToString(elements: Element[]): string {
         return el_string
     })
     return ret.join(';')
+}
+
+export function sanitizeEventName(eventName: any): string {
+    if (typeof eventName !== 'string') {
+        try {
+            eventName = JSON.stringify(eventName)
+        } catch {
+            eventName = String(eventName)
+        }
+    }
+    return eventName.substr(0, 2)
 }
