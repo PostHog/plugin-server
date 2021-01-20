@@ -95,7 +95,7 @@
         }
     },
     "lint-staged": {
-        "*.{js,ts}": "eslint --fix",
-        "*.{js,ts,css,scss}": "prettier --write"
+        "*.{js,ts}": "node_modules/.bin/eslint --fix",
+        "*.{js,ts,css,scss}": "node_modules/.bin/prettier --write"
     }
 }
