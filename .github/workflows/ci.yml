@@ -64,6 +64,15 @@ jobs:
                     KAFKA_ADVERTISED_HOST_NAME: kafka
                     sKAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
 
+        env:
+            SECRET_KEY: 'abcdef' # unsafe - for testing only
+            DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
+            REDIS_URL: 'redis://localhost'
+            PRIMARY_DB: 'clickhouse'
+            CLICKHOUSE_HOST: 'localhost'
+            CLICKHOUSE_DATABASE: 'posthog_test'
+            TEST: 'true'
+
         steps:
             - name: Check out Django server for database setup
               uses: actions/checkout@v2
@@ -91,14 +100,6 @@ jobs:
               run: python -m pip install --upgrade pip && python -m pip install -r posthog/requirements.txt
 
             - name: Set up ClickHouse
-              env:
-                  SECRET_KEY: 'abcdef' # unsafe - for testing only
-                  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
-                  REDIS_URL: 'redis://localhost'
-                  PRIMARY_DB: 'clickhouse'
-                  CLICKHOUSE_HOST: 'localhost'
-                  CLICKHOUSE_DATABASE: 'test_posthog'
-                  TEST: 'true'
               run: python posthog/manage.py setup_test_clickhouse
 
             - name: Install package.json dependencies with Yarn
