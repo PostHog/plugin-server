@@ -107,8 +107,8 @@ jobs:
               run: |
                   python django/manage.py clickhouse_test_teardown
 
-    tests-postgres:
-        name: Tests – Postgres + Redis
+    tests:
+        name: Tests
         runs-on: ubuntu-20.04
 
         services:
