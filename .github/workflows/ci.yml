@@ -64,6 +64,11 @@ jobs:
                     KAFKA_ADVERTISED_HOST_NAME: kafka
                     sKAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
 
+        env:
+            REDIS_URL: 'redis://localhost'
+            CLICKHOUSE_HOST: 'localhost'
+            CLICKHOUSE_DATABASE: 'test_posthog'
+
         steps:
             - name: Check out Django server for database setup
               uses: actions/checkout@v2
@@ -94,10 +99,7 @@ jobs:
               env:
                   SECRET_KEY: 'abcdef' # unsafe - for testing only
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/posthog'
-                  REDIS_URL: 'redis://localhost'
                   PRIMARY_DB: 'clickhouse'
-                  CLICKHOUSE_HOST: 'localhost'
-                  CLICKHOUSE_DATABASE: 'test_posthog'
                   TEST: 'true'
               run: python posthog/manage.py setup_test_clickhouse
 
