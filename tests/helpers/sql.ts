@@ -54,5 +54,11 @@ async function insertRow(db: Pool, table: string, object: Record<string, any>): 
     const params = Object.keys(object)
         .map((_, i) => `\$${i + 1}`)
         .join(',')
-    await db.query(`INSERT INTO ${table} (${keys}) VALUES (${params})`, Object.values(object))
+    try {
+        await db.query(`INSERT INTO ${table} (${keys}) VALUES (${params})`, Object.values(object))
+    } catch (error) {
+        console.error(`Error on table ${table} when inserting object:`)
+        console.error(object)
+        throw error
+    }
 }
