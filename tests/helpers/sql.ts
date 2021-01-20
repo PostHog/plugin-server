@@ -6,8 +6,6 @@ import { delay } from '../../src/utils'
 export async function resetTestDatabase(code: string): Promise<void> {
     const db = new Pool({ connectionString: defaultConfig.DATABASE_URL })
     const mocks = makePluginObjects(code)
-    console.log((await db.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")).rows)
-    console.log((await db.query('SELECT datname FROM pg_database')).rows)
     await db.query('DELETE FROM posthog_pluginstorage')
     await db.query('DELETE FROM posthog_pluginattachment')
     await db.query('DELETE FROM posthog_pluginconfig')
