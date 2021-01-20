@@ -35,7 +35,7 @@ jobs:
                 env:
                     POSTGRES_USER: postgres
                     POSTGRES_PASSWORD: postgres
-                    POSTGRES_DB: postgres
+                    POSTGRES_DB: test_posthog
                 ports: ['5432:5432']
                 options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
             redis:
@@ -93,7 +93,7 @@ jobs:
             - name: Set up ClickHouse
               env:
                   SECRET_KEY: 'abcdef' # unsafe - for testing only
-                  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/postgres'
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
                   PRIMARY_DB: 'clickhouse'
                   CLICKHOUSE_HOST: 'localhost'
@@ -108,14 +108,14 @@ jobs:
 
             - name: Test with Jest
               env:
-                  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/postgres'
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
               run: cd plugin-server && yarn test
 
             - name: Tear down ClickHouse
               env:
                   SECRET_KEY: 'abcdef' # unsafe - for testing only
-                  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/postgres'
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
                   PRIMARY_DB: 'clickhouse'
                   CLICKHOUSE_HOST: 'localhost'
