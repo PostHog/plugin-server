@@ -93,7 +93,7 @@ jobs:
             - name: Set up ClickHouse
               env:
                   SECRET_KEY: 'abcdef' # unsafe - for testing only
-                  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/posthog'
                   REDIS_URL: 'redis://localhost'
                   PRIMARY_DB: 'clickhouse'
                   CLICKHOUSE_HOST: 'localhost'
