@@ -97,11 +97,9 @@ jobs:
                   REDIS_URL: 'redis://localhost'
                   PRIMARY_DB: 'clickhouse'
                   CLICKHOUSE_HOST: 'localhost'
-                  CLICKHOUSE_DATABASE: 'posthog_test'
-                  CLICKHOUSE_SECURE: 'false'
-                  CLICKHOUSE_VERIFY: 'false'
+                  CLICKHOUSE_DATABASE: 'test_posthog'
                   TEST: 'true'
-              run: python posthog/manage.py clickhouse_test_setup
+              run: python posthog/manage.py setup_test_clickhouse
 
             - name: Install package.json dependencies with Yarn
               run: cd plugin-server && yarn
@@ -111,20 +109,6 @@ jobs:
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
               run: cd plugin-server && yarn test
-
-            - name: Tear down ClickHouse
-              env:
-                  SECRET_KEY: 'abcdef' # unsafe - for testing only
-                  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
-                  REDIS_URL: 'redis://localhost'
-                  PRIMARY_DB: 'clickhouse'
-                  CLICKHOUSE_HOST: 'localhost'
-                  CLICKHOUSE_DATABASE: 'posthog_test'
-                  CLICKHOUSE_SECURE: 'false'
-                  CLICKHOUSE_VERIFY: 'false'
-                  TEST: 'true'
-              run: |
-                  python posthog/manage.py clickhouse_test_teardown
 
     tests:
         name: Tests
