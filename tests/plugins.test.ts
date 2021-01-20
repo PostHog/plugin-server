@@ -15,7 +15,7 @@ jest.mock('../src/sql')
 let mockServer: PluginsServer
 let closeServer: () => Promise<void>
 beforeEach(async () => {
-    ;[mockServer, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
+    [mockServer, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
 })
 afterEach(() => {
     closeServer()

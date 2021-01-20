@@ -5,7 +5,7 @@ import { createServer } from '../src/server'
 let mockServer: PluginsServer
 let closeServer: () => Promise<void>
 beforeEach(async () => {
-    ;[mockServer, closeServer] = await createServer()
+    [mockServer, closeServer] = await createServer()
 })
 afterEach(() => {
     closeServer()

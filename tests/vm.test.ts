@@ -22,7 +22,7 @@ const defaultEvent = {
 let mockServer: PluginsServer
 
 beforeEach(async () => {
-    ;(Client as any).mockClear()
+    (Client as any).mockClear()
     mockServer = (await createServer())[0]
 })
 
