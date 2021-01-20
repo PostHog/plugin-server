@@ -16,6 +16,7 @@ export async function resetTestDatabase(code: string): Promise<void> {
     for (const team_id of team_ids) {
         await insertRow(db, 'posthog_team', {
             id: team_id,
+            app_urls: [],
             name: 'TEST',
             event_names: [],
             event_names_with_usage: [],
