@@ -1,7 +1,7 @@
 import { makePluginObjects } from './plugins'
 import { defaultConfig } from '../../src/config'
 import { Pool } from 'pg'
-import { delay } from '../../src/utils'
+import { delay, UUIDT } from '../../src/utils'
 
 export async function resetTestDatabase(code: string): Promise<void> {
     const db = new Pool({ connectionString: defaultConfig.DATABASE_URL })
@@ -14,7 +14,24 @@ export async function resetTestDatabase(code: string): Promise<void> {
 
     const team_ids = mocks.pluginConfigRows.map((c) => c.team_id)
     for (const team_id of team_ids) {
-        await insertRow(db, 'posthog_team', { id: team_id, name: 'TEST' })
+        await insertRow(db, 'posthog_team', {
+            id: team_id,
+            name: 'TEST',
+            event_names: [],
+            event_names_with_usage: [],
+            event_properties: [],
+            event_properties_with_usage: [],
+            event_properties_numerical: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            anonymize_ips: false,
+            completed_snippet_onboarding: true,
+            ingested_event: true,
+            uuid: new UUIDT().toString(),
+            session_recording_opt_in: true,
+            plugins_opt_in: true,
+            opt_out_capture: false,
+        })
     }
     for (const plugin of mocks.pluginRows) {
         await insertRow(db, 'posthog_plugin', plugin)
