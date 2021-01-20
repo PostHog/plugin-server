@@ -30,6 +30,10 @@ export class KafkaQueue implements Queue {
     }
 
     async start(): Promise<void> {
+        const promise = new Promise<void>((resolve, reject) => {
+            this.consumer.on(this.consumer.events.GROUP_JOIN, () => resolve())
+            this.consumer.on(this.consumer.events.CRASH, ({ payload: { error } }) => reject(error))
+        })
         status.info('⏬', `Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
         await this.consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
         // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
@@ -80,6 +84,7 @@ export class KafkaQueue implements Queue {
             },
         })
         this.wasConsumerRan = true
+        return promise
     }
 
     async pause(): Promise<void> {
@@ -126,6 +131,7 @@ export class KafkaQueue implements Queue {
             status.error('⚠️', `Kafka consumer group ${groupId} crashed!`)
             console.error(error)
             Sentry.captureException(error)
+            process.kill(process.pid, 'SIGINT')
         })
         consumer.on(CONNECT, () => {
             status.info('✅', 'Kafka consumer connected!')

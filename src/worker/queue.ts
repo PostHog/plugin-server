@@ -5,23 +5,28 @@ import Worker from '../celery/worker'
 import Client from '../celery/client'
 import { PluginsServer, Queue } from '../types'
 import { KafkaQueue } from '../ingestion/kafka-queue'
-import { UUID } from '../utils'
 import { status } from '../status'
 
-export function startQueue(
+export async function startQueue(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
     processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
-): Queue {
+): Promise<Queue> {
     const relevantStartQueue = server.KAFKA_ENABLED ? startQueueKafka : startQueueRedis
-    return relevantStartQueue(server, processEvent, processEventBatch)
+    try {
+        return await relevantStartQueue(server, processEvent, processEventBatch)
+    } catch (error) {
+        status.error('💥', `Failed to start Kafka queue:\n${error}`)
+        process.kill(process.pid, 'SIGINT')
+        process.exit(1)
+    }
 }
 
-function startQueueRedis(
+async function startQueueRedis(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
     processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
-): Queue {
+): Promise<Queue> {
     const worker = new Worker(server.redis, server.PLUGINS_CELERY_QUEUE)
     const client = new Client(server.redis, server.CELERY_DEFAULT_QUEUE)
 
@@ -65,11 +70,11 @@ function startQueueRedis(
     return worker
 }
 
-function startQueueKafka(
+async function startQueueKafka(
     server: PluginsServer,
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>,
     processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
-): Queue {
+): Promise<Queue> {
     const kafkaQueue = new KafkaQueue(server, processEventBatch, async (event: PluginEvent) => {
         const singleIngestionTimer = new Date()
         const { distinct_id, ip, site_url, team_id, now, sent_at, uuid } = event
@@ -86,10 +91,7 @@ function startQueueKafka(
         server.statsd?.timing('single-ingestion', singleIngestionTimer)
     })
 
-    kafkaQueue.start().catch((reason) => {
-        status.error('💥', `Failed to start Kafka queue:\n${reason}`)
-        process.exit(1)
-    })
+    await kafkaQueue.start()
 
     return kafkaQueue
 }
