@@ -108,6 +108,12 @@ jobs:
             - name: Install package.json dependencies with Yarn
               run: cd plugin-server && yarn
 
+            - name: Test with Jest
+              env:
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:${{ job.services.postgres.ports[5432] }}/postgres'
+                  REDIS_URL: 'redis://localhost'
+              run: cd plugin-server && yarn test
+
             - name: Tear down ClickHouse
               env:
                   SECRET_KEY: 'abcdef' # unsafe - for testing only
