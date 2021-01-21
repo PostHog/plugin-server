@@ -37,6 +37,7 @@ export class KafkaQueue implements Queue {
         isRunning,
         isStale,
     }: EachBatchPayload): Promise<void> {
+        const batchProcessingTimer = new Date()
         const rawEvents: RawEventMessage[] = batch.messages.map((message) => ({
             ...JSON.parse(message.value!.toString()),
             kafka_offset: message.offset,
@@ -62,11 +63,14 @@ export class KafkaQueue implements Queue {
                 status.info('😮', 'Batch stale, canceling batch processing!')
                 return
             }
+            const singleIngestionTimer = new Date()
             await this.saveEvent(event)
             resolveOffset(event.kafka_offset!)
             await heartbeat()
             await commitOffsetsIfNecessary()
+            this.pluginsServer.statsd?.timing('kafka_queue.single_ingestion', singleIngestionTimer)
         }
+        this.pluginsServer.statsd?.timing('kafka_queue.each_batch', batchProcessingTimer)
     }
 
     async start(): Promise<void> {
