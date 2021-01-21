@@ -78,6 +78,7 @@ export class KafkaQueue implements Queue {
             this.consumer.on(this.consumer.events.GROUP_JOIN, () => resolve())
             this.consumer.on(this.consumer.events.CRASH, ({ payload: { error } }) => reject(error))
             status.info('⏬', `Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
+            this.wasConsumerRan = true
             await this.consumer.subscribe({ topic: KAFKA_EVENTS_WAL })
             // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
             await this.consumer.run({
@@ -88,7 +89,6 @@ export class KafkaQueue implements Queue {
                 autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
                 eachBatch: this.eachBatch,
             })
-            this.wasConsumerRan = true
         })
         return await startPromise
     }
