@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node'
-import { Kafka, Consumer, Message } from 'kafkajs'
+import { Kafka, Consumer, Message, EachBatchPayload } from 'kafkajs'
 import { PluginsServer, Queue, RawEventMessage } from 'types'
 import { KAFKA_EVENTS_WAL } from './topics'
 import { PluginEvent } from '@posthog/plugin-scaffold'
@@ -28,6 +28,47 @@ export class KafkaQueue implements Queue {
         this.saveEvent = saveEvent
     }
 
+    private async eachBatch({
+        batch,
+        resolveOffset,
+        heartbeat,
+        commitOffsetsIfNecessary,
+        uncommittedOffsets,
+        isRunning,
+        isStale,
+    }: EachBatchPayload): Promise<void> {
+        const rawEvents: RawEventMessage[] = batch.messages.map((message) => ({
+            ...JSON.parse(message.value!.toString()),
+            kafka_offset: message.offset,
+        }))
+        const parsedEvents = rawEvents.map((rawEvent) => ({
+            ...rawEvent,
+            data: JSON.parse(rawEvent.data),
+        }))
+        const pluginEvents: PluginEvent[] = parsedEvents.map((parsedEvent) => ({
+            ...parsedEvent,
+            event: parsedEvent.data.event,
+            properties: parsedEvent.data.properties,
+        }))
+        const processedEvents: PluginEvent[] = (
+            await this.processEventBatch(pluginEvents)
+        ).filter((event: PluginEvent[] | false | null | undefined) => Boolean(event))
+        for (const event of processedEvents) {
+            if (!isRunning()) {
+                status.info('😮', 'Consumer not running anymore, canceling batch processing!')
+                return
+            }
+            if (isStale()) {
+                status.info('😮', 'Batch stale, canceling batch processing!')
+                return
+            }
+            await this.saveEvent(event)
+            resolveOffset(event.kafka_offset!)
+            await heartbeat()
+            await commitOffsetsIfNecessary()
+        }
+    }
+
     async start(): Promise<void> {
         const startPromise = new Promise<void>(async (resolve, reject) => {
             this.consumer.on(this.consumer.events.GROUP_JOIN, () => resolve())
@@ -41,46 +82,7 @@ export class KafkaQueue implements Queue {
                 // discards some events, leaving us with no kafka_offset to resolve when in fact it should be resolved.
                 autoCommitInterval: 500, // autocommit every 500 ms…
                 autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
-                eachBatch: async ({
-                    batch,
-                    resolveOffset,
-                    heartbeat,
-                    commitOffsetsIfNecessary,
-                    uncommittedOffsets,
-                    isRunning,
-                    isStale,
-                }) => {
-                    const rawEvents: RawEventMessage[] = batch.messages.map((message) => ({
-                        ...JSON.parse(message.value!.toString()),
-                        kafka_offset: message.offset,
-                    }))
-                    const parsedEvents = rawEvents.map((rawEvent) => ({
-                        ...rawEvent,
-                        data: JSON.parse(rawEvent.data),
-                    }))
-                    const pluginEvents: PluginEvent[] = parsedEvents.map((parsedEvent) => ({
-                        ...parsedEvent,
-                        event: parsedEvent.data.event,
-                        properties: parsedEvent.data.properties,
-                    }))
-                    const processedEvents: PluginEvent[] = (
-                        await this.processEventBatch(pluginEvents)
-                    ).filter((event: PluginEvent[] | false | null | undefined) => Boolean(event))
-                    for (const event of processedEvents) {
-                        if (!isRunning()) {
-                            status.info('😮', 'Consumer not running anymore, canceling batch processing!')
-                            return
-                        }
-                        if (isStale()) {
-                            status.info('😮', 'Batch stale, canceling batch processing!')
-                            return
-                        }
-                        await this.saveEvent(event)
-                        resolveOffset(event.kafka_offset!)
-                        await heartbeat()
-                        await commitOffsetsIfNecessary()
-                    }
-                },
+                eachBatch: this.eachBatch,
             })
             this.wasConsumerRan = true
         })
