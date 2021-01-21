@@ -133,7 +133,7 @@ export default class RedisBroker implements Pausable {
      * @param {Function} callback
      */
     private receiveFast(resolve: () => void, queue: string, callback: (message: Message) => any): void {
-        process.nextTick(() => this.recieveOneOnNextTick(resolve, queue, callback))
+        process.nextTick(() => this.receiveOneOnNextTick(resolve, queue, callback))
     }
 
     /**
@@ -144,7 +144,7 @@ export default class RedisBroker implements Pausable {
      * @param {Function} callback
      */
     private receiveSlow(resolve: () => void, queue: string, callback: (message: Message) => any): void {
-        setTimeout(() => this.recieveOneOnNextTick(resolve, queue, callback), 50)
+        setTimeout(() => this.receiveOneOnNextTick(resolve, queue, callback), 50)
     }
 
     /**
@@ -154,7 +154,7 @@ export default class RedisBroker implements Pausable {
      * @param {Function} callback
      * @returns {Promise}
      */
-    private async recieveOneOnNextTick(
+    private async receiveOneOnNextTick(
         resolve: () => void,
         queue: string,
         callback: (message: Message) => any
