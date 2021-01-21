@@ -178,7 +178,7 @@ export default class RedisBroker implements Pausable {
                     this.receiveSlow(resolve, queue, callback)
                 }
             })
-            .catch((err) => status.error(err))
+            .catch((error) => status.error('⚠️', 'An error occured in Celery broker:\n', error))
     }
 
     /**

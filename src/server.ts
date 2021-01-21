@@ -244,7 +244,7 @@ export async function startPluginsServer(
         status.info('🚀', 'All systems go.')
     } catch (error) {
         Sentry.captureException(error)
-        status.error('💥', 'Launchpad failure!', error.stack)
+        status.error('💥', 'Launchpad failure!', error)
         Sentry.flush().then(() => true) // flush in the background
         await closeJobs()
         process.exit(1)

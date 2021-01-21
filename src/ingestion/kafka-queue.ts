@@ -97,18 +97,18 @@ export class KafkaQueue implements Queue {
         if (!this.wasConsumerRan || this.isPaused()) {
             return
         }
-        status.info('⏳ Pausing Kafka consumer...')
+        status.info('⏳', 'Pausing Kafka consumer...')
         await this.consumer.pause([{ topic: KAFKA_EVENTS_WAL }])
-        status.info('⏸ Kafka consumer paused!')
+        status.info('⏸', 'Kafka consumer paused!')
     }
 
     async resume(): Promise<void> {
         if (!this.wasConsumerRan || !this.isPaused()) {
             return
         }
-        status.info('⏳ Resuming Kafka consumer...')
+        status.info('⏳', 'Resuming Kafka consumer...')
         await this.consumer.resume([{ topic: KAFKA_EVENTS_WAL }])
-        status.info('▶️ Kafka consumer resumed!')
+        status.info('▶️', 'Kafka consumer resumed!')
     }
 
     isPaused(): boolean {
@@ -121,7 +121,7 @@ export class KafkaQueue implements Queue {
             await this.consumer.stop()
             status.info('⏹', 'Kafka consumer stopped!')
         } catch (error) {
-            status.error(error)
+            status.error('⚠️', 'An error occurred while stopping Kafka queue:\n', error)
         }
         try {
             await this.consumer.disconnect()
