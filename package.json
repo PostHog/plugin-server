@@ -5,7 +5,9 @@
     "types": "dist/src/index.d.ts",
     "main": "dist/src/index.js",
     "scripts": {
-        "test": "jest --runInBand tests/*.test.ts",
+        "test": "jest --runInBand 'tests/*.test.ts'",
+        "test:postgres": "yarn test --testPathIgnorePatterns '**/clickhouse/**/*'",
+        "test:clickhouse": "yarn test --testPathIgnorePatterns '**/postgres/**/*'",
         "benchmark": "node --expose-gc node_modules/.bin/jest --runInBand benchmarks/",
         "start": "yarn start:dev",
         "start:dist": "node dist/src/index.js --base-dir ../posthog",

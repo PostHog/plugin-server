@@ -25,7 +25,7 @@ jobs:
             - name: Lint with ESLint
               run: yarn lint
 
-    tests:
+    tests-postgres:
         name: Tests / Postgres + Redis
         runs-on: ubuntu-20.04
 
@@ -92,7 +92,7 @@ jobs:
                   # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
-              run: cd plugin-server && yarn test
+              run: cd plugin-server && yarn test:postgres
 
     tests-clickhouse:
         name: Tests / ClickHouse + Kafka
@@ -182,9 +182,9 @@ jobs:
                   # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
-              run: cd plugin-server && yarn test
+              run: cd plugin-server && yarn test:clickhouse
 
-    benchmarks:
+    benchmarks-postgres:
         name: Benchmarks / Postgres + Redis
         runs-on: ubuntu-20.04
 
