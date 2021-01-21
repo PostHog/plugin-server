@@ -165,7 +165,9 @@ export async function startPluginsServer(
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
         await stopSchedule?.()
-        await stopPiscina(piscina!)
+        if (piscina) {
+            await stopPiscina(piscina)
+        }
         await closeServer()
 
         // wait an extra second for any misc async task to finish
@@ -213,7 +215,9 @@ export async function startPluginsServer(
                 status.info('⚡', 'Reloading plugins!')
                 await queue?.stop()
                 await stopSchedule?.()
-                await stopPiscina(piscina!)
+                if (piscina) {
+                    await stopPiscina(piscina)
+                }
                 piscina = makePiscina(serverConfig!)
                 queue = startQueue(server!, processEvent, processEventBatch)
                 stopSchedule = await startSchedule(server!, piscina)
