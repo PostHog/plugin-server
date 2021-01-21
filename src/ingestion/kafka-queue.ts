@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/node'
 import { Kafka, Consumer, Message } from 'kafkajs'
-import { ParsedEventMessage, PluginsServer, Queue, RawEventMessage } from 'types'
+import { PluginsServer, Queue, RawEventMessage } from 'types'
 import { KAFKA_EVENTS_WAL } from './topics'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import { status } from '../status'
@@ -29,6 +29,10 @@ export class KafkaQueue implements Queue {
     }
 
     async start(): Promise<void> {
+        const promise = new Promise<void>((resolve, reject) => {
+            this.consumer.on(this.consumer.events.GROUP_JOIN, () => resolve())
+            this.consumer.on(this.consumer.events.CRASH, ({ payload: { error } }) => reject(error))
+        })
         status.info('⏬', `Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
         await this.consumer.subscribe({ topic: KAFKA_EVENTS_WAL })
         // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
@@ -80,6 +84,7 @@ export class KafkaQueue implements Queue {
             },
         })
         this.wasConsumerRan = true
+        return promise
     }
 
     async pause(): Promise<void> {
@@ -106,9 +111,15 @@ export class KafkaQueue implements Queue {
 
     async stop(): Promise<void> {
         status.info('⏳', 'Stopping Kafka queue...')
-        await this.consumer.stop()
-        status.error('⏹', 'Kafka consumer stopped!')
-        await this.consumer.disconnect()
+        try {
+            await this.consumer.stop()
+            status.info('⏹', 'Kafka consumer stopped!')
+        } catch (error) {
+            status.error(error)
+        }
+        try {
+            await this.consumer.disconnect()
+        } catch {}
     }
 
     private static buildConsumer(kafka: Kafka): Consumer {

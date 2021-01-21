@@ -204,7 +204,7 @@ export async function startPluginsServer(
             fastifyInstance = await startFastifyInstance(server)
         }
 
-        queue = startQueue(server, processEvent, processEventBatch)
+        queue = await startQueue(server, processEvent, processEventBatch)
         piscina.on('drain', () => {
             queue?.resume()
         })
@@ -220,7 +220,7 @@ export async function startPluginsServer(
                     await stopPiscina(piscina)
                 }
                 piscina = makePiscina(serverConfig!)
-                queue = startQueue(server!, processEvent, processEventBatch)
+                queue = await startQueue(server!, processEvent, processEventBatch)
                 stopSchedule = await startSchedule(server!, piscina)
             }
         })
