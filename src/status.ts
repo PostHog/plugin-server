@@ -1,6 +1,6 @@
 import { threadId } from 'worker_threads'
 
-export type StatusMethod = (icon: string, ...message: string[]) => void
+export type StatusMethod = (icon: string, ...message: any[]) => void
 
 export interface Status {
     info: StatusMethod
@@ -12,10 +12,10 @@ function getPrefix(): string {
 }
 
 export const status: Status = {
-    info(icon: string, ...message: string[]) {
+    info(icon: string, ...message: any[]) {
         console.info(getPrefix(), icon, ...message.filter(Boolean))
     },
-    error(icon: string, ...message: string[]) {
+    error(icon: string, ...message: any[]) {
         console.error(getPrefix(), icon, ...message.filter(Boolean))
     },
 }

@@ -16,7 +16,7 @@ export async function startQueue(
     try {
         return await relevantStartQueue(server, processEvent, processEventBatch)
     } catch (error) {
-        status.error('💥', 'Failed to start Kafka queue:\n', error)
+        status.error('💥', 'Failed to start event queue:\n', error)
         throw error
     }
 }
@@ -61,10 +61,7 @@ async function startQueueRedis(
         }
     )
 
-    worker.start().catch((reason) => {
-        status.error('💥', `Failed to start Redis queue:\n${reason}`)
-        process.exit(1)
-    })
+    worker.start()
 
     return worker
 }
@@ -75,7 +72,6 @@ async function startQueueKafka(
     processEventBatch: (event: PluginEvent[]) => Promise<(PluginEvent | null)[]>
 ): Promise<Queue> {
     const kafkaQueue = new KafkaQueue(server, processEventBatch, async (event: PluginEvent) => {
-        const singleIngestionTimer = new Date()
         const { distinct_id, ip, site_url, team_id, now, sent_at, uuid } = event
         await server.eventsProcessor.processEventEE(
             distinct_id,
@@ -87,7 +83,6 @@ async function startQueueKafka(
             sent_at ? DateTime.fromISO(sent_at) : null,
             uuid!
         )
-        server.statsd?.timing('single-ingestion', singleIngestionTimer)
     })
 
     await kafkaQueue.start()
