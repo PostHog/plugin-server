@@ -89,6 +89,7 @@ jobs:
 
             - name: Test with Jest
               env:
+                  # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
               run: cd plugin-server && yarn test
@@ -130,13 +131,14 @@ jobs:
                     - '9092:9092'
                 env:
                     KAFKA_ADVERTISED_HOST_NAME: kafka
-                    sKAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+                    KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
 
         env:
             REDIS_URL: 'redis://localhost'
             CLICKHOUSE_HOST: 'localhost'
             CLICKHOUSE_DATABASE: 'test_posthog'
             KAFKA_ENABLED: 'true'
+            KAFKA_HOSTS: 'localhost:9092'
 
         steps:
             - name: Check out Django server for database setup
@@ -177,6 +179,7 @@ jobs:
 
             - name: Test with Jest
               env:
+                  # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
               run: cd plugin-server && yarn test
@@ -243,8 +246,9 @@ jobs:
             - name: Install package.json dependencies with Yarn
               run: cd plugin-server && yarn
 
-            - name: Test with Jest
+            - name: Run benchmarks
               env:
+                  # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
               run: cd plugin-server && yarn benchmark
