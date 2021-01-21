@@ -2,6 +2,7 @@ import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows, setError }
 import { PluginConfig, PluginError, PluginsServer } from '../src/types'
 import { createServer } from '../src/server'
 import { resetTestDatabase } from './helpers/sql'
+import { organizationId } from './helpers/plugins'
 
 let server: PluginsServer
 let closeServer: () => Promise<void>
@@ -83,6 +84,7 @@ test('getPluginRows', async () => {
             from_json: false,
             from_web: false,
             id: 60,
+            organization_id: organizationId,
             name: 'test-maxmind-plugin',
             plugin_type: 'custom',
             source: null,

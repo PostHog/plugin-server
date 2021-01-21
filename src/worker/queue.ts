@@ -16,8 +16,8 @@ export async function startQueue(
     try {
         return await relevantStartQueue(server, processEvent, processEventBatch)
     } catch (error) {
-        status.error('💥', `Failed to start Kafka queue:\n${error}`)
-        process.exit(1)
+        status.error('💥', 'Failed to start Kafka queue:\n', error)
+        throw error
     }
 }
 
