@@ -29,62 +29,62 @@ export class KafkaQueue implements Queue {
     }
 
     async start(): Promise<void> {
-        const promise = new Promise<void>((resolve, reject) => {
+        const startPromise = new Promise<void>(async (resolve, reject) => {
             this.consumer.on(this.consumer.events.GROUP_JOIN, () => resolve())
             this.consumer.on(this.consumer.events.CRASH, ({ payload: { error } }) => reject(error))
-        })
-        status.info('⏬', `Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
-        await this.consumer.subscribe({ topic: KAFKA_EVENTS_WAL })
-        // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
-        await this.consumer.run({
-            // TODO: eachBatchAutoResolve: false, // don't autoresolve whole batch in case we exit it early
-            // The issue is right now we'd miss some messages and not resolve them as processEventBatch COMPETELY
-            // discards some events, leaving us with no kafka_offset to resolve when in fact it should be resolved.
-            autoCommitInterval: 500, // autocommit every 500 ms…
-            autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
-            eachBatch: async ({
-                batch,
-                resolveOffset,
-                heartbeat,
-                commitOffsetsIfNecessary,
-                uncommittedOffsets,
-                isRunning,
-                isStale,
-            }) => {
-                const rawEvents: RawEventMessage[] = batch.messages.map((message) => ({
-                    ...JSON.parse(message.value!.toString()),
-                    kafka_offset: message.offset,
-                }))
-                const parsedEvents = rawEvents.map((rawEvent) => ({
-                    ...rawEvent,
-                    data: JSON.parse(rawEvent.data),
-                }))
-                const pluginEvents: PluginEvent[] = parsedEvents.map((parsedEvent) => ({
-                    ...parsedEvent,
-                    event: parsedEvent.data.event,
-                    properties: parsedEvent.data.properties,
-                }))
-                const processedEvents: PluginEvent[] = (
-                    await this.processEventBatch(pluginEvents)
-                ).filter((event: PluginEvent[] | false | null | undefined) => Boolean(event))
-                for (const event of processedEvents) {
-                    if (!isRunning()) {
-                        status.info('😮', 'Consumer not running anymore, canceling batch processing!')
-                        return
+            status.info('⏬', `Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
+            await this.consumer.subscribe({ topic: KAFKA_EVENTS_WAL })
+            // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
+            await this.consumer.run({
+                // TODO: eachBatchAutoResolve: false, // don't autoresolve whole batch in case we exit it early
+                // The issue is right now we'd miss some messages and not resolve them as processEventBatch COMPETELY
+                // discards some events, leaving us with no kafka_offset to resolve when in fact it should be resolved.
+                autoCommitInterval: 500, // autocommit every 500 ms…
+                autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
+                eachBatch: async ({
+                    batch,
+                    resolveOffset,
+                    heartbeat,
+                    commitOffsetsIfNecessary,
+                    uncommittedOffsets,
+                    isRunning,
+                    isStale,
+                }) => {
+                    const rawEvents: RawEventMessage[] = batch.messages.map((message) => ({
+                        ...JSON.parse(message.value!.toString()),
+                        kafka_offset: message.offset,
+                    }))
+                    const parsedEvents = rawEvents.map((rawEvent) => ({
+                        ...rawEvent,
+                        data: JSON.parse(rawEvent.data),
+                    }))
+                    const pluginEvents: PluginEvent[] = parsedEvents.map((parsedEvent) => ({
+                        ...parsedEvent,
+                        event: parsedEvent.data.event,
+                        properties: parsedEvent.data.properties,
+                    }))
+                    const processedEvents: PluginEvent[] = (
+                        await this.processEventBatch(pluginEvents)
+                    ).filter((event: PluginEvent[] | false | null | undefined) => Boolean(event))
+                    for (const event of processedEvents) {
+                        if (!isRunning()) {
+                            status.info('😮', 'Consumer not running anymore, canceling batch processing!')
+                            return
+                        }
+                        if (isStale()) {
+                            status.info('😮', 'Batch stale, canceling batch processing!')
+                            return
+                        }
+                        await this.saveEvent(event)
+                        resolveOffset(event.kafka_offset!)
+                        await heartbeat()
+                        await commitOffsetsIfNecessary()
                     }
-                    if (isStale()) {
-                        status.info('😮', 'Batch stale, canceling batch processing!')
-                        return
-                    }
-                    await this.saveEvent(event)
-                    resolveOffset(event.kafka_offset!)
-                    await heartbeat()
-                    await commitOffsetsIfNecessary()
-                }
-            },
+                },
+            })
+            this.wasConsumerRan = true
         })
-        this.wasConsumerRan = true
-        return promise
+        return await startPromise
     }
 
     async pause(): Promise<void> {
