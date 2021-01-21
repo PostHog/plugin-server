@@ -5,6 +5,7 @@ import { KAFKA_EVENTS_INGESTION_HANDOFF } from './topics'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import { status } from '../status'
 import { parseRawEventMessage } from './utils'
+import { killGracefully } from 'utils'
 
 export type BatchCallback = (messages: Message[]) => Promise<void>
 
@@ -131,7 +132,7 @@ export class KafkaQueue implements Queue {
             status.error('⚠️', `Kafka consumer group ${groupId} crashed!`)
             console.error(error)
             Sentry.captureException(error)
-            process.kill(process.pid, 'SIGINT')
+            killGracefully()
         })
         consumer.on(CONNECT, () => {
             status.info('✅', 'Kafka consumer connected!')

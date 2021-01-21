@@ -6,6 +6,7 @@ import Client from '../celery/client'
 import { PluginsServer, Queue } from '../types'
 import { KafkaQueue } from '../ingestion/kafka-queue'
 import { status } from '../status'
+import { killGracefully } from 'utils'
 
 export async function startQueue(
     server: PluginsServer,
@@ -17,8 +18,7 @@ export async function startQueue(
         return await relevantStartQueue(server, processEvent, processEventBatch)
     } catch (error) {
         status.error('💥', `Failed to start Kafka queue:\n${error}`)
-        process.kill(process.pid, 'SIGINT')
-        process.exit(1)
+        killGracefully()
     }
 }
 

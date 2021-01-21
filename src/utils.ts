@@ -5,6 +5,7 @@ import * as zlib from 'zlib'
 import { LogLevel } from './types'
 import { randomBytes } from 'crypto'
 import { DateTime } from 'luxon'
+import { status } from './status'
 
 /**
  * @param binary Buffer
@@ -279,4 +280,16 @@ export function delay(ms: number): Promise<void> {
     return new Promise((resolve) => {
         setTimeout(resolve, ms)
     })
+}
+
+/** Time until autoexit (due to error) gives up on graceful exit and kills the process right away. */
+const GRACEFUL_EXIT_PERIOD_SECONDS = 5
+
+export function killGracefully(): void {
+    status.error('⏲', 'Shutting plugin server down gracefully with SIGTERM...')
+    process.kill(process.pid, 'SIGTERM')
+    setTimeout(() => {
+        status.error('⏲', `Plugin server still running after ${GRACEFUL_EXIT_PERIOD_SECONDS} s, killing it forcefully!`)
+        process.exit(1)
+    }, GRACEFUL_EXIT_PERIOD_SECONDS * 1000)
 }
