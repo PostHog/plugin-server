@@ -42,11 +42,9 @@ test('getPluginConfigRows', async () => {
             },
             enabled: true,
             error: null,
-            id: 2,
-            name: 'TEST',
+            id: 39,
             order: 0,
             plugin_id: 60,
-            plugins_opt_in: true,
             team_id: 2,
         },
     ])
