@@ -1,6 +1,6 @@
 import { threadId } from 'worker_threads'
 
-export type StatusMethod = (icon: string, ...message: string[]) => void
+export type StatusMethod = (icon: string, ...message: any[]) => void
 
 export interface Status {
     info: StatusMethod
