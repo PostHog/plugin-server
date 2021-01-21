@@ -11,6 +11,7 @@ export async function resetTestDatabase(code: string): Promise<void> {
     await db.query('DELETE FROM posthog_pluginconfig')
     await db.query('DELETE FROM posthog_plugin')
     await db.query('DELETE FROM posthog_team')
+    await db.query('DELETE FROM posthog_organization')
 
     const teamIds = mocks.pluginConfigRows.map((c) => c.team_id)
     await insertRow(db, 'posthog_organization', {
