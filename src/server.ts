@@ -31,8 +31,7 @@ export async function createServer(
     redis
         .on('error', (error) => {
             Sentry.captureException(error)
-            console.error('🔴 Redis error encountered! Trying to reconnect...')
-            console.error(error)
+            status.error('🔴', 'Redis error encountered! Trying to reconnect...\n', error)
         })
         .on('ready', () => {
             if (process.env.NODE_ENV !== 'test') {
@@ -245,10 +244,9 @@ export async function startPluginsServer(
         status.info('🚀', 'All systems go.')
     } catch (error) {
         Sentry.captureException(error)
-        console.error(`💥 Launchpad failure!\n${error.stack}`)
+        status.error('💥', 'Launchpad failure!', error.stack)
         Sentry.flush().then(() => true) // flush in the background
         await closeJobs()
-
         process.exit(1)
     }
 

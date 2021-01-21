@@ -12,10 +12,10 @@ function getPrefix(): string {
 }
 
 export const status: Status = {
-    info(icon: string, ...message: string[]) {
+    info(icon: string, ...message: any[]) {
         console.info(getPrefix(), icon, ...message.filter(Boolean))
     },
-    error(icon: string, ...message: string[]) {
+    error(icon: string, ...message: any[]) {
         console.error(getPrefix(), icon, ...message.filter(Boolean))
     },
 }

@@ -91,18 +91,18 @@ export class KafkaQueue implements Queue {
         if (!this.wasConsumerRan || this.isPaused()) {
             return
         }
-        console.error('⏳ Pausing Kafka consumer...')
+        status.info('⏳ Pausing Kafka consumer...')
         await this.consumer.pause([{ topic: KAFKA_EVENTS_WAL }])
-        console.error('⏸ Kafka consumer paused!')
+        status.info('⏸ Kafka consumer paused!')
     }
 
     async resume(): Promise<void> {
         if (!this.wasConsumerRan || !this.isPaused()) {
             return
         }
-        console.error('⏳ Resuming Kafka consumer...')
+        status.info('⏳ Resuming Kafka consumer...')
         await this.consumer.resume([{ topic: KAFKA_EVENTS_WAL }])
-        console.error('▶️ Kafka consumer resumed!')
+        status.info('▶️ Kafka consumer resumed!')
     }
 
     isPaused(): boolean {
@@ -132,8 +132,7 @@ export class KafkaQueue implements Queue {
             status.info('✅', `Kafka consumer joined group ${groupId}!`)
         })
         consumer.on(CRASH, ({ payload: { error, groupId } }) => {
-            status.error('⚠️', `Kafka consumer group ${groupId} crashed!`)
-            console.error(error)
+            status.error('⚠️', `Kafka consumer group ${groupId} crashed:\n`, error)
             Sentry.captureException(error)
         })
         consumer.on(CONNECT, () => {

@@ -1,4 +1,5 @@
 import * as Redis from 'ioredis'
+import { status } from '../status'
 import { v4 } from 'uuid'
 import { Pausable } from '../types'
 import { Message } from './message'
@@ -177,7 +178,7 @@ export default class RedisBroker implements Pausable {
                     this.receiveSlow(resolve, queue, callback)
                 }
             })
-            .catch((err) => console.error(err))
+            .catch((err) => status.error(err))
     }
 
     /**
