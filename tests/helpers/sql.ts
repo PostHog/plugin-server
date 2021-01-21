@@ -1,4 +1,4 @@
-import { makePluginObjects } from './plugins'
+import { makePluginObjects, organizationId } from './plugins'
 import { defaultConfig } from '../../src/config'
 import { Pool } from 'pg'
 import { delay, UUIDT } from '../../src/utils'
@@ -12,12 +12,19 @@ export async function resetTestDatabase(code: string): Promise<void> {
     await db.query('DELETE FROM posthog_plugin')
     await db.query('DELETE FROM posthog_team')
 
-    const team_ids = mocks.pluginConfigRows.map((c) => c.team_id)
-    for (const team_id of team_ids) {
+    const teamIds = mocks.pluginConfigRows.map((c) => c.team_id)
+    await insertRow(db, 'posthog_organization', {
+        id: organizationId,
+        name: 'TEST ORG',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+    })
+    for (const teamId of teamIds) {
         await insertRow(db, 'posthog_team', {
-            id: team_id,
+            id: teamId,
+            organization_id: organizationId,
             app_urls: [],
-            name: 'TEST',
+            name: 'TEST PROJECT',
             event_names: [],
             event_names_with_usage: [],
             event_properties: [],
@@ -57,8 +64,7 @@ async function insertRow(db: Pool, table: string, object: Record<string, any>): 
     try {
         await db.query(`INSERT INTO ${table} (${keys}) VALUES (${params})`, Object.values(object))
     } catch (error) {
-        console.error(`Error on table ${table} when inserting object:`)
-        console.error(object)
+        console.error(`Error on table ${table} when inserting object:\n`, object, '\n', error)
         throw error
     }
 }
