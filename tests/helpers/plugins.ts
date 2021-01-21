@@ -4,7 +4,7 @@ import path from 'path'
 import os from 'os'
 import AdmZip from 'adm-zip'
 
-export const organizationId = 'CA30F2EC-E9A4-4001-BF27-3EF194086068'
+export const organizationId = 'ca30f2ec-e9a4-4001-bf27-3ef194086068'
 
 export const plugin60: Plugin & { organization_id: string } = {
     id: 60,
