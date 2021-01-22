@@ -43,7 +43,11 @@ export async function createServer(
 
     const db = new Pool({
         connectionString: serverConfig.DATABASE_URL,
-        ssl: process.env.DEPLOYMENT?.startsWith('Heroku') || undefined,
+        ssl: process.env.DEPLOYMENT?.startsWith('Heroku')
+            ? {
+                  rejectUnauthorized: false,
+              }
+            : undefined,
     })
 
     let kafkaSsl: ConnectionOptions | undefined
@@ -61,7 +65,7 @@ export async function createServer(
             Kafka on Heroku doesn't currently provide stable hostnames. We're pinned to a specific certificate
             #for this connection even though the certificate doesn't include host information. We rely
             on the ca trust_cert for this purpose. */
-            checkServerIdentity: () => undefined,
+            rejectUnauthorized: false,
         }
     }
 
