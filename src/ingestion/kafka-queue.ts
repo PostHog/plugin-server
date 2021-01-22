@@ -135,7 +135,6 @@ export class KafkaQueue implements Queue {
             groupId: 'clickhouse-ingestion',
             readUncommitted: false,
         })
-        console.log('Consumer:', consumer)
         const { GROUP_JOIN, CRASH, CONNECT, DISCONNECT } = consumer.events
         consumer.on(GROUP_JOIN, ({ payload: { groupId } }) => {
             status.info('✅', `Kafka consumer joined group ${groupId}!`)
