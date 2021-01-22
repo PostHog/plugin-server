@@ -228,6 +228,7 @@ export async function startPluginsServer(
             fastifyInstance = await startFastifyInstance(server)
         }
 
+        stopSchedule = await startSchedule(server, piscina)
         queue = await startQueue(server, processEvent, processEventBatch)
         piscina.on('drain', () => {
             queue?.resume()
@@ -263,8 +264,6 @@ export async function startPluginsServer(
                 server!.statsd?.gauge(`piscina.queue_size`, piscina?.queueSize)
             }
         })
-
-        stopSchedule = await startSchedule(server, piscina)
 
         status.info('🚀', 'All systems go.')
     } catch (error) {
