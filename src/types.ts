@@ -1,12 +1,13 @@
 import { Pool } from 'pg'
 import { Redis } from 'ioredis'
 import { Kafka, Producer } from 'kafkajs'
-import { PluginEvent, PluginAttachment, PluginConfigSchema } from '@posthog/plugin-scaffold'
+import { PluginEvent, PluginAttachment, PluginConfigSchema, Properties } from '@posthog/plugin-scaffold'
 import { VM } from 'vm2'
 import { DateTime } from 'luxon'
 import { StatsD } from 'hot-shots'
 import { EventsProcessor } from 'ingestion/process-event'
 import { ClickHouse } from 'clickhouse'
+import { DB } from './db'
 
 export enum LogLevel {
     Debug = 'debug',
@@ -50,7 +51,7 @@ export interface PluginsServerConfig extends Record<string, any> {
 
 export interface PluginsServer extends PluginsServerConfig {
     // active connections to Postgres, Redis, ClickHouse, Kafka, StatsD
-    db: Pool
+    db: DB
     redis: Redis
     clickhouse?: ClickHouse
     kafka?: Kafka
@@ -200,9 +201,6 @@ export interface EventData extends PluginEvent {
     $set?: Properties
     offset?: number
 }
-
-/** Any kind of properties field. */
-export type Properties = Record<string, any>
 
 /** Usable Team model. */
 export interface Team {

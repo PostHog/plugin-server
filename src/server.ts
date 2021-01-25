@@ -18,6 +18,7 @@ import { EventsProcessor } from './ingestion/process-event'
 import { status } from './status'
 import { startSchedule } from './services/schedule'
 import { ConnectionOptions } from 'tls'
+import { DB } from './db'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
@@ -40,15 +41,6 @@ export async function createServer(
             }
         })
     await redis.info()
-
-    const db = new Pool({
-        connectionString: serverConfig.DATABASE_URL,
-        ssl: process.env.DEPLOYMENT?.startsWith('Heroku')
-            ? {
-                  rejectUnauthorized: false,
-              }
-            : undefined,
-    })
 
     let kafkaSsl: ConnectionOptions | undefined
     if (
@@ -95,6 +87,19 @@ export async function createServer(
         })
         kafkaProducer = kafka.producer()
     }
+
+    const db = new DB(
+        {
+            connectionString: serverConfig.DATABASE_URL,
+            ssl: process.env.DEPLOYMENT?.startsWith('Heroku')
+                ? {
+                      rejectUnauthorized: false,
+                  }
+                : undefined,
+        },
+        kafkaProducer,
+        clickhouse
+    )
 
     let statsd: StatsD | undefined
     if (serverConfig.STATSD_HOST) {

@@ -279,13 +279,14 @@ export class UUIDT extends UUID {
     }
 }
 
+/** Format timestamp for ClickHouse. */
 export function castTimestampOrNow(timestamp?: DateTime | string | null): string {
     if (!timestamp) {
         timestamp = DateTime.utc()
+    } else if (typeof timestamp === 'string') {
+        timestamp = DateTime.fromISO(timestamp)
     }
-    // ClickHouse-specific formatting
-    timestamp = typeof timestamp === 'string' ? DateTime.fromISO(timestamp) : timestamp.toUTC()
-    return timestamp.toFormat('yyyy-MM-dd HH:mm:ss.u')
+    return timestamp.toUTC().toFormat('yyyy-MM-dd HH:mm:ss.u')
 }
 
 export function delay(ms: number): Promise<void> {

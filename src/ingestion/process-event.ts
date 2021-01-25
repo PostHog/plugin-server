@@ -1,27 +1,17 @@
-import { PluginEvent } from '@posthog/plugin-scaffold'
+import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import { DateTime, Duration } from 'luxon'
-import {
-    PluginsServer,
-    EventData,
-    Properties,
-    Element,
-    Team,
-    Person,
-    PersonDistinctId,
-    CohortPeople,
-    RawPerson,
-} from '../types'
+import { PluginsServer, EventData, Element, Team, Person, PersonDistinctId, CohortPeople } from '../types'
 import { castTimestampOrNow, UUIDT } from '../utils'
 import { Event as EventProto } from '../idl/protos'
-import { Pool } from 'pg'
 import { Producer } from 'kafkajs'
 import { KAFKA_EVENTS, KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { sanitizeEventName, elementsToString, unparsePersonPartial } from './utils'
 import { ClickHouse } from 'clickhouse'
+import { DB } from '../db'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
-    db: Pool
+    db: DB
     clickhouse: ClickHouse
     kafkaProducer: Producer
 
@@ -129,10 +119,10 @@ export class EventsProcessor {
     }
 
     private async setIsIdentified(teamId: number, distinctId: string, isIdentified = true): Promise<void> {
-        let personFound = await this.fetchPerson(teamId, distinctId)
+        let personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
             try {
-                const personCreated = await this.createPerson(
+                const personCreated = await this.db.createPerson(
                     DateTime.utc(),
                     {},
                     teamId,
@@ -140,11 +130,11 @@ export class EventsProcessor {
                     true,
                     new UUIDT().toString()
                 )
-                this.addDistinctId(personCreated, distinctId)
+                this.db.addDistinctId(personCreated, distinctId)
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
-                personFound = await this.fetchPerson(teamId, distinctId)
+                personFound = await this.db.fetchPerson(teamId, distinctId)
             }
         }
         if (personFound && !personFound.is_identified) {
@@ -161,10 +151,10 @@ export class EventsProcessor {
         properties: Properties,
         setOnce = false
     ): Promise<void> {
-        let personFound = await this.fetchPerson(teamId, distinctId)
+        let personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
             try {
-                const personCreated = await this.createPerson(
+                const personCreated = await this.db.createPerson(
                     DateTime.utc(),
                     properties,
                     teamId,
@@ -172,11 +162,11 @@ export class EventsProcessor {
                     false,
                     new UUIDT().toString()
                 )
-                await this.addDistinctId(personCreated, distinctId)
+                await this.db.addDistinctId(personCreated, distinctId)
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
-                personFound = await this.fetchPerson(teamId, distinctId)
+                personFound = await this.db.fetchPerson(teamId, distinctId)
             }
         }
         this.db.query('UPDATE posthog_person SET properties = $1 WHERE id = $2', [
@@ -193,12 +183,12 @@ export class EventsProcessor {
         teamId: number,
         retryIfFailed = true
     ): Promise<void> {
-        const oldPerson = await this.fetchPerson(teamId, previousDistinctId)
-        const newPerson = await this.fetchPerson(teamId, distinctId)
+        const oldPerson = await this.db.fetchPerson(teamId, previousDistinctId)
+        const newPerson = await this.db.fetchPerson(teamId, distinctId)
 
         if (oldPerson && !newPerson) {
             try {
-                this.addDistinctId(oldPerson, distinctId)
+                this.db.addDistinctId(oldPerson, distinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
             } catch {
                 // integrity error
@@ -212,7 +202,7 @@ export class EventsProcessor {
 
         if (!oldPerson && newPerson) {
             try {
-                this.addDistinctId(newPerson, previousDistinctId)
+                this.db.addDistinctId(newPerson, previousDistinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
             } catch {
                 // integrity error
@@ -226,7 +216,7 @@ export class EventsProcessor {
 
         if (!oldPerson && !newPerson) {
             try {
-                const personCreated = await this.createPerson(
+                const personCreated = await this.db.createPerson(
                     DateTime.utc(),
                     {},
                     teamId,
@@ -234,8 +224,8 @@ export class EventsProcessor {
                     false,
                     new UUIDT().toString()
                 )
-                this.addDistinctId(personCreated, distinctId)
-                this.addDistinctId(personCreated, previousDistinctId)
+                this.db.addDistinctId(personCreated, distinctId)
+                this.db.addDistinctId(personCreated, previousDistinctId)
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
@@ -264,7 +254,7 @@ export class EventsProcessor {
             }
         }
 
-        await this.updatePerson(mergeInto, { created_at: first_seen })
+        await this.db.updatePerson(mergeInto, { created_at: first_seen })
 
         // merge the distinct_ids
         for (const other_person of peopleToMerge) {
@@ -275,7 +265,7 @@ export class EventsProcessor {
                 ])
             ).rows
             for (const person_distinct_id of other_person_distinct_ids) {
-                await this.updateDistinctId(person_distinct_id, { person_id: mergeInto.id })
+                await this.db.updateDistinctId(person_distinct_id, { person_id: mergeInto.id })
             }
 
             const other_person_cohort_ids: CohortPeople[] = (
@@ -288,7 +278,7 @@ export class EventsProcessor {
                 ])
             }
 
-            await this.deletePerson(other_person.id)
+            await this.db.deletePerson(other_person.id)
         }
     }
 
@@ -339,7 +329,7 @@ export class EventsProcessor {
         if (!pdiCount) {
             // Catch race condition where in between getting and creating, another request already created this user
             try {
-                const personCreated: Person = await this.createPerson(
+                const personCreated: Person = await this.db.createPerson(
                     sentAt || DateTime.utc(),
                     {},
                     teamId,
@@ -347,7 +337,7 @@ export class EventsProcessor {
                     false,
                     personUuid.toString()
                 )
-                await this.addDistinctId(personCreated, distinctId)
+                await this.db.addDistinctId(personCreated, distinctId)
             } catch {}
         }
 
@@ -399,122 +389,6 @@ export class EventsProcessor {
                     team.id,
                 ]
             )
-        }
-    }
-
-    private async fetchPerson(teamId: number, distinctId: string): Promise<Person | undefined> {
-        const selectResult = await this.db.query(
-            `SELECT
-                posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties,
-                posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid,
-                posthog_persondistinctid.team_id AS persondistinctid__team_id,
-                posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id
-            FROM posthog_person
-            JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id)
-            WHERE
-                posthog_person.team_id = $1
-                AND posthog_persondistinctid.team_id = $1
-                AND posthog_persondistinctid.distinct_id = $2`,
-            [teamId, distinctId]
-        )
-        const rawPerson: RawPerson = selectResult.rows[0]
-        return { ...rawPerson, created_at: DateTime.fromISO(rawPerson.created_at) }
-    }
-
-    private async createPerson(
-        createdAt: DateTime,
-        properties: Properties,
-        teamId: number,
-        isUserId: number | null,
-        isIdentified: boolean,
-        uuid: string
-    ): Promise<Person> {
-        const insertResult = await this.db.query(
-            'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [createdAt.toISO(), JSON.stringify(properties), teamId, isUserId, isIdentified, uuid]
-        )
-        const personCreated = insertResult.rows[0] as Person
-        if (this.pluginsServer.KAFKA_ENABLED) {
-            const data = {
-                created_at: castTimestampOrNow(createdAt),
-                properties: JSON.stringify(properties),
-                team_id: teamId,
-                is_identified: isIdentified,
-                id: uuid,
-            }
-            await this.kafkaProducer.send({
-                topic: KAFKA_PERSON,
-                messages: [{ value: Buffer.from(JSON.stringify(data)) }],
-            })
-        }
-        return personCreated
-    }
-
-    private async updatePerson(person: Person, update: Partial<Person>): Promise<Person> {
-        const updatedPerson: Person = { ...person, ...update }
-        await this.db.query(
-            `UPDATE posthog_person SET ${Object.keys(update).map(
-                (field, index) => field + ' = $' + (index + 1)
-            )} WHERE id = $${Object.values(update).length + 1}`,
-            [...Object.values(unparsePersonPartial(update)), person.id]
-        )
-        if (this.pluginsServer.KAFKA_ENABLED) {
-            const data = {
-                created_at: castTimestampOrNow(updatedPerson.created_at),
-                properties: JSON.stringify(updatedPerson.properties),
-                team_id: updatedPerson.team_id,
-                is_identified: updatedPerson.is_identified,
-                id: updatedPerson.uuid.toString(),
-            }
-            await this.kafkaProducer.send({
-                topic: KAFKA_PERSON,
-                messages: [{ value: Buffer.from(JSON.stringify(data)) }],
-            })
-        }
-        return updatedPerson
-    }
-
-    private async deletePerson(personId: number): Promise<void> {
-        await this.db.query('DELETE FROM person_distinct_id WHERE person_id = $1', [personId])
-        await this.db.query('DELETE FROM posthog_person WHERE id = $1', [personId])
-        if (this.pluginsServer.KAFKA_ENABLED) {
-            await this.clickhouse.query(`ALTER TABLE person DELETE WHERE id = ${personId}`).toPromise()
-            await this.clickhouse
-                .query(`ALTER TABLE person_distinct_id DELETE WHERE person_id = ${personId}`)
-                .toPromise()
-        }
-    }
-
-    private async addDistinctId(person: Person, distinctId: string): Promise<void> {
-        const insertResult = await this.db.query(
-            'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3) RETURNING *',
-            [distinctId, person.id, person.team_id]
-        )
-        const personDistinctIdCreated = insertResult.rows[0] as PersonDistinctId
-        if (this.pluginsServer.KAFKA_ENABLED) {
-            await this.kafkaProducer.send({
-                topic: KAFKA_PERSON_UNIQUE_ID,
-                messages: [{ value: Buffer.from(JSON.stringify(personDistinctIdCreated)) }],
-            })
-        }
-    }
-
-    private async updateDistinctId(
-        personDistinctId: PersonDistinctId,
-        update: Partial<PersonDistinctId>
-    ): Promise<void> {
-        const updatedPersonDistinctId: PersonDistinctId = { ...personDistinctId, ...update }
-        await this.db.query(
-            `UPDATE posthog_persondistinctid SET ${Object.keys(update).map(
-                (field, index) => field + ' = $' + (index + 1)
-            )} WHERE id = $${Object.values(update).length + 1}`,
-            [...Object.values(update), personDistinctId.id]
-        )
-        if (this.pluginsServer.KAFKA_ENABLED) {
-            await this.kafkaProducer.send({
-                topic: KAFKA_PERSON_UNIQUE_ID,
-                messages: [{ value: Buffer.from(JSON.stringify(updatedPersonDistinctId)) }],
-            })
         }
     }
 
