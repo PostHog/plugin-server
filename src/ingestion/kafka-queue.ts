@@ -23,8 +23,10 @@ export class KafkaQueue implements Queue {
         saveEvent: (event: PluginEvent) => Promise<void>
     ) {
         this.pluginsServer = pluginsServer
+        console.log('Kafka:', pluginsServer.kafka)
         this.kafka = pluginsServer.kafka!
         this.consumer = KafkaQueue.buildConsumer(this.kafka)
+        console.log('Consumer constructed:', this.consumer)
         this.wasConsumerRan = false
         this.processEventBatch = processEventBatch
         this.saveEvent = saveEvent
@@ -135,6 +137,7 @@ export class KafkaQueue implements Queue {
             groupId: 'clickhouse-ingestion',
             readUncommitted: false,
         })
+        console.log('Consumer:', consumer)
         const { GROUP_JOIN, CRASH, CONNECT, DISCONNECT } = consumer.events
         consumer.on(GROUP_JOIN, ({ payload: { groupId } }) => {
             status.info('✅', `Kafka consumer joined group ${groupId}!`)
