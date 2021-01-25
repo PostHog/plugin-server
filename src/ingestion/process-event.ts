@@ -42,6 +42,8 @@ export class EventsProcessor {
         sentAt: DateTime | null,
         eventUuid: string
     ): Promise<void> {
+        const singleSaveTimer = new Date()
+
         const properties: Properties = data.properties ?? {}
         if (data['$set']) {
             properties['$set'] = data['$set']
@@ -64,6 +66,7 @@ export class EventsProcessor {
                 ts,
                 properties['$snapshot_data']
             )
+            this.pluginsServer.statsd?.timing('kafka_queue.single_save.snapshot', singleSaveTimer)
         } else {
             await this.captureEE(
                 eventUuid,
@@ -77,6 +80,7 @@ export class EventsProcessor {
                 ts,
                 sentAt
             )
+            this.pluginsServer.statsd?.timing('kafka_queue.single_save.standard', singleSaveTimer)
         }
     }
 
@@ -271,10 +275,7 @@ export class EventsProcessor {
                 ])
             ).rows
             for (const person_distinct_id of other_person_distinct_ids) {
-                await this.db.query('UPDATE posthog_persondistinctid SET person_id = $1 WHERE id = $2', [
-                    mergeInto.id,
-                    person_distinct_id.id,
-                ])
+                await this.updateDistinctId(person_distinct_id, { person_id: mergeInto.id })
             }
 
             const other_person_cohort_ids: CohortPeople[] = (
@@ -525,7 +526,7 @@ export class EventsProcessor {
         properties?: Properties,
         timestamp?: DateTime | string,
         elements?: Element[]
-    ): Promise<string> {
+    ): Promise<void> {
         const timestampString = castTimestampOrNow(timestamp)
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
 
@@ -544,8 +545,6 @@ export class EventsProcessor {
             topic: KAFKA_EVENTS,
             messages: [{ key: uuid, value: EventProto.encodeDelimited(message).finish() as Buffer }],
         })
-
-        return uuid
     }
 
     private async createSessionRecordingEvent(
@@ -555,7 +554,7 @@ export class EventsProcessor {
         session_id: string,
         timestamp: DateTime | string,
         snapshot_data: Record<any, any>
-    ): Promise<string> {
+    ): Promise<void> {
         const timestampString = castTimestampOrNow(timestamp)
 
         const data = {
@@ -572,7 +571,5 @@ export class EventsProcessor {
             topic: KAFKA_SESSION_RECORDING_EVENTS,
             messages: [{ key: uuid, value: Buffer.from(JSON.stringify(data)) }],
         })
-
-        return uuid
     }
 }
