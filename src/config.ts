@@ -8,7 +8,7 @@ export function getDefaultConfig(): PluginsServerConfig {
 
     return {
         CELERY_DEFAULT_QUEUE: 'celery',
-        DATABASE_URL: isTestEnv ? 'postgres://localhost:5432/posthog_test' : 'postgres://localhost:5432/posthog',
+        DATABASE_URL: isTestEnv ? 'postgres://localhost:5432/test_posthog' : 'postgres://localhost:5432/posthog',
         CLICKHOUSE_HOST: 'localhost',
         CLICKHOUSE_DATABASE: 'default',
         CLICKHOUSE_USERNAME: 'default',
