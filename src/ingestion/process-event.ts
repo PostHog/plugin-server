@@ -138,10 +138,7 @@ export class EventsProcessor {
             }
         }
         if (personFound && !personFound.is_identified) {
-            await this.db.query('UPDATE posthog_person SET is_identified = $1 WHERE id = $2', [
-                isIdentified,
-                personFound.id,
-            ])
+            await this.db.updatePerson(personFound, { is_identified: isIdentified })
         }
     }
 
@@ -169,12 +166,10 @@ export class EventsProcessor {
                 personFound = await this.db.fetchPerson(teamId, distinctId)
             }
         }
-        this.db.query('UPDATE posthog_person SET properties = $1 WHERE id = $2', [
-            JSON.stringify(
-                setOnce ? { ...properties, ...personFound!.properties } : { ...personFound!.properties, ...properties }
-            ),
-            personFound!.id,
-        ])
+        this.db.updatePerson(
+            personFound!,
+            setOnce ? { ...properties, ...personFound!.properties } : { ...personFound!.properties, ...properties }
+        )
     }
 
     private async alias(
