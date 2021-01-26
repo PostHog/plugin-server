@@ -73,7 +73,11 @@ async function startQueueKafka(
 ): Promise<Queue> {
     const kafkaQueue = new KafkaQueue(server, processEventBatch, async (event: PluginEvent) => {
         const { distinct_id, ip, site_url, team_id, now, sent_at, uuid } = event
-        await server.eventsProcessor.processEventEE(
+        if (!uuid) {
+            status.error('❓', 'UUID missing in event received from Kafka!')
+            return
+        }
+        await server.eventsProcessor.processEvent(
             distinct_id,
             ip,
             site_url,
@@ -81,7 +85,7 @@ async function startQueueKafka(
             team_id,
             DateTime.fromISO(now),
             sent_at ? DateTime.fromISO(sent_at) : null,
-            uuid!
+            uuid
         )
     })
 
