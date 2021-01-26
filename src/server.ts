@@ -88,18 +88,15 @@ export async function createServer(
         kafkaProducer = kafka.producer()
     }
 
-    const db = new DB(
-        {
-            connectionString: serverConfig.DATABASE_URL,
-            ssl: process.env.DEPLOYMENT?.startsWith('Heroku')
-                ? {
-                      rejectUnauthorized: false,
-                  }
-                : undefined,
-        },
-        kafkaProducer,
-        clickhouse
-    )
+    const postgres = new Pool({
+        connectionString: serverConfig.DATABASE_URL,
+        ssl: process.env.DEPLOYMENT?.startsWith('Heroku')
+            ? {
+                  rejectUnauthorized: false,
+              }
+            : undefined,
+    })
+    const db = new DB(postgres, kafkaProducer, clickhouse)
 
     let statsd: StatsD | undefined
     if (serverConfig.STATSD_HOST) {

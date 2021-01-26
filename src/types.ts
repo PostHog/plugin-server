@@ -196,13 +196,6 @@ export interface EventMessage extends BaseEventMessage {
     sent_at: DateTime | null
 }
 
-export interface EventData extends PluginEvent {
-    properties?: Properties
-    timestamp?: string
-    $set?: Properties
-    offset?: number
-}
-
 /** Usable Team model. */
 export interface Team {
     id: number
@@ -271,4 +264,13 @@ export interface CohortPeople {
     id: number
     cohort_id: number
     person_id: number
+}
+export interface SessionRecordingEvent {
+    uuid: string
+    timestamp: string
+    team_id: number
+    distinct_id: string
+    session_id: string
+    snapshot_data: string
+    created_at: string
 }

@@ -2,26 +2,29 @@ import { Properties } from '@posthog/plugin-scaffold'
 import { ClickHouse } from 'clickhouse'
 import { Producer } from 'kafkajs'
 import { DateTime } from 'luxon'
-import { Pool, PoolConfig } from 'pg'
+import { Pool } from 'pg'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { unparsePersonPartial } from './ingestion/utils'
 import { Person, PersonDistinctId, RawPerson } from './types'
 import { castTimestampOrNow } from './utils'
 
-export class DB extends Pool {
+/** The recommended way of accessing the database. */
+export class DB {
+    /** Postgres connection pool for primary database access. */
+    postgres: Pool
     /** Kafka producer used for syncing Postgres and ClickHouse person data. */
     kafkaProducer?: Producer
     /** ClickHouse used for syncing Postgres and ClickHouse person data. */
     clickhouse?: ClickHouse
 
-    constructor(config: PoolConfig, kafkaProducer?: Producer, clickhouse?: ClickHouse) {
-        super(config)
+    constructor(postgres: Pool, kafkaProducer?: Producer, clickhouse?: ClickHouse) {
+        this.postgres = postgres
         this.kafkaProducer = kafkaProducer
         this.clickhouse = clickhouse
     }
 
     public async fetchPerson(teamId: number, distinctId: string): Promise<Person | undefined> {
-        const selectResult = await this.query(
+        const selectResult = await this.postgres.query(
             `SELECT
                 posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties,
                 posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid,
@@ -47,7 +50,7 @@ export class DB extends Pool {
         isIdentified: boolean,
         uuid: string
     ): Promise<Person> {
-        const insertResult = await this.query(
+        const insertResult = await this.postgres.query(
             'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
             [createdAt.toISO(), JSON.stringify(properties), teamId, isUserId, isIdentified, uuid]
         )
@@ -70,7 +73,7 @@ export class DB extends Pool {
 
     public async updatePerson(person: Person, update: Partial<Person>): Promise<Person> {
         const updatedPerson: Person = { ...person, ...update }
-        await this.query(
+        await this.postgres.query(
             `UPDATE posthog_person SET ${Object.keys(update).map(
                 (field, index) => field + ' = $' + (index + 1)
             )} WHERE id = $${Object.values(update).length + 1}`,
@@ -93,8 +96,8 @@ export class DB extends Pool {
     }
 
     public async deletePerson(personId: number): Promise<void> {
-        await this.query('DELETE FROM person_distinct_id WHERE person_id = $1', [personId])
-        await this.query('DELETE FROM posthog_person WHERE id = $1', [personId])
+        await this.postgres.query('DELETE FROM person_distinct_id WHERE person_id = $1', [personId])
+        await this.postgres.query('DELETE FROM posthog_person WHERE id = $1', [personId])
         if (this.clickhouse) {
             await this.clickhouse.query(`ALTER TABLE person DELETE WHERE id = ${personId}`).toPromise()
             await this.clickhouse
@@ -104,7 +107,7 @@ export class DB extends Pool {
     }
 
     public async addDistinctId(person: Person, distinctId: string): Promise<void> {
-        const insertResult = await this.query(
+        const insertResult = await this.postgres.query(
             'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3) RETURNING *',
             [distinctId, person.id, person.team_id]
         )
@@ -122,7 +125,7 @@ export class DB extends Pool {
         update: Partial<PersonDistinctId>
     ): Promise<void> {
         const updatedPersonDistinctId: PersonDistinctId = { ...personDistinctId, ...update }
-        await this.query(
+        await this.postgres.query(
             `UPDATE posthog_persondistinctid SET ${Object.keys(update).map(
                 (field, index) => field + ' = $' + (index + 1)
             )} WHERE id = $${Object.values(update).length + 1}`,
