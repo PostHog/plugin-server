@@ -4,10 +4,12 @@ import { PluginsServer, Element, Team, Person, PersonDistinctId, CohortPeople, S
 import { castTimestampOrNow, UUIDT } from '../utils'
 import { Event as EventProto, IEvent } from '../idl/protos'
 import { Producer } from 'kafkajs'
-import { KAFKA_EVENTS, KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { sanitizeEventName, elementsToString, unparsePersonPartial } from './utils'
+import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
+import { sanitizeEventName, elementsToString } from './utils'
 import { ClickHouse } from 'clickhouse'
 import { DB } from '../db'
+import { status } from '../status'
+import * as Sentry from '@sentry/node'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
@@ -88,7 +90,8 @@ export class EventsProcessor {
                     // otherwise we can't get a diff to add to now
                     return now.plus(DateTime.fromISO(data['timestamp']).diff(sentAt))
                 } catch (error) {
-                    console.error(error)
+                    status.error('⚠️', 'Error when handling timestamp:', error)
+                    Sentry.captureException(error)
                 }
             }
             return DateTime.fromISO(data['timestamp'])
