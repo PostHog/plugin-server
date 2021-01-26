@@ -242,44 +242,42 @@ export class EventsProcessor {
     }
 
     private async mergePeople(mergeInto: Person, peopleToMerge: Person[]): Promise<void> {
-        let first_seen = mergeInto.created_at
+        let firstSeen = mergeInto.created_at
 
         // merge the properties
-        for (const other_person of peopleToMerge) {
-            mergeInto.properties = { ...other_person.properties, ...mergeInto.properties }
-            if (other_person.created_at < first_seen) {
+        for (const otherPerson of peopleToMerge) {
+            mergeInto.properties = { ...otherPerson.properties, ...mergeInto.properties }
+            if (otherPerson.created_at < firstSeen) {
                 // Keep the oldest created_at (i.e. the first time we've seen this person)
-                first_seen = other_person.created_at
+                firstSeen = otherPerson.created_at
             }
         }
 
-        await this.db.updatePerson(mergeInto, { created_at: first_seen })
+        await this.db.updatePerson(mergeInto, { created_at: firstSeen })
 
         // merge the distinct_ids
-        for (const other_person of peopleToMerge) {
-            const other_person_distinct_ids: PersonDistinctId[] = (
+        for (const otherPerson of peopleToMerge) {
+            const otherPersonDistinctIds: PersonDistinctId[] = (
                 await this.db.postgresQuery(
                     'SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2',
-                    [other_person, mergeInto.team_id]
+                    [otherPerson, mergeInto.team_id]
                 )
             ).rows
-            for (const person_distinct_id of other_person_distinct_ids) {
-                await this.db.updateDistinctId(person_distinct_id, { person_id: mergeInto.id })
+            for (const personDistinctId of otherPersonDistinctIds) {
+                await this.db.updateDistinctId(personDistinctId, { person_id: mergeInto.id })
             }
 
-            const other_person_cohort_ids: CohortPeople[] = (
-                await this.db.postgresQuery('SELECT * FROM posthog_cohortpeople WHERE person_id = $1', [
-                    other_person.id,
-                ])
+            const otherPersonCohortIds: CohortPeople[] = (
+                await this.db.postgresQuery('SELECT * FROM posthog_cohortpeople WHERE person_id = $1', [otherPerson.id])
             ).rows
-            for (const person_cohort_id of other_person_cohort_ids) {
+            for (const personCohortId of otherPersonCohortIds) {
                 await this.db.postgresQuery('UPDATE posthog_cohortpeople SET person_id = $1 WHERE id = $2', [
                     mergeInto.id,
-                    person_cohort_id.id,
+                    personCohortId.id,
                 ])
             }
 
-            await this.db.deletePerson(other_person.id)
+            await this.db.deletePerson(otherPerson.id)
         }
     }
 
