@@ -17,8 +17,7 @@
         "lint:fix": "eslint --fix .",
         "prettier": "prettier --write .",
         "prettier:check": "prettier --check .",
-        "prepublishOnly": "yarn build",
-        "task:init-test-db": "NODE_ENV=test ts-node ./tasks/init-test-db.ts"
+        "prepublishOnly": "yarn build"
     },
     "bin": {
         "posthog-plugin-server": "bin/posthog-plugin-server"
