@@ -1,6 +1,6 @@
-import { runPlugins, setupPlugins } from '../src/plugins'
-import { createServer } from '../src/server'
-import { LogLevel, PluginsServer } from '../src/types'
+import { runPlugins, setupPlugins } from '../../src/plugins'
+import { createServer } from '../../src/server'
+import { LogLevel, PluginsServer } from '../../src/types'
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import {
     mockPluginTempFolder,
@@ -8,8 +8,8 @@ import {
     plugin60,
     pluginAttachment1,
     pluginConfig39,
-} from './helpers/plugins'
-import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows, setError } from './helpers/sqlMock'
+} from '../helpers/plugins'
+import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows, setError } from '../helpers/sqlMock'
 jest.mock('../src/sql')
 
 let mockServer: PluginsServer
@@ -92,7 +92,7 @@ test('plugin returns null', async () => {
 test('plugin meta has what it should have', async () => {
     getPluginRows.mockReturnValueOnce([
         mockPluginWithArchive(`
-            function setupPlugin (meta) { meta.global.key = 'value' } 
+            function setupPlugin (meta) { meta.global.key = 'value' }
             function processEvent (event, meta) { event.properties=meta; return event }
         `),
     ])

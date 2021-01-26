@@ -142,7 +142,7 @@ export class KafkaQueue implements Queue {
         consumer.on(CRASH, ({ payload: { error, groupId } }) => {
             status.error('⚠️', `Kafka consumer group ${groupId} crashed:\n`, error)
             Sentry.captureException(error)
-            // killGracefully()
+            killGracefully()
         })
         consumer.on(CONNECT, () => {
             status.info('✅', 'Kafka consumer connected!')

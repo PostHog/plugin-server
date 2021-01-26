@@ -188,9 +188,9 @@ export async function startPluginsServer(
             await stopFastifyInstance(fastifyInstance!)
         }
         await queue?.stop()
-        await pubSub?.quit()
         await kafkaProducer?.disconnect()
         pubSub?.disconnect()
+        await pubSub?.quit()
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
         await stopSchedule?.()
