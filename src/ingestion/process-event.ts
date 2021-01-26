@@ -267,13 +267,13 @@ export class EventsProcessor {
                 await this.db.updateDistinctId(personDistinctId, { person_id: mergeInto.id })
             }
 
-            const otherPersonCohortIds: CohortPeople[] = (
+            const otherCohortPeople: CohortPeople[] = (
                 await this.db.postgresQuery('SELECT * FROM posthog_cohortpeople WHERE person_id = $1', [otherPerson.id])
             ).rows
-            for (const personCohortId of otherPersonCohortIds) {
+            for (const cohortPeople of otherCohortPeople) {
                 await this.db.postgresQuery('UPDATE posthog_cohortpeople SET person_id = $1 WHERE id = $2', [
                     mergeInto.id,
-                    personCohortId.id,
+                    cohortPeople.id,
                 ])
             }
 
@@ -296,14 +296,14 @@ export class EventsProcessor {
         event = sanitizeEventName(event)
 
         const elements: Record<string, any>[] | undefined = properties['$elements']
-        let elements_list: Element[] = []
+        let elementsList: Element[] = []
         if (elements && elements.length) {
             delete properties['$elements']
-            elements_list = elements.map((el) => ({
-                text: el['$el_text'] ? el['$el_text'].slice(0, 400) : null,
+            elementsList = elements.map((el) => ({
+                text: el['$el_text']?.slice(0, 400),
                 tag_name: el['tag_name'],
-                href: el['attr__href'] ? el['attr__href'].slice(0, 2048) : null,
-                attr_class: el['attr__class'] ? el['attr__class'].split(' ') : null,
+                href: el['attr__href']?.slice(0, 2048),
+                attr_class: el['attr__class']?.split(' '),
                 attr_id: el['attr__id'],
                 nth_child: el['nth_child'],
                 nth_of_type: el['nth_of_type'],
@@ -340,7 +340,7 @@ export class EventsProcessor {
             } catch {}
         }
 
-        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elements_list)
+        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elementsList)
     }
 
     private async storeNamesAndProperties(team: Team, event: string, properties: Properties): Promise<void> {
