@@ -117,6 +117,7 @@ export async function createServer(
     const server: Omit<PluginsServer, 'eventsProcessor'> = {
         ...serverConfig,
         db,
+        postgres,
         redis,
         clickhouse,
         kafka,

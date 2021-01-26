@@ -258,20 +258,22 @@ export class EventsProcessor {
         // merge the distinct_ids
         for (const other_person of peopleToMerge) {
             const other_person_distinct_ids: PersonDistinctId[] = (
-                await this.db.query('SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2', [
-                    other_person,
-                    mergeInto.team_id,
-                ])
+                await this.db.postgresQuery(
+                    'SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2',
+                    [other_person, mergeInto.team_id]
+                )
             ).rows
             for (const person_distinct_id of other_person_distinct_ids) {
                 await this.db.updateDistinctId(person_distinct_id, { person_id: mergeInto.id })
             }
 
             const other_person_cohort_ids: CohortPeople[] = (
-                await this.db.query('SELECT * FROM posthog_cohortpeople WHERE person_id = $1', [other_person.id])
+                await this.db.postgresQuery('SELECT * FROM posthog_cohortpeople WHERE person_id = $1', [
+                    other_person.id,
+                ])
             ).rows
             for (const person_cohort_id of other_person_cohort_ids) {
-                await this.db.query('UPDATE posthog_cohortpeople SET person_id = $1 WHERE id = $2', [
+                await this.db.postgresQuery('UPDATE posthog_cohortpeople SET person_id = $1 WHERE id = $2', [
                     mergeInto.id,
                     person_cohort_id.id,
                 ])
@@ -311,7 +313,7 @@ export class EventsProcessor {
             }))
         }
 
-        const team: Team = (await this.db.query('SELECT * FROM posthog_team WHERE id = $1', [teamId])).rows[0]
+        const team: Team = (await this.db.postgresQuery('SELECT * FROM posthog_team WHERE id = $1', [teamId])).rows[0]
 
         if (!team.anonymize_ips && !('$ip' in properties)) {
             properties['$ip'] = ip
@@ -319,7 +321,7 @@ export class EventsProcessor {
 
         this.storeNamesAndProperties(team, event, properties)
 
-        const pdiSelectResult = await this.db.query(
+        const pdiSelectResult = await this.db.postgresQuery(
             'SELECT COUNT(*) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
             [teamId, distinctId]
         )
@@ -373,7 +375,7 @@ export class EventsProcessor {
             }
         }
         if (save) {
-            await this.db.query(
+            await this.db.postgresQuery(
                 `UPDATE posthog_team SET
                     ingested_event = $1, event_names = $2, event_names_with_usage = $3, event_properties = $4,
                     event_properties_with_usage = $5, event_properties_numerical = $6

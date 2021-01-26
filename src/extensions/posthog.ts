@@ -1,7 +1,7 @@
 import { KAFKA_EVENTS_INGESTION_HANDOFF } from '../ingestion/topics'
 import { Properties } from '@posthog/plugin-scaffold'
 import { DateTime } from 'luxon'
-import { PluginsServer, PluginConfig, RawEventMessage, EventData } from 'types'
+import { PluginsServer, PluginConfig, RawEventMessage } from 'types'
 import { version } from '../../package.json'
 import Client from '../celery/client'
 import { UUIDT } from '../utils'

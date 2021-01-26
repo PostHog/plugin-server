@@ -52,6 +52,7 @@ export interface PluginsServerConfig extends Record<string, any> {
 export interface PluginsServer extends PluginsServerConfig {
     // active connections to Postgres, Redis, ClickHouse, Kafka, StatsD
     db: DB
+    postgres: Pool
     redis: Redis
     clickhouse?: ClickHouse
     kafka?: Kafka

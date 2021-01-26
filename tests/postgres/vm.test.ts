@@ -28,7 +28,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
     mockServer.redis.disconnect()
-    await mockServer.db.end()
+    await mockServer.postgres.end()
     jest.clearAllMocks()
 })
 
