@@ -1,8 +1,8 @@
 import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import { DateTime, Duration } from 'luxon'
-import { PluginsServer, EventData, Element, Team, Person, PersonDistinctId, CohortPeople } from '../types'
+import { PluginsServer, Element, Team, Person, PersonDistinctId, CohortPeople, SessionRecordingEvent } from '../types'
 import { castTimestampOrNow, UUIDT } from '../utils'
-import { Event as EventProto } from '../idl/protos'
+import { Event as EventProto, IEvent } from '../idl/protos'
 import { Producer } from 'kafkajs'
 import { KAFKA_EVENTS, KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
 import { sanitizeEventName, elementsToString, unparsePersonPartial } from './utils'
@@ -22,7 +22,7 @@ export class EventsProcessor {
         this.kafkaProducer = pluginsServer.kafkaProducer!
     }
 
-    public async processEventEE(
+    public async processEvent(
         distinctId: string,
         ip: string,
         siteUrl: string,
@@ -31,7 +31,7 @@ export class EventsProcessor {
         now: DateTime,
         sentAt: DateTime | null,
         eventUuid: string
-    ): Promise<void> {
+    ): Promise<IEvent | SessionRecordingEvent> {
         const singleSaveTimer = new Date()
 
         const properties: Properties = data.properties ?? {}
@@ -47,8 +47,10 @@ export class EventsProcessor {
         const ts = this.handleTimestamp(data, now, sentAt)
         this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
 
+        let result: IEvent | SessionRecordingEvent
+
         if (data['event'] === '$snapshot') {
-            await this.createSessionRecordingEvent(
+            result = await this.createSessionRecordingEvent(
                 eventUuid,
                 teamId,
                 distinctId,
@@ -58,7 +60,7 @@ export class EventsProcessor {
             )
             this.pluginsServer.statsd?.timing('kafka_queue.single_save.snapshot', singleSaveTimer)
         } else {
-            await this.captureEE(
+            result = await this.captureEE(
                 eventUuid,
                 personUuid,
                 ip,
@@ -72,9 +74,11 @@ export class EventsProcessor {
             )
             this.pluginsServer.statsd?.timing('kafka_queue.single_save.standard', singleSaveTimer)
         }
+
+        return result
     }
 
-    private handleTimestamp(data: EventData, now: DateTime, sentAt: DateTime | null): DateTime {
+    private handleTimestamp(data: PluginEvent, now: DateTime, sentAt: DateTime | null): DateTime {
         if (data['timestamp']) {
             if (sentAt) {
                 // sent_at - timestamp == now - x
@@ -288,7 +292,7 @@ export class EventsProcessor {
         properties: Properties,
         timestamp: DateTime,
         sentAt: DateTime | null
-    ): Promise<void> {
+    ): Promise<IEvent> {
         event = sanitizeEventName(event)
 
         const elements: Record<string, any>[] | undefined = properties['$elements']
@@ -336,7 +340,7 @@ export class EventsProcessor {
             } catch {}
         }
 
-        await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elements_list)
+        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elements_list)
     }
 
     private async storeNamesAndProperties(team: Team, event: string, properties: Properties): Promise<void> {
@@ -395,11 +399,11 @@ export class EventsProcessor {
         properties?: Properties,
         timestamp?: DateTime | string,
         elements?: Element[]
-    ): Promise<void> {
+    ): Promise<IEvent> {
         const timestampString = castTimestampOrNow(timestamp)
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
 
-        const message = EventProto.create({
+        const data: IEvent = {
             uuid,
             event,
             properties: JSON.stringify(properties ?? {}),
@@ -408,12 +412,14 @@ export class EventsProcessor {
             distinctId,
             elementsChain,
             createdAt: timestampString,
-        })
+        }
 
         await this.kafkaProducer.send({
             topic: KAFKA_EVENTS,
-            messages: [{ key: uuid, value: EventProto.encodeDelimited(message).finish() as Buffer }],
+            messages: [{ key: uuid, value: EventProto.encodeDelimited(EventProto.create(data)).finish() as Buffer }],
         })
+
+        return data
     }
 
     private async createSessionRecordingEvent(
@@ -423,10 +429,10 @@ export class EventsProcessor {
         session_id: string,
         timestamp: DateTime | string,
         snapshot_data: Record<any, any>
-    ): Promise<void> {
+    ): Promise<SessionRecordingEvent> {
         const timestampString = castTimestampOrNow(timestamp)
 
-        const data = {
+        const data: SessionRecordingEvent = {
             uuid,
             team_id: team_id,
             distinct_id: distinct_id,
@@ -440,5 +446,7 @@ export class EventsProcessor {
             topic: KAFKA_SESSION_RECORDING_EVENTS,
             messages: [{ key: uuid, value: Buffer.from(JSON.stringify(data)) }],
         })
+
+        return data
     }
 }
