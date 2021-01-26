@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events'
 import { Kafka, Consumer, logLevel, EachMessagePayload, Producer } from 'kafkajs'
-import { KAFKA_EVENTS_INGESTION_HANDOFF } from '../../src/ingestion/topics'
+import { KAFKA_EVENTS, KAFKA_EVENTS_INGESTION_HANDOFF } from '../../src/ingestion/topics'
 import { parseRawEventMessage } from '../../src/ingestion/utils'
-import { EventMessage, RawEventMessage } from '../../src/types'
+import { EventMessage } from '../../src/types'
 import { UUIDT } from '../../src/utils'
 
 export class KafkaObserver extends EventEmitter {
@@ -34,7 +34,7 @@ export class KafkaObserver extends EventEmitter {
         this.isStarted = true
         return await new Promise<void>(async (resolve, reject) => {
             await this.producer.connect()
-            await this.consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
+            await this.consumer.subscribe({ topic: KAFKA_EVENTS })
             await this.consumer.run({
                 eachMessage: async (payload) => {
                     this.emit('message', payload)
