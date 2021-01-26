@@ -56,6 +56,7 @@ export function elementsToString(elements: Element[]): string {
     return ret.join(';')
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function sanitizeEventName(eventName: any): string {
     if (typeof eventName !== 'string') {
         try {

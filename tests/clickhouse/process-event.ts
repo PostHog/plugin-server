@@ -2,7 +2,7 @@ import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows, setError }
 import { PluginConfig, PluginError, PluginsServer } from '../../src/types'
 import { createServer } from '../../src/server'
 import { resetTestDatabase } from '../helpers/sql'
-import { organizationId } from '../helpers/plugins'
+import { commonOrganizationId } from '../helpers/plugins'
 import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
 import { Consumer, EachMessagePayload, Kafka, Producer } from 'kafkajs'
 import { KafkaObserver } from '../helpers/kafka'
