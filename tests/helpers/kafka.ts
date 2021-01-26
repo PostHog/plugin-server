@@ -28,7 +28,9 @@ export class KafkaObserver extends EventEmitter {
     }
 
     public async start(): Promise<void> {
-        if (this.isStarted) {return}
+        if (this.isStarted) {
+            return
+        }
         this.isStarted = true
         return await new Promise<void>(async (resolve, reject) => {
             await this.producer.connect()
