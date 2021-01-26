@@ -136,7 +136,7 @@ export async function createServer(
 
     const closeServer = async () => {
         await server.redis.quit()
-        await server.db.end()
+        await server.postgres.end()
     }
 
     return [server as PluginsServer, closeServer]
