@@ -1,4 +1,4 @@
-import { makePluginObjects, organizationId } from './plugins'
+import { makePluginObjects, commonOrganizationId } from './plugins'
 import { defaultConfig } from '../../src/config'
 import { Pool } from 'pg'
 import { delay, UUIDT } from '../../src/utils'
@@ -15,7 +15,7 @@ export async function resetTestDatabase(code: string): Promise<void> {
 
     const teamIds = mocks.pluginConfigRows.map((c) => c.team_id)
     await insertRow(db, 'posthog_organization', {
-        id: organizationId,
+        id: commonOrganizationId,
         name: 'TEST ORG',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -23,7 +23,7 @@ export async function resetTestDatabase(code: string): Promise<void> {
     for (const teamId of teamIds) {
         await insertRow(db, 'posthog_team', {
             id: teamId,
-            organization_id: organizationId,
+            organization_id: commonOrganizationId,
             app_urls: [],
             name: 'TEST PROJECT',
             event_names: [],
