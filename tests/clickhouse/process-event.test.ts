@@ -6,6 +6,8 @@ import { commonOrganizationId } from '../helpers/plugins'
 import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
 import { Consumer, EachMessagePayload, Kafka, Producer } from 'kafkajs'
 import { KafkaObserver } from '../helpers/kafka'
+import { UUIDT } from '../../src/utils'
+import { DateTime } from 'luxon'
 
 let server: PluginsServer
 let closeServer: () => Promise<void>
@@ -22,5 +24,25 @@ afterEach(() => {
 })
 
 test('event is passed through', async () => {
+    const uuid = new UUIDT().toString()
+    const now = new DateTime()
+    kafkaObserver.handOffMessage({
+        distinct_id: 'abcd',
+        ip: '1.1.1.1',
+        site_url: 'x.com',
+        team_id: 1,
+        uuid,
+        data: {
+            distinct_id: 'abcd',
+            ip: '1.1.1.1',
+            site_url: 'x.com',
+            team_id: 1,
+            now: now.toString(),
+            event: 'test',
+            uuid,
+        },
+        now,
+        sent_at: null,
+    })
     expect(1).toEqual(1)
 })
