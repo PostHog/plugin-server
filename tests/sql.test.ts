@@ -85,6 +85,8 @@ test('getPluginRows', async () => {
             from_web: false,
             id: 60,
             organization_id: organizationId,
+            latest_tag: null,
+            latest_tag_checked_at: null,
             name: 'test-maxmind-plugin',
             plugin_type: 'custom',
             source: null,
