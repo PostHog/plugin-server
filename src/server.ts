@@ -188,7 +188,6 @@ export async function startPluginsServer(
         await queue?.stop()
         await kafkaProducer?.disconnect()
         pubSub?.disconnect()
-        await pubSub?.quit()
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
         await stopSchedule?.()
