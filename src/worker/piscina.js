@@ -1,5 +1,6 @@
 const Sentry = require('@sentry/node')
 const { isMainThread, threadId } = require('worker_threads')
+const { status } = require('../status')
 
 if (isMainThread) {
     const Piscina = require('piscina')

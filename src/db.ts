@@ -4,9 +4,9 @@ import { Producer } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
-import { sanitizeSqlIdentifier, unparsePersonPartial } from './ingestion/utils'
+import { unparsePersonPartial } from './ingestion/utils'
 import { Person, PersonDistinctId, RawPerson } from './types'
-import { castTimestampOrNow } from './utils'
+import { castTimestampOrNow, sanitizeSqlIdentifier } from './utils'
 
 /** The recommended way of accessing the database. */
 export class DB {
