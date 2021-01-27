@@ -25,7 +25,7 @@ afterEach(() => {
 
 test('event is passed through', async () => {
     const uuid = new UUIDT().toString()
-    const now = new DateTime()
+    const now = DateTime.utc()
     kafkaObserver.handOffMessage({
         distinct_id: 'abcd',
         ip: '1.1.1.1',

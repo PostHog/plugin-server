@@ -135,7 +135,7 @@ jobs:
         env:
             REDIS_URL: 'redis://localhost'
             CLICKHOUSE_HOST: 'localhost'
-            CLICKHOUSE_DATABASE: 'test_posthog'
+            CLICKHOUSE_DATABASE: 'default'
             KAFKA_ENABLED: 'true'
             KAFKA_HOSTS: 'localhost:9092'
 
