@@ -6,6 +6,8 @@ import { KafkaObserver } from '../helpers/kafka'
 import { UUIDT } from '../../src/utils'
 import { DateTime } from 'luxon'
 
+jest.setTimeout(60_000) // 60 sec timeout
+
 let server: PluginsServer
 let closeServer: () => Promise<void>
 const kafkaObserver = new KafkaObserver()
