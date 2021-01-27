@@ -154,7 +154,7 @@ export class EventsProcessor {
         distinctId: string,
         properties: Properties,
         setOnce = false
-    ): Promise<void> {
+    ): Promise<Person> {
         let personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
             try {
@@ -173,10 +173,10 @@ export class EventsProcessor {
                 personFound = await this.db.fetchPerson(teamId, distinctId)
             }
         }
-        this.db.updatePerson(
-            personFound!,
-            setOnce ? { ...properties, ...personFound!.properties } : { ...personFound!.properties, ...properties }
-        )
+        const updatedProperties: Properties = setOnce
+            ? { ...properties, ...personFound!.properties }
+            : { ...personFound!.properties, ...properties }
+        return await this.db.updatePerson(personFound!, { properties: updatedProperties })
     }
 
     private async alias(
@@ -314,7 +314,8 @@ export class EventsProcessor {
             }))
         }
 
-        const team: Team = (await this.db.postgresQuery('SELECT * FROM posthog_team WHERE id = $1', [teamId])).rows[0]
+        const teamQueryResult = await this.db.postgresQuery('SELECT * FROM posthog_team WHERE id = $1', [teamId])
+        const team: Team = teamQueryResult.rows[0]
 
         if (!team.anonymize_ips && !('$ip' in properties)) {
             properties['$ip'] = ip
