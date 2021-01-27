@@ -8,7 +8,7 @@ import Client from '../../src/celery/client'
 import { resetTestDatabase } from '../helpers/sql'
 import { pluginConfig39 } from '../helpers/plugins'
 
-jest.mock('../src/celery/client')
+jest.mock('../../src/celery/client')
 
 const defaultEvent = {
     distinct_id: 'my_id',
