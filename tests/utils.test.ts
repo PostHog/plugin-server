@@ -303,6 +303,6 @@ describe('sanitizeSqlIdentifier', () => {
 
         const sanitizedIdentifier = sanitizeSqlIdentifier(rawIdentifier)
 
-        expect(sanitizeSqlIdentifier).toStrictEqual('"some_field; DROP TABLE actually_an_injection;"')
+        expect(sanitizedIdentifier).toStrictEqual('"some_field; DROP TABLE actually_an_injection;"')
     })
 })
