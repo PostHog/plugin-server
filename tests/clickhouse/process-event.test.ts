@@ -26,7 +26,7 @@ afterEach(() => {
 test('event is passed through', async () => {
     const uuid = new UUIDT().toString()
     const now = DateTime.utc()
-    kafkaObserver.handOffMessage({
+    await kafkaObserver.handOffMessage({
         distinct_id: 'abcd',
         ip: '1.1.1.1',
         site_url: 'x.com',
@@ -44,7 +44,7 @@ test('event is passed through', async () => {
         now,
         sent_at: null,
     })
-    const processedMessages = kafkaObserver.waitForProcessedMessages(1)
+    const processedMessages = await kafkaObserver.waitForProcessedMessages(1)
     console.log(processedMessages)
     expect(1).toEqual(1)
 })
