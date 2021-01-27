@@ -1,10 +1,7 @@
-import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows, setError } from '../../src/sql'
-import { PluginConfig, PluginError, PluginsServer } from '../../src/types'
+import { PluginsServer } from '../../src/types'
 import { createServer } from '../../src/server'
 import { resetTestDatabase } from '../helpers/sql'
-import { commonOrganizationId } from '../helpers/plugins'
 import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
-import { Consumer, EachMessagePayload, Kafka, Producer } from 'kafkajs'
 import { KafkaObserver } from '../helpers/kafka'
 import { UUIDT } from '../../src/utils'
 import { DateTime } from 'luxon'
@@ -17,7 +14,6 @@ beforeEach(async () => {
     ;[server, closeServer] = await createServer()
     await resetTestDatabase(`const processEvent = event => event`)
     await resetTestDatabaseClickhouse()
-    await kafkaObserver.start()
 })
 afterEach(() => {
     closeServer()
@@ -26,6 +22,8 @@ afterEach(() => {
 test('event is passed through', async () => {
     const uuid = new UUIDT().toString()
     const now = DateTime.utc()
+    await kafkaObserver.start()
+
     await kafkaObserver.handOffMessage({
         distinct_id: 'abcd',
         ip: '1.1.1.1',
@@ -45,6 +43,7 @@ test('event is passed through', async () => {
         sent_at: null,
     })
     const processedMessages = await kafkaObserver.waitForProcessedMessages(1)
+
     console.log(processedMessages)
     expect(1).toEqual(1)
 })
