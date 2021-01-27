@@ -7,6 +7,7 @@ import {
     cloneObject,
     UUID,
     UUIDT,
+    sanitizeSqlIdentifier,
 } from '../src/utils'
 import { randomBytes } from 'crypto'
 import { LogLevel } from '../src/types'
@@ -293,5 +294,15 @@ describe('UUIDT', () => {
         expect(uuidtString.slice(0, 8)).toEqual(Date.now().toString(16).padStart(12, '0').slice(0, 8))
         // series matching
         expect(uuidtString.slice(14, 18)).toEqual('0000')
+    })
+})
+
+describe('sanitizeSqlIdentifier', () => {
+    it('removes quotes inside and adds quotes around identifier', () => {
+        const rawIdentifier = 'some_field"; DROP TABLE actually_an_injection;'
+
+        const sanitizedIdentifier = sanitizeSqlIdentifier(rawIdentifier)
+
+        expect(sanitizeSqlIdentifier).toStrictEqual('"some_field; DROP TABLE actually_an_injection;"')
     })
 })
