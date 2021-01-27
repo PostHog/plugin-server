@@ -21,8 +21,7 @@ export class KafkaObserver extends EventEmitter {
         })
         this.producer = this.kafka.producer()
         this.consumer = this.kafka.consumer({
-            groupId: 'clickhouse-ingestion',
-            readUncommitted: false,
+            groupId: 'clickhouse-ingestion-test',
         })
         this.isStarted = false
     }
@@ -46,8 +45,15 @@ export class KafkaObserver extends EventEmitter {
                 },
             })
             console.info('setting group join and crash listeners')
-            const { GROUP_JOIN, CRASH } = this.consumer.events
-            this.consumer.on(GROUP_JOIN, () => resolve())
+            return resolve()
+            const { CONNECT, GROUP_JOIN, CRASH } = this.consumer.events
+            this.consumer.on(CONNECT, () => {
+                console.log('consumer connected to kafka')
+            })
+            this.consumer.on(GROUP_JOIN, () => {
+                console.log('joined group')
+                resolve()
+            })
             this.consumer.on(CRASH, ({ payload: { error } }) => reject(error))
         })
     }
@@ -69,27 +75,33 @@ export class KafkaObserver extends EventEmitter {
             messages: [{ value: Buffer.from(JSON.stringify(message)) }],
         })
     }
+}
 
-    public async waitForProcessedMessages(numberOfMessages: number): Promise<EventMessage[]> {
-        return await new Promise<EventMessage[]>((resolve, reject) => {
-            console.info('waiting for processed messages')
-            const accumulator: EventMessage[] = []
-            const timeoutSeconds = numberOfMessages * 2 // give every message 2 s on average to show up
-            const rejectTimeout = setTimeout(
-                () =>
-                    reject(`Timed out waiting ${timeoutSeconds} seconds for ${numberOfMessages} message(s) from Kafka`),
-                timeoutSeconds * 1000
-            )
-            const onMessage = (payload: EachMessagePayload) => {
-                console.info('message received')
-                accumulator.push(parseRawEventMessage(JSON.parse(payload.message.value!.toString())))
-                if (accumulator.length >= numberOfMessages) {
-                    this.removeListener('message', onMessage)
-                    clearTimeout(rejectTimeout)
-                    resolve(accumulator)
+export class KafkaCollector extends EventEmitter {
+    collection: EventMessage[]
+    kafkaObserver: KafkaObserver
+
+    constructor(kafkaObserver: KafkaObserver) {
+        super()
+        this.collection = []
+        this.kafkaObserver = kafkaObserver
+        kafkaObserver.addListener('message', (payload: EachMessagePayload) => {
+            console.info('message received')
+            this.collection.push(parseRawEventMessage(JSON.parse(payload.message.value!.toString())))
+            this.emit('message')
+        })
+    }
+
+    async collect(numberOfMessages: number): Promise<EventMessage[]> {
+        return await new Promise((resolve) => {
+            const resolveIfCollectedEnough = () => {
+                if (this.collection.length >= numberOfMessages) {
+                    this.removeListener('message', resolveIfCollectedEnough)
+                    resolve(this.collection)
                 }
             }
-            this.addListener('message', onMessage)
+            this.addListener('message', resolveIfCollectedEnough)
+            resolveIfCollectedEnough()
         })
     }
 }
