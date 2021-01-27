@@ -114,12 +114,8 @@ export class EventsProcessor {
             if (properties['$anon_distinct_id']) {
                 await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
             }
-            // TODO: roll the two updatePersonProperties calls into one to `UPDATE posthog_person` only once
-            if (properties['$set']) {
-                this.updatePersonProperties(teamId, distinctId, properties['$set'])
-            }
-            if (properties['$set_once']) {
-                this.updatePersonProperties(teamId, distinctId, properties['$set_once'], true)
+            if (properties['$set'] || properties['$set_once']) {
+                this.updatePersonProperties(teamId, distinctId, properties['$set'] || {}, properties['$set_once'] || {})
             }
             this.setIsIdentified(teamId, distinctId)
         }
@@ -153,7 +149,7 @@ export class EventsProcessor {
         teamId: number,
         distinctId: string,
         properties: Properties,
-        setOnce = false
+        propertiesOnce: Properties
     ): Promise<Person> {
         let personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
@@ -173,9 +169,7 @@ export class EventsProcessor {
                 personFound = await this.db.fetchPerson(teamId, distinctId)
             }
         }
-        const updatedProperties: Properties = setOnce
-            ? { ...properties, ...personFound!.properties }
-            : { ...personFound!.properties, ...properties }
+        const updatedProperties: Properties = { ...propertiesOnce, ...personFound!.properties, ...properties }
         return await this.db.updatePerson(personFound!, { properties: updatedProperties })
     }
 
