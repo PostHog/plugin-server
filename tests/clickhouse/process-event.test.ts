@@ -44,5 +44,7 @@ test('event is passed through', async () => {
         now,
         sent_at: null,
     })
+    const processedMessages = kafkaObserver.waitForProcessedMessages(1)
+    console.log(processedMessages)
     expect(1).toEqual(1)
 })
