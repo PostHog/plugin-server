@@ -1,4 +1,4 @@
-import { createPluginConfigVM } from '../src/vm'
+import { createPluginConfigVM } from '../src/vm/vm'
 import { PluginConfig, PluginsServer, Plugin } from '../src/types'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import { createServer } from '../src/server'

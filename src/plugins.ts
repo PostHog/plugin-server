@@ -1,12 +1,12 @@
 import * as path from 'path'
 import * as fs from 'fs'
-import { createPluginConfigVM } from './vm'
 import { PluginsServer, PluginConfig, PluginJsonConfig, TeamId, PluginTask } from './types'
 import { PluginEvent, PluginAttachment } from '@posthog/plugin-scaffold'
 import { clearError, processError } from './error'
 import { getFileFromArchive } from './utils'
 import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows } from './sql'
 import { status } from './status'
+import { createLazyPluginConfigVM } from './vm/lazy-vm'
 
 export async function setupPlugins(server: PluginsServer): Promise<void> {
     const pluginRows = await getPluginRows(server)
@@ -141,7 +141,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
             }
 
             try {
-                pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs, libJs)
+                pluginConfig.vm = createLazyPluginConfigVM(server, pluginConfig, indexJs, libJs)
                 status.info('🔌', `Loaded local plugin "${plugin.name}" from "${pluginPath}"!`)
                 await clearError(server, pluginConfig)
                 return true
@@ -169,7 +169,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
 
             if (indexJs) {
                 try {
-                    pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs, libJs || '')
+                    pluginConfig.vm = createLazyPluginConfigVM(server, pluginConfig, indexJs, libJs || '')
                     status.info('🔌', `Loaded plugin "${plugin.name}"!`)
                     await clearError(server, pluginConfig)
                     return true
@@ -181,7 +181,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
             }
         } else if (plugin.plugin_type === 'source' && plugin.source) {
             try {
-                pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, plugin.source)
+                pluginConfig.vm = createLazyPluginConfigVM(server, pluginConfig, plugin.source)
                 status.info('🔌', `Loaded plugin "${plugin.name}"!`)
                 await clearError(server, pluginConfig)
                 return true

@@ -18,9 +18,9 @@ export function createStorage(server: PluginsServer, pluginConfig: PluginConfig)
         } else {
             await server.db.query(
                 `
-                    INSERT INTO posthog_pluginstorage ("plugin_config_id", "key", "value") 
+                    INSERT INTO posthog_pluginstorage ("plugin_config_id", "key", "value")
                     VALUES ($1, $2, $3)
-                    ON CONFLICT ("plugin_config_id", "key") 
+                    ON CONFLICT ("plugin_config_id", "key")
                     DO UPDATE SET value = $3
                 `,
                 [pluginConfig.id, key, JSON.stringify(value)]
