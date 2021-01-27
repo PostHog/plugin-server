@@ -38,6 +38,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     REDIS_URL: string
     BASE_DIR: string
     PLUGINS_RELOAD_PUBSUB_CHANNEL: string
+    POSTHOG_TEAM_ID: string | null
     DISABLE_WEB: boolean
     WEB_PORT: number
     WEB_HOSTNAME: string
@@ -200,6 +201,8 @@ export interface EventMessage extends BaseEventMessage {
 /** Usable Team model. */
 export interface Team {
     id: number
+    uuid: string
+    organization_id: string
     name: string
     anonymize_ips: boolean
     api_token: string

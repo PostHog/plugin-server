@@ -50,6 +50,7 @@ There's a multitude of settings you can use to control the plugin server. Use th
 | KAFKA_CLIENT_CERT_KEY_B64     | Kafka certificate key in Base64                            | `null`                                |
 | KAFKA_TRUSTED_CERT_B64        | Kafka trusted CA in Base64                                 | `null`                                |
 | DISABLE_WEB                   | whether to disable web server                              | `true`                                |
+| POSTHOG_TEAM_ID | ID of the PostHog team to capture internal server events to | `null` |
 | WEB_PORT                      | port for web server to listen on                           | `3008`                                |
 | WEB_HOSTNAME                  | hostname for web server to listen on                       | `'0.0.0.0'`                           |
 | LOG_LEVEL                     | minimum log level                                          | `LogLevel.Info`                       |

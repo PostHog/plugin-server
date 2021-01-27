@@ -10,18 +10,23 @@ import { ClickHouse } from 'clickhouse'
 import { DB } from '../db'
 import { status } from '../status'
 import * as Sentry from '@sentry/node'
+import { createPosthog, DummyPostHog } from '../extensions/posthog'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
     db: DB
     clickhouse: ClickHouse
     kafkaProducer: Producer
+    posthog?: DummyPostHog
 
     constructor(pluginsServer: PluginsServer) {
         this.pluginsServer = pluginsServer
         this.db = pluginsServer.db
         this.clickhouse = pluginsServer.clickhouse!
         this.kafkaProducer = pluginsServer.kafkaProducer!
+        if (pluginsServer.POSTHOG_TEAM_ID) {
+            this.posthog = createPosthog(this.pluginsServer, parseInt(pluginsServer.POSTHOG_TEAM_ID))
+        }
     }
 
     public async processEvent(
@@ -345,8 +350,17 @@ export class EventsProcessor {
         // In _capture we only prefetch a couple of fields in Team to avoid fetching too much data
         let save = false
         if (!team.ingested_event) {
-            // First event for the team captured
-            // TODO: capture "first team event ingested"
+            if (this.posthog) {
+                // First event for the team captured
+                const organizationMembers = await this.db.postgresQuery(
+                    'SELECT distinct_id FROM posthog_user JOIN posthog_organizationmembership ON posthog_user.id = posthog_organizationmembership.user_id WHERE organization_id = $1',
+                    [team.organization_id]
+                )
+                const distinctIds: { distinct_id: string }[] = (await organizationMembers).rows
+                for (const { distinct_id } of distinctIds) {
+                    this.posthog.capture('first team event ingested', { team: team.uuid }, distinct_id)
+                }
+            }
             team.ingested_event = true
             save = true
         }
