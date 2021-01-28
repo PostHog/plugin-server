@@ -72,6 +72,10 @@ describe('process event', () => {
         await stopServer?.()
     })
 
+    test.skip('capture new person', async () => {
+        // TODO
+    })
+
     test('capture no element', async () => {
         await createPerson(team, ['asdfasdfasdf'])
 
@@ -92,6 +96,243 @@ describe('process event', () => {
         expect(await getDistinctIds((await getPersons())[0])).toEqual(['asdfasdfasdf'])
         const [event] = await getEvents()
         expect(event.event).toBe('$pageview')
+    })
+
+    test('capture sent_at', async () => {
+        await createPerson(team, ['asdfasdfasdf'])
+
+        const rightNow = DateTime.utc()
+        const tomorrow = rightNow.plus({ days: 1, hours: 2 })
+        const tomorrowSentAt = rightNow.plus({ days: 1, hours: 2, minutes: 10 })
+
+        await eventsProcessor.processEvent(
+            'movie played',
+            '',
+            '',
+            ({
+                event: '$pageview',
+                timestamp: tomorrow.toISO(),
+                properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
+            } as any) as PluginEvent,
+            team.id,
+            rightNow,
+            tomorrowSentAt,
+            new UUIDT().toString()
+        )
+
+        const [event] = await getEvents()
+        const eventSecondsBeforeNow = rightNow.diff(DateTime.fromJSDate(event.timestamp), 'seconds').seconds
+
+        expect(eventSecondsBeforeNow).toBeGreaterThan(590)
+        expect(eventSecondsBeforeNow).toBeLessThan(610)
+    })
+
+    test('capture sent_at no timezones', async () => {
+        await createPerson(team, ['asdfasdfasdf'])
+
+        const rightNow = DateTime.utc()
+        const tomorrow = rightNow.plus({ days: 1, hours: 2 }).setZone('UTC+4')
+        const tomorrowSentAt = rightNow.plus({ days: 1, hours: 2, minutes: 10 }).setZone('UTC+4')
+
+        // TODO: not sure if this is correct?
+        // tomorrow = tomorrow.replace(tzinfo=None)
+        // tomorrow_sent_at = tomorrow_sent_at.replace(tzinfo=None)
+
+        await eventsProcessor.processEvent(
+            'movie played',
+            '',
+            '',
+            ({
+                event: '$pageview',
+                timestamp: tomorrow,
+                properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
+            } as any) as PluginEvent,
+            team.id,
+            rightNow,
+            tomorrowSentAt,
+            new UUIDT().toString()
+        )
+
+        const [event] = await getEvents()
+        const eventSecondsBeforeNow = rightNow.diff(DateTime.fromJSDate(event.timestamp), 'seconds').seconds
+
+        expect(eventSecondsBeforeNow).toBeGreaterThan(590)
+        expect(eventSecondsBeforeNow).toBeLessThan(610)
+    })
+
+    test('capture no sent_at', async () => {
+        await createPerson(team, ['asdfasdfasdf'])
+
+        const rightNow = DateTime.utc()
+        const tomorrow = rightNow.plus({ days: 1, hours: 2 })
+
+        await eventsProcessor.processEvent(
+            'movie played',
+            '',
+            '',
+            ({
+                event: '$pageview',
+                timestamp: tomorrow.toISO(),
+                properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
+            } as any) as PluginEvent,
+            team.id,
+            rightNow,
+            null,
+            new UUIDT().toString()
+        )
+
+        const [event] = await getEvents()
+        const difference = tomorrow.diff(DateTime.fromJSDate(event.timestamp), 'seconds').seconds
+        expect(difference).toBeLessThan(1)
+    })
+
+    test('ip capture', async () => {
+        await createPerson(team, ['asdfasdfasdf'])
+
+        await eventsProcessor.processEvent(
+            'asdfasdfasdf',
+            '11.12.13.14',
+            '',
+            ({
+                event: '$pageview',
+                properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
+            } as any) as PluginEvent,
+            team.id,
+            DateTime.utc(),
+            DateTime.utc(),
+            new UUIDT().toString()
+        )
+        const [event] = await getEvents()
+        expect(event.properties['$ip']).toBe('11.12.13.14')
+    })
+
+    test('ip override', async () => {
+        await createPerson(team, ['asdfasdfasdf'])
+
+        await eventsProcessor.processEvent(
+            'asdfasdfasdf',
+            '11.12.13.14',
+            '',
+            ({
+                event: '$pageview',
+                properties: { $ip: '1.0.0.1', distinct_id: 'asdfasdfasdf', token: team.api_token },
+            } as any) as PluginEvent,
+            team.id,
+            DateTime.utc(),
+            DateTime.utc(),
+            new UUIDT().toString()
+        )
+        const [event] = await getEvents()
+        expect(event.properties['$ip']).toBe('1.0.0.1')
+    })
+
+    test('anonymized ip capture', async () => {
+        await server.db.postgresQuery('update posthog_team set anonymize_ips = $1', [true])
+        await createPerson(team, ['asdfasdfasdf'])
+
+        await eventsProcessor.processEvent(
+            'asdfasdfasdf',
+            '11.12.13.14',
+            '',
+            ({
+                event: '$pageview',
+                properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
+            } as any) as PluginEvent,
+            team.id,
+            DateTime.utc(),
+            DateTime.utc(),
+            new UUIDT().toString()
+        )
+        const [event] = await getEvents()
+        expect(event.properties['$ip']).not.toBeDefined()
+    })
+
+    test.skip('alias', async () => {
+        // TODO
+    })
+
+    test.skip('alias reverse', async () => {
+        // TODO
+    })
+
+    test.skip('alias twice', async () => {
+        // TODO
+    })
+
+    test.skip('alias before person', async () => {
+        // TODO
+    })
+
+    test.skip('alias both existing', async () => {
+        // TODO
+    })
+
+    test.skip('offset timestamp', async () => {
+        // TODO
+    })
+
+    test.skip('offset timestamp no sent_at', async () => {
+        // TODO
+    })
+
+    test.skip('alias merge properties', async () => {
+        // TODO
+    })
+
+    test.skip('long htext', async () => {
+        // TODO
+    })
+
+    test.skip('capture first team event', async () => {
+        // TODO
+    })
+
+    test.skip('snapshot event stored as session_recording_event', async () => {
+        // TODO
+    })
+
+    test.skip('identify set', async () => {
+        // TODO
+    })
+
+    test.skip('identify set_once', async () => {
+        // TODO
+    })
+
+    test.skip('distinct with anonymous_id', async () => {
+        // TODO
+    })
+
+    test.skip('distinct with anonymous_id which was already created', async () => {
+        // TODO
+    })
+
+    test.skip('distinct with multiple anonymous_ids which were already created', async () => {
+        // TODO
+    })
+
+    test.skip('distinct team leakage', async () => {
+        // TODO
+    })
+
+    test.skip('set is_identified', async () => {
+        // TODO
+    })
+
+    test.skip('team event_properties', async () => {
+        // TODO
+    })
+
+    test.skip('add feature flags if missing', async () => {
+        // TODO
+    })
+
+    test.skip('event name dict json', async () => {
+        // TODO
+    })
+
+    test.skip('event name list json', async () => {
+        // TODO
     })
 
     test('long event name substr', async () => {

@@ -238,11 +238,11 @@ export interface Event {
     event?: string
     properties: Record<string, any>
     elements?: Element[]
-    timestamp: string
+    timestamp: Date
     team_id: number
     distinct_id: string
     elements_hash: string
-    created_at: DateTime
+    created_at: Date
 }
 
 /** Properties shared by RawPerson and Person. */
