@@ -1,4 +1,4 @@
-import { makePluginObjects, commonOrganizationId } from './plugins'
+import { makePluginObjects, commonOrganizationId, commonUserId, commonOrganizationMembershipId } from './plugins'
 import { defaultConfig } from '../../src/config'
 import { Pool } from 'pg'
 import { delay, UUIDT } from '../../src/utils'
@@ -14,13 +14,34 @@ export async function resetTestDatabase(code: string): Promise<void> {
     await db.query('DELETE FROM posthog_pluginconfig')
     await db.query('DELETE FROM posthog_plugin')
     await db.query('DELETE FROM posthog_team')
+    await db.query('DELETE FROM posthog_organizationmembership')
     await db.query('DELETE FROM posthog_organization')
+    await db.query('DELETE FROM posthog_user')
 
     const teamIds = mocks.pluginConfigRows.map((c) => c.team_id)
+    await insertRow(db, 'posthog_user', {
+        id: commonUserId,
+        password: 'gibberish',
+        first_name: 'PluginTest',
+        last_name: 'User',
+        email: 'test@posthog.com',
+        distinct_id: 'plugin_test_user_distinct_id',
+        is_staff: false,
+        is_active: false,
+        date_joined: new Date().toISOString(),
+    })
     await insertRow(db, 'posthog_organization', {
         id: commonOrganizationId,
         name: 'TEST ORG',
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+    })
+    await insertRow(db, 'posthog_organizationmembership', {
+        id: commonOrganizationMembershipId,
+        organization_id: commonOrganizationId,
+        user_id: commonUserId,
+        level: 15,
+        joined_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
     })
     for (const teamId of teamIds) {
