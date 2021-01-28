@@ -297,5 +297,5 @@ export function delay(ms: number): Promise<void> {
 
 /** Remove all quotes from the provided identifier to prevent SQL injection. */
 export function sanitizeSqlIdentifier(unquotedIdentifier: string): string {
-    return '"' + unquotedIdentifier.replace(/["']/g, '') + '"'
+    return '"' + unquotedIdentifier.replace(/[^\w\d_]+/g, '') + '"'
 }

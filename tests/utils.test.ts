@@ -298,11 +298,11 @@ describe('UUIDT', () => {
 })
 
 describe('sanitizeSqlIdentifier', () => {
-    it('removes quotes inside and adds quotes around identifier', () => {
-        const rawIdentifier = 'some_field"; DROP TABLE actually_an_injection;'
+    it('removes all characters that are neither letter, digit or underscore and adds quotes around identifier', () => {
+        const rawIdentifier = 'some_field"; DROP TABLE actually_an_injection-9;'
 
         const sanitizedIdentifier = sanitizeSqlIdentifier(rawIdentifier)
 
-        expect(sanitizedIdentifier).toStrictEqual('"some_field; DROP TABLE actually_an_injection;"')
+        expect(sanitizedIdentifier).toStrictEqual('"some_fieldDROPTABLEactually_an_injection9"')
     })
 })
