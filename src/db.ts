@@ -82,11 +82,12 @@ export class DB {
 
     public async updatePerson(person: Person, update: Partial<Person>): Promise<Person> {
         const updatedPerson: Person = { ...person, ...update }
+        const values = [...Object.values(unparsePersonPartial(update)), person.id]
         await this.postgresQuery(
             `UPDATE posthog_person SET ${Object.keys(update).map(
                 (field, index) => sanitizeSqlIdentifier(field) + ' = $' + (index + 1)
             )} WHERE id = $${Object.values(update).length + 1}`,
-            [...Object.values(unparsePersonPartial(update)), person.id]
+            values
         )
         if (this.kafkaProducer) {
             const data = {
