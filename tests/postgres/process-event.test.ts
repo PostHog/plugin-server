@@ -44,8 +44,15 @@ async function getDistinctIds(person: Person) {
     return (result.rows as PersonDistinctId[]).map((pdi) => pdi.distinct_id)
 }
 
-async function createPerson(team: Team, distinctIds: string[]) {
-    const person = await server.db.createPerson(DateTime.utc(), {}, team.id, null, false, new UUIDT().toString())
+async function createPerson(team: Team, distinctIds: string[], properties: Record<string, any> = {}) {
+    const person = await server.db.createPerson(
+        DateTime.utc(),
+        properties,
+        team.id,
+        null,
+        false,
+        new UUIDT().toString()
+    )
     for (const distinctId of distinctIds) {
         await server.db.addDistinctId(person, distinctId)
     }
@@ -88,8 +95,8 @@ describe('process event', () => {
                 properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
             } as any) as PluginEvent,
             team.id,
-            DateTime.utc(),
-            DateTime.utc(),
+            now,
+            now,
             new UUIDT().toString()
         )
 
@@ -198,8 +205,8 @@ describe('process event', () => {
                 properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
             } as any) as PluginEvent,
             team.id,
-            DateTime.utc(),
-            DateTime.utc(),
+            now,
+            now,
             new UUIDT().toString()
         )
         const [event] = await getEvents()
@@ -218,8 +225,8 @@ describe('process event', () => {
                 properties: { $ip: '1.0.0.1', distinct_id: 'asdfasdfasdf', token: team.api_token },
             } as any) as PluginEvent,
             team.id,
-            DateTime.utc(),
-            DateTime.utc(),
+            now,
+            now,
             new UUIDT().toString()
         )
         const [event] = await getEvents()
@@ -239,8 +246,8 @@ describe('process event', () => {
                 properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
             } as any) as PluginEvent,
             team.id,
-            DateTime.utc(),
-            DateTime.utc(),
+            now,
+            now,
             new UUIDT().toString()
         )
         const [event] = await getEvents()
@@ -259,8 +266,8 @@ describe('process event', () => {
                 properties: { distinct_id: 'new_distinct_id', token: team.api_token, alias: 'old_distinct_id' },
             } as any) as PluginEvent,
             team.id,
-            DateTime.utc(),
-            DateTime.utc(),
+            now,
+            now,
             new UUIDT().toString()
         )
 
@@ -280,8 +287,8 @@ describe('process event', () => {
                 properties: { distinct_id: 'old_distinct_id', token: team.api_token, alias: 'new_distinct_id' },
             } as any) as PluginEvent,
             team.id,
-            DateTime.utc(),
-            DateTime.utc(),
+            now,
+            now,
             new UUIDT().toString()
         )
 
@@ -301,8 +308,8 @@ describe('process event', () => {
                 properties: { distinct_id: 'new_distinct_id', token: team.api_token, alias: 'old_distinct_id' },
             } as any) as PluginEvent,
             team.id,
-            DateTime.utc(),
-            DateTime.utc(),
+            now,
+            now,
             new UUIDT().toString()
         )
 
@@ -320,8 +327,8 @@ describe('process event', () => {
                 properties: { distinct_id: 'new_distinct_id', token: team.api_token, alias: 'old_distinct_id_2' },
             } as any) as PluginEvent,
             team.id,
-            DateTime.utc(),
-            DateTime.utc(),
+            now,
+            now,
             new UUIDT().toString()
         )
         expect((await getEvents()).length).toBe(2)
@@ -342,8 +349,8 @@ describe('process event', () => {
                 properties: { distinct_id: 'new_distinct_id', token: team.api_token, alias: 'old_distinct_id' },
             } as any) as PluginEvent,
             team.id,
-            DateTime.utc(),
-            DateTime.utc(),
+            now,
+            now,
             new UUIDT().toString()
         )
 
@@ -352,20 +359,92 @@ describe('process event', () => {
         expect(await getDistinctIds((await getPersons())[0])).toEqual(['new_distinct_id', 'old_distinct_id'])
     })
 
-    test.skip('alias both existing', async () => {
-        // TODO
+    test('alias both existing', async () => {
+        await createPerson(team, ['old_distinct_id'])
+        await createPerson(team, ['new_distinct_id'])
+
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$create_alias',
+                properties: { distinct_id: 'new_distinct_id', token: team.api_token, alias: 'old_distinct_id' },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect((await getEvents()).length).toBe(1)
+        expect(await getDistinctIds((await getPersons())[0])).toEqual(['old_distinct_id', 'new_distinct_id'])
     })
 
-    test.skip('offset timestamp', async () => {
-        // TODO
+    test('offset timestamp', async () => {
+        now = DateTime.fromISO('2020-01-01T12:00:05.200Z')
+
+        await eventsProcessor.processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({ offset: 150, event: '$autocapture', distinct_id: 'distinct_id' } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+        expect((await getEvents()).length).toBe(1)
+
+        const [event] = await getEvents()
+        expect(event.timestamp).toEqual('2020-01-01T12:00:05.050Z')
     })
 
-    test.skip('offset timestamp no sent_at', async () => {
-        // TODO
+    test('offset timestamp no sent_at', async () => {
+        now = DateTime.fromISO('2020-01-01T12:00:05.200Z')
+
+        await eventsProcessor.processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({ offset: 150, event: '$autocapture', distinct_id: 'distinct_id' } as any) as PluginEvent,
+            team.id,
+            now,
+            null,
+            new UUIDT().toString()
+        )
+        expect((await getEvents()).length).toBe(1)
+
+        const [event] = await getEvents()
+        expect(event.timestamp).toEqual('2020-01-01T12:00:05.050Z')
     })
 
-    test.skip('alias merge properties', async () => {
-        // TODO
+    test('alias merge properties', async () => {
+        await createPerson(team, ['old_distinct_id'], { key_on_both: 'old value both', key_on_old: 'old value' })
+        await createPerson(team, ['new_distinct_id'], { key_on_both: 'new value both', key_on_new: 'new value' })
+
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$create_alias',
+                properties: { distinct_id: 'new_distinct_id', token: team.api_token, alias: 'old_distinct_id' },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect((await getEvents()).length).toBe(1)
+        const [person] = await getPersons()
+        expect(await getDistinctIds(person)).toEqual(['old_distinct_id', 'new_distinct_id'])
+        expect(person.properties).toEqual({
+            key_on_both: 'new value both',
+            key_on_new: 'new value',
+            key_on_old: 'old value',
+        })
     })
 
     test.skip('long htext', async () => {
