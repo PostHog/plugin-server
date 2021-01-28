@@ -6,6 +6,9 @@ import { delay, UUIDT } from '../../src/utils'
 export async function resetTestDatabase(code: string): Promise<void> {
     const db = new Pool({ connectionString: defaultConfig.DATABASE_URL })
     const mocks = makePluginObjects(code)
+    await db.query('DELETE FROM posthog_persondistinctid')
+    await db.query('DELETE FROM posthog_person')
+    await db.query('DELETE FROM posthog_event')
     await db.query('DELETE FROM posthog_pluginstorage')
     await db.query('DELETE FROM posthog_pluginattachment')
     await db.query('DELETE FROM posthog_pluginconfig')
@@ -26,11 +29,11 @@ export async function resetTestDatabase(code: string): Promise<void> {
             organization_id: commonOrganizationId,
             app_urls: [],
             name: 'TEST PROJECT',
-            event_names: [],
-            event_names_with_usage: [],
-            event_properties: [],
-            event_properties_with_usage: [],
-            event_properties_numerical: [],
+            event_names: JSON.stringify(['test']),
+            event_names_with_usage: JSON.stringify([]),
+            event_properties: JSON.stringify([]),
+            event_properties_with_usage: JSON.stringify([]),
+            event_properties_numerical: JSON.stringify([]),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             anonymize_ips: false,

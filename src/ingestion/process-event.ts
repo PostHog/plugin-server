@@ -431,9 +431,19 @@ export class EventsProcessor {
         } else {
             // TODO: add element_group code!
             // https://github.com/PostHog/posthog/blob/5d5ede19e4799dc71ffd5ec18e65bd969520b543/posthog/models/event.py#L235
+            const elementsHash = ''
             const insertResult = await this.db.postgresQuery(
-                'INSERT INTO posthog_event (created_at, event, properties, team_id, site_url, timestamp, elements) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-                [data.createdAt, data.event, data.properties, data.teamId, siteUrl, data.timestamp, data.elementsChain]
+                'INSERT INTO posthog_event (created_at, event, distinct_id, properties, team_id, timestamp, elements, elements_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+                [
+                    data.createdAt,
+                    data.event,
+                    distinctId,
+                    data.properties,
+                    data.teamId,
+                    data.timestamp,
+                    JSON.stringify(elements || []),
+                    elementsHash,
+                ]
             )
             const eventCreated = insertResult.rows[0] as Event
         }

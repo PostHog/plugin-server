@@ -1,15 +1,10 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
-import { setupPiscina } from '../helpers/worker'
-import { delay } from '../../src/utils'
-import { createServer, startPluginsServer } from '../../src/server'
+import { createServer } from '../../src/server'
 import { LogLevel, PluginsServer, Team, Event } from '../../src/types'
-import { makePiscina } from '../../src/worker/piscina'
-import Client from '../../src/celery/client'
 import { resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
 import { DateTime } from 'luxon'
 
-// jest.mock('../src/sql')
 jest.setTimeout(600000) // 600 sec timeout
 
 let team: Team
@@ -65,20 +60,6 @@ async function getEvents(): Promise<Event[]> {
     const insertResult = await server.db.postgresQuery('SELECT * FROM posthog_event')
     return insertResult.rows as Event[]
 }
-
-//
-// def test_long_event_name_substr(self) -> None:
-//     process_event(
-//         "xxx",
-//         "",
-//         "",
-//         {"event": "E" * 300, "properties": {"price": 299.99, "name": "AirPods Pro"},},
-//         self.team.pk,
-//         now().isoformat(),
-//         now().isoformat(),
-//     )
-//     event = get_events()[0]
-//     self.assertEqual(len(event.event), 200)
 
 test('long event name substr', async () => {
     await eventsProcessor.processEvent(
