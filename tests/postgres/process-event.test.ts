@@ -247,8 +247,25 @@ describe('process event', () => {
         expect(event.properties['$ip']).not.toBeDefined()
     })
 
-    test.skip('alias', async () => {
-        // TODO
+    test('alias', async () => {
+        await createPerson(team, ['old_distinct_id'])
+
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$create_alias',
+                properties: { distinct_id: 'new_distinct_id', token: team.api_token, alias: 'old_distinct_id' },
+            } as any) as PluginEvent,
+            team.id,
+            DateTime.utc(),
+            DateTime.utc(),
+            new UUIDT().toString()
+        )
+
+        expect((await getEvents()).length).toBe(1)
+        expect(getDistinctIds((await getPersons())[0])).toBe(['old_distinct_id', 'new_distinct_id'])
     })
 
     test.skip('alias reverse', async () => {
