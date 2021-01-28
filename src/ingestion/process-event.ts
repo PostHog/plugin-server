@@ -10,18 +10,24 @@ import { ClickHouse } from 'clickhouse'
 import { DB } from '../db'
 import { status } from '../status'
 import * as Sentry from '@sentry/node'
+import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
+import Client from '../celery/client'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
     db: DB
     clickhouse: ClickHouse
     kafkaProducer: Producer
+    celery: Client
+    posthog: ReturnType<typeof nodePostHog>
 
     constructor(pluginsServer: PluginsServer) {
         this.pluginsServer = pluginsServer
         this.db = pluginsServer.db
         this.clickhouse = pluginsServer.clickhouse!
         this.kafkaProducer = pluginsServer.kafkaProducer!
+        this.celery = new Client(pluginsServer.redis)
+        this.posthog = nodePostHog('sTMFPsFhdP1Ssg')
     }
 
     public async processEvent(
@@ -114,12 +120,8 @@ export class EventsProcessor {
             if (properties['$anon_distinct_id']) {
                 await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
             }
-            // TODO: roll the two updatePersonProperties calls into one to `UPDATE posthog_person` only once
-            if (properties['$set']) {
-                this.updatePersonProperties(teamId, distinctId, properties['$set'])
-            }
-            if (properties['$set_once']) {
-                this.updatePersonProperties(teamId, distinctId, properties['$set_once'], true)
+            if (properties['$set'] || properties['$set_once']) {
+                this.updatePersonProperties(teamId, distinctId, properties['$set'] || {}, properties['$set_once'] || {})
             }
             this.setIsIdentified(teamId, distinctId)
         }
@@ -153,8 +155,8 @@ export class EventsProcessor {
         teamId: number,
         distinctId: string,
         properties: Properties,
-        setOnce = false
-    ): Promise<void> {
+        propertiesOnce: Properties
+    ): Promise<Person> {
         let personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
             try {
@@ -173,10 +175,8 @@ export class EventsProcessor {
                 personFound = await this.db.fetchPerson(teamId, distinctId)
             }
         }
-        this.db.updatePerson(
-            personFound!,
-            setOnce ? { ...properties, ...personFound!.properties } : { ...personFound!.properties, ...properties }
-        )
+        const updatedProperties: Properties = { ...propertiesOnce, ...personFound!.properties, ...properties }
+        return await this.db.updatePerson(personFound!, { properties: updatedProperties })
     }
 
     private async alias(
@@ -314,7 +314,8 @@ export class EventsProcessor {
             }))
         }
 
-        const team: Team = (await this.db.postgresQuery('SELECT * FROM posthog_team WHERE id = $1', [teamId])).rows[0]
+        const teamQueryResult = await this.db.postgresQuery('SELECT * FROM posthog_team WHERE id = $1', [teamId])
+        const team: Team = teamQueryResult.rows[0]
 
         if (!team.anonymize_ips && !('$ip' in properties)) {
             properties['$ip'] = ip
@@ -343,7 +344,7 @@ export class EventsProcessor {
             } catch {}
         }
 
-        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elementsList)
+        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elementsList, siteUrl)
     }
 
     private async storeNamesAndProperties(team: Team, event: string, properties: Properties): Promise<void> {
@@ -351,7 +352,15 @@ export class EventsProcessor {
         let save = false
         if (!team.ingested_event) {
             // First event for the team captured
-            // TODO: capture "first team event ingested"
+            const organizationMembers = await this.db.postgresQuery(
+                'SELECT distinct_id FROM posthog_user JOIN posthog_organizationmembership ON posthog_user.id = posthog_organizationmembership.user_id WHERE organization_id = $1',
+                [team.organization_id]
+            )
+            const distinctIds: { distinct_id: string }[] = (await organizationMembers).rows
+            for (const { distinct_id } of distinctIds) {
+                this.posthog.identify(distinct_id)
+                this.posthog.capture('first team event ingested', { team: team.uuid })
+            }
             team.ingested_event = true
             save = true
         }
@@ -401,7 +410,8 @@ export class EventsProcessor {
         distinctId: string,
         properties?: Properties,
         timestamp?: DateTime | string,
-        elements?: Element[]
+        elements?: Element[],
+        siteUrl?: string
     ): Promise<IEvent> {
         const timestampString = castTimestampOrNow(timestamp)
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
@@ -446,6 +456,18 @@ export class EventsProcessor {
             )
             const eventCreated = insertResult.rows[0] as Event
         }
+
+        this.celery.sendTask('ee.tasks.webhooks_ee.post_event_to_webhook_ee', [
+            {
+                event,
+                properties,
+                distinct_id: distinctId,
+                timestamp,
+                elements_list: elements,
+            },
+            team.id,
+            siteUrl,
+        ])
 
         return data
     }
