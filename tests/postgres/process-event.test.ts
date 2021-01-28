@@ -38,7 +38,7 @@ async function getPersons(): Promise<Person[]> {
 
 async function getDistinctIds(person: Person) {
     const result = await server.db.postgresQuery(
-        'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 and team_id=$2',
+        'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 and team_id=$2 ORDER BY id',
         [person.id, person.team_id]
     )
     return (result.rows as PersonDistinctId[]).map((pdi) => pdi.distinct_id)
@@ -121,7 +121,7 @@ describe('process event', () => {
         )
 
         const [event] = await getEvents()
-        const eventSecondsBeforeNow = rightNow.diff(DateTime.fromJSDate(event.timestamp), 'seconds').seconds
+        const eventSecondsBeforeNow = rightNow.diff(DateTime.fromISO(event.timestamp), 'seconds').seconds
 
         expect(eventSecondsBeforeNow).toBeGreaterThan(590)
         expect(eventSecondsBeforeNow).toBeLessThan(610)
@@ -154,7 +154,7 @@ describe('process event', () => {
         )
 
         const [event] = await getEvents()
-        const eventSecondsBeforeNow = rightNow.diff(DateTime.fromJSDate(event.timestamp), 'seconds').seconds
+        const eventSecondsBeforeNow = rightNow.diff(DateTime.fromISO(event.timestamp), 'seconds').seconds
 
         expect(eventSecondsBeforeNow).toBeGreaterThan(590)
         expect(eventSecondsBeforeNow).toBeLessThan(610)
@@ -182,7 +182,7 @@ describe('process event', () => {
         )
 
         const [event] = await getEvents()
-        const difference = tomorrow.diff(DateTime.fromJSDate(event.timestamp), 'seconds').seconds
+        const difference = tomorrow.diff(DateTime.fromISO(event.timestamp), 'seconds').seconds
         expect(difference).toBeLessThan(1)
     })
 
@@ -265,19 +265,91 @@ describe('process event', () => {
         )
 
         expect((await getEvents()).length).toBe(1)
-        expect(getDistinctIds((await getPersons())[0])).toBe(['old_distinct_id', 'new_distinct_id'])
+        expect(await getDistinctIds((await getPersons())[0])).toEqual(['old_distinct_id', 'new_distinct_id'])
     })
 
-    test.skip('alias reverse', async () => {
-        // TODO
+    test('alias reverse', async () => {
+        await createPerson(team, ['old_distinct_id'])
+
+        await eventsProcessor.processEvent(
+            'old_distinct_id',
+            '',
+            '',
+            ({
+                event: '$create_alias',
+                properties: { distinct_id: 'old_distinct_id', token: team.api_token, alias: 'new_distinct_id' },
+            } as any) as PluginEvent,
+            team.id,
+            DateTime.utc(),
+            DateTime.utc(),
+            new UUIDT().toString()
+        )
+
+        expect((await getEvents()).length).toBe(1)
+        expect(await getDistinctIds((await getPersons())[0])).toEqual(['old_distinct_id', 'new_distinct_id'])
     })
 
-    test.skip('alias twice', async () => {
-        // TODO
+    test('alias twice', async () => {
+        await createPerson(team, ['old_distinct_id'])
+
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$create_alias',
+                properties: { distinct_id: 'new_distinct_id', token: team.api_token, alias: 'old_distinct_id' },
+            } as any) as PluginEvent,
+            team.id,
+            DateTime.utc(),
+            DateTime.utc(),
+            new UUIDT().toString()
+        )
+
+        expect((await getEvents()).length).toBe(1)
+        expect(await getDistinctIds((await getPersons())[0])).toEqual(['old_distinct_id', 'new_distinct_id'])
+
+        await createPerson(team, ['old_distinct_id_2'])
+
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$create_alias',
+                properties: { distinct_id: 'new_distinct_id', token: team.api_token, alias: 'old_distinct_id_2' },
+            } as any) as PluginEvent,
+            team.id,
+            DateTime.utc(),
+            DateTime.utc(),
+            new UUIDT().toString()
+        )
+        expect((await getEvents()).length).toBe(2)
+        expect(await getDistinctIds((await getPersons())[0])).toEqual([
+            'old_distinct_id',
+            'new_distinct_id',
+            'old_distinct_id_2',
+        ])
     })
 
-    test.skip('alias before person', async () => {
-        // TODO
+    test('alias before person', async () => {
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$create_alias',
+                properties: { distinct_id: 'new_distinct_id', token: team.api_token, alias: 'old_distinct_id' },
+            } as any) as PluginEvent,
+            team.id,
+            DateTime.utc(),
+            DateTime.utc(),
+            new UUIDT().toString()
+        )
+
+        expect((await getEvents()).length).toBe(1)
+        expect((await getPersons()).length).toBe(1)
+        expect(await getDistinctIds((await getPersons())[0])).toEqual(['new_distinct_id', 'old_distinct_id'])
     })
 
     test.skip('alias both existing', async () => {
