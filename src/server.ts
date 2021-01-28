@@ -19,6 +19,19 @@ import { status } from './status'
 import { startSchedule } from './services/schedule'
 import { ConnectionOptions } from 'tls'
 import { DB } from './db'
+import { types } from 'pg'
+import { DateTime } from 'luxon'
+
+// postgres will only return strings as dates
+types.setTypeParser(1083 /* types.TypeId.TIME */, (timeStr) =>
+    timeStr ? DateTime.fromSQL(timeStr, { zone: 'utc' }).toISO() : null
+)
+types.setTypeParser(1114 /* types.TypeId.TIMESTAMP */, (timeStr) =>
+    timeStr ? DateTime.fromSQL(timeStr, { zone: 'utc' }).toISO() : null
+)
+types.setTypeParser(1184 /* types.TypeId.TIMESTAMPTZ */, (timeStr) =>
+    timeStr ? DateTime.fromSQL(timeStr, { zone: 'utc' }).toISO() : null
+)
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},

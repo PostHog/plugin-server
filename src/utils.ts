@@ -286,7 +286,7 @@ export function castTimestampOrNow(timestamp?: DateTime | string | null): string
     } else if (typeof timestamp === 'string') {
         timestamp = DateTime.fromISO(timestamp)
     }
-    return timestamp.toUTC().toFormat('yyyy-MM-dd HH:mm:ss.u')
+    return timestamp.toUTC().toISO()
 }
 
 export function delay(ms: number): Promise<void> {
