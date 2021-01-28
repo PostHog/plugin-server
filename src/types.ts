@@ -38,7 +38,6 @@ export interface PluginsServerConfig extends Record<string, any> {
     REDIS_URL: string
     BASE_DIR: string
     PLUGINS_RELOAD_PUBSUB_CHANNEL: string
-    POSTHOG_TEAM_ID: string | null
     DISABLE_WEB: boolean
     WEB_PORT: number
     WEB_HOSTNAME: string

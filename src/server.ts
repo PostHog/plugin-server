@@ -20,8 +20,6 @@ import { startSchedule } from './services/schedule'
 import { ConnectionOptions } from 'tls'
 import { DB } from './db'
 
-export const clientId = `plugin-server-v${version}-${new UUIDT()}`
-
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
     threadId: number | null = null
@@ -82,7 +80,7 @@ export async function createServer(
             },
         })
         kafka = new Kafka({
-            clientId,
+            clientId: `plugin-server-v${version}-${new UUIDT()}`,
             brokers: serverConfig.KAFKA_HOSTS.split(','),
             logLevel: logLevel.NOTHING,
             ssl: kafkaSsl,

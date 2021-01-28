@@ -10,23 +10,18 @@ import { ClickHouse } from 'clickhouse'
 import { DB } from '../db'
 import { status } from '../status'
 import * as Sentry from '@sentry/node'
-import { createPosthog, DummyPostHog } from '../extensions/posthog'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
     db: DB
     clickhouse: ClickHouse
     kafkaProducer: Producer
-    posthog?: DummyPostHog
 
     constructor(pluginsServer: PluginsServer) {
         this.pluginsServer = pluginsServer
         this.db = pluginsServer.db
         this.clickhouse = pluginsServer.clickhouse!
         this.kafkaProducer = pluginsServer.kafkaProducer!
-        if (pluginsServer.POSTHOG_TEAM_ID) {
-            this.posthog = createPosthog(this.pluginsServer, parseInt(pluginsServer.POSTHOG_TEAM_ID))
-        }
     }
 
     public async processEvent(

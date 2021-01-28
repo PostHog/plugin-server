@@ -25,7 +25,6 @@ export function getDefaultConfig(): PluginsServerConfig {
         BASE_DIR: '.',
         PLUGINS_RELOAD_PUBSUB_CHANNEL: 'reload-plugins',
         DISABLE_WEB: true,
-        POSTHOG_TEAM_ID: null,
         WEB_PORT: 3008,
         WEB_HOSTNAME: '0.0.0.0',
         WORKER_CONCURRENCY: 0, // use all cores
@@ -54,7 +53,6 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         BASE_DIR: 'base path for resolving local plugins',
         PLUGINS_RELOAD_PUBSUB_CHANNEL: 'Redis channel for reload events',
         DISABLE_WEB: 'whether to disable web server',
-        POSTHOG_TEAM_ID: 'ID of the PostHog team to capture internal server events to',
         WEB_PORT: 'port for web server to listen on',
         WEB_HOSTNAME: 'hostname for web server to listen on',
         WORKER_CONCURRENCY: 'number of concurrent worker threads',

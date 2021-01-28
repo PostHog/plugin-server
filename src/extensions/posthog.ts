@@ -5,7 +5,6 @@ import { PluginsServer, PluginConfig, RawEventMessage } from 'types'
 import { version } from '../../package.json'
 import Client from '../celery/client'
 import { UUIDT } from '../utils'
-import { clientId } from '../server'
 
 interface InternalData {
     distinct_id: string
@@ -17,19 +16,11 @@ interface InternalData {
 }
 
 export interface DummyPostHog {
-    capture(event: string, properties?: Record<string, any>, customDistinctId?: string): void
+    capture(event: string, properties?: Record<string, any>): void
 }
 
-export function createPosthog(server: PluginsServer, pluginConfigOrTeamId: PluginConfig | number): DummyPostHog {
-    let teamId: number
-    let inferredDistinctId: string
-    if (typeof pluginConfigOrTeamId === 'number') {
-        teamId = pluginConfigOrTeamId
-        inferredDistinctId = clientId
-    } else {
-        teamId = pluginConfigOrTeamId.team_id
-        inferredDistinctId = pluginConfigOrTeamId.plugin?.name || `plugin-id-${pluginConfigOrTeamId.plugin_id}`
-    }
+export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig): DummyPostHog {
+    const distinctId = pluginConfig.plugin?.name || `plugin-id-${pluginConfig.plugin_id}`
 
     let sendEvent: (data: InternalData) => Promise<void>
 
@@ -48,7 +39,7 @@ export function createPosthog(server: PluginsServer, pluginConfigOrTeamId: Plugi
                             ip: '',
                             site_url: '',
                             data: JSON.stringify(data),
-                            team_id: teamId,
+                            team_id: pluginConfig.team_id,
                             now: data.timestamp,
                             sent_at: data.timestamp,
                             uuid: data.uuid,
@@ -63,17 +54,17 @@ export function createPosthog(server: PluginsServer, pluginConfigOrTeamId: Plugi
         sendEvent = async (data) => {
             client.sendTask(
                 'posthog.tasks.process_event.process_event_with_plugins',
-                [data.distinct_id, null, null, data, teamId, data.timestamp, data.timestamp],
+                [data.distinct_id, null, null, data, pluginConfig.team_id, data.timestamp, data.timestamp],
                 {}
             )
         }
     }
 
     return {
-        capture(event, properties = {}, customDistinctId) {
+        capture(event, properties = {}) {
             const { timestamp = DateTime.utc().toISO(), ...otherProperties } = properties
             const data: InternalData = {
-                distinct_id: customDistinctId || inferredDistinctId,
+                distinct_id: distinctId,
                 event,
                 timestamp,
                 properties: {
@@ -81,7 +72,7 @@ export function createPosthog(server: PluginsServer, pluginConfigOrTeamId: Plugi
                     $lib_version: version,
                     ...otherProperties,
                 },
-                team_id: teamId,
+                team_id: pluginConfig.team_id,
                 uuid: new UUIDT().toString(),
             }
             sendEvent(data)
