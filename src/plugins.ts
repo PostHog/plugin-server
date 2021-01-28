@@ -83,7 +83,7 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         }
     }
 
-    const sortFunction = (a: PluginConfig, b: PluginConfig) => (a.order || 0) - (b.order || 0)
+    const sortFunction = (a: PluginConfig, b: PluginConfig) => a.order - b.order
     for (const teamId of server.pluginConfigsPerTeam.keys()) {
         if (server.defaultConfigs.length > 0) {
             const combinedPluginConfigs = [
