@@ -1,6 +1,6 @@
 import { PluginEvent, Properties } from '@posthog/plugin-scaffold/src/types'
 import { createServer } from '../../src/server'
-import { LogLevel, PluginsServer, Team, Event, Person, PersonDistinctId } from '../../src/types'
+import { LogLevel, PluginsServer, Team, Event, Person, PersonDistinctId, Element } from '../../src/types'
 import { resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
 import { DateTime } from 'luxon'
@@ -48,6 +48,10 @@ async function getFirstTeam(): Promise<Team> {
     return (await server.db.postgresQuery('SELECT * FROM posthog_team LIMIT 1')).rows[0]
 }
 
+async function getElements(event: Event): Promise<Element[]> {
+    return []
+}
+
 async function createPerson(team: Team, distinctIds: string[], properties: Record<string, any> = {}) {
     const person = await server.db.createPerson(
         DateTime.utc(),
@@ -84,7 +88,64 @@ describe('process event', () => {
     })
 
     test('capture new person', async () => {
-        expect(true).toBe(false)
+        await server.db.postgresQuery(`UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`, [true, team.id])
+        team = await getFirstTeam()
+
+        expect(team.event_names).toEqual([])
+
+        await eventsProcessor.processEvent(
+            '2',
+            '',
+            '',
+            ({
+                event: '$autocapture',
+                properties: {
+                    distinct_id: 2,
+                    token: team.api_token,
+                    $elements: [
+                        { tag_name: 'a', nth_child: 1, nth_of_type: 2, attr__class: 'btn btn-sm' },
+                        { tag_name: 'div', nth_child: 1, nth_of_type: 2, $el_text: '💻' },
+                    ],
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        // TODO: add this back?
+        // num_queries = 28
+        // if settings.EE_AVAILABLE:  # extra queries to check for hooks
+        //     num_queries += 4
+        // if settings.MULTI_TENANCY:  # extra query to check for billing plan
+        //     num_queries += 1
+        // with self.assertNumQueries(num_queries):
+
+        const [event] = await getEvents()
+        const [person] = await getPersons()
+        const distinctIds = await getDistinctIds(person)
+
+        expect(event.distinct_id).toEqual('2')
+        expect(distinctIds).toEqual(['2'])
+        expect(event.event).toEqual('$autocapture')
+
+        // TODO: add this
+        // const elements = await getElements(event)
+        // expect(elements[0].tag_name).toEqual('a')
+        // expect(elements[0].attr_class).toEqual(['btn', 'btn-sm'])
+        // expect(elements[1].order).toEqual(1)
+        // expect(elements[1].text).toEqual('💻')
+
+        team = await getFirstTeam()
+        expect(team.event_names).toEqual(['$autocapture'])
+        expect(team.event_names_with_usage).toEqual([{ event: '$autocapture', volume: null, usage_count: null }])
+        expect(team.event_properties).toEqual(['distinct_id', 'token', '$ip'])
+        expect(team.event_properties_with_usage).toEqual([
+            { key: 'distinct_id', usage_count: null, volume: null },
+            { key: 'token', usage_count: null, volume: null },
+            { key: '$ip', usage_count: null, volume: null },
+        ])
     })
 
     test('capture no element', async () => {

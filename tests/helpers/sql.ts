@@ -29,7 +29,7 @@ export async function resetTestDatabase(code: string): Promise<void> {
             organization_id: commonOrganizationId,
             app_urls: [],
             name: 'TEST PROJECT',
-            event_names: JSON.stringify(['test']),
+            event_names: JSON.stringify([]),
             event_names_with_usage: JSON.stringify([]),
             event_properties: JSON.stringify([]),
             event_properties_with_usage: JSON.stringify([]),
