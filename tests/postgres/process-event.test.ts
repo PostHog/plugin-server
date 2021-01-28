@@ -79,8 +79,8 @@ describe('process event', () => {
         await stopServer?.()
     })
 
-    test.skip('capture new person', async () => {
-        // TODO
+    test('capture new person', async () => {
+        expect(true).toBe(false)
     })
 
     test('capture no element', async () => {
@@ -438,6 +438,7 @@ describe('process event', () => {
         )
 
         expect((await getEvents()).length).toBe(1)
+        expect((await getPersons()).length).toBe(1)
         const [person] = await getPersons()
         expect(await getDistinctIds(person)).toEqual(['old_distinct_id', 'new_distinct_id'])
         expect(person.properties).toEqual({
@@ -448,59 +449,345 @@ describe('process event', () => {
     })
 
     test.skip('long htext', async () => {
-        // TODO
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$autocapture',
+                properties: {
+                    distinct_id: 'new_distinct_id',
+                    token: team.api_token,
+                    $elements: [
+                        {
+                            tag_name: 'a',
+                            $el_text: 'a'.repeat(2050),
+                            attr__href: 'a'.repeat(2050),
+                            nth_child: 1,
+                            nth_of_type: 2,
+                            attr__class: 'btn btn-sm',
+                        },
+                    ],
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        // event = get_events()[0]
+        // element = get_elements(event.id)[0]
+        // self.assertEqual(len(element.href), 2048)
+        // self.assertEqual(len(element.text), 400)
+        expect(true).toBe(false)
     })
 
-    test.skip('capture first team event', async () => {
-        // TODO
+    test('capture first team event', async () => {
+        expect(true).toBe(false)
     })
 
-    test.skip('snapshot event stored as session_recording_event', async () => {
-        // TODO
+    test('snapshot event stored as session_recording_event', async () => {
+        expect(true).toBe(false)
     })
 
-    test.skip('identify set', async () => {
-        // TODO
+    test('identify set', async () => {
+        await createPerson(team, ['distinct_id'])
+
+        await eventsProcessor.processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: '$identify',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $set: { a_prop: 'test-1', c_prop: 'test-1' },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect((await getEvents()).length).toBe(1)
+
+        const [event] = await getEvents()
+        expect(event.properties['$set']).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
+
+        const [person] = await getPersons()
+        expect(await getDistinctIds(person)).toEqual(['distinct_id'])
+        expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
+        expect(person.is_identified).toEqual(true)
+
+        await eventsProcessor.processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: '$identify',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $set: { a_prop: 'test-2', b_prop: 'test-2b' },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+        expect((await getEvents()).length).toBe(2)
+        const [person2] = await getPersons()
+        expect(person2.properties).toEqual({ a_prop: 'test-2', b_prop: 'test-2b', c_prop: 'test-1' })
     })
 
-    test.skip('identify set_once', async () => {
-        // TODO
+    test('identify set_once', async () => {
+        await createPerson(team, ['distinct_id'])
+
+        await eventsProcessor.processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: '$identify',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $set_once: { a_prop: 'test-1', c_prop: 'test-1' },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect((await getEvents()).length).toBe(1)
+
+        const [event] = await getEvents()
+        expect(event.properties['$set_once']).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
+
+        const [person] = await getPersons()
+        expect(await getDistinctIds(person)).toEqual(['distinct_id'])
+        expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
+        expect(person.is_identified).toEqual(true)
+
+        await eventsProcessor.processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: '$identify',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $set_once: { a_prop: 'test-2', b_prop: 'test-2b' },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+        expect((await getEvents()).length).toBe(2)
+        const [person2] = await getPersons()
+        expect(person2.properties).toEqual({ a_prop: 'test-1', b_prop: 'test-2b', c_prop: 'test-1' })
     })
 
-    test.skip('distinct with anonymous_id', async () => {
-        // TODO
+    test('distinct with anonymous_id', async () => {
+        await createPerson(team, ['anonymous_id'])
+
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$identify',
+                properties: {
+                    $anon_distinct_id: 'anonymous_id',
+                    token: team.api_token,
+                    distinct_id: 'new_distinct_id',
+                    $set: { a_prop: 'test' },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect((await getEvents()).length).toBe(1)
+        const [event] = await getEvents()
+        expect(event.properties['$set']).toEqual({ a_prop: 'test' })
+        const [person] = await getPersons()
+        expect(await getDistinctIds(person)).toEqual(['anonymous_id', 'new_distinct_id'])
+        expect(person.properties).toEqual({ a_prop: 'test' })
+
+        // check no errors as this call can happen multiple times
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$identify',
+                properties: {
+                    $anon_distinct_id: 'anonymous_id',
+                    token: team.api_token,
+                    distinct_id: 'new_distinct_id',
+                    $set: { a_prop: 'test' },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
     })
 
-    test.skip('distinct with anonymous_id which was already created', async () => {
-        // TODO
+    // This case is likely to happen after signup, for example:
+    // 1. User browses website with anonymous_id
+    // 2. User signs up, triggers event with their new_distinct_id (creating a new Person)
+    // 3. In the frontend, try to alias anonymous_id with new_distinct_id
+    // Result should be that we end up with one Person with both ID's
+    test('distinct with anonymous_id which was already created', async () => {
+        await createPerson(team, ['anonymous_id'])
+        await createPerson(team, ['new_distinct_id'], { email: 'someone@gmail.com' })
+
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$identify',
+                properties: {
+                    $anon_distinct_id: 'anonymous_id',
+                    token: team.api_token,
+                    distinct_id: 'new_distinct_id',
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const [person] = await getPersons()
+        expect(await getDistinctIds(person)).toEqual(['anonymous_id', 'new_distinct_id'])
+        expect(person.properties['email']).toEqual('someone@gmail.com')
     })
 
-    test.skip('distinct with multiple anonymous_ids which were already created', async () => {
-        // TODO
+    test('distinct with multiple anonymous_ids which were already created', async () => {
+        await createPerson(team, ['anonymous_id'])
+        await createPerson(team, ['new_distinct_id'], { email: 'someone@gmail.com' })
+
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$identify',
+                properties: {
+                    $anon_distinct_id: 'anonymous_id',
+                    token: team.api_token,
+                    distinct_id: 'new_distinct_id',
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const [person] = await getPersons()
+        expect(await getDistinctIds(person)).toEqual(['anonymous_id', 'new_distinct_id'])
+        expect(person.properties['email']).toEqual('someone@gmail.com')
+
+        await createPerson(team, ['anonymous_id_2'])
+
+        await eventsProcessor.processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            ({
+                event: '$identify',
+                properties: {
+                    $anon_distinct_id: 'anonymous_id_2',
+                    token: team.api_token,
+                    distinct_id: 'new_distinct_id',
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const persons = await getPersons()
+        expect(persons.length).toBe(1)
+        const person2 = persons[0]
+        expect(await getDistinctIds(person2)).toEqual(['anonymous_id', 'new_distinct_id', 'anonymous_id_2'])
+        expect(person2.properties['email']).toEqual('someone@gmail.com')
     })
 
-    test.skip('distinct team leakage', async () => {
-        // TODO
+    test('distinct team leakage', async () => {
+        expect(true).toBe(false)
     })
 
-    test.skip('set is_identified', async () => {
-        // TODO
+    test('set is_identified', async () => {
+        const distinct_id = '777'
+        const person1 = await createPerson(team, [distinct_id])
+        expect(person1.is_identified).toBe(false)
+
+        await eventsProcessor.processEvent(
+            distinct_id,
+            '',
+            '',
+            ({ event: '$identify', properties: {} } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const [person2] = await getPersons()
+        expect(person2.is_identified).toBe(true)
     })
 
-    test.skip('team event_properties', async () => {
-        // TODO
+    test('team event_properties', async () => {
+        expect(true).toBe(false)
     })
 
-    test.skip('add feature flags if missing', async () => {
-        // TODO
+    test('event name object json', async () => {
+        await eventsProcessor.processEvent(
+            'xxx',
+            '',
+            '',
+            ({ event: { 'event name': 'as object' }, properties: {} } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+        const [event] = await getEvents()
+        expect(event.event).toEqual('{"event name":"as object"}')
     })
 
-    test.skip('event name dict json', async () => {
-        // TODO
-    })
-
-    test.skip('event name list json', async () => {
-        // TODO
+    test('event name array json', async () => {
+        await eventsProcessor.processEvent(
+            'xxx',
+            '',
+            '',
+            ({ event: ['event name', 'a list'], properties: {} } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+        const [event] = await getEvents()
+        expect(event.event).toEqual('["event name","a list"]')
     })
 
     test('long event name substr', async () => {
