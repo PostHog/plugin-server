@@ -289,6 +289,7 @@ export interface CohortPeople {
     cohort_id: number
     person_id: number
 }
+
 export interface SessionRecordingEvent {
     uuid: string
     timestamp: string
@@ -297,6 +298,10 @@ export interface SessionRecordingEvent {
     session_id: string
     snapshot_data: string
     created_at: string
+}
+
+export interface PostgresSessionRecordingEvent extends Omit<SessionRecordingEvent, 'uuid'> {
+    id: string
 }
 
 export enum TimestampFormat {

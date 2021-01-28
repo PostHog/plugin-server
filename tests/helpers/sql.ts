@@ -6,6 +6,7 @@ import { delay, UUIDT } from '../../src/utils'
 export async function resetTestDatabase(code: string): Promise<void> {
     const db = new Pool({ connectionString: defaultConfig.DATABASE_URL })
     const mocks = makePluginObjects(code)
+    await db.query('DELETE FROM posthog_sessionrecordingevent')
     await db.query('DELETE FROM posthog_persondistinctid')
     await db.query('DELETE FROM posthog_person')
     await db.query('DELETE FROM posthog_event')
