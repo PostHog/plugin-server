@@ -259,7 +259,7 @@ export class EventsProcessor {
             }
         }
 
-        await this.db.updatePerson(mergeInto, { created_at: firstSeen })
+        await this.db.updatePerson(mergeInto, { created_at: firstSeen, properties: mergeInto.properties })
 
         // merge the distinct_ids
         for (const otherPerson of peopleToMerge) {
