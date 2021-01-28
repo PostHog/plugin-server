@@ -45,7 +45,6 @@ export class KafkaObserver extends EventEmitter {
                 },
             })
             console.info('setting group join and crash listeners')
-            return resolve()
             const { CONNECT, GROUP_JOIN, CRASH } = this.consumer.events
             this.consumer.on(CONNECT, () => {
                 console.log('consumer connected to kafka')
@@ -95,6 +94,7 @@ export class KafkaCollector extends EventEmitter {
     async collect(numberOfMessages: number): Promise<EventMessage[]> {
         return await new Promise((resolve) => {
             const resolveIfCollectedEnough = () => {
+                console.log('collection:', this.collection)
                 if (this.collection.length >= numberOfMessages) {
                     this.removeListener('message', resolveIfCollectedEnough)
                     resolve(this.collection)
