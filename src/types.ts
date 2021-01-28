@@ -147,6 +147,7 @@ export interface PluginConfigVMReponse {
 
 export interface PluginConfigLazyVMReponse {
     vm(): Promise<VM>
+    ready(): Promise<boolean>
     methods: {
         processEvent: (event: PluginEvent) => Promise<PluginEvent>
         processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>

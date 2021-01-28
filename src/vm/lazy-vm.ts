@@ -14,6 +14,11 @@ export function createLazyPluginConfigVM(
     let originalResponse: PluginConfigVMReponse
     let originalResponsePromise: Promise<PluginConfigVMReponse>
 
+    let methods: {
+        processEvent: (event: PluginEvent) => Promise<PluginEvent>
+        processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
+    }
+
     const awaitVm = async () => {
         if (originalResponse) {
             return originalResponse
@@ -24,6 +29,8 @@ export function createLazyPluginConfigVM(
         originalResponsePromise = createPluginConfigVM(server, pluginConfig, indexJs, libJs)
         try {
             originalResponse = await originalResponsePromise
+            response.tasks = originalResponse.tasks
+            response.methods = originalResponse.methods
             status.info(
                 '🔌',
                 `Loaded plugin "${pluginConfig?.plugin?.name || `config ${pluginConfig.id}`}" (team ${
@@ -38,9 +45,17 @@ export function createLazyPluginConfigVM(
         }
     }
 
-    const response = {
+    const response: PluginConfigLazyVMReponse = {
         async vm(): Promise<VM> {
             return (await awaitVm()).vm
+        },
+        async ready(): Promise<boolean> {
+            try {
+                await awaitVm()
+                return true
+            } catch (e) {
+                return false
+            }
         },
         methods: {
             async processEvent(event: PluginEvent): Promise<PluginEvent> {

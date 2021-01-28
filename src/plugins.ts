@@ -65,13 +65,17 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
             teamConfigs.push(pluginConfig)
         }
     }
+
+    const loadingPromises: Promise<boolean>[] = []
     for (const [id, pluginConfig] of server.pluginConfigs) {
         if (!foundPluginConfigs.has(id)) {
             server.pluginConfigs.delete(id)
         } else if (!pluginConfig.vm) {
-            await loadPlugin(server, pluginConfig)
+            loadingPromises.push(loadPlugin(server, pluginConfig))
         }
     }
+
+    await Promise.all(loadingPromises)
 
     // gather runEvery* tasks into a schedule
     server.pluginSchedule = { runEveryMinute: [], runEveryHour: [], runEveryDay: [] }
@@ -144,7 +148,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                 pluginConfig.vm = createLazyPluginConfigVM(server, pluginConfig, indexJs, libJs)
                 status.info('🔌', `Loaded local plugin "${plugin.name}" from "${pluginPath}"!`)
                 await clearError(server, pluginConfig)
-                return true
+                return pluginConfig.vm.ready()
             } catch (error) {
                 await processError(server, pluginConfig, error)
             }
@@ -172,7 +176,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                     pluginConfig.vm = createLazyPluginConfigVM(server, pluginConfig, indexJs, libJs || '')
                     status.info('🔌', `Loaded plugin "${plugin.name}"!`)
                     await clearError(server, pluginConfig)
-                    return true
+                    return pluginConfig.vm.ready()
                 } catch (error) {
                     await processError(server, pluginConfig, error)
                 }
@@ -184,7 +188,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                 pluginConfig.vm = createLazyPluginConfigVM(server, pluginConfig, plugin.source)
                 status.info('🔌', `Loaded plugin "${plugin.name}"!`)
                 await clearError(server, pluginConfig)
-                return true
+                return pluginConfig.vm.ready()
             } catch (error) {
                 await processError(server, pluginConfig, error)
             }
