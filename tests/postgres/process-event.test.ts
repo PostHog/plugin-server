@@ -66,7 +66,7 @@ test('long event name substr', async () => {
         'xxx',
         '',
         '',
-        createEvent({ event: 'E'.repeat(300), properties: { price: 299.99, name: 'AirPods Pro' } }),
+        ({ event: 'E'.repeat(300), properties: { price: 299.99, name: 'AirPods Pro' } } as any) as PluginEvent,
         team.id,
         DateTime.utc(),
         DateTime.utc(),
