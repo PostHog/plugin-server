@@ -343,7 +343,7 @@ export class EventsProcessor {
             } catch {}
         }
 
-        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elementsList, siteUrl)
+        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elementsList)
     }
 
     private async storeNamesAndProperties(team: Team, event: string, properties: Properties): Promise<void> {
@@ -401,8 +401,7 @@ export class EventsProcessor {
         distinctId: string,
         properties?: Properties,
         timestamp?: DateTime | string,
-        elements?: Element[],
-        siteUrl?: string
+        elements?: Element[]
     ): Promise<IEvent> {
         const timestampString = castTimestampOrNow(timestamp)
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
