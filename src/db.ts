@@ -5,7 +5,7 @@ import { DateTime } from 'luxon'
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { unparsePersonPartial } from './ingestion/utils'
-import { Person, PersonDistinctId, RawPerson } from './types'
+import { Person, PersonDistinctId, RawPerson, RawOrganization } from './types'
 import { castTimestampOrNow, sanitizeSqlIdentifier } from './utils'
 
 /** The recommended way of accessing the database. */
@@ -144,5 +144,13 @@ export class DB {
                 messages: [{ value: Buffer.from(JSON.stringify(updatedPersonDistinctId)) }],
             })
         }
+    }
+
+    public async fetchOrganization(organizationId: string): Promise<RawOrganization | undefined> {
+        const selectResult = await this.postgresQuery(`SELECT * FROM posthog_organization WHERE id $1`, [
+            organizationId,
+        ])
+        const rawOrganization: RawOrganization = selectResult.rows[0]
+        return rawOrganization
     }
 }

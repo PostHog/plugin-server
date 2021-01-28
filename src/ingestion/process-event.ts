@@ -11,12 +11,14 @@ import { DB } from '../db'
 import { status } from '../status'
 import * as Sentry from '@sentry/node'
 import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
+import Client from '../celery/client'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
     db: DB
     clickhouse: ClickHouse
     kafkaProducer: Producer
+    celery: Client
     posthog: ReturnType<typeof nodePostHog>
 
     constructor(pluginsServer: PluginsServer) {
@@ -24,6 +26,7 @@ export class EventsProcessor {
         this.db = pluginsServer.db
         this.clickhouse = pluginsServer.clickhouse!
         this.kafkaProducer = pluginsServer.kafkaProducer!
+        this.celery = new Client(pluginsServer.redis)
         this.posthog = nodePostHog('sTMFPsFhdP1Ssg')
     }
 
@@ -341,7 +344,7 @@ export class EventsProcessor {
             } catch {}
         }
 
-        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elementsList)
+        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elementsList, siteUrl)
     }
 
     private async storeNamesAndProperties(team: Team, event: string, properties: Properties): Promise<void> {
@@ -407,7 +410,8 @@ export class EventsProcessor {
         distinctId: string,
         properties?: Properties,
         timestamp?: DateTime | string,
-        elements?: Element[]
+        elements?: Element[],
+        siteUrl?: string
     ): Promise<IEvent> {
         const timestampString = castTimestampOrNow(timestamp)
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
@@ -427,6 +431,18 @@ export class EventsProcessor {
             topic: KAFKA_EVENTS,
             messages: [{ key: uuid, value: EventProto.encodeDelimited(EventProto.create(data)).finish() as Buffer }],
         })
+
+        this.celery.sendTask('ee.tasks.webhooks_ee.post_event_to_webhook_ee', [
+            {
+                event,
+                properties,
+                distinct_id: distinctId,
+                timestamp,
+                elements_list: elements,
+            },
+            team.id,
+            siteUrl,
+        ])
 
         return data
     }

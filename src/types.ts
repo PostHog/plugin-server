@@ -197,6 +197,14 @@ export interface EventMessage extends BaseEventMessage {
     sent_at: DateTime | null
 }
 
+/** Raw Organization row from database. */
+export interface RawOrganization {
+    id: string
+    name: string
+    created_at: string
+    updated_at: string
+}
+
 /** Usable Team model. */
 export interface Team {
     id: number
