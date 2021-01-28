@@ -28,6 +28,9 @@ export class EventsProcessor {
         this.kafkaProducer = pluginsServer.kafkaProducer!
         this.celery = new Client(pluginsServer.redis)
         this.posthog = nodePostHog('sTMFPsFhdP1Ssg')
+        if (process.env.NODE_ENV === 'test') {
+            this.posthog.optOut()
+        }
     }
 
     public async processEvent(
