@@ -4,7 +4,6 @@ import { PluginsServer, Queue, RawEventMessage } from 'types'
 import { KAFKA_EVENTS_INGESTION_HANDOFF } from './topics'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import { status } from '../status'
-import { parseRawEventMessage } from './utils'
 import { killGracefully } from '../utils'
 
 export type BatchCallback = (messages: Message[]) => Promise<void>

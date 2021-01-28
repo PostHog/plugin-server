@@ -294,3 +294,8 @@ export function delay(ms: number): Promise<void> {
         setTimeout(resolve, ms)
     })
 }
+
+/** Remove all quotes from the provided identifier to prevent SQL injection. */
+export function sanitizeSqlIdentifier(unquotedIdentifier: string): string {
+    return '"' + unquotedIdentifier.replace(/[^\w\d_]+/g, '') + '"'
+}

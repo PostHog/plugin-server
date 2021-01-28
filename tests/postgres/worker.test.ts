@@ -7,7 +7,7 @@ import { makePiscina } from '../../src/worker/piscina'
 import Client from '../../src/celery/client'
 import { resetTestDatabase } from '../helpers/sql'
 
-jest.mock('../src/sql')
+jest.mock('../../src/sql')
 jest.setTimeout(600000) // 600 sec timeout
 
 function createEvent(index = 0): PluginEvent {

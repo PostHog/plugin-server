@@ -5,8 +5,8 @@ import { DateTime } from 'luxon'
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { unparsePersonPartial } from './ingestion/utils'
-import { Person, PersonDistinctId, RawPerson } from './types'
-import { castTimestampOrNow } from './utils'
+import { Person, PersonDistinctId, RawPerson, RawOrganization } from './types'
+import { castTimestampOrNow, sanitizeSqlIdentifier } from './utils'
 
 /** The recommended way of accessing the database. */
 export class DB {
@@ -82,7 +82,7 @@ export class DB {
         const updatedPerson: Person = { ...person, ...update }
         await this.postgresQuery(
             `UPDATE posthog_person SET ${Object.keys(update).map(
-                (field, index) => field + ' = $' + (index + 1)
+                (field, index) => sanitizeSqlIdentifier(field) + ' = $' + (index + 1)
             )} WHERE id = $${Object.values(update).length + 1}`,
             [...Object.values(unparsePersonPartial(update)), person.id]
         )
@@ -134,7 +134,7 @@ export class DB {
         const updatedPersonDistinctId: PersonDistinctId = { ...personDistinctId, ...update }
         await this.postgresQuery(
             `UPDATE posthog_persondistinctid SET ${Object.keys(update).map(
-                (field, index) => field + ' = $' + (index + 1)
+                (field, index) => sanitizeSqlIdentifier(field) + ' = $' + (index + 1)
             )} WHERE id = $${Object.values(update).length + 1}`,
             [...Object.values(update), personDistinctId.id]
         )
@@ -144,5 +144,13 @@ export class DB {
                 messages: [{ value: Buffer.from(JSON.stringify(updatedPersonDistinctId)) }],
             })
         }
+    }
+
+    public async fetchOrganization(organizationId: string): Promise<RawOrganization | undefined> {
+        const selectResult = await this.postgresQuery(`SELECT * FROM posthog_organization WHERE id $1`, [
+            organizationId,
+        ])
+        const rawOrganization: RawOrganization = selectResult.rows[0]
+        return rawOrganization
     }
 }

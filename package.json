@@ -5,7 +5,7 @@
     "types": "dist/src/index.d.ts",
     "main": "dist/src/index.js",
     "scripts": {
-        "test": "jest --runInBand tests/*.test.ts",
+        "test": "jest --runInBand tests/**/*.test.ts",
         "test:postgres": "yarn test --testPathIgnorePatterns '.*/clickhouse'",
         "test:clickhouse": "yarn test --testPathIgnorePatterns '.*/postgres'",
         "benchmark": "node --expose-gc node_modules/.bin/jest --runInBand benchmarks/",
@@ -46,6 +46,7 @@
         "node-schedule": "^1.3.2",
         "pg": "^8.4.2",
         "piscina": "^2.1.0",
+        "posthog-js-lite": "^0.0.5",
         "protobufjs": "^6.10.2",
         "redlock": "^4.2.0",
         "tar-stream": "^2.1.4",
@@ -101,6 +102,6 @@
     },
     "lint-staged": {
         "*.{js,ts}": "eslint --fix",
-        "*.{js,ts,css,scss,json,yml}": "prettier --write"
+        "*.{js,ts,css,scss,json,yml,md}": "prettier --write"
     }
 }
