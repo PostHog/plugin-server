@@ -398,7 +398,7 @@ export class EventsProcessor {
                     JSON.stringify(team.event_names),
                     JSON.stringify(team.event_names_with_usage),
                     JSON.stringify(team.event_properties),
-                    JSON.stringify(team.event_names_with_usage),
+                    JSON.stringify(team.event_properties_with_usage),
                     JSON.stringify(team.event_properties_numerical),
                     team.id,
                 ]
