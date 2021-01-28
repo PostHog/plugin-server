@@ -1,11 +1,20 @@
 import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import { DateTime, Duration } from 'luxon'
-import { PluginsServer, Element, Team, Person, PersonDistinctId, CohortPeople, SessionRecordingEvent } from '../types'
+import {
+    CohortPeople,
+    Element,
+    Person,
+    PersonDistinctId,
+    PluginsServer,
+    SessionRecordingEvent,
+    Team,
+    TimestampFormat,
+} from '../types'
 import { castTimestampOrNow, UUIDT } from '../utils'
 import { Event as EventProto, IEvent } from '../idl/protos'
 import { Producer } from 'kafkajs'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { sanitizeEventName, elementsToString } from './utils'
+import { elementsToString, sanitizeEventName } from './utils'
 import { ClickHouse } from 'clickhouse'
 import { DB } from '../db'
 import { status } from '../status'
@@ -416,7 +425,10 @@ export class EventsProcessor {
         elements?: Element[],
         siteUrl?: string
     ): Promise<IEvent> {
-        const timestampString = castTimestampOrNow(timestamp)
+        const timestampString = castTimestampOrNow(
+            timestamp,
+            this.kafkaProducer ? TimestampFormat.Clickhouse : TimestampFormat.ISO
+        )
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
 
         const data: IEvent = {

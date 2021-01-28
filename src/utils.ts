@@ -2,7 +2,7 @@ import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import AdmZip from 'adm-zip'
 import * as zlib from 'zlib'
-import { LogLevel } from './types'
+import { LogLevel, TimestampFormat } from './types'
 import { randomBytes } from 'crypto'
 import { DateTime } from 'luxon'
 import { status } from './status'
@@ -280,11 +280,18 @@ export class UUIDT extends UUID {
 }
 
 /** Format timestamp for ClickHouse. */
-export function castTimestampOrNow(timestamp?: DateTime | string | null): string {
+export function castTimestampOrNow(
+    timestamp?: DateTime | string | null,
+    timestampFormat: TimestampFormat = TimestampFormat.ISO
+): string {
     if (!timestamp) {
         timestamp = DateTime.utc()
     } else if (typeof timestamp === 'string') {
         timestamp = DateTime.fromISO(timestamp)
+    }
+
+    if (timestampFormat === TimestampFormat.Clickhouse) {
+        return timestamp.toUTC().toFormat('yyyy-MM-dd HH:mm:ss.u')
     }
     return timestamp.toUTC().toISO()
 }

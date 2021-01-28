@@ -298,3 +298,8 @@ export interface SessionRecordingEvent {
     snapshot_data: string
     created_at: string
 }
+
+export enum TimestampFormat {
+    Clickhouse = 'clickhouse',
+    ISO = 'iso',
+}
