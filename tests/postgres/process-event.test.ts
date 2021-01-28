@@ -44,6 +44,10 @@ async function getDistinctIds(person: Person) {
     return (result.rows as PersonDistinctId[]).map((pdi) => pdi.distinct_id)
 }
 
+async function getFirstTeam(): Promise<Team> {
+    return (await server.db.postgresQuery('SELECT * FROM posthog_team LIMIT 1')).rows[0]
+}
+
 async function createPerson(team: Team, distinctIds: string[], properties: Record<string, any> = {}) {
     const person = await server.db.createPerson(
         DateTime.utc(),
@@ -71,7 +75,7 @@ describe('process event', () => {
         await resetTestDatabase(testCode)
         ;[server, stopServer] = await getServer()
         eventsProcessor = new EventsProcessor(server)
-        team = (await server.db.postgresQuery('SELECT * FROM posthog_team LIMIT 1')).rows[0]
+        team = await getFirstTeam()
         now = DateTime.utc()
     })
 
@@ -757,7 +761,22 @@ describe('process event', () => {
     })
 
     test('team event_properties', async () => {
-        expect(true).toBe(false)
+        expect(team.event_properties_numerical).toEqual([])
+
+        await eventsProcessor.processEvent(
+            'xxx',
+            '',
+            '',
+            ({ event: 'purchase', properties: { price: 299.99, name: 'AirPods Pro' } } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        team = await getFirstTeam()
+        expect(team.event_properties).toEqual(['price', 'name', '$ip'])
+        expect(team.event_properties_numerical).toEqual(['price'])
     })
 
     test('event name object json', async () => {
