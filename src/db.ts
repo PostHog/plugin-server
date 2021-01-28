@@ -45,8 +45,10 @@ export class DB {
                 AND posthog_persondistinctid.distinct_id = $2`,
             [teamId, distinctId]
         )
-        const rawPerson: RawPerson = selectResult.rows[0]
-        return { ...rawPerson, created_at: DateTime.fromISO(rawPerson.created_at) }
+        if (selectResult.rows.length > 0) {
+            const rawPerson: RawPerson = selectResult.rows[0]
+            return { ...rawPerson, created_at: DateTime.fromISO(rawPerson.created_at) }
+        }
     }
 
     public async createPerson(
