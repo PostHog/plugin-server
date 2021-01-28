@@ -234,7 +234,15 @@ export interface Element {
 
 /** Usable Event model. */
 export interface Event {
+    id: number
     event?: string
+    properties: Record<string, any>
+    elements?: Element[]
+    timestamp: string
+    team_id: number
+    distinct_id: string
+    elements_hash: string
+    created_at: DateTime
 }
 
 /** Properties shared by RawPerson and Person. */

@@ -1,9 +1,10 @@
-import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
+import { PluginEvent, Properties } from '@posthog/plugin-scaffold/src/types'
 import { createServer } from '../../src/server'
-import { LogLevel, PluginsServer, Team, Event } from '../../src/types'
+import { LogLevel, PluginsServer, Team, Event, Person, PersonDistinctId } from '../../src/types'
 import { resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
 import { DateTime } from 'luxon'
+import { UUIDT } from '../../src/utils'
 
 jest.setTimeout(600000) // 600 sec timeout
 
@@ -57,9 +58,53 @@ afterEach(async () => {
 })
 
 async function getEvents(): Promise<Event[]> {
-    const insertResult = await server.db.postgresQuery('SELECT * FROM posthog_event')
-    return insertResult.rows as Event[]
+    const result = await server.db.postgresQuery('SELECT * FROM posthog_event')
+    return result.rows as Event[]
 }
+
+async function getPersons(): Promise<Person[]> {
+    const result = await server.db.postgresQuery('SELECT * FROM posthog_person')
+    return result.rows as Person[]
+}
+
+async function getDistinctIds(person: Person) {
+    const result = await server.db.postgresQuery(
+        'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 and team_id=$2',
+        [person.id, person.team_id]
+    )
+    return (result.rows as PersonDistinctId[]).map((pdi) => pdi.distinct_id)
+}
+
+async function createPerson(team: Team, distinctIds: string[]) {
+    const person = await server.db.createPerson(DateTime.utc(), {}, team.id, null, false, new UUIDT().toString())
+    for (const distinctId of distinctIds) {
+        await server.db.addDistinctId(person, distinctId)
+    }
+
+    return person
+}
+
+test('capture no element', async () => {
+    await createPerson(team, ['asdfasdfasdf'])
+
+    await eventsProcessor.processEvent(
+        'asdfasdfasdf',
+        '',
+        '',
+        ({
+            event: '$pageview',
+            properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
+        } as any) as PluginEvent,
+        team.id,
+        DateTime.utc(),
+        DateTime.utc(),
+        new UUIDT().toString()
+    )
+
+    expect(await getDistinctIds((await getPersons())[0])).toEqual(['asdfasdfasdf'])
+    const [event] = await getEvents()
+    expect(event.event).toBe('$pageview')
+})
 
 test('long event name substr', async () => {
     await eventsProcessor.processEvent(
