@@ -266,7 +266,7 @@ export class EventsProcessor {
             const otherPersonDistinctIds: PersonDistinctId[] = (
                 await this.db.postgresQuery(
                     'SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2',
-                    [otherPerson, mergeInto.team_id]
+                    [otherPerson.id, mergeInto.team_id]
                 )
             ).rows
             for (const personDistinctId of otherPersonDistinctIds) {
