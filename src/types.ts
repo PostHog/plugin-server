@@ -232,6 +232,11 @@ export interface Element {
     group_id?: number
 }
 
+/** Usable Event model. */
+export interface Event {
+    event?: string
+}
+
 /** Properties shared by RawPerson and Person. */
 export interface BasePerson {
     id: number

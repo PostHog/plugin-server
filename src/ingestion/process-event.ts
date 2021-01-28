@@ -343,7 +343,7 @@ export class EventsProcessor {
             } catch {}
         }
 
-        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elementsList)
+        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elementsList, siteUrl)
     }
 
     private async storeNamesAndProperties(team: Team, event: string, properties: Properties): Promise<void> {
@@ -401,7 +401,8 @@ export class EventsProcessor {
         distinctId: string,
         properties?: Properties,
         timestamp?: DateTime | string,
-        elements?: Element[]
+        elements?: Element[],
+        siteUrl?: string
     ): Promise<IEvent> {
         const timestampString = castTimestampOrNow(timestamp)
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
@@ -417,10 +418,25 @@ export class EventsProcessor {
             createdAt: timestampString,
         }
 
-        await this.kafkaProducer.send({
-            topic: KAFKA_EVENTS,
-            messages: [{ key: uuid, value: EventProto.encodeDelimited(EventProto.create(data)).finish() as Buffer }],
-        })
+        if (this.kafkaProducer) {
+            await this.kafkaProducer.send({
+                topic: KAFKA_EVENTS,
+                messages: [
+                    {
+                        key: uuid,
+                        value: EventProto.encodeDelimited(EventProto.create(data)).finish() as Buffer,
+                    },
+                ],
+            })
+        } else {
+            // TODO: add element_group code!
+            // https://github.com/PostHog/posthog/blob/5d5ede19e4799dc71ffd5ec18e65bd969520b543/posthog/models/event.py#L235
+            const insertResult = await this.db.postgresQuery(
+                'INSERT INTO posthog_event (created_at, event, properties, team_id, site_url, timestamp, elements) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+                [data.createdAt, data.event, data.properties, data.teamId, siteUrl, data.timestamp, data.elementsChain]
+            )
+            const eventCreated = insertResult.rows[0] as Event
+        }
 
         return data
     }
