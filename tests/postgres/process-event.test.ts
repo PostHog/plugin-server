@@ -14,19 +14,6 @@ let stopServer: () => Promise<void>
 let eventsProcessor: EventsProcessor
 let now = DateTime.utc()
 
-function createEvent(event = {}): PluginEvent {
-    return {
-        distinct_id: 'my_id',
-        ip: '127.0.0.1',
-        site_url: 'http://localhost',
-        team_id: 2,
-        now: now?.toISO() || new Date().toISOString(),
-        event: 'default event',
-        properties: {},
-        ...event,
-    }
-}
-
 async function getServer(): Promise<[PluginsServer, () => Promise<void>]> {
     const [server, stopServer] = await createServer({
         PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
@@ -38,24 +25,6 @@ async function getServer(): Promise<[PluginsServer, () => Promise<void>]> {
     await server.redis.del(server.CELERY_DEFAULT_QUEUE)
     return [server, stopServer]
 }
-
-beforeEach(async () => {
-    const testCode = `
-        function processEvent (event, meta) {
-            event.properties["somewhere"] = "over the rainbow";
-            return event
-        }
-    `
-    await resetTestDatabase(testCode)
-    ;[server, stopServer] = await getServer()
-    eventsProcessor = new EventsProcessor(server)
-    team = (await server.db.postgresQuery('SELECT * FROM posthog_team LIMIT 1')).rows[0]
-    now = DateTime.utc()
-})
-
-afterEach(async () => {
-    await stopServer?.()
-})
 
 async function getEvents(): Promise<Event[]> {
     const result = await server.db.postgresQuery('SELECT * FROM posthog_event')
@@ -84,40 +53,60 @@ async function createPerson(team: Team, distinctIds: string[]) {
     return person
 }
 
-test('capture no element', async () => {
-    await createPerson(team, ['asdfasdfasdf'])
+describe('process event', () => {
+    beforeEach(async () => {
+        const testCode = `
+            function processEvent (event, meta) {
+                event.properties["somewhere"] = "over the rainbow";
+                return event
+            }
+        `
+        await resetTestDatabase(testCode)
+        ;[server, stopServer] = await getServer()
+        eventsProcessor = new EventsProcessor(server)
+        team = (await server.db.postgresQuery('SELECT * FROM posthog_team LIMIT 1')).rows[0]
+        now = DateTime.utc()
+    })
 
-    await eventsProcessor.processEvent(
-        'asdfasdfasdf',
-        '',
-        '',
-        ({
-            event: '$pageview',
-            properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
-        } as any) as PluginEvent,
-        team.id,
-        DateTime.utc(),
-        DateTime.utc(),
-        new UUIDT().toString()
-    )
+    afterEach(async () => {
+        await stopServer?.()
+    })
 
-    expect(await getDistinctIds((await getPersons())[0])).toEqual(['asdfasdfasdf'])
-    const [event] = await getEvents()
-    expect(event.event).toBe('$pageview')
-})
+    test('capture no element', async () => {
+        await createPerson(team, ['asdfasdfasdf'])
 
-test('long event name substr', async () => {
-    await eventsProcessor.processEvent(
-        'xxx',
-        '',
-        '',
-        ({ event: 'E'.repeat(300), properties: { price: 299.99, name: 'AirPods Pro' } } as any) as PluginEvent,
-        team.id,
-        DateTime.utc(),
-        DateTime.utc(),
-        'uuid'
-    )
+        await eventsProcessor.processEvent(
+            'asdfasdfasdf',
+            '',
+            '',
+            ({
+                event: '$pageview',
+                properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
+            } as any) as PluginEvent,
+            team.id,
+            DateTime.utc(),
+            DateTime.utc(),
+            new UUIDT().toString()
+        )
 
-    const [event] = await getEvents()
-    expect(event.event?.length).toBe(200)
+        expect(await getDistinctIds((await getPersons())[0])).toEqual(['asdfasdfasdf'])
+        const [event] = await getEvents()
+        expect(event.event).toBe('$pageview')
+    })
+
+    test('long event name substr', async () => {
+        await eventsProcessor.processEvent(
+            'xxx',
+            '',
+            '',
+            ({ event: 'E'.repeat(300), properties: { price: 299.99, name: 'AirPods Pro' } } as any) as PluginEvent,
+            team.id,
+            DateTime.utc(),
+            DateTime.utc(),
+            'uuid'
+        )
+
+        const [event] = await getEvents()
+        expect(event.event?.length).toBe(200)
+    })
 })
