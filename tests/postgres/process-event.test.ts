@@ -130,12 +130,11 @@ describe('process event', () => {
         expect(distinctIds).toEqual(['2'])
         expect(event.event).toEqual('$autocapture')
 
-        // TODO: add this
-        // const elements = await getElements(event)
-        // expect(elements[0].tag_name).toEqual('a')
-        // expect(elements[0].attr_class).toEqual(['btn', 'btn-sm'])
-        // expect(elements[1].order).toEqual(1)
-        // expect(elements[1].text).toEqual('💻')
+        const elements = await getElements(event)
+        expect(elements[0].tag_name).toEqual('a')
+        expect(elements[0].attr_class).toEqual(['btn', 'btn-sm'])
+        expect(elements[1].order).toEqual(1)
+        expect(elements[1].text).toEqual('💻')
 
         team = await getFirstTeam()
         expect(team.event_names).toEqual(['$autocapture'])
@@ -541,11 +540,10 @@ describe('process event', () => {
             new UUIDT().toString()
         )
 
-        // event = get_events()[0]
-        // element = get_elements(event.id)[0]
-        // self.assertEqual(len(element.href), 2048)
-        // self.assertEqual(len(element.text), 400)
-        expect(true).toBe(false)
+        const [event] = await getEvents()
+        const [element] = await getElements(event)
+        expect(element.href?.length).toEqual(2048)
+        expect(element.text?.length).toEqual(400)
     })
 
     test('capture first team event', async () => {
