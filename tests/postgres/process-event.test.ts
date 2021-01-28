@@ -701,9 +701,10 @@ describe('process event', () => {
             new UUIDT().toString()
         )
 
-        const [person] = await getPersons()
-        expect(await getDistinctIds(person)).toEqual(['anonymous_id', 'new_distinct_id'])
-        expect(person.properties['email']).toEqual('someone@gmail.com')
+        const persons1 = await getPersons()
+        expect(persons1.length).toBe(1)
+        expect(await getDistinctIds(persons1[0])).toEqual(['anonymous_id', 'new_distinct_id'])
+        expect(persons1[0].properties['email']).toEqual('someone@gmail.com')
 
         await createPerson(team, ['anonymous_id_2'])
 
@@ -725,11 +726,10 @@ describe('process event', () => {
             new UUIDT().toString()
         )
 
-        const persons = await getPersons()
-        expect(persons.length).toBe(1)
-        const person2 = persons[0]
-        expect(await getDistinctIds(person2)).toEqual(['anonymous_id', 'new_distinct_id', 'anonymous_id_2'])
-        expect(person2.properties['email']).toEqual('someone@gmail.com')
+        const persons2 = await getPersons()
+        expect(persons2.length).toBe(1)
+        expect(await getDistinctIds(persons2[0])).toEqual(['anonymous_id', 'new_distinct_id', 'anonymous_id_2'])
+        expect(persons2[0].properties['email']).toEqual('someone@gmail.com')
     })
 
     test('distinct team leakage', async () => {
