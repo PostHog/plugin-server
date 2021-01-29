@@ -419,10 +419,12 @@ describe('process event', () => {
             new UUIDT().toString()
         )
 
+        expect((await getPersons()).length).toBe(1)
         expect((await getEvents()).length).toBe(1)
         expect(await getDistinctIds((await getPersons())[0])).toEqual(['old_distinct_id', 'new_distinct_id'])
 
         await createPerson(team, ['old_distinct_id_2'])
+        expect((await getPersons()).length).toBe(2)
 
         await eventsProcessor.processEvent(
             'new_distinct_id',
@@ -438,6 +440,7 @@ describe('process event', () => {
             new UUIDT().toString()
         )
         expect((await getEvents()).length).toBe(2)
+        expect((await getPersons()).length).toBe(1)
         expect(await getDistinctIds((await getPersons())[0])).toEqual([
             'old_distinct_id',
             'new_distinct_id',
