@@ -378,13 +378,13 @@ export class EventsProcessor {
             team.ingested_event = true
             save = true
         }
-        if (team.event_names && !(event in team.event_names)) {
+        if (team.event_names && !team.event_names.includes(event)) {
             save = true
             team.event_names.push(event)
             team.event_names_with_usage.push({ event: event, usage_count: null, volume: null })
         }
         for (const [key, value] of Object.entries(properties)) {
-            if (team.event_properties && !(key in team.event_properties)) {
+            if (team.event_properties && !team.event_properties.includes(key)) {
                 team.event_properties.push(key)
                 team.event_properties_with_usage.push({ key: key, usage_count: null, volume: null })
                 save = true
@@ -392,7 +392,7 @@ export class EventsProcessor {
             if (
                 typeof value === 'number' &&
                 team.event_properties_numerical &&
-                !(key in team.event_properties_numerical)
+                !team.event_properties_numerical.includes(key)
             ) {
                 team.event_properties_numerical.push(key)
                 save = true
