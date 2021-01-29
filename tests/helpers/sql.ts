@@ -22,54 +22,8 @@ export async function resetTestDatabase(code: string): Promise<void> {
     await db.query('DELETE FROM posthog_user')
 
     const teamIds = mocks.pluginConfigRows.map((c) => c.team_id)
-    await insertRow(db, 'posthog_user', {
-        id: commonUserId,
-        password: 'gibberish',
-        first_name: 'PluginTest',
-        last_name: 'User',
-        email: 'test@posthog.com',
-        distinct_id: 'plugin_test_user_distinct_id',
-        is_staff: false,
-        is_active: false,
-        date_joined: new Date().toISOString(),
-    })
-    await insertRow(db, 'posthog_organization', {
-        id: commonOrganizationId,
-        name: 'TEST ORG',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-    })
-    await insertRow(db, 'posthog_organizationmembership', {
-        id: commonOrganizationMembershipId,
-        organization_id: commonOrganizationId,
-        user_id: commonUserId,
-        level: 15,
-        joined_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-    })
-    for (const teamId of teamIds) {
-        await insertRow(db, 'posthog_team', {
-            id: teamId,
-            organization_id: commonOrganizationId,
-            app_urls: [],
-            name: 'TEST PROJECT',
-            event_names: JSON.stringify([]),
-            event_names_with_usage: JSON.stringify([]),
-            event_properties: JSON.stringify([]),
-            event_properties_with_usage: JSON.stringify([]),
-            event_properties_numerical: JSON.stringify([]),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            anonymize_ips: false,
-            completed_snippet_onboarding: true,
-            ingested_event: true,
-            uuid: new UUIDT().toString(),
-            session_recording_opt_in: true,
-            plugins_opt_in: true,
-            opt_out_capture: false,
-            is_demo: false,
-        })
-    }
+    await createUserTeamAndOrganization(db, teamIds[0])
+
     for (const plugin of mocks.pluginRows) {
         await insertRow(db, 'posthog_plugin', plugin)
     }
@@ -96,4 +50,59 @@ async function insertRow(db: Pool, table: string, object: Record<string, any>): 
         console.error(`Error on table ${table} when inserting object:\n`, object, '\n', error)
         throw error
     }
+}
+
+export async function createUserTeamAndOrganization(
+    db: Pool,
+    teamId: number,
+    userId: number = commonUserId,
+    organizationId: string = commonOrganizationId,
+    organizationMembershipId: string = commonOrganizationMembershipId
+) {
+    await insertRow(db, 'posthog_user', {
+        id: userId,
+        password: 'gibberish',
+        first_name: 'PluginTest',
+        last_name: 'User',
+        email: `test${userId}@posthog.com`,
+        distinct_id: `plugin_test_user_distinct_id_${userId}`,
+        is_staff: false,
+        is_active: false,
+        date_joined: new Date().toISOString(),
+    })
+    await insertRow(db, 'posthog_organization', {
+        id: organizationId,
+        name: 'TEST ORG',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+    })
+    await insertRow(db, 'posthog_organizationmembership', {
+        id: organizationMembershipId,
+        organization_id: organizationId,
+        user_id: userId,
+        level: 15,
+        joined_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+    })
+    await insertRow(db, 'posthog_team', {
+        id: teamId,
+        organization_id: organizationId,
+        app_urls: [],
+        name: 'TEST PROJECT',
+        event_names: JSON.stringify([]),
+        event_names_with_usage: JSON.stringify([]),
+        event_properties: JSON.stringify([]),
+        event_properties_with_usage: JSON.stringify([]),
+        event_properties_numerical: JSON.stringify([]),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        anonymize_ips: false,
+        completed_snippet_onboarding: true,
+        ingested_event: true,
+        uuid: new UUIDT().toString(),
+        session_recording_opt_in: true,
+        plugins_opt_in: true,
+        opt_out_capture: false,
+        is_demo: false,
+    })
 }

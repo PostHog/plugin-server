@@ -10,7 +10,7 @@ import {
     Element,
     PostgresSessionRecordingEvent,
 } from '../../src/types'
-import { resetTestDatabase } from '../helpers/sql'
+import { createUserTeamAndOrganization, resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
 import { DateTime } from 'luxon'
 import { UUIDT } from '../../src/utils'
@@ -58,8 +58,11 @@ async function getDistinctIds(person: Person) {
     return (result.rows as PersonDistinctId[]).map((pdi) => pdi.distinct_id)
 }
 
+async function getTeams(): Promise<Team[]> {
+    return (await server.db.postgresQuery('SELECT * FROM posthog_team ORDER BY id')).rows
+}
 async function getFirstTeam(): Promise<Team> {
-    return (await server.db.postgresQuery('SELECT * FROM posthog_team LIMIT 1')).rows[0]
+    return (await getTeams())[0]
 }
 
 async function getElements(event: Event): Promise<Element[]> {
@@ -618,7 +621,7 @@ describe('process event', () => {
             new UUIDT().toString()
         )
 
-        expect(eventsProcessor.posthog.identify).toHaveBeenCalledWith('plugin_test_user_distinct_id')
+        expect(eventsProcessor.posthog.identify).toHaveBeenCalledWith('plugin_test_user_distinct_id_1001')
         expect(eventsProcessor.posthog.capture).toHaveBeenCalledWith('first team event ingested', {
             team: team.uuid,
         })
@@ -899,7 +902,42 @@ describe('process event', () => {
     })
 
     test('distinct team leakage', async () => {
-        expect(true).toBe(false)
+        await createUserTeamAndOrganization(
+            server.postgres,
+            3,
+            1002,
+            '01774e2f-0d01-0000-ee94-9a238640c6ee',
+            '0174f81e-36f5-0000-7ef8-cc26c1fbab1c'
+        )
+        const team2 = (await getTeams())[1]
+        await createPerson(team2, ['2'], { email: 'team2@gmail.com' })
+        await createPerson(team, ['1', '2'])
+
+        await eventsProcessor.processEvent(
+            '2',
+            '',
+            '',
+            ({
+                event: '$identify',
+                properties: {
+                    $anon_distinct_id: '1',
+                    token: team.api_token,
+                    distinct_id: '2',
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const people = await getPersons()
+        expect(people.length).toEqual(2)
+        expect(people[1].team_id).toEqual(team.id)
+        expect(people[1].properties).toEqual({})
+        expect(await getDistinctIds(people[1])).toEqual(['1', '2'])
+        expect(people[0].team_id).toEqual(team2.id)
+        expect(await getDistinctIds(people[0])).toEqual(['2'])
     })
 
     test('set is_identified', async () => {
