@@ -37,7 +37,7 @@ export class EventsProcessor {
         this.db = pluginsServer.db
         this.clickhouse = pluginsServer.clickhouse!
         this.kafkaProducer = pluginsServer.kafkaProducer!
-        this.celery = new Client(pluginsServer.redis)
+        this.celery = new Client(pluginsServer.redis, pluginsServer.CELERY_DEFAULT_QUEUE)
         this.posthog = nodePostHog('sTMFPsFhdP1Ssg')
         if (process.env.NODE_ENV === 'test') {
             this.posthog.optOut()

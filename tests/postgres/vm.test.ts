@@ -713,7 +713,8 @@ test('posthog in runEvery', async () => {
     expect(response).toBe('haha')
 
     expect(Client).toHaveBeenCalledTimes(2)
-    expect((Client as any).mock.calls[0][1]).toEqual(mockServer.PLUGINS_CELERY_QUEUE)
+    expect((Client as any).mock.calls[0][1]).toEqual(mockServer.CELERY_DEFAULT_QUEUE) // webhook to celery queue
+    expect((Client as any).mock.calls[1][1]).toEqual(mockServer.PLUGINS_CELERY_QUEUE) // events out to start of plugin queue
 
     const mockClientInstance = (Client as any).mock.instances[0]
     const mockSendTask = mockClientInstance.sendTask
@@ -751,7 +752,8 @@ test('posthog in runEvery with timestamp', async () => {
     expect(response).toBe('haha')
 
     expect(Client).toHaveBeenCalledTimes(2)
-    expect((Client as any).mock.calls[0][1]).toEqual(mockServer.PLUGINS_CELERY_QUEUE)
+    expect((Client as any).mock.calls[0][1]).toEqual(mockServer.CELERY_DEFAULT_QUEUE) // webhook to celery queue
+    expect((Client as any).mock.calls[1][1]).toEqual(mockServer.PLUGINS_CELERY_QUEUE) // events out to start of plugin queue
 
     const mockClientInstance = (Client as any).mock.instances[0]
     const mockSendTask = mockClientInstance.sendTask
