@@ -1,4 +1,4 @@
-import { PluginEvent, Properties } from '@posthog/plugin-scaffold/src/types'
+import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import { createServer } from '../../src/server'
 import {
     LogLevel,
@@ -8,7 +8,6 @@ import {
     Person,
     PersonDistinctId,
     Element,
-    SessionRecordingEvent,
     PostgresSessionRecordingEvent,
 } from '../../src/types'
 import { resetTestDatabase } from '../helpers/sql'
@@ -64,7 +63,7 @@ async function getFirstTeam(): Promise<Team> {
 }
 
 async function getElements(event: Event): Promise<Element[]> {
-    return []
+    return (await server.db.postgresQuery('SELECT * FROM posthog_element')).rows
 }
 
 async function createPerson(team: Team, distinctIds: string[], properties: Record<string, any> = {}) {
