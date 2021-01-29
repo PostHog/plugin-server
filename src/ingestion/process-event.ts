@@ -6,6 +6,7 @@ import {
     Person,
     PersonDistinctId,
     PluginsServer,
+    PostgresSessionRecordingEvent,
     SessionRecordingEvent,
     Team,
     TimestampFormat,
@@ -494,7 +495,7 @@ export class EventsProcessor {
         session_id: string,
         timestamp: DateTime | string,
         snapshot_data: Record<any, any>
-    ): Promise<SessionRecordingEvent> {
+    ): Promise<SessionRecordingEvent | PostgresSessionRecordingEvent> {
         const timestampString = castTimestampOrNow(timestamp)
 
         const data: SessionRecordingEvent = {
@@ -507,11 +508,19 @@ export class EventsProcessor {
             created_at: timestampString,
         }
 
-        await this.kafkaProducer.send({
-            topic: KAFKA_SESSION_RECORDING_EVENTS,
-            messages: [{ key: uuid, value: Buffer.from(JSON.stringify(data)) }],
-        })
-
+        if (this.kafkaProducer) {
+            await this.kafkaProducer.send({
+                topic: KAFKA_SESSION_RECORDING_EVENTS,
+                messages: [{ key: uuid, value: Buffer.from(JSON.stringify(data)) }],
+            })
+        } else {
+            const insertResult = await this.db.postgresQuery(
+                'INSERT INTO posthog_sessionrecordingevent (created_at, team_id, distinct_id, session_id, timestamp, snapshot_data) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+                [data.created_at, data.team_id, data.distinct_id, data.session_id, data.timestamp, data.snapshot_data]
+            )
+            const eventCreated = insertResult.rows[0] as PostgresSessionRecordingEvent
+            return eventCreated
+        }
         return data
     }
 }

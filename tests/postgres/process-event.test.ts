@@ -1,6 +1,16 @@
 import { PluginEvent, Properties } from '@posthog/plugin-scaffold/src/types'
 import { createServer } from '../../src/server'
-import { LogLevel, PluginsServer, Team, Event, Person, PersonDistinctId, Element } from '../../src/types'
+import {
+    LogLevel,
+    PluginsServer,
+    Team,
+    Event,
+    Person,
+    PersonDistinctId,
+    Element,
+    SessionRecordingEvent,
+    PostgresSessionRecordingEvent,
+} from '../../src/types'
 import { resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
 import { DateTime } from 'luxon'
@@ -24,6 +34,11 @@ async function getServer(): Promise<[PluginsServer, () => Promise<void>]> {
     await server.redis.del(server.PLUGINS_CELERY_QUEUE)
     await server.redis.del(server.CELERY_DEFAULT_QUEUE)
     return [server, stopServer]
+}
+
+async function getSessionRecordingEvents(): Promise<PostgresSessionRecordingEvent[]> {
+    const result = await server.db.postgresQuery('SELECT * FROM posthog_sessionrecordingevent')
+    return result.rows as PostgresSessionRecordingEvent[]
 }
 
 async function getEvents(): Promise<Event[]> {
@@ -547,11 +562,65 @@ describe('process event', () => {
     })
 
     test('capture first team event', async () => {
-        expect(true).toBe(false)
+        await server.db.postgresQuery(`UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`, [false, team.id])
+
+        eventsProcessor.posthog = {
+            identify: jest.fn((distinctId) => true),
+            capture: jest.fn((event, properties) => true),
+        } as any
+
+        await eventsProcessor.processEvent(
+            '2',
+            '',
+            '',
+            ({
+                event: '$autocapture',
+                properties: {
+                    distinct_id: 1,
+                    token: team.api_token,
+                    $elements: [{ tag_name: 'a', nth_child: 1, nth_of_type: 2, attr__class: 'btn btn-sm' }],
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect(eventsProcessor.posthog.identify).toHaveBeenCalledWith('plugin_test_user_distinct_id')
+        expect(eventsProcessor.posthog.capture).toHaveBeenCalledWith('first team event ingested', {
+            team: team.uuid,
+        })
+
+        team = await getFirstTeam()
+        expect(team.ingested_event).toEqual(true)
     })
 
     test('snapshot event stored as session_recording_event', async () => {
-        expect(true).toBe(false)
+        await eventsProcessor.processEvent(
+            'some-id',
+            '',
+            '',
+            ({
+                event: '$snapshot',
+                properties: { $session_id: 'abcf-efg', $snapshot_data: { timestamp: 123 } },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const events = await getEvents()
+        expect(events.length).toEqual(0)
+
+        const sessionRecordingEvents = await getSessionRecordingEvents()
+        expect(sessionRecordingEvents.length).toBe(1)
+
+        const [event] = sessionRecordingEvents
+        expect(event.session_id).toEqual('abcf-efg')
+        expect(event.distinct_id).toEqual('some-id')
+        expect(event.snapshot_data).toEqual({ timestamp: 123 })
     })
 
     test('identify set', async () => {
