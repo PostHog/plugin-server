@@ -15,7 +15,7 @@ import { castTimestampOrNow, UUIDT } from '../utils'
 import { Event as EventProto, IEvent } from '../idl/protos'
 import { Producer } from 'kafkajs'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { elementsToString, sanitizeEventName } from './utils'
+import { elementsToString, hashElements, sanitizeEventName } from './utils'
 import { ClickHouse } from 'clickhouse'
 import { DB } from '../db'
 import { status } from '../status'
@@ -454,9 +454,10 @@ export class EventsProcessor {
                 ],
             })
         } else {
-            // TODO: add element_group code!
-            // https://github.com/PostHog/posthog/blob/5d5ede19e4799dc71ffd5ec18e65bd969520b543/posthog/models/event.py#L235
-            const elementsHash = ''
+            let elementsHash = ''
+            if (elements && elements.length > 0) {
+                elementsHash = await this.createElementGroup(elements)
+            }
             const insertResult = await this.db.postgresQuery(
                 'INSERT INTO posthog_event (created_at, event, distinct_id, properties, team_id, timestamp, elements, elements_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
                 [
@@ -486,6 +487,15 @@ export class EventsProcessor {
         ])
 
         return data
+    }
+
+    private async createElementGroup(elements: Element[]): Promise<string> {
+        const cleanedElements = elements.map((element, index) => ({ ...element, order: index }))
+        const hash = hashElements(cleanedElements)
+
+        // TODO: create actual element group and elements
+
+        return hash
     }
 
     private async createSessionRecordingEvent(

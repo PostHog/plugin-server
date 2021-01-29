@@ -144,6 +144,7 @@ describe('process event', () => {
         expect(event.distinct_id).toEqual('2')
         expect(distinctIds).toEqual(['2'])
         expect(event.event).toEqual('$autocapture')
+        expect(event.elements_hash).toEqual('0679137c0cd2408a2906839143e7a71f')
 
         const elements = await getElements(event)
         expect(elements[0].tag_name).toEqual('a')
@@ -527,7 +528,7 @@ describe('process event', () => {
         })
     })
 
-    test.skip('long htext', async () => {
+    test('long htext', async () => {
         await eventsProcessor.processEvent(
             'new_distinct_id',
             '',
@@ -556,6 +557,7 @@ describe('process event', () => {
         )
 
         const [event] = await getEvents()
+        expect(event.elements_hash).toEqual('c2659b28e72835706835764cf7f63c2a')
         const [element] = await getElements(event)
         expect(element.href?.length).toEqual(2048)
         expect(element.text?.length).toEqual(400)
@@ -594,6 +596,9 @@ describe('process event', () => {
 
         team = await getFirstTeam()
         expect(team.ingested_event).toEqual(true)
+
+        const [event] = await getEvents()
+        expect(event.elements_hash).toEqual('a89021a60b3497d24e93ae181fba01aa')
     })
 
     test('snapshot event stored as session_recording_event', async () => {

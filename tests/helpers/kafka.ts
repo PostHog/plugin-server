@@ -16,7 +16,7 @@ export class KafkaObserver extends EventEmitter {
         super()
         this.kafka = new Kafka({
             clientId: `plugin-server-test-${new UUIDT()}`,
-            brokers: process.env.KAFKA_HOSTS!.split(','),
+            brokers: (process.env.KAFKA_HOSTS || '').split(','),
             logLevel: logLevel.NOTHING,
         })
         this.producer = this.kafka.producer()

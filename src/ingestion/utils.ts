@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
 import { Element, BaseEventMessage, RawEventMessage, EventMessage, BasePerson, RawPerson, Person } from '../types'
+import crypto from 'crypto'
 
 export function parseRawEventMessage(message: RawEventMessage): EventMessage {
     return {
@@ -66,4 +67,52 @@ export function sanitizeEventName(eventName: any): string {
         }
     }
     return eventName.substr(0, 200)
+}
+
+export function hashElements(elements: Element[]): string {
+    const elementsList = elements
+        .map((element) => ({
+            attributes: element.attributes ?? null,
+            text: element.text ?? null,
+            tag_name: element.tag_name ?? null,
+            href: element.href ?? null,
+            attr_id: element.attr_id ?? null,
+            attr_class: element.attr_class ?? null,
+            nth_child: element.nth_child ?? null,
+            nth_of_type: element.nth_of_type ?? null,
+            order: element.order ?? null,
+        }))
+        .map((element) => {
+            const newElement: Record<string, any> = {}
+            for (const key of Object.keys(element).sort()) {
+                newElement[key] = element[key as keyof typeof element]
+            }
+            return newElement
+        })
+
+    // escape utf-8 characters into `\u1234`
+    function jsonEscapeUTF(s: string): string {
+        return s.replace(/[^\x20-\x7F]/g, (x) => '\\u' + ('000' + x.codePointAt(0)?.toString(16)).slice(-4))
+    }
+
+    // produce output compatible to that of python's json.dumps
+    function pythonDumps(obj: any): string {
+        if (typeof obj === 'object' && obj !== null) {
+            if (Array.isArray(obj)) {
+                return `[${obj.map(pythonDumps).join(', ')}]`
+            } else {
+                return `{${Object.entries(obj)
+                    .map(([k, v]) => `${JSON.stringify(k)}: ${pythonDumps(v)}`)
+                    .join(', ')}}`
+            }
+        } else if (typeof obj === 'string') {
+            return jsonEscapeUTF(JSON.stringify(obj))
+        } else {
+            return JSON.stringify(obj)
+        }
+    }
+
+    const serializedString = pythonDumps(elementsList)
+
+    return crypto.createHash('md5').update(serializedString).digest('hex')
 }
