@@ -67,7 +67,7 @@ export class EventsProcessor {
         const personUuid = new UUIDT().toString()
 
         const ts = this.handleTimestamp(data, now, sentAt)
-        this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
+        await this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
 
         let result: IEvent | SessionRecordingEvent
 
@@ -135,9 +135,14 @@ export class EventsProcessor {
                 await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
             }
             if (properties['$set'] || properties['$set_once']) {
-                this.updatePersonProperties(teamId, distinctId, properties['$set'] || {}, properties['$set_once'] || {})
+                await this.updatePersonProperties(
+                    teamId,
+                    distinctId,
+                    properties['$set'] || {},
+                    properties['$set_once'] || {}
+                )
             }
-            this.setIsIdentified(teamId, distinctId)
+            await this.setIsIdentified(teamId, distinctId)
         }
     }
 
@@ -153,7 +158,7 @@ export class EventsProcessor {
                     true,
                     new UUIDT().toString()
                 )
-                this.db.addDistinctId(personCreated, distinctId)
+                await this.db.addDistinctId(personCreated, distinctId)
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
