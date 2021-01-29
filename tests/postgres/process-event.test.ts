@@ -136,8 +136,35 @@ describe('process event', () => {
         //     num_queries += 1
         // with self.assertNumQueries(num_queries):
 
-        const [event] = await getEvents()
-        const [person] = await getPersons()
+        // capture a second time to verify e.g. event_names is not ['$autocapture', '$autocapture']
+        await eventsProcessor.processEvent(
+            '2',
+            '',
+            '',
+            ({
+                event: '$autocapture',
+                properties: {
+                    distinct_id: 2,
+                    token: team.api_token,
+                    $elements: [
+                        { tag_name: 'a', nth_child: 1, nth_of_type: 2, attr__class: 'btn btn-sm' },
+                        { tag_name: 'div', nth_child: 1, nth_of_type: 2, $el_text: '💻' },
+                    ],
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const events = await getEvents()
+        const persons = await getPersons()
+        expect(events.length).toEqual(2)
+        expect(persons.length).toEqual(1)
+
+        const [event] = events
+        const [person] = persons
         const distinctIds = await getDistinctIds(person)
 
         expect(event.distinct_id).toEqual('2')
