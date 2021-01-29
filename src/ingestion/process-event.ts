@@ -209,13 +209,13 @@ export class EventsProcessor {
 
         if (oldPerson && !newPerson) {
             try {
-                this.db.addDistinctId(oldPerson, distinctId)
+                await this.db.addDistinctId(oldPerson, distinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
             } catch {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
-                    this.alias(previousDistinctId, distinctId, teamId, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, false)
                 }
             }
             return
@@ -223,13 +223,13 @@ export class EventsProcessor {
 
         if (!oldPerson && newPerson) {
             try {
-                this.db.addDistinctId(newPerson, previousDistinctId)
+                await this.db.addDistinctId(newPerson, previousDistinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
             } catch {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
-                    this.alias(previousDistinctId, distinctId, teamId, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, false)
                 }
             }
             return
@@ -245,21 +245,21 @@ export class EventsProcessor {
                     false,
                     new UUIDT().toString()
                 )
-                this.db.addDistinctId(personCreated, distinctId)
-                this.db.addDistinctId(personCreated, previousDistinctId)
+                await this.db.addDistinctId(personCreated, distinctId)
+                await this.db.addDistinctId(personCreated, previousDistinctId)
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
                 if (retryIfFailed) {
                     // Try once more, probably one of the two persons exists now
-                    this.alias(previousDistinctId, distinctId, teamId, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, false)
                 }
             }
             return
         }
 
         if (oldPerson && newPerson && oldPerson.id !== newPerson.id) {
-            this.mergePeople(newPerson, [oldPerson])
+            await this.mergePeople(newPerson, [oldPerson])
         }
     }
 
@@ -340,7 +340,7 @@ export class EventsProcessor {
             properties['$ip'] = ip
         }
 
-        this.storeNamesAndProperties(team, event, properties)
+        await this.storeNamesAndProperties(team, event, properties)
 
         const pdiSelectResult = await this.db.postgresQuery(
             'SELECT COUNT(*) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
