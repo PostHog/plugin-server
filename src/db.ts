@@ -5,8 +5,16 @@ import { DateTime } from 'luxon'
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { unparsePersonPartial } from './ingestion/utils'
-import { Person, PersonDistinctId, RawPerson, RawOrganization } from './types'
-import { castTimestampOrNow, sanitizeSqlIdentifier } from './utils'
+import {
+    Person,
+    PersonDistinctId,
+    RawPerson,
+    RawOrganization,
+    Team,
+    PostgresSessionRecordingEvent,
+    Event,
+} from './types'
+import { castTimestampOrNow, sanitizeSqlIdentifier, UUIDT } from './utils'
 
 /** The recommended way of accessing the database. */
 export class DB {
@@ -30,6 +38,13 @@ export class DB {
         return this.postgres.query(queryTextOrConfig, values)
     }
 
+    // Person
+
+    public async fetchPersons(): Promise<Person[]> {
+        const result = await this.postgresQuery('SELECT * FROM posthog_person')
+        return result.rows as Person[]
+    }
+
     public async fetchPerson(teamId: number, distinctId: string): Promise<Person | undefined> {
         const selectResult = await this.postgresQuery(
             `SELECT
@@ -45,8 +60,10 @@ export class DB {
                 AND posthog_persondistinctid.distinct_id = $2`,
             [teamId, distinctId]
         )
-        const rawPerson: RawPerson = selectResult.rows[0]
-        return { ...rawPerson, created_at: DateTime.fromISO(rawPerson.created_at) }
+        if (selectResult.rows.length > 0) {
+            const rawPerson: RawPerson = selectResult.rows[0]
+            return { ...rawPerson, created_at: DateTime.fromISO(rawPerson.created_at) }
+        }
     }
 
     public async createPerson(
@@ -55,7 +72,8 @@ export class DB {
         teamId: number,
         isUserId: number | null,
         isIdentified: boolean,
-        uuid: string
+        uuid: string,
+        distinctIds?: string[]
     ): Promise<Person> {
         const insertResult = await this.postgresQuery(
             'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
@@ -75,16 +93,22 @@ export class DB {
                 messages: [{ value: Buffer.from(JSON.stringify(data)) }],
             })
         }
+
+        for (const distinctId of distinctIds || []) {
+            await this.addDistinctId(personCreated, distinctId)
+        }
+
         return personCreated
     }
 
     public async updatePerson(person: Person, update: Partial<Person>): Promise<Person> {
         const updatedPerson: Person = { ...person, ...update }
+        const values = [...Object.values(unparsePersonPartial(update)), person.id]
         await this.postgresQuery(
             `UPDATE posthog_person SET ${Object.keys(update).map(
                 (field, index) => sanitizeSqlIdentifier(field) + ' = $' + (index + 1)
             )} WHERE id = $${Object.values(update).length + 1}`,
-            [...Object.values(unparsePersonPartial(update)), person.id]
+            values
         )
         if (this.kafkaProducer) {
             const data = {
@@ -103,7 +127,7 @@ export class DB {
     }
 
     public async deletePerson(personId: number): Promise<void> {
-        await this.postgresQuery('DELETE FROM person_distinct_id WHERE person_id = $1', [personId])
+        await this.postgresQuery('DELETE FROM posthog_persondistinctid WHERE person_id = $1', [personId])
         await this.postgresQuery('DELETE FROM posthog_person WHERE id = $1', [personId])
         if (this.clickhouse) {
             await this.clickhouse.query(`ALTER TABLE person DELETE WHERE id = ${personId}`).toPromise()
@@ -111,6 +135,16 @@ export class DB {
                 .query(`ALTER TABLE person_distinct_id DELETE WHERE person_id = ${personId}`)
                 .toPromise()
         }
+    }
+
+    // PersonDistinctId
+
+    public async fetchDistinctIdValues(person: Person): Promise<string[]> {
+        const result = await this.postgresQuery(
+            'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 and team_id=$2 ORDER BY id',
+            [person.id, person.team_id]
+        )
+        return (result.rows as PersonDistinctId[]).map((pdi) => pdi.distinct_id)
     }
 
     public async addDistinctId(person: Person, distinctId: string): Promise<void> {
@@ -146,11 +180,33 @@ export class DB {
         }
     }
 
+    // Organization
+
     public async fetchOrganization(organizationId: string): Promise<RawOrganization | undefined> {
         const selectResult = await this.postgresQuery(`SELECT * FROM posthog_organization WHERE id $1`, [
             organizationId,
         ])
         const rawOrganization: RawOrganization = selectResult.rows[0]
         return rawOrganization
+    }
+
+    // Event
+
+    public async fetchEvents(): Promise<Event[]> {
+        const result = await this.postgresQuery('SELECT * FROM posthog_event')
+        return result.rows as Event[]
+    }
+
+    // SessionRecordingEvent
+
+    public async fetchSessionRecordingEvents(): Promise<PostgresSessionRecordingEvent[]> {
+        const result = await this.postgresQuery('SELECT * FROM posthog_sessionrecordingevent')
+        return result.rows as PostgresSessionRecordingEvent[]
+    }
+
+    // Element
+
+    public async fetchElements(): Promise<Element[]> {
+        return (await this.postgresQuery('SELECT * FROM posthog_element')).rows
     }
 }

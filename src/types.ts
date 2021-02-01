@@ -242,6 +242,25 @@ export interface Element {
     group_id?: number
 }
 
+export interface ElementGroup {
+    id: number
+    hash: string
+    team_id: number
+}
+
+/** Usable Event model. */
+export interface Event {
+    id: number
+    event?: string
+    properties: Record<string, any>
+    elements?: Element[]
+    timestamp: string
+    team_id: number
+    distinct_id: string
+    elements_hash: string
+    created_at: string
+}
+
 /** Properties shared by RawPerson and Person. */
 export interface BasePerson {
     id: number
@@ -276,6 +295,7 @@ export interface CohortPeople {
     cohort_id: number
     person_id: number
 }
+
 export interface SessionRecordingEvent {
     uuid: string
     timestamp: string
@@ -284,4 +304,13 @@ export interface SessionRecordingEvent {
     session_id: string
     snapshot_data: string
     created_at: string
+}
+
+export interface PostgresSessionRecordingEvent extends Omit<SessionRecordingEvent, 'uuid'> {
+    id: string
+}
+
+export enum TimestampFormat {
+    ClickHouse = 'clickhouse',
+    ISO = 'iso',
 }

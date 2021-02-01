@@ -1,4 +1,4 @@
-import { Pool } from 'pg'
+import { Pool, types as pgTypes } from 'pg'
 import * as schedule from 'node-schedule'
 import Redis from 'ioredis'
 import { Kafka, logLevel, Producer } from 'kafkajs'
@@ -19,6 +19,7 @@ import { status } from './status'
 import { startSchedule } from './services/schedule'
 import { ConnectionOptions } from 'tls'
 import { DB } from './db'
+import { DateTime } from 'luxon'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
@@ -87,6 +88,19 @@ export async function createServer(
         })
         kafkaProducer = kafka.producer()
     }
+
+    // `node-postgres` will return dates as plain JS Date objects, which will use the local timezone.
+    // This converts all date fields to a proper luxon UTC DateTime
+    // Unfortunately this must be done on a global object before initializing the `Pool`
+    pgTypes.setTypeParser(1083 /* types.TypeId.TIME */, (timeStr) =>
+        timeStr ? DateTime.fromSQL(timeStr, { zone: 'utc' }).toISO() : null
+    )
+    pgTypes.setTypeParser(1114 /* types.TypeId.TIMESTAMP */, (timeStr) =>
+        timeStr ? DateTime.fromSQL(timeStr, { zone: 'utc' }).toISO() : null
+    )
+    pgTypes.setTypeParser(1184 /* types.TypeId.TIMESTAMPTZ */, (timeStr) =>
+        timeStr ? DateTime.fromSQL(timeStr, { zone: 'utc' }).toISO() : null
+    )
 
     const postgres = new Pool({
         connectionString: serverConfig.DATABASE_URL,

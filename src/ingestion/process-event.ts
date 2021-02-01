@@ -1,11 +1,22 @@
 import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import { DateTime, Duration } from 'luxon'
-import { PluginsServer, Element, Team, Person, PersonDistinctId, CohortPeople, SessionRecordingEvent } from '../types'
+import {
+    CohortPeople,
+    Element,
+    ElementGroup,
+    Person,
+    PersonDistinctId,
+    PluginsServer,
+    PostgresSessionRecordingEvent,
+    SessionRecordingEvent,
+    Team,
+    TimestampFormat,
+} from '../types'
 import { castTimestampOrNow, UUIDT } from '../utils'
 import { Event as EventProto, IEvent } from '../idl/protos'
 import { Producer } from 'kafkajs'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { sanitizeEventName, elementsToString } from './utils'
+import { elementsToString, hashElements, sanitizeEventName } from './utils'
 import { ClickHouse } from 'clickhouse'
 import { DB } from '../db'
 import { status } from '../status'
@@ -26,8 +37,11 @@ export class EventsProcessor {
         this.db = pluginsServer.db
         this.clickhouse = pluginsServer.clickhouse!
         this.kafkaProducer = pluginsServer.kafkaProducer!
-        this.celery = new Client(pluginsServer.redis)
+        this.celery = new Client(pluginsServer.redis, pluginsServer.CELERY_DEFAULT_QUEUE)
         this.posthog = nodePostHog('sTMFPsFhdP1Ssg')
+        if (process.env.NODE_ENV === 'test') {
+            this.posthog.optOut()
+        }
     }
 
     public async processEvent(
@@ -53,7 +67,7 @@ export class EventsProcessor {
         const personUuid = new UUIDT().toString()
 
         const ts = this.handleTimestamp(data, now, sentAt)
-        this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
+        await this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
 
         let result: IEvent | SessionRecordingEvent
 
@@ -121,9 +135,14 @@ export class EventsProcessor {
                 await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
             }
             if (properties['$set'] || properties['$set_once']) {
-                this.updatePersonProperties(teamId, distinctId, properties['$set'] || {}, properties['$set_once'] || {})
+                await this.updatePersonProperties(
+                    teamId,
+                    distinctId,
+                    properties['$set'] || {},
+                    properties['$set_once'] || {}
+                )
             }
-            this.setIsIdentified(teamId, distinctId)
+            await this.setIsIdentified(teamId, distinctId)
         }
     }
 
@@ -139,7 +158,7 @@ export class EventsProcessor {
                     true,
                     new UUIDT().toString()
                 )
-                this.db.addDistinctId(personCreated, distinctId)
+                await this.db.addDistinctId(personCreated, distinctId)
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
@@ -190,13 +209,13 @@ export class EventsProcessor {
 
         if (oldPerson && !newPerson) {
             try {
-                this.db.addDistinctId(oldPerson, distinctId)
+                await this.db.addDistinctId(oldPerson, distinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
             } catch {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
-                    this.alias(previousDistinctId, distinctId, teamId, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, false)
                 }
             }
             return
@@ -204,13 +223,13 @@ export class EventsProcessor {
 
         if (!oldPerson && newPerson) {
             try {
-                this.db.addDistinctId(newPerson, previousDistinctId)
+                await this.db.addDistinctId(newPerson, previousDistinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
             } catch {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
-                    this.alias(previousDistinctId, distinctId, teamId, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, false)
                 }
             }
             return
@@ -226,21 +245,21 @@ export class EventsProcessor {
                     false,
                     new UUIDT().toString()
                 )
-                this.db.addDistinctId(personCreated, distinctId)
-                this.db.addDistinctId(personCreated, previousDistinctId)
+                await this.db.addDistinctId(personCreated, distinctId)
+                await this.db.addDistinctId(personCreated, previousDistinctId)
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
                 if (retryIfFailed) {
                     // Try once more, probably one of the two persons exists now
-                    this.alias(previousDistinctId, distinctId, teamId, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, false)
                 }
             }
             return
         }
 
         if (oldPerson && newPerson && oldPerson.id !== newPerson.id) {
-            this.mergePeople(newPerson, [oldPerson])
+            await this.mergePeople(newPerson, [oldPerson])
         }
     }
 
@@ -256,14 +275,14 @@ export class EventsProcessor {
             }
         }
 
-        await this.db.updatePerson(mergeInto, { created_at: firstSeen })
+        await this.db.updatePerson(mergeInto, { created_at: firstSeen, properties: mergeInto.properties })
 
         // merge the distinct_ids
         for (const otherPerson of peopleToMerge) {
             const otherPersonDistinctIds: PersonDistinctId[] = (
                 await this.db.postgresQuery(
                     'SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2',
-                    [otherPerson, mergeInto.team_id]
+                    [otherPerson.id, mergeInto.team_id]
                 )
             ).rows
             for (const personDistinctId of otherPersonDistinctIds) {
@@ -321,7 +340,7 @@ export class EventsProcessor {
             properties['$ip'] = ip
         }
 
-        this.storeNamesAndProperties(team, event, properties)
+        await this.storeNamesAndProperties(team, event, properties)
 
         const pdiSelectResult = await this.db.postgresQuery(
             'SELECT COUNT(*) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
@@ -364,13 +383,13 @@ export class EventsProcessor {
             team.ingested_event = true
             save = true
         }
-        if (team.event_names && !(event in team.event_names)) {
+        if (team.event_names && !team.event_names.includes(event)) {
             save = true
             team.event_names.push(event)
             team.event_names_with_usage.push({ event: event, usage_count: null, volume: null })
         }
         for (const [key, value] of Object.entries(properties)) {
-            if (team.event_properties && !(key in team.event_properties)) {
+            if (team.event_properties && !team.event_properties.includes(key)) {
                 team.event_properties.push(key)
                 team.event_properties_with_usage.push({ key: key, usage_count: null, volume: null })
                 save = true
@@ -378,7 +397,7 @@ export class EventsProcessor {
             if (
                 typeof value === 'number' &&
                 team.event_properties_numerical &&
-                !(key in team.event_properties_numerical)
+                !team.event_properties_numerical.includes(key)
             ) {
                 team.event_properties_numerical.push(key)
                 save = true
@@ -395,7 +414,7 @@ export class EventsProcessor {
                     JSON.stringify(team.event_names),
                     JSON.stringify(team.event_names_with_usage),
                     JSON.stringify(team.event_properties),
-                    JSON.stringify(team.event_names_with_usage),
+                    JSON.stringify(team.event_properties_with_usage),
                     JSON.stringify(team.event_properties_numerical),
                     team.id,
                 ]
@@ -413,7 +432,10 @@ export class EventsProcessor {
         elements?: Element[],
         siteUrl?: string
     ): Promise<IEvent> {
-        const timestampString = castTimestampOrNow(timestamp)
+        const timestampString = castTimestampOrNow(
+            timestamp,
+            this.kafkaProducer ? TimestampFormat.ClickHouse : TimestampFormat.ISO
+        )
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
 
         const data: IEvent = {
@@ -427,10 +449,36 @@ export class EventsProcessor {
             createdAt: timestampString,
         }
 
-        await this.kafkaProducer.send({
-            topic: KAFKA_EVENTS,
-            messages: [{ key: uuid, value: EventProto.encodeDelimited(EventProto.create(data)).finish() as Buffer }],
-        })
+        if (this.kafkaProducer) {
+            await this.kafkaProducer.send({
+                topic: KAFKA_EVENTS,
+                messages: [
+                    {
+                        key: uuid,
+                        value: EventProto.encodeDelimited(EventProto.create(data)).finish() as Buffer,
+                    },
+                ],
+            })
+        } else {
+            let elementsHash = ''
+            if (elements && elements.length > 0) {
+                elementsHash = await this.createElementGroup(elements, team.id)
+            }
+            const insertResult = await this.db.postgresQuery(
+                'INSERT INTO posthog_event (created_at, event, distinct_id, properties, team_id, timestamp, elements, elements_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+                [
+                    data.createdAt,
+                    data.event,
+                    distinctId,
+                    data.properties,
+                    data.teamId,
+                    data.timestamp,
+                    JSON.stringify(elements || []),
+                    elementsHash,
+                ]
+            )
+            const eventCreated = insertResult.rows[0] as Event
+        }
 
         this.celery.sendTask('ee.tasks.webhooks_ee.post_event_to_webhook_ee', [
             {
@@ -447,6 +495,45 @@ export class EventsProcessor {
         return data
     }
 
+    private async createElementGroup(elements: Element[], teamId: number): Promise<string> {
+        const cleanedElements = elements.map((element, index) => ({ ...element, order: index }))
+        const hash = hashElements(cleanedElements)
+
+        try {
+            const insertResult = await this.db.postgresQuery(
+                'INSERT INTO posthog_elementgroup (hash, team_id) VALUES ($1, $2) RETURNING *',
+                [hash, teamId]
+            )
+            const elementGroup = insertResult.rows[0] as ElementGroup
+            for (const element of cleanedElements) {
+                await this.db.postgresQuery(
+                    'INSERT INTO posthog_element (text, tag_name, href, attr_id, nth_child, nth_of_type, attributes, "order", event_id, attr_class, group_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+                    [
+                        element.text,
+                        element.tag_name,
+                        element.href,
+                        element.attr_id,
+                        element.nth_child,
+                        element.nth_of_type,
+                        element.attributes,
+                        element.order,
+                        element.event_id,
+                        element.attr_class,
+                        elementGroup.id,
+                    ]
+                )
+            }
+        } catch (error) {
+            // Throw further if not postgres error nr "23505" == "unique_violation"
+            // https://www.postgresql.org/docs/12/errcodes-appendix.html
+            if (error.code !== '23505') {
+                throw error
+            }
+        }
+
+        return hash
+    }
+
     private async createSessionRecordingEvent(
         uuid: string,
         team_id: number,
@@ -454,7 +541,7 @@ export class EventsProcessor {
         session_id: string,
         timestamp: DateTime | string,
         snapshot_data: Record<any, any>
-    ): Promise<SessionRecordingEvent> {
+    ): Promise<SessionRecordingEvent | PostgresSessionRecordingEvent> {
         const timestampString = castTimestampOrNow(timestamp)
 
         const data: SessionRecordingEvent = {
@@ -467,11 +554,19 @@ export class EventsProcessor {
             created_at: timestampString,
         }
 
-        await this.kafkaProducer.send({
-            topic: KAFKA_SESSION_RECORDING_EVENTS,
-            messages: [{ key: uuid, value: Buffer.from(JSON.stringify(data)) }],
-        })
-
+        if (this.kafkaProducer) {
+            await this.kafkaProducer.send({
+                topic: KAFKA_SESSION_RECORDING_EVENTS,
+                messages: [{ key: uuid, value: Buffer.from(JSON.stringify(data)) }],
+            })
+        } else {
+            const insertResult = await this.db.postgresQuery(
+                'INSERT INTO posthog_sessionrecordingevent (created_at, team_id, distinct_id, session_id, timestamp, snapshot_data) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+                [data.created_at, data.team_id, data.distinct_id, data.session_id, data.timestamp, data.snapshot_data]
+            )
+            const eventCreated = insertResult.rows[0] as PostgresSessionRecordingEvent
+            return eventCreated
+        }
         return data
     }
 }

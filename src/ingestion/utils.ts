@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
 import { Element, BaseEventMessage, RawEventMessage, EventMessage, BasePerson, RawPerson, Person } from '../types'
+import crypto from 'crypto'
 
 export function parseRawEventMessage(message: RawEventMessage): EventMessage {
     return {
@@ -66,4 +67,45 @@ export function sanitizeEventName(eventName: any): string {
         }
     }
     return eventName.substr(0, 200)
+}
+
+/** Escape UTF-8 characters into `\u1234`. */
+function jsonEscapeUtf8(s: string): string {
+    return s.replace(/[^\x20-\x7F]/g, (x) => '\\u' + ('000' + x.codePointAt(0)?.toString(16)).slice(-4))
+}
+
+/** Produce output compatible with that of Python's `json.dumps`. */
+function jsonDumps(obj: any): string {
+    if (typeof obj === 'object' && obj !== null) {
+        if (Array.isArray(obj)) {
+            return `[${obj.map(jsonDumps).join(', ')}]` // space after comma
+        } else {
+            return `{${Object.keys(obj) // no space after '{' or before '}'
+                .sort() // must sort the keys of the object!
+                .map((k) => `${jsonDumps(k)}: ${jsonDumps(obj[k])}`) // space after ':'
+                .join(', ')}}` // space after ','
+        }
+    } else if (typeof obj === 'string') {
+        return jsonEscapeUtf8(JSON.stringify(obj))
+    } else {
+        return JSON.stringify(obj)
+    }
+}
+
+export function hashElements(elements: Element[]): string {
+    const elementsList = elements.map((element) => ({
+        attributes: element.attributes ?? null,
+        text: element.text ?? null,
+        tag_name: element.tag_name ?? null,
+        href: element.href ?? null,
+        attr_id: element.attr_id ?? null,
+        attr_class: element.attr_class ?? null,
+        nth_child: element.nth_child ?? null,
+        nth_of_type: element.nth_of_type ?? null,
+        order: element.order ?? null,
+    }))
+
+    const serializedString = jsonDumps(elementsList)
+
+    return crypto.createHash('md5').update(serializedString).digest('hex')
 }
