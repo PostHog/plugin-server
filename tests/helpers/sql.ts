@@ -2,9 +2,14 @@ import { makePluginObjects, commonOrganizationId, commonUserId, commonOrganizati
 import { defaultConfig } from '../../src/config'
 import { Pool } from 'pg'
 import { delay, UUIDT } from '../../src/utils'
+import { PluginsServerConfig } from '../../src/types'
 
-export async function resetTestDatabase(code: string): Promise<void> {
-    const db = new Pool({ connectionString: defaultConfig.DATABASE_URL })
+export async function resetTestDatabase(
+    code: string,
+    extraServerConfig: Partial<PluginsServerConfig> = {}
+): Promise<void> {
+    const config = { ...defaultConfig, ...extraServerConfig }
+    const db = new Pool({ connectionString: config.DATABASE_URL })
     const mocks = makePluginObjects(code)
     await db.query('DELETE FROM posthog_element')
     await db.query('DELETE FROM posthog_elementgroup')

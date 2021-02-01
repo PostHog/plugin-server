@@ -36,25 +36,8 @@ async function getDistinctIds(server: PluginsServer, person: Person): Promise<st
     return (result.rows as PersonDistinctId[]).map((pdi) => pdi.distinct_id)
 }
 
-async function getTeams(server: PluginsServer): Promise<Team[]> {
-    return (await server.db.postgresQuery('SELECT * FROM posthog_team ORDER BY id')).rows
-}
-
-async function getFirstTeam(server: PluginsServer): Promise<Team> {
-    return (await getTeams(server))[0]
-}
-
 async function getElements(server: PluginsServer, event: Event): Promise<Element[]> {
     return (await server.db.postgresQuery('SELECT * FROM posthog_element')).rows
-}
-
-async function createPerson(
-    server: PluginsServer,
-    team: Team,
-    distinctIds: string[],
-    properties: Record<string, any> = {}
-): Promise<Person> {
-    return server.db.createPerson(DateTime.utc(), properties, team.id, null, false, new UUIDT().toString(), distinctIds)
 }
 
 describe('process event (postgresql)', () => {
@@ -63,9 +46,6 @@ describe('process event (postgresql)', () => {
         getEvents,
         getPersons,
         getDistinctIds,
-        getTeams,
-        getFirstTeam,
         getElements,
-        createPerson,
     })
 })

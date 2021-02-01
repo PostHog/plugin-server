@@ -1,12 +1,14 @@
 import { defaultConfig } from '../../src/config'
 import { ClickHouse } from 'clickhouse'
+import { PluginsServerConfig } from '../../src/types'
 
-export async function resetTestDatabaseClickhouse(): Promise<void> {
+export async function resetTestDatabaseClickhouse(extraServerConfig: Partial<PluginsServerConfig>): Promise<void> {
+    const config = { ...defaultConfig, ...extraServerConfig }
     const clickhouse = new ClickHouse({
-        url: `http://$${defaultConfig.CLICKHOUSE_HOST}`,
+        url: `http://$${config.CLICKHOUSE_HOST}`,
         port: 8123,
         config: {
-            database: defaultConfig.CLICKHOUSE_DATABASE,
+            database: config.CLICKHOUSE_DATABASE,
         },
     })
     await clickhouse.query('TRUNCATE events').toPromise()

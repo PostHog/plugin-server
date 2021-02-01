@@ -9,6 +9,7 @@ import {
     PersonDistinctId,
     Element,
     PostgresSessionRecordingEvent,
+    PluginsServerConfig,
 } from '../../src/types'
 import { createUserTeamAndOrganization, resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
@@ -17,6 +18,23 @@ import { UUIDT } from '../../src/utils'
 
 jest.setTimeout(600000) // 600 sec timeout
 
+async function getTeams(server: PluginsServer): Promise<Team[]> {
+    return (await server.db.postgresQuery('SELECT * FROM posthog_team ORDER BY id')).rows
+}
+
+async function getFirstTeam(server: PluginsServer): Promise<Team> {
+    return (await getTeams(server))[0]
+}
+
+async function createPerson(
+    server: PluginsServer,
+    team: Team,
+    distinctIds: string[],
+    properties: Record<string, any> = {}
+): Promise<Person> {
+    return server.db.createPerson(DateTime.utc(), properties, team.id, null, false, new UUIDT().toString(), distinctIds)
+}
+
 export const createProcessEventTests = (
     database: 'postgresql' | 'clickhouse',
     {
@@ -24,26 +42,16 @@ export const createProcessEventTests = (
         getEvents,
         getPersons,
         getDistinctIds,
-        getTeams,
-        getFirstTeam,
         getElements,
-        createPerson,
     }: {
         getSessionRecordingEvents: (server: PluginsServer) => Promise<PostgresSessionRecordingEvent[]>
         getEvents: (server: PluginsServer) => Promise<Event[]>
         getPersons: (server: PluginsServer) => Promise<Person[]>
         getDistinctIds: (server: PluginsServer, person: Person) => Promise<string[]>
-        getTeams: (server: PluginsServer) => Promise<Team[]>
-        getFirstTeam: (server: PluginsServer) => Promise<Team>
         getElements: (server: PluginsServer, event: Event) => Promise<Element[]>
-        createPerson: (
-            server: PluginsServer,
-            team: Team,
-            distinctIds: string[],
-            properties?: Record<string, any>
-        ) => Promise<Person>
-    }
-) => {
+    },
+    extraServerConfig?: Partial<PluginsServerConfig>
+): PluginsServer => {
     let queryCounter = 0
     let team: Team
     let server: PluginsServer
@@ -56,6 +64,7 @@ export const createProcessEventTests = (
             PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
             CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
             LOG_LEVEL: LogLevel.Log,
+            ...(extraServerConfig ?? {}),
         })
 
         await server.redis.del(server.PLUGINS_CELERY_QUEUE)
@@ -77,7 +86,7 @@ export const createProcessEventTests = (
                 return event
             }
         `
-        await resetTestDatabase(testCode)
+        await resetTestDatabase(testCode, extraServerConfig)
         ;[server, stopServer] = await getServer()
         eventsProcessor = new EventsProcessor(server)
         queryCounter = 0
@@ -1032,4 +1041,6 @@ export const createProcessEventTests = (
         const [event] = await getEvents(server)
         expect(event.event?.length).toBe(200)
     })
+
+    return server!
 }

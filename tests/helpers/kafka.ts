@@ -2,8 +2,9 @@ import { EventEmitter } from 'events'
 import { Kafka, Consumer, logLevel, EachMessagePayload, Producer } from 'kafkajs'
 import { KAFKA_EVENTS, KAFKA_EVENTS_INGESTION_HANDOFF } from '../../src/ingestion/topics'
 import { parseRawEventMessage } from '../../src/ingestion/utils'
-import { EventMessage } from '../../src/types'
+import { EventMessage, PluginsServerConfig } from '../../src/types'
 import { UUIDT } from '../../src/utils'
+import { defaultConfig, overrideWithEnv } from '../../src/config'
 
 export class KafkaObserver extends EventEmitter {
     public kafka: Kafka
@@ -12,11 +13,12 @@ export class KafkaObserver extends EventEmitter {
 
     private isStarted: boolean
 
-    constructor() {
+    constructor(extraServerConfig: Partial<PluginsServerConfig>) {
         super()
+        const config = { ...overrideWithEnv(defaultConfig, process.env), ...extraServerConfig }
         this.kafka = new Kafka({
             clientId: `plugin-server-test-${new UUIDT()}`,
-            brokers: (process.env.KAFKA_HOSTS || '').split(','),
+            brokers: (config.KAFKA_HOSTS || '').split(','),
             logLevel: logLevel.NOTHING,
         })
         this.producer = this.kafka.producer()
