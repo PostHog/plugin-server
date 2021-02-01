@@ -1,4 +1,4 @@
-import { PluginsServerConfig } from '../../src/types'
+import { PluginsServerConfig, Event } from '../../src/types'
 import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
 import { resetKafka } from '../helpers/kafka'
 import { createProcessEventTests } from '../shared/process-event'
@@ -26,7 +26,7 @@ describe('process event (clickhouse)', () => {
             getEvents: (server) => server.db.fetchEvents(),
             getPersons: (server) => server.db.fetchPersons(),
             getDistinctIds: (server, person) => server.db.fetchDistinctIdValues(person),
-            getElements: (server) => server.db.fetchElements(),
+            getElements: (server, event: Event) => server.db.fetchElements(event),
         },
         extraServerConfig
     )

@@ -4,7 +4,7 @@ import { Producer } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
-import { unparsePersonPartial } from './ingestion/utils'
+import { chainToElements, unparsePersonPartial } from './ingestion/utils'
 import {
     Person,
     PersonDistinctId,
@@ -14,6 +14,7 @@ import {
     PostgresSessionRecordingEvent,
     Event,
     ClickHouseEvent,
+    Element,
 } from './types'
 import { castTimestampOrNow, sanitizeSqlIdentifier, UUIDT } from './utils'
 
@@ -217,7 +218,15 @@ export class DB {
 
     // Element
 
-    public async fetchElements(): Promise<Element[]> {
-        return (await this.postgresQuery('SELECT * FROM posthog_element')).rows
+    public async fetchElements(event: Event): Promise<Element[]> {
+        if (this.kafkaProducer) {
+            const events = (await this.clickhouse
+                ?.query(`SELECT elements_chain FROM events WHERE uuid='${sanitizeSqlIdentifier((event as any).uuid)}'`)
+                .toPromise()) as ClickHouseEvent[]
+            const chain = events?.[0]?.elements_chain
+            return chainToElements(chain)
+        } else {
+            return (await this.postgresQuery('SELECT * FROM posthog_element')).rows
+        }
     }
 }

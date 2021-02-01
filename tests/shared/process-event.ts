@@ -17,6 +17,7 @@ import { EventsProcessor } from '../../src/ingestion/process-event'
 import { DateTime } from 'luxon'
 import { delay, UUIDT } from '../../src/utils'
 import { IEvent } from '../../src/idl/protos'
+import { hashElements } from '../../src/ingestion/utils'
 
 jest.setTimeout(600000) // 600 sec timeout
 
@@ -651,14 +652,14 @@ export const createProcessEventTests = (
         )
 
         const [event] = (await getEvents(server)) as Event[]
-        expect(event.elements_hash).toEqual('c2659b28e72835706835764cf7f63c2a')
-
-        if (database === 'clickhouse') {
-            expect(0).toBe(1)
-        } else if (database === 'postgresql') {
-            const [element] = await getElements(server, event)
-            expect(element.href?.length).toEqual(2048)
-            expect(element.text?.length).toEqual(400)
+        const [element] = await getElements(server, event)
+        expect(element.href?.length).toEqual(2048)
+        expect(element.text?.length).toEqual(400)
+        if (database === 'postgresql') {
+            expect(event.elements_hash).toEqual('c2659b28e72835706835764cf7f63c2a')
+        } else if (database === 'clickhouse') {
+            const hash = hashElements([element])
+            expect(hash).toEqual('c2659b28e72835706835764cf7f63c2a')
         }
     })
 
@@ -697,7 +698,13 @@ export const createProcessEventTests = (
         expect(team.ingested_event).toEqual(true)
 
         const [event] = (await getEvents(server)) as Event[]
-        expect(event.elements_hash).toEqual('a89021a60b3497d24e93ae181fba01aa')
+        if (database === 'postgresql') {
+            expect(event.elements_hash).toEqual('a89021a60b3497d24e93ae181fba01aa')
+        } else if (database === 'clickhouse') {
+            const elements = await getElements(server, event)
+            const hash = hashElements(elements)
+            expect(hash).toEqual('a89021a60b3497d24e93ae181fba01aa')
+        }
     })
 
     test('snapshot event stored as session_recording_event', async () => {

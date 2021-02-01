@@ -237,7 +237,7 @@ export interface Element {
     attr_class?: string[]
     nth_child?: number
     nth_of_type?: number
-    attributes: Record<string, any>
+    attributes?: Record<string, any>
     event_id?: number
     order?: number
     group_id?: number
