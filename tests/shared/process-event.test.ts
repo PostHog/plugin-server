@@ -44,6 +44,7 @@ export const createProcessEventTests = (
         ) => Promise<Person>
     }
 ) => {
+    let queryCounter = 0
     let team: Team
     let server: PluginsServer
     let stopServer: () => Promise<void>
@@ -59,6 +60,13 @@ export const createProcessEventTests = (
 
         await server.redis.del(server.PLUGINS_CELERY_QUEUE)
         await server.redis.del(server.CELERY_DEFAULT_QUEUE)
+
+        const query = server.postgres.query.bind(server.postgres)
+        server.postgres.query = (queryText: any, values?: any, callback?: any): any => {
+            queryCounter++
+            return query(queryText, values, callback)
+        }
+
         return [server, stopServer]
     }
 
@@ -72,6 +80,7 @@ export const createProcessEventTests = (
         await resetTestDatabase(testCode)
         ;[server, stopServer] = await getServer()
         eventsProcessor = new EventsProcessor(server)
+        queryCounter = 0
         team = await getFirstTeam(server)
         now = DateTime.utc()
     })
@@ -107,7 +116,9 @@ export const createProcessEventTests = (
             new UUIDT().toString()
         )
 
-        // TODO: add this back?
+        expect(queryCounter).toBe(12)
+
+        // TODO: 12 vs 28 is a big difference. Why so?
         // num_queries = 28
         // if settings.EE_AVAILABLE:  # extra queries to check for hooks
         //     num_queries += 4
