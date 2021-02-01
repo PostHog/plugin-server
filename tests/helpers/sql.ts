@@ -19,6 +19,7 @@ export async function resetTestDatabase(code: string): Promise<void> {
         name: 'TEST ORG',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        personalization: '{}',
     })
     for (const teamId of teamIds) {
         await insertRow(db, 'posthog_team', {
