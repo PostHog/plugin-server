@@ -434,7 +434,7 @@ export class EventsProcessor {
     ): Promise<IEvent> {
         const timestampString = castTimestampOrNow(
             timestamp,
-            this.kafkaProducer ? TimestampFormat.Clickhouse : TimestampFormat.ISO
+            this.kafkaProducer ? TimestampFormat.ClickHouse : TimestampFormat.ISO
         )
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
 

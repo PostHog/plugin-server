@@ -311,6 +311,6 @@ export interface PostgresSessionRecordingEvent extends Omit<SessionRecordingEven
 }
 
 export enum TimestampFormat {
-    Clickhouse = 'clickhouse',
+    ClickHouse = 'clickhouse',
     ISO = 'iso',
 }

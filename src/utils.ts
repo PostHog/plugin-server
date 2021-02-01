@@ -289,11 +289,14 @@ export function castTimestampOrNow(
     } else if (typeof timestamp === 'string') {
         timestamp = DateTime.fromISO(timestamp)
     }
-
-    if (timestampFormat === TimestampFormat.Clickhouse) {
-        return timestamp.toUTC().toFormat('yyyy-MM-dd HH:mm:ss.u')
+    timestamp = timestamp.toUTC()
+    if (timestampFormat === TimestampFormat.ClickHouse) {
+        return timestamp.toFormat('yyyy-MM-dd HH:mm:ss.u')
+    } else if (timestampFormat === TimestampFormat.ISO) {
+        return timestamp.toUTC().toISO()
+    } else {
+        throw new Error(`Unrecognized timestamp format ${timestampFormat}!`)
     }
-    return timestamp.toUTC().toISO()
 }
 
 export function delay(ms: number): Promise<void> {
