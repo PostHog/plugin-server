@@ -165,15 +165,11 @@ export const createProcessEventTests = (
             new UUIDT().toString()
         )
 
-        expect(queryCounter).toBe(12)
-
-        // TODO: 12 vs 28 is a big difference. Why so?
-        // num_queries = 28
-        // if settings.EE_AVAILABLE:  # extra queries to check for hooks
-        //     num_queries += 4
-        // if settings.MULTI_TENANCY:  # extra query to check for billing plan
-        //     num_queries += 1
-        // with self.assertNumQueries(num_queries):
+        if (database === 'clickhouse') {
+            expect(queryCounter).toBe(8)
+        } else if (database === 'postgresql') {
+            expect(queryCounter).toBe(12)
+        }
 
         // capture a second time to verify e.g. event_names is not ['$autocapture', '$autocapture']
         await processEvent(
@@ -209,16 +205,17 @@ export const createProcessEventTests = (
         expect(event.distinct_id).toEqual('2')
         expect(distinctIds).toEqual(['2'])
         expect(event.event).toEqual('$autocapture')
-        expect(event.elements_hash).toEqual('0679137c0cd2408a2906839143e7a71f')
+
+        const elements = await getElements(server, event)
+        expect(elements[0].tag_name).toEqual('a')
+        expect(elements[0].attr_class).toEqual(['btn', 'btn-sm'])
+        expect(elements[1].order).toEqual(1)
+        expect(elements[1].text).toEqual('💻')
 
         if (database === 'clickhouse') {
-            expect(0).toBe(1)
+            expect(hashElements(elements)).toEqual('0679137c0cd2408a2906839143e7a71f')
         } else if (database === 'postgresql') {
-            const elements = await getElements(server, event)
-            expect(elements[0].tag_name).toEqual('a')
-            expect(elements[0].attr_class).toEqual(['btn', 'btn-sm'])
-            expect(elements[1].order).toEqual(1)
-            expect(elements[1].text).toEqual('💻')
+            expect(event.elements_hash).toEqual('0679137c0cd2408a2906839143e7a71f')
         }
 
         team = await getFirstTeam(server)
@@ -658,8 +655,7 @@ export const createProcessEventTests = (
         if (database === 'postgresql') {
             expect(event.elements_hash).toEqual('c2659b28e72835706835764cf7f63c2a')
         } else if (database === 'clickhouse') {
-            const hash = hashElements([element])
-            expect(hash).toEqual('c2659b28e72835706835764cf7f63c2a')
+            expect(hashElements([element])).toEqual('c2659b28e72835706835764cf7f63c2a')
         }
     })
 
@@ -702,8 +698,7 @@ export const createProcessEventTests = (
             expect(event.elements_hash).toEqual('a89021a60b3497d24e93ae181fba01aa')
         } else if (database === 'clickhouse') {
             const elements = await getElements(server, event)
-            const hash = hashElements(elements)
-            expect(hash).toEqual('a89021a60b3497d24e93ae181fba01aa')
+            expect(hashElements(elements)).toEqual('a89021a60b3497d24e93ae181fba01aa')
         }
     })
 
