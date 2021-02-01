@@ -1,12 +1,4 @@
-import {
-    Element,
-    Event,
-    Person,
-    PersonDistinctId,
-    PluginsServer,
-    PluginsServerConfig,
-    PostgresSessionRecordingEvent,
-} from '../../src/types'
+import { PluginsServerConfig } from '../../src/types'
 import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
 import { KafkaCollector, KafkaObserver } from '../helpers/kafka'
 import { UUIDT } from '../../src/utils'
