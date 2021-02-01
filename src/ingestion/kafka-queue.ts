@@ -47,11 +47,16 @@ export class KafkaQueue implements Queue {
             ...rawEvent,
             data: JSON.parse(rawEvent.data),
         }))
-        const pluginEvents: PluginEvent[] = parsedEvents.map((parsedEvent) => ({
-            ...parsedEvent,
-            event: parsedEvent.data.event,
-            properties: parsedEvent.data.properties,
-        }))
+        const pluginEvents: PluginEvent[] = rawEvents.map((rawEvent) => {
+            const { data: dataStr, ...restOfRawEvent } = rawEvent
+            const event = { ...restOfRawEvent, ...JSON.parse(dataStr) }
+            return {
+                ...event,
+                kafka_offset: restOfRawEvent.kafka_offset,
+                site_url: event.site_url || null,
+                ip: event.ip || null,
+            }
+        })
         const processedEvents: PluginEvent[] = (
             await this.processEventBatch(pluginEvents)
         ).filter((event: PluginEvent[] | false | null | undefined) => Boolean(event))

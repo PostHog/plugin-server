@@ -189,6 +189,8 @@ export interface RawEventMessage extends BaseEventMessage {
     now: string
     /** ISO-formatted datetime. May be empty! */
     sent_at: string
+    /** JSON-encoded number. */
+    kafka_offset: string
 }
 
 /** Usable event message. */
