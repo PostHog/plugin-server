@@ -16,7 +16,7 @@ import {
     ClickHouseEvent,
     Element,
 } from './types'
-import { castTimestampOrNow, sanitizeSqlIdentifier, UUIDT } from './utils'
+import { castTimestampOrNow, clickHouseTimestampToISO, sanitizeSqlIdentifier } from './utils'
 
 /** The recommended way of accessing the database. */
 export class DB {
@@ -196,12 +196,18 @@ export class DB {
 
     public async fetchEvents(): Promise<Event[] | ClickHouseEvent[]> {
         if (this.kafkaProducer) {
-            const events = await this.clickhouse?.query(`SELECT * FROM events`).toPromise()
+            const events = (await this.clickhouse?.query(`SELECT * FROM events`).toPromise()) as ClickHouseEvent[]
             return (
-                (events?.map((event: Record<string, any>) => ({
-                    ...event,
-                    ...(typeof event['properties'] === 'string' ? { properties: JSON.parse(event.properties) } : {}),
-                })) as ClickHouseEvent[]) || []
+                events?.map(
+                    (event) =>
+                        ({
+                            ...event,
+                            ...(typeof event['properties'] === 'string'
+                                ? { properties: JSON.parse(event.properties) }
+                                : {}),
+                            timestamp: clickHouseTimestampToISO(event.timestamp),
+                        } as ClickHouseEvent)
+                ) || []
             )
         } else {
             const result = await this.postgresQuery('SELECT * FROM posthog_event')

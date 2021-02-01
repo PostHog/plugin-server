@@ -299,6 +299,10 @@ export function castTimestampOrNow(
     }
 }
 
+export function clickHouseTimestampToISO(timestamp: string): string {
+    return DateTime.fromFormat(timestamp, 'yyyy-MM-dd HH:mm:ss.u', { zone: 'UTC' }).toISO()
+}
+
 export function delay(ms: number): Promise<void> {
     return new Promise((resolve) => {
         setTimeout(resolve, ms)
