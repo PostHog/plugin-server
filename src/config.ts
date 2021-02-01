@@ -20,6 +20,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         KAFKA_CLIENT_CERT_B64: null,
         KAFKA_CLIENT_CERT_KEY_B64: null,
         KAFKA_TRUSTED_CERT_B64: null,
+        PLUGIN_SERVER_INGESTION: false,
         PLUGINS_CELERY_QUEUE: 'posthog-plugins',
         REDIS_URL: 'redis://127.0.0.1',
         BASE_DIR: '.',
@@ -40,6 +41,7 @@ export function getDefaultConfig(): PluginsServerConfig {
 
 export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
     return {
+        PLUGIN_SERVER_INGESTION: 'Ingest events via plugin-server',
         CELERY_DEFAULT_QUEUE: 'Celery outgoing queue',
         PLUGINS_CELERY_QUEUE: 'Celery incoming queue',
         DATABASE_URL: 'Postgres database URL',
