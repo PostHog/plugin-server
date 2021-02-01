@@ -69,24 +69,24 @@ export function sanitizeEventName(eventName: any): string {
     return eventName.substr(0, 200)
 }
 
-// escape utf-8 characters into `\u1234`
-function jsonEscapeUTF8(s: string): string {
+/** Escape UTF-8 characters into `\u1234`. */
+function jsonEscapeUtf8(s: string): string {
     return s.replace(/[^\x20-\x7F]/g, (x) => '\\u' + ('000' + x.codePointAt(0)?.toString(16)).slice(-4))
 }
 
-// produce output compatible to that of python's json.dumps
-function pythonDumps(obj: any): string {
+/** Produce output compatible with that of Python's `json.dumps`. */
+function jsonDumps(obj: any): string {
     if (typeof obj === 'object' && obj !== null) {
         if (Array.isArray(obj)) {
-            return `[${obj.map(pythonDumps).join(', ')}]` // space after comma
+            return `[${obj.map(jsonDumps).join(', ')}]` // space after comma
         } else {
             return `{${Object.keys(obj) // no space after '{' or before '}'
                 .sort() // must sort the keys of the object!
-                .map((k) => `${pythonDumps(k)}: ${pythonDumps(obj[k])}`) // space after ':'
+                .map((k) => `${jsonDumps(k)}: ${jsonDumps(obj[k])}`) // space after ':'
                 .join(', ')}}` // space after ','
         }
     } else if (typeof obj === 'string') {
-        return jsonEscapeUTF8(JSON.stringify(obj))
+        return jsonEscapeUtf8(JSON.stringify(obj))
     } else {
         return JSON.stringify(obj)
     }
@@ -105,7 +105,7 @@ export function hashElements(elements: Element[]): string {
         order: element.order ?? null,
     }))
 
-    const serializedString = pythonDumps(elementsList)
+    const serializedString = jsonDumps(elementsList)
 
     return crypto.createHash('md5').update(serializedString).digest('hex')
 }
