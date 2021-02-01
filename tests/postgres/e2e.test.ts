@@ -6,6 +6,7 @@ import { PluginsServer } from '../../src/types'
 import { createPosthog, DummyPostHog } from '../../src/extensions/posthog'
 import { pluginConfig39 } from '../helpers/plugins'
 import { delay, UUIDT } from '../../src/utils'
+import { delayUntilEventIngested } from '../shared/process-event'
 
 jest.setTimeout(60000) // 60 sec timeout
 
@@ -49,8 +50,8 @@ describe('e2e postgres ingestion', () => {
     test('event captured, processed, ingested', async () => {
         expect((await server.db.fetchEvents()).length).toBe(0)
         const uuid = new UUIDT().toString()
-        posthog.capture('custom event', { name: 'haha', uuid })
-        await delay(2000)
+        posthog.capture('custom event', { name: 'haha', uuid, randomProperty: 'lololo' })
+        await delayUntilEventIngested(server)
         const events = await server.db.fetchEvents()
         expect(events.length).toBe(1)
         expect(events[0].properties.processed).toEqual('hell yes')

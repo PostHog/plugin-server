@@ -29,6 +29,15 @@ async function getFirstTeam(server: PluginsServer): Promise<Team> {
     return (await getTeams(server))[0]
 }
 
+export async function delayUntilEventIngested(server: PluginsServer, minCount = 1): Promise<void> {
+    for (let i = 0; i < 30; i++) {
+        if ((await server.db.fetchEvents()).length >= minCount) {
+            return
+        }
+        await delay(500)
+    }
+}
+
 async function createPerson(
     server: PluginsServer,
     team: Team,
@@ -114,7 +123,9 @@ export const createProcessEventTests = (
             sentAt,
             eventUuid
         )
-        await delayUntilEventIngested(++processEventCounter)
+        if (database === 'clickhouse') {
+            await delayUntilEventIngested(server, ++processEventCounter)
+        }
         return response
     }
 
