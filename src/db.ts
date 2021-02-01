@@ -107,7 +107,7 @@ export class DB {
         const values = [...Object.values(unparsePersonPartial(update)), person.id]
         await this.postgresQuery(
             `UPDATE posthog_person SET ${Object.keys(update).map(
-                (field, index) => sanitizeSqlIdentifier(field) + ' = $' + (index + 1)
+                (field, index) => `"${sanitizeSqlIdentifier(field)}" = $${index + 1}`
             )} WHERE id = $${Object.values(update).length + 1}`,
             values
         )
@@ -169,7 +169,7 @@ export class DB {
         const updatedPersonDistinctId: PersonDistinctId = { ...personDistinctId, ...update }
         await this.postgresQuery(
             `UPDATE posthog_persondistinctid SET ${Object.keys(update).map(
-                (field, index) => sanitizeSqlIdentifier(field) + ' = $' + (index + 1)
+                (field, index) => `"${sanitizeSqlIdentifier(field)}" = $${index + 1}`
             )} WHERE id = $${Object.values(update).length + 1}`,
             [...Object.values(update), personDistinctId.id]
         )
