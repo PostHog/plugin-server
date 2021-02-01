@@ -7,13 +7,11 @@ import {
     PluginsServerConfig,
     PostgresSessionRecordingEvent,
 } from '../../src/types'
-import { createServer } from '../../src/server'
-import { resetTestDatabase } from '../helpers/sql'
 import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
 import { KafkaCollector, KafkaObserver } from '../helpers/kafka'
 import { UUIDT } from '../../src/utils'
 import { DateTime } from 'luxon'
-import { createProcessEventTests } from '../shared/process-event.test'
+import { createProcessEventTests } from '../shared/process-event'
 
 jest.setTimeout(180_000) // 3 minute timeout
 

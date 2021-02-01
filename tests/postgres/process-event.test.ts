@@ -1,15 +1,5 @@
-import {
-    PluginsServer,
-    Team,
-    Event,
-    Person,
-    PersonDistinctId,
-    Element,
-    PostgresSessionRecordingEvent,
-} from '../../src/types'
-import { DateTime } from 'luxon'
-import { UUIDT } from '../../src/utils'
-import { createProcessEventTests } from '../shared/process-event.test'
+import { PluginsServer, Event, Person, PersonDistinctId, Element, PostgresSessionRecordingEvent } from '../../src/types'
+import { createProcessEventTests } from '../shared/process-event'
 
 jest.setTimeout(600000) // 600 sec timeout
 

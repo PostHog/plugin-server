@@ -6,7 +6,6 @@ import {
     Team,
     Event,
     Person,
-    PersonDistinctId,
     Element,
     PostgresSessionRecordingEvent,
     PluginsServerConfig,
