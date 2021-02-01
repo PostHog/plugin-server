@@ -84,7 +84,7 @@ export const createProcessEventTests = (
 
     async function delayUntilEventIngested(minCount = 1) {
         if (database === 'clickhouse') {
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < 20; i++) {
                 if ((await getEvents(server)).length >= minCount) {
                     return
                 }
