@@ -10,11 +10,13 @@ import {
     PostgresSessionRecordingEvent,
     PluginsServerConfig,
     ClickHouseEvent,
+    SessionRecordingEvent,
 } from '../../src/types'
 import { createUserTeamAndOrganization, resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
 import { DateTime } from 'luxon'
 import { delay, UUIDT } from '../../src/utils'
+import { IEvent } from '../../src/idl/protos'
 
 jest.setTimeout(600000) // 600 sec timeout
 
@@ -53,6 +55,7 @@ export const createProcessEventTests = (
     extraServerConfig?: Partial<PluginsServerConfig>
 ): PluginsServer => {
     let queryCounter = 0
+    let processEventCounter = 0
     let team: Team
     let server: PluginsServer
     let stopServer: () => Promise<void>
@@ -79,10 +82,42 @@ export const createProcessEventTests = (
         return [server, stopServer]
     }
 
-    beforeEach(async () => {
+    async function delayUntilEventIngested(minCount = 1) {
         if (database === 'clickhouse') {
-            await delay(1000)
+            for (let i = 0; i < 10; i++) {
+                if ((await getEvents(server)).length >= minCount) {
+                    return
+                }
+                await delay(500)
+            }
         }
+    }
+
+    async function processEvent(
+        distinctId: string,
+        ip: string,
+        siteUrl: string,
+        data: PluginEvent,
+        teamId: number,
+        now: DateTime,
+        sentAt: DateTime | null,
+        eventUuid: string
+    ): Promise<IEvent | SessionRecordingEvent> {
+        const response = await eventsProcessor.processEvent(
+            distinctId,
+            ip,
+            siteUrl,
+            data,
+            teamId,
+            now,
+            sentAt,
+            eventUuid
+        )
+        await delayUntilEventIngested(++processEventCounter)
+        return response
+    }
+
+    beforeEach(async () => {
         const testCode = `
             function processEvent (event, meta) {
                 event.properties["somewhere"] = "over the rainbow";
@@ -93,6 +128,7 @@ export const createProcessEventTests = (
         ;[server, stopServer] = await getServer()
         eventsProcessor = new EventsProcessor(server)
         queryCounter = 0
+        processEventCounter = 0
         team = await getFirstTeam(server)
         now = DateTime.utc()
     })
@@ -107,7 +143,7 @@ export const createProcessEventTests = (
 
         expect(team.event_names).toEqual([])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             '2',
             '',
             '',
@@ -139,7 +175,7 @@ export const createProcessEventTests = (
         // with self.assertNumQueries(num_queries):
 
         // capture a second time to verify e.g. event_names is not ['$autocapture', '$autocapture']
-        await eventsProcessor.processEvent(
+        await processEvent(
             '2',
             '',
             '',
@@ -168,15 +204,15 @@ export const createProcessEventTests = (
         const [person] = persons
         const distinctIds = await getDistinctIds(server, person)
 
+        const [event] = events as Event[]
+        expect(event.distinct_id).toEqual('2')
+        expect(distinctIds).toEqual(['2'])
+        expect(event.event).toEqual('$autocapture')
+        expect(event.elements_hash).toEqual('0679137c0cd2408a2906839143e7a71f')
+
         if (database === 'clickhouse') {
             expect(0).toBe(1)
         } else if (database === 'postgresql') {
-            const [event] = events as Event[]
-            expect(event.distinct_id).toEqual('2')
-            expect(distinctIds).toEqual(['2'])
-            expect(event.event).toEqual('$autocapture')
-            expect(event.elements_hash).toEqual('0679137c0cd2408a2906839143e7a71f')
-
             const elements = await getElements(server, event)
             expect(elements[0].tag_name).toEqual('a')
             expect(elements[0].attr_class).toEqual(['btn', 'btn-sm'])
@@ -198,7 +234,7 @@ export const createProcessEventTests = (
     test('capture no element', async () => {
         await createPerson(server, team, ['asdfasdfasdf'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'asdfasdfasdf',
             '',
             '',
@@ -211,9 +247,6 @@ export const createProcessEventTests = (
             now,
             new UUIDT().toString()
         )
-        if (database === 'clickhouse') {
-            await delay(10000)
-        }
 
         expect(await getDistinctIds(server, (await getPersons(server))[0])).toEqual(['asdfasdfasdf'])
         const [event] = await getEvents(server)
@@ -227,7 +260,7 @@ export const createProcessEventTests = (
         const tomorrow = rightNow.plus({ days: 1, hours: 2 })
         const tomorrowSentAt = rightNow.plus({ days: 1, hours: 2, minutes: 10 })
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'movie played',
             '',
             '',
@@ -241,9 +274,6 @@ export const createProcessEventTests = (
             tomorrowSentAt,
             new UUIDT().toString()
         )
-        if (database === 'clickhouse') {
-            await delay(10000)
-        }
 
         const [event] = await getEvents(server)
         const eventSecondsBeforeNow = rightNow.diff(DateTime.fromISO(event.timestamp), 'seconds').seconds
@@ -263,7 +293,7 @@ export const createProcessEventTests = (
         // tomorrow = tomorrow.replace(tzinfo=None)
         // tomorrow_sent_at = tomorrow_sent_at.replace(tzinfo=None)
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'movie played',
             '',
             '',
@@ -291,7 +321,7 @@ export const createProcessEventTests = (
         const rightNow = DateTime.utc()
         const tomorrow = rightNow.plus({ days: 1, hours: 2 })
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'movie played',
             '',
             '',
@@ -305,9 +335,6 @@ export const createProcessEventTests = (
             null,
             new UUIDT().toString()
         )
-        if (database === 'clickhouse') {
-            await delay(10000)
-        }
 
         const [event] = await getEvents(server)
         const difference = tomorrow.diff(DateTime.fromISO(event.timestamp), 'seconds').seconds
@@ -317,7 +344,7 @@ export const createProcessEventTests = (
     test('ip capture', async () => {
         await createPerson(server, team, ['asdfasdfasdf'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'asdfasdfasdf',
             '11.12.13.14',
             '',
@@ -330,9 +357,6 @@ export const createProcessEventTests = (
             now,
             new UUIDT().toString()
         )
-        if (database === 'clickhouse') {
-            await delay(10000)
-        }
         const [event] = await getEvents(server)
         expect(event.properties['$ip']).toBe('11.12.13.14')
     })
@@ -340,7 +364,7 @@ export const createProcessEventTests = (
     test('ip override', async () => {
         await createPerson(server, team, ['asdfasdfasdf'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'asdfasdfasdf',
             '11.12.13.14',
             '',
@@ -353,9 +377,6 @@ export const createProcessEventTests = (
             now,
             new UUIDT().toString()
         )
-        if (database === 'clickhouse') {
-            await delay(10000)
-        }
 
         const [event] = await getEvents(server)
         expect(event.properties['$ip']).toBe('1.0.0.1')
@@ -365,7 +386,7 @@ export const createProcessEventTests = (
         await server.db.postgresQuery('update posthog_team set anonymize_ips = $1', [true])
         await createPerson(server, team, ['asdfasdfasdf'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'asdfasdfasdf',
             '11.12.13.14',
             '',
@@ -378,9 +399,6 @@ export const createProcessEventTests = (
             now,
             new UUIDT().toString()
         )
-        if (database === 'clickhouse') {
-            await delay(10000)
-        }
 
         const [event] = await getEvents(server)
         expect(event.properties['$ip']).not.toBeDefined()
@@ -389,7 +407,7 @@ export const createProcessEventTests = (
     test('alias', async () => {
         await createPerson(server, team, ['old_distinct_id'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -413,7 +431,7 @@ export const createProcessEventTests = (
     test('alias reverse', async () => {
         await createPerson(server, team, ['old_distinct_id'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'old_distinct_id',
             '',
             '',
@@ -437,7 +455,7 @@ export const createProcessEventTests = (
     test('alias twice', async () => {
         await createPerson(server, team, ['old_distinct_id'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -461,7 +479,7 @@ export const createProcessEventTests = (
         await createPerson(server, team, ['old_distinct_id_2'])
         expect((await getPersons(server)).length).toBe(2)
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -484,7 +502,7 @@ export const createProcessEventTests = (
     })
 
     test('alias before person', async () => {
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -510,7 +528,7 @@ export const createProcessEventTests = (
         await createPerson(server, team, ['old_distinct_id'])
         await createPerson(server, team, ['new_distinct_id'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -534,7 +552,7 @@ export const createProcessEventTests = (
     test('offset timestamp', async () => {
         now = DateTime.fromISO('2020-01-01T12:00:05.200Z')
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'distinct_id',
             '',
             '',
@@ -553,7 +571,7 @@ export const createProcessEventTests = (
     test('offset timestamp no sent_at', async () => {
         now = DateTime.fromISO('2020-01-01T12:00:05.200Z')
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'distinct_id',
             '',
             '',
@@ -579,7 +597,7 @@ export const createProcessEventTests = (
             key_on_new: 'new value',
         })
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -605,7 +623,7 @@ export const createProcessEventTests = (
     })
 
     test('long htext', async () => {
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -632,11 +650,12 @@ export const createProcessEventTests = (
             new UUIDT().toString()
         )
 
+        const [event] = (await getEvents(server)) as Event[]
+        expect(event.elements_hash).toEqual('c2659b28e72835706835764cf7f63c2a')
+
         if (database === 'clickhouse') {
             expect(0).toBe(1)
         } else if (database === 'postgresql') {
-            const [event] = (await getEvents(server)) as Event[]
-            expect(event.elements_hash).toEqual('c2659b28e72835706835764cf7f63c2a')
             const [element] = await getElements(server, event)
             expect(element.href?.length).toEqual(2048)
             expect(element.text?.length).toEqual(400)
@@ -651,7 +670,7 @@ export const createProcessEventTests = (
             capture: jest.fn((event, properties) => true),
         } as any
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             '2',
             '',
             '',
@@ -677,16 +696,12 @@ export const createProcessEventTests = (
         team = await getFirstTeam(server)
         expect(team.ingested_event).toEqual(true)
 
-        if (database === 'clickhouse') {
-            expect(0).toBe(1)
-        } else if (database === 'postgresql') {
-            const [event] = (await getEvents(server)) as Event[]
-            expect(event.elements_hash).toEqual('a89021a60b3497d24e93ae181fba01aa')
-        }
+        const [event] = (await getEvents(server)) as Event[]
+        expect(event.elements_hash).toEqual('a89021a60b3497d24e93ae181fba01aa')
     })
 
     test('snapshot event stored as session_recording_event', async () => {
-        await eventsProcessor.processEvent(
+        await processEvent(
             'some-id',
             '',
             '',
@@ -715,7 +730,7 @@ export const createProcessEventTests = (
     test('identify set', async () => {
         await createPerson(server, team, ['distinct_id'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'distinct_id',
             '',
             '',
@@ -743,7 +758,7 @@ export const createProcessEventTests = (
         expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
         expect(person.is_identified).toEqual(true)
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'distinct_id',
             '',
             '',
@@ -768,7 +783,7 @@ export const createProcessEventTests = (
     test('identify set_once', async () => {
         await createPerson(server, team, ['distinct_id'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'distinct_id',
             '',
             '',
@@ -796,7 +811,7 @@ export const createProcessEventTests = (
         expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
         expect(person.is_identified).toEqual(true)
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'distinct_id',
             '',
             '',
@@ -821,7 +836,7 @@ export const createProcessEventTests = (
     test('distinct with anonymous_id', async () => {
         await createPerson(server, team, ['anonymous_id'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -848,7 +863,7 @@ export const createProcessEventTests = (
         expect(person.properties).toEqual({ a_prop: 'test' })
 
         // check no errors as this call can happen multiple times
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -877,7 +892,7 @@ export const createProcessEventTests = (
         await createPerson(server, team, ['anonymous_id'])
         await createPerson(server, team, ['new_distinct_id'], { email: 'someone@gmail.com' })
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -904,7 +919,7 @@ export const createProcessEventTests = (
         await createPerson(server, team, ['anonymous_id'])
         await createPerson(server, team, ['new_distinct_id'], { email: 'someone@gmail.com' })
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -929,7 +944,7 @@ export const createProcessEventTests = (
 
         await createPerson(server, team, ['anonymous_id_2'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'new_distinct_id',
             '',
             '',
@@ -965,7 +980,7 @@ export const createProcessEventTests = (
         await createPerson(server, team2, ['2'], { email: 'team2@gmail.com' })
         await createPerson(server, team, ['1', '2'])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             '2',
             '',
             '',
@@ -997,7 +1012,7 @@ export const createProcessEventTests = (
         const person1 = await createPerson(server, team, [distinct_id])
         expect(person1.is_identified).toBe(false)
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             distinct_id,
             '',
             '',
@@ -1015,7 +1030,7 @@ export const createProcessEventTests = (
     test('team event_properties', async () => {
         expect(team.event_properties_numerical).toEqual([])
 
-        await eventsProcessor.processEvent(
+        await processEvent(
             'xxx',
             '',
             '',
@@ -1032,7 +1047,7 @@ export const createProcessEventTests = (
     })
 
     test('event name object json', async () => {
-        await eventsProcessor.processEvent(
+        await processEvent(
             'xxx',
             '',
             '',
@@ -1047,7 +1062,7 @@ export const createProcessEventTests = (
     })
 
     test('event name array json', async () => {
-        await eventsProcessor.processEvent(
+        await processEvent(
             'xxx',
             '',
             '',
@@ -1062,7 +1077,7 @@ export const createProcessEventTests = (
     })
 
     test('long event name substr', async () => {
-        await eventsProcessor.processEvent(
+        await processEvent(
             'xxx',
             '',
             '',
