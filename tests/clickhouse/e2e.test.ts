@@ -13,7 +13,7 @@ jest.setTimeout(60000) // 60 sec timeout
 
 const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_ENABLED: true,
-    KAFKA_HOSTS: 'kafka:9092',
+    KAFKA_HOSTS: process.env.KAFKA_HOSTS || 'kafka:9092',
     WORKER_CONCURRENCY: 2,
     PLUGIN_SERVER_INGESTION: true,
     LOG_LEVEL: LogLevel.Log,
