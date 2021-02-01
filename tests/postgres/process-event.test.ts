@@ -8,6 +8,6 @@ describe('process event (postgresql)', () => {
         getEvents: (server) => server.db.fetchEvents(),
         getPersons: (server) => server.db.fetchPersons(),
         getDistinctIds: (server, person) => server.db.fetchDistinctIdValues(person),
-        getElements: (server) => server.db.fetchElements(),
+        getElements: (server, event) => server.db.fetchElements(event),
     })
 })
