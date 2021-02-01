@@ -14,7 +14,7 @@ import {
 import { createUserTeamAndOrganization, resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
 import { DateTime } from 'luxon'
-import { UUIDT } from '../../src/utils'
+import { delay, UUIDT } from '../../src/utils'
 
 jest.setTimeout(600000) // 600 sec timeout
 
@@ -80,6 +80,9 @@ export const createProcessEventTests = (
     }
 
     beforeEach(async () => {
+        if (database === 'clickhouse') {
+            await delay(1000)
+        }
         const testCode = `
             function processEvent (event, meta) {
                 event.properties["somewhere"] = "over the rainbow";
@@ -208,6 +211,9 @@ export const createProcessEventTests = (
             now,
             new UUIDT().toString()
         )
+        if (database === 'clickhouse') {
+            await delay(10000)
+        }
 
         expect(await getDistinctIds(server, (await getPersons(server))[0])).toEqual(['asdfasdfasdf'])
         const [event] = await getEvents(server)
@@ -235,6 +241,9 @@ export const createProcessEventTests = (
             tomorrowSentAt,
             new UUIDT().toString()
         )
+        if (database === 'clickhouse') {
+            await delay(10000)
+        }
 
         const [event] = await getEvents(server)
         const eventSecondsBeforeNow = rightNow.diff(DateTime.fromISO(event.timestamp), 'seconds').seconds
@@ -296,6 +305,9 @@ export const createProcessEventTests = (
             null,
             new UUIDT().toString()
         )
+        if (database === 'clickhouse') {
+            await delay(10000)
+        }
 
         const [event] = await getEvents(server)
         const difference = tomorrow.diff(DateTime.fromISO(event.timestamp), 'seconds').seconds
@@ -318,6 +330,9 @@ export const createProcessEventTests = (
             now,
             new UUIDT().toString()
         )
+        if (database === 'clickhouse') {
+            await delay(10000)
+        }
         const [event] = await getEvents(server)
         expect(event.properties['$ip']).toBe('11.12.13.14')
     })
@@ -338,6 +353,10 @@ export const createProcessEventTests = (
             now,
             new UUIDT().toString()
         )
+        if (database === 'clickhouse') {
+            await delay(10000)
+        }
+
         const [event] = await getEvents(server)
         expect(event.properties['$ip']).toBe('1.0.0.1')
     })
@@ -359,6 +378,10 @@ export const createProcessEventTests = (
             now,
             new UUIDT().toString()
         )
+        if (database === 'clickhouse') {
+            await delay(10000)
+        }
+
         const [event] = await getEvents(server)
         expect(event.properties['$ip']).not.toBeDefined()
     })

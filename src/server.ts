@@ -87,6 +87,7 @@ export async function createServer(
             ssl: kafkaSsl,
         })
         kafkaProducer = kafka.producer()
+        await kafkaProducer?.connect()
     }
 
     // `node-postgres` will return dates as plain JS Date objects, which will use the local timezone.
@@ -149,6 +150,7 @@ export async function createServer(
     server.eventsProcessor = new EventsProcessor(server as PluginsServer)
 
     const closeServer = async () => {
+        await kafkaProducer?.disconnect()
         await server.redis.quit()
         await server.postgres.end()
     }
@@ -177,7 +179,6 @@ export async function startPluginsServer(
     let pingJob: schedule.Job | undefined
     let statsJob: schedule.Job | undefined
     let piscina: Piscina | undefined
-    let kafkaProducer: Producer | undefined
     let queue: Queue | undefined
     let closeServer: () => Promise<void> | undefined
     let stopSchedule: () => Promise<void> | undefined
@@ -200,7 +201,6 @@ export async function startPluginsServer(
             await stopFastifyInstance(fastifyInstance!)
         }
         await queue?.stop()
-        await kafkaProducer?.disconnect()
         await pubSub?.quit()
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
@@ -224,8 +224,6 @@ export async function startPluginsServer(
             ...config,
         }
         ;[server, closeServer] = await createServer(serverConfig, null)
-
-        await server.kafkaProducer?.connect()
 
         piscina = makePiscina(serverConfig)
         const processEvent = (event: PluginEvent) => {
