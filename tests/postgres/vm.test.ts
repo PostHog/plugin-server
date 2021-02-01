@@ -712,7 +712,7 @@ test('posthog in runEvery', async () => {
     const response = await vm.tasks.runEveryMinute.exec()
     expect(response).toBe('haha')
 
-    expect(Client).toHaveBeenCalledTimes(1)
+    expect(Client).toHaveBeenCalledTimes(2)
     expect((Client as any).mock.calls[0][1]).toEqual(mockServer.PLUGINS_CELERY_QUEUE)
 
     const mockClientInstance = (Client as any).mock.instances[0]
@@ -750,7 +750,7 @@ test('posthog in runEvery with timestamp', async () => {
     const response = await vm.tasks.runEveryMinute.exec()
     expect(response).toBe('haha')
 
-    expect(Client).toHaveBeenCalledTimes(1)
+    expect(Client).toHaveBeenCalledTimes(2)
     expect((Client as any).mock.calls[0][1]).toEqual(mockServer.PLUGINS_CELERY_QUEUE)
 
     const mockClientInstance = (Client as any).mock.instances[0]
