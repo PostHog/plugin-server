@@ -9,6 +9,7 @@ import {
     Element,
     PostgresSessionRecordingEvent,
     PluginsServerConfig,
+    ClickHouseEvent,
 } from '../../src/types'
 import { createUserTeamAndOrganization, resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
@@ -44,7 +45,7 @@ export const createProcessEventTests = (
         getElements,
     }: {
         getSessionRecordingEvents: (server: PluginsServer) => Promise<PostgresSessionRecordingEvent[]>
-        getEvents: (server: PluginsServer) => Promise<Event[]>
+        getEvents: (server: PluginsServer) => Promise<Event[] | ClickHouseEvent[]>
         getPersons: (server: PluginsServer) => Promise<Person[]>
         getDistinctIds: (server: PluginsServer, person: Person) => Promise<string[]>
         getElements: (server: PluginsServer, event: Event) => Promise<Element[]>
@@ -161,20 +162,24 @@ export const createProcessEventTests = (
         expect(events.length).toEqual(2)
         expect(persons.length).toEqual(1)
 
-        const [event] = events
         const [person] = persons
         const distinctIds = await getDistinctIds(server, person)
 
-        expect(event.distinct_id).toEqual('2')
-        expect(distinctIds).toEqual(['2'])
-        expect(event.event).toEqual('$autocapture')
-        expect(event.elements_hash).toEqual('0679137c0cd2408a2906839143e7a71f')
+        if (database === 'clickhouse') {
+            expect(0).toBe(1)
+        } else if (database === 'postgresql') {
+            const [event] = events as Event[]
+            expect(event.distinct_id).toEqual('2')
+            expect(distinctIds).toEqual(['2'])
+            expect(event.event).toEqual('$autocapture')
+            expect(event.elements_hash).toEqual('0679137c0cd2408a2906839143e7a71f')
 
-        const elements = await getElements(server, event)
-        expect(elements[0].tag_name).toEqual('a')
-        expect(elements[0].attr_class).toEqual(['btn', 'btn-sm'])
-        expect(elements[1].order).toEqual(1)
-        expect(elements[1].text).toEqual('💻')
+            const elements = await getElements(server, event)
+            expect(elements[0].tag_name).toEqual('a')
+            expect(elements[0].attr_class).toEqual(['btn', 'btn-sm'])
+            expect(elements[1].order).toEqual(1)
+            expect(elements[1].text).toEqual('💻')
+        }
 
         team = await getFirstTeam(server)
         expect(team.event_names).toEqual(['$autocapture'])
@@ -604,11 +609,15 @@ export const createProcessEventTests = (
             new UUIDT().toString()
         )
 
-        const [event] = await getEvents(server)
-        expect(event.elements_hash).toEqual('c2659b28e72835706835764cf7f63c2a')
-        const [element] = await getElements(server, event)
-        expect(element.href?.length).toEqual(2048)
-        expect(element.text?.length).toEqual(400)
+        if (database === 'clickhouse') {
+            expect(0).toBe(1)
+        } else if (database === 'postgresql') {
+            const [event] = (await getEvents(server)) as Event[]
+            expect(event.elements_hash).toEqual('c2659b28e72835706835764cf7f63c2a')
+            const [element] = await getElements(server, event)
+            expect(element.href?.length).toEqual(2048)
+            expect(element.text?.length).toEqual(400)
+        }
     })
 
     test('capture first team event', async () => {
@@ -645,8 +654,12 @@ export const createProcessEventTests = (
         team = await getFirstTeam(server)
         expect(team.ingested_event).toEqual(true)
 
-        const [event] = await getEvents(server)
-        expect(event.elements_hash).toEqual('a89021a60b3497d24e93ae181fba01aa')
+        if (database === 'clickhouse') {
+            expect(0).toBe(1)
+        } else if (database === 'postgresql') {
+            const [event] = (await getEvents(server)) as Event[]
+            expect(event.elements_hash).toEqual('a89021a60b3497d24e93ae181fba01aa')
+        }
     })
 
     test('snapshot event stored as session_recording_event', async () => {

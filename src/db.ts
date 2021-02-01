@@ -13,6 +13,7 @@ import {
     Team,
     PostgresSessionRecordingEvent,
     Event,
+    ClickHouseEvent,
 } from './types'
 import { castTimestampOrNow, sanitizeSqlIdentifier, UUIDT } from './utils'
 
@@ -192,9 +193,19 @@ export class DB {
 
     // Event
 
-    public async fetchEvents(): Promise<Event[]> {
-        const result = await this.postgresQuery('SELECT * FROM posthog_event')
-        return result.rows as Event[]
+    public async fetchEvents(): Promise<Event[] | ClickHouseEvent[]> {
+        if (this.kafkaProducer) {
+            const events = await this.clickhouse?.query(`SELECT * FROM events`).toPromise()
+            return (
+                (events?.map((event: Record<string, any>) => ({
+                    ...event,
+                    ...(typeof event['properties'] === 'string' ? { properties: JSON.parse(event.properties) } : {}),
+                })) as ClickHouseEvent[]) || []
+            )
+        } else {
+            const result = await this.postgresQuery('SELECT * FROM posthog_event')
+            return result.rows as Event[]
+        }
     }
 
     // SessionRecordingEvent

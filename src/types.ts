@@ -262,6 +262,11 @@ export interface Event {
     created_at: string
 }
 
+export interface ClickHouseEvent extends Omit<Event, 'id' | 'elements' | 'elements_hash'> {
+    uuid: string
+    elements_chain: string
+}
+
 /** Properties shared by RawPerson and Person. */
 export interface BasePerson {
     id: number
