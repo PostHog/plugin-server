@@ -14,7 +14,6 @@ jest.setTimeout(60000) // 60 sec timeout
 const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_ENABLED: true,
     KAFKA_HOSTS: 'kafka:9092',
-    DATABASE_URL: 'postgres://posthog:posthog@localhost:5439/test_posthog',
     WORKER_CONCURRENCY: 2,
     PLUGIN_SERVER_INGESTION: true,
     LOG_LEVEL: LogLevel.Log,
@@ -52,10 +51,9 @@ describe('e2e clickhouse ingestion', () => {
         expect((await server.db.fetchEvents()).length).toBe(0)
         const uuid = new UUIDT().toString()
         posthog.capture('custom event', { name: 'haha', uuid })
-        await delay(3000)
+        await delay(10000)
         const events = await server.db.fetchEvents()
         expect(events.length).toBe(1)
-        console.log(events)
         expect(events[0].properties.processed).toEqual('hell yes')
         expect(events[0].properties.upperUuid).toEqual(uuid.toUpperCase())
     })
