@@ -24,8 +24,9 @@
         "prettier:check": "prettier --check .",
         "prepare": "yarn compile:protobuf",
         "prepublishOnly": "yarn build",
-        "setup:dev": "cd ../posthog && (dropdb test_posthog || echo 'no db to drop') && createdb test_posthog && source env/bin/activate && DATABASE_URL=postgres://localhost:5432/test_posthog DEBUG=1 python manage.py migrate",
-        "setup:dev:ee": "export DEBUG=1 PRIMARY_DB=clickhouse DATABASE_URL=postgres://posthog:posthog@localhost:5439/test_posthog PGPASSWORD=posthog && cd ../posthog && (dropdb -p 5439 -h localhost -U posthog test_posthog || echo 'no db to drop') && createdb -p 5439 -h localhost -U posthog test_posthog && source env/bin/activate && python manage.py migrate && python manage.py migrate_clickhouse"
+        "setup:dev:ee": "yarn setup:dev:postgres && yarn setup:dev:clickhouse",
+        "setup:dev:postgres": "cd ../posthog && (dropdb test_posthog || echo 'no db to drop') && createdb test_posthog && source env/bin/activate && DATABASE_URL=postgres://localhost:5432/test_posthog DEBUG=1 python manage.py migrate",
+        "setup:dev:clickhouse": "cd ../posthog && export DEBUG=1 PRIMARY_DB=clickhouse && source env/bin/activate && python manage.py migrate_clickhouse"
     },
     "bin": {
         "posthog-plugin-server": "bin/posthog-plugin-server"
