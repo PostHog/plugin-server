@@ -58,7 +58,7 @@ export async function createUserTeamAndOrganization(
     userId: number = commonUserId,
     organizationId: string = commonOrganizationId,
     organizationMembershipId: string = commonOrganizationMembershipId
-) {
+): Promise<void> {
     await insertRow(db, 'posthog_user', {
         id: userId,
         password: 'gibberish',

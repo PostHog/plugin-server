@@ -5,8 +5,8 @@ import { DateTime } from 'luxon'
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { unparsePersonPartial } from './ingestion/utils'
-import { Person, PersonDistinctId, RawPerson, RawOrganization } from './types'
-import { castTimestampOrNow, sanitizeSqlIdentifier } from './utils'
+import { Person, PersonDistinctId, RawPerson, RawOrganization, Team } from './types'
+import { castTimestampOrNow, sanitizeSqlIdentifier, UUIDT } from './utils'
 
 /** The recommended way of accessing the database. */
 export class DB {
@@ -57,7 +57,8 @@ export class DB {
         teamId: number,
         isUserId: number | null,
         isIdentified: boolean,
-        uuid: string
+        uuid: string,
+        distinctIds?: string[]
     ): Promise<Person> {
         const insertResult = await this.postgresQuery(
             'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
@@ -77,6 +78,11 @@ export class DB {
                 messages: [{ value: Buffer.from(JSON.stringify(data)) }],
             })
         }
+
+        for (const distinctId of distinctIds || []) {
+            await this.addDistinctId(personCreated, distinctId)
+        }
+
         return personCreated
     }
 

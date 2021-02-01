@@ -23,7 +23,8 @@
         "prettier": "prettier --write .",
         "prettier:check": "prettier --check .",
         "prepare": "yarn compile:protobuf",
-        "prepublishOnly": "yarn build"
+        "prepublishOnly": "yarn build",
+        "setup:dev": "cd ../posthog && dropdb test_posthog && createdb test_posthog && source env/bin/activate && DATABASE_URL=postgres://localhost:5432/test_posthog DEBUG=1 python manage.py migrate"
     },
     "bin": {
         "posthog-plugin-server": "bin/posthog-plugin-server"
