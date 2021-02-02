@@ -51,7 +51,8 @@ type ReturnWithServer = { server?: PluginsServer; stopServer?: () => Promise<voi
 
 export const createProcessEventTests = (
     database: 'postgresql' | 'clickhouse',
-    extraServerConfig?: Partial<PluginsServerConfig>
+    extraServerConfig?: Partial<PluginsServerConfig>,
+    createTests?: (response: ReturnWithServer) => void
 ): ReturnWithServer => {
     let queryCounter = 0
     let processEventCounter = 0
@@ -129,6 +130,8 @@ export const createProcessEventTests = (
     afterEach(async () => {
         await stopServer?.()
     })
+
+    createTests?.(returned)
 
     test('capture new person', async () => {
         await server.db.postgresQuery(`UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`, [true, team.id])
