@@ -177,7 +177,6 @@ jobs:
               env:
                   SECRET_KEY: 'abcdef' # unsafe - for testing only
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/posthog'
-                  CLICKHOUSE_DATABASE: 'posthog_test'
                   PRIMARY_DB: 'clickhouse'
                   TEST: 'true'
               run: python posthog/manage.py setup_test_environment
@@ -189,7 +188,6 @@ jobs:
               env:
                   # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
-                  CLICKHOUSE_DATABASE: 'posthog_test'
                   REDIS_URL: 'redis://localhost'
               run: cd plugin-server && yarn test:clickhouse
 
