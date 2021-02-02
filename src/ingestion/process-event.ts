@@ -3,7 +3,6 @@ import { DateTime, Duration } from 'luxon'
 import {
     CohortPeople,
     Element,
-    ElementGroup,
     Person,
     PersonDistinctId,
     PluginsServer,
@@ -12,11 +11,11 @@ import {
     Team,
     TimestampFormat,
 } from '../types'
-import { castTimestampOrNow, isUUIDFormat, UUIDT } from '../utils'
+import { castTimestampOrNow, UUID, UUIDT } from '../utils'
 import { Event as EventProto, IEvent } from '../idl/protos'
 import { Producer } from 'kafkajs'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { elementsToString, hashElements, sanitizeEventName } from './utils'
+import { elementsToString, sanitizeEventName } from './utils'
 import { ClickHouse } from 'clickhouse'
 import { DB } from '../db'
 import { status } from '../status'
@@ -54,7 +53,7 @@ export class EventsProcessor {
         sentAt: DateTime | null,
         eventUuid: string
     ): Promise<IEvent | SessionRecordingEvent> {
-        if (!isUUIDFormat(eventUuid)) {
+        if (!UUID.validateString(eventUuid, false)) {
             throw new Error(`Not a valid UUID: "${eventUuid}"`)
         }
         const singleSaveTimer = new Date()

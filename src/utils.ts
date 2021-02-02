@@ -147,12 +147,24 @@ for (let i = 0; i < 256; i++) {
 }
 
 export class UUID {
-    static validateString(candidate: string): void {
-        if (!candidate.match(/^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i)) {
+    /**
+     * Check whether str
+     *
+     * This does not care about RFC4122, since neither does UUIDT above.
+     * https://stackoverflow.com/questions/7905929/how-to-test-valid-uuid-guid
+     */
+    static validateString(candidate: any, throwOnInvalid = true): boolean {
+        const isValid = Boolean(
+            candidate &&
+                typeof candidate === 'string' &&
+                candidate.match(/^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i)
+        )
+        if (!isValid && throwOnInvalid) {
             throw new Error(
                 'String does not match format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX (where each X is a hexadecimal character)!'
             )
         }
+        return isValid
     }
 
     array: Uint8Array
@@ -277,17 +289,6 @@ export class UUIDT extends UUID {
         array.set(randomBytes(8), 8)
         super(array)
     }
-}
-
-/**
- * Returns true if the string looks like an UUID.
- *
- * This does not care about RFC4122, since neither does UUIDT above.
- * https://stackoverflow.com/questions/7905929/how-to-test-valid-uuid-guid
- */
-export function isUUIDFormat(uuid: string): boolean {
-    // 0177623e-698f-0000-c616-a14493d7897d
-    return !!uuid && !!uuid.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
 }
 
 /** Format timestamp for ClickHouse. */
