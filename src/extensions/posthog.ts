@@ -27,6 +27,7 @@ export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig)
     if (server.KAFKA_ENABLED) {
         // Sending event to our Kafka>ClickHouse pipeline
         const producer = server.kafka!.producer()
+        ;(createPosthog as any).producer = producer
         sendEvent = async (data) => {
             await producer.connect()
             producer!.send({

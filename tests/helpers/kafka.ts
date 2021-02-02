@@ -127,6 +127,26 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
     })
     const messages = []
 
+    async function createTopic(topic: string) {
+        try {
+            const admin = kafka.admin()
+            await admin.connect()
+            await admin.createTopics({
+                waitForLeaders: true,
+                topics: [{ topic }],
+            })
+            await admin.disconnect()
+        } catch (e) {
+            if (!e?.error?.includes('Topic with this name already exists')) {
+                console.error(`Error creating kafka topic "${topic}". This might be fine!`)
+                console.error(e)
+            }
+        }
+    }
+
+    await createTopic(KAFKA_EVENTS_INGESTION_HANDOFF)
+    await createTopic(KAFKA_SESSION_RECORDING_EVENTS)
+
     const connected = await new Promise<void>(async (resolve, reject) => {
         console.info('setting group join and crash listeners')
         const { CONNECT, GROUP_JOIN, CRASH } = consumer.events
@@ -141,26 +161,6 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
         console.info('connecting producer')
         await producer.connect()
         console.info('subscribing consumer')
-
-        async function createTopic(topic: string) {
-            try {
-                const admin = kafka.admin()
-                await admin.connect()
-                await admin.createTopics({
-                    waitForLeaders: true,
-                    topics: [{ topic }],
-                })
-                await admin.disconnect()
-            } catch (e) {
-                if (!e?.error?.includes('Topic with this name already exists')) {
-                    console.error(`Error creating kafka topic "${topic}". This might be fine!`)
-                    console.error(e)
-                }
-            }
-        }
-
-        await createTopic(KAFKA_EVENTS_INGESTION_HANDOFF)
-        await createTopic(KAFKA_SESSION_RECORDING_EVENTS)
 
         await consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
         console.info('running consumer')

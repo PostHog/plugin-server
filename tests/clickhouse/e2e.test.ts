@@ -46,6 +46,8 @@ describe('e2e clickhouse ingestion', () => {
 
     afterEach(async () => {
         await stopServer()
+        // TODO: this needs a better way to stop
+        ;(createPosthog as any).producer.disconnect()
     })
 
     test('event captured, processed, ingested', async () => {
