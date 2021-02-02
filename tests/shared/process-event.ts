@@ -12,7 +12,7 @@ import {
     ClickHouseEvent,
     SessionRecordingEvent,
 } from '../../src/types'
-import { createUserTeamAndOrganization, resetTestDatabase } from '../helpers/sql'
+import { createUserTeamAndOrganization, getFirstTeam, getTeams, resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
 import { DateTime } from 'luxon'
 import { delay, UUIDT } from '../../src/utils'
@@ -21,20 +21,18 @@ import { hashElements } from '../../src/ingestion/utils'
 
 jest.setTimeout(600000) // 600 sec timeout
 
-async function getTeams(server: PluginsServer): Promise<Team[]> {
-    return (await server.db.postgresQuery('SELECT * FROM posthog_team ORDER BY id')).rows
-}
-
-async function getFirstTeam(server: PluginsServer): Promise<Team> {
-    return (await getTeams(server))[0]
-}
-
-export async function delayUntilEventIngested(fetchEvents: () => Promise<any[]>, minCount = 1): Promise<void> {
-    for (let i = 0; i < 30; i++) {
-        if ((await fetchEvents()).length >= minCount) {
+export async function delayUntilEventIngested(
+    fetchEvents: () => Promise<any[] | any>,
+    minCount = 1,
+    delayMs = 500,
+    maxDelayCount = 30
+): Promise<void> {
+    for (let i = 0; i < maxDelayCount; i++) {
+        const events = await fetchEvents()
+        if ((typeof events === 'number' ? events : events.length) >= minCount) {
             return
         }
-        await delay(500)
+        await delay(delayMs)
     }
 }
 
