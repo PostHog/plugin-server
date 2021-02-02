@@ -1,8 +1,9 @@
 import { Properties } from '@posthog/plugin-scaffold'
-import { ClickHouse } from 'clickhouse'
+import { ClickHouse, QueryCursor } from 'clickhouse'
 import { Producer } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg'
+import { string } from 'yargs'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { chainToElements, hashElements, unparsePersonPartial } from './ingestion/utils'
 import {
@@ -10,7 +11,6 @@ import {
     PersonDistinctId,
     RawPerson,
     RawOrganization,
-    Team,
     PostgresSessionRecordingEvent,
     Event,
     ClickHouseEvent,
@@ -35,11 +35,20 @@ export class DB {
         this.clickhouse = clickhouse
     }
 
+    // Direct queries
+
     public async postgresQuery<R extends QueryResultRow = any, I extends any[] = any[]>(
         queryTextOrConfig: string | QueryConfig<I>,
         values?: I
     ): Promise<QueryResult<R>> {
         return this.postgres.query(queryTextOrConfig, values)
+    }
+
+    public async clickhouseQuery(query: string, reqParams?: Record<string, any>): Promise<Record<string, any>> {
+        if (!this.clickhouse) {
+            throw new Error('ClickHouse connection has not been provided to this DB instance!')
+        }
+        return this.clickhouse.query(query, reqParams).toPromise()
     }
 
     // Person
@@ -134,10 +143,8 @@ export class DB {
         await this.postgresQuery('DELETE FROM posthog_persondistinctid WHERE person_id = $1', [personId])
         await this.postgresQuery('DELETE FROM posthog_person WHERE id = $1', [personId])
         if (this.clickhouse) {
-            await this.clickhouse.query(`ALTER TABLE person DELETE WHERE id = ${personId}`).toPromise()
-            await this.clickhouse
-                .query(`ALTER TABLE person_distinct_id DELETE WHERE person_id = ${personId}`)
-                .toPromise()
+            await this.clickhouseQuery(`ALTER TABLE person DELETE WHERE id = ${personId}`)
+            await this.clickhouseQuery(`ALTER TABLE person_distinct_id DELETE WHERE person_id = ${personId}`)
         }
     }
 
@@ -198,7 +205,7 @@ export class DB {
 
     public async fetchEvents(): Promise<Event[] | ClickHouseEvent[]> {
         if (this.kafkaProducer) {
-            const events = (await this.clickhouse?.query(`SELECT * FROM events`).toPromise()) as ClickHouseEvent[]
+            const events = (await this.clickhouseQuery(`SELECT * FROM events`)) as ClickHouseEvent[]
             return (
                 events?.map(
                     (event) =>
@@ -221,9 +228,9 @@ export class DB {
 
     public async fetchSessionRecordingEvents(): Promise<PostgresSessionRecordingEvent[] | SessionRecordingEvent[]> {
         if (this.kafkaProducer) {
-            const events = ((await this.clickhouse
-                ?.query(`SELECT * FROM session_recording_events`)
-                .toPromise()) as SessionRecordingEvent[]).map((event) => {
+            const events = ((await this.clickhouseQuery(
+                `SELECT * FROM session_recording_events`
+            )) as SessionRecordingEvent[]).map((event) => {
                 return {
                     ...event,
                     snapshot_data: event.snapshot_data ? JSON.parse(event.snapshot_data) : null,
@@ -240,9 +247,9 @@ export class DB {
 
     public async fetchElements(event?: Event): Promise<Element[]> {
         if (this.kafkaProducer) {
-            const events = (await this.clickhouse
-                ?.query(`SELECT elements_chain FROM events WHERE uuid='${sanitizeSqlIdentifier((event as any).uuid)}'`)
-                .toPromise()) as ClickHouseEvent[]
+            const events = (await this.clickhouseQuery(
+                `SELECT elements_chain FROM events WHERE uuid='${sanitizeSqlIdentifier((event as any).uuid)}'`
+            )) as ClickHouseEvent[]
             const chain = events?.[0]?.elements_chain
             return chainToElements(chain)
         } else {
