@@ -122,15 +122,6 @@ jobs:
                     --health-interval 10s
                     --health-timeout 5s
                     --health-retries 5
-            clickhouse:
-                image: yandex/clickhouse-server
-                ports:
-                    - '8123:8123'
-                    - '9000:9000'
-                    - '9440:9440'
-                    - '9009:9009'
-                options: -v ${{ github.workspace }}/posthog/ee/idl:/idl -v ${{ github.workspace }}/posthog/docker/clickhouse/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d -v ${{ github.workspace }}/posthog/docker/clickhouse/config.xml:/etc/clickhouse-server/config.xml --name clickhouse
-
             zookeeper:
                 image: wurstmeister/zookeeper
             kafka:
@@ -160,10 +151,19 @@ jobs:
               with:
                   path: 'plugin-server'
 
-            - name: Restart clickhouse (with idl protos)
-              uses: docker://docker
-              with:
-                  args: docker restart clickhouse
+            - name: Install clickhouse db with .proto files
+              run: |
+                  docker run \
+                    --detach \
+                    --name clickhouse \
+                    -p 8123:8123 \
+                    -p 9000:9000 \
+                    -p 9440:9440 \
+                    -p 9009:9009 \
+                    -v ${{ github.workspace }}/posthog/ee/idl:/idl \
+                    -v ${{ github.workspace }}/posthog/docker/clickhouse/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d \
+                    -v ${{ github.workspace }}/posthog/docker/clickhouse/config.xml:/etc/clickhouse-server/config.xml \
+                    yandex/clickhouse-server
 
             - name: Set up Python
               uses: actions/setup-python@v2
