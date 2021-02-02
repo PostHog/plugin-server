@@ -19,15 +19,5 @@ describe('process event (clickhouse)', () => {
         await resetTestDatabaseClickhouse(extraServerConfig)
     })
 
-    const server = createProcessEventTests(
-        'clickhouse',
-        {
-            getSessionRecordingEvents: (server) => server.db.fetchSessionRecordingEvents(),
-            getEvents: (server) => server.db.fetchEvents(),
-            getPersons: (server) => server.db.fetchPersons(),
-            getDistinctIds: (server, person) => server.db.fetchDistinctIdValues(person),
-            getElements: (server, event: Event) => server.db.fetchElements(event),
-        },
-        extraServerConfig
-    )
+    const server = createProcessEventTests('clickhouse', extraServerConfig)
 })
