@@ -19,12 +19,18 @@ import { hashElements } from '../../src/ingestion/utils'
 
 jest.setTimeout(600000) // 600 sec timeout
 
-export async function delayUntilEventIngested(fetchEvents: () => Promise<any[]>, minCount = 1): Promise<void> {
-    for (let i = 0; i < 30; i++) {
-        if ((await fetchEvents()).length >= minCount) {
+export async function delayUntilEventIngested(
+    fetchEvents: () => Promise<any[] | any>,
+    minCount = 1,
+    delayMs = 500,
+    maxDelayCount = 30
+): Promise<void> {
+    for (let i = 0; i < maxDelayCount; i++) {
+        const events = await fetchEvents()
+        if ((typeof events === 'number' ? events : events.length) >= minCount) {
             return
         }
-        await delay(500)
+        await delay(delayMs)
     }
 }
 
