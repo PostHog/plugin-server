@@ -152,8 +152,10 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
                 })
                 await admin.disconnect()
             } catch (e) {
-                console.error(`Error creating kafka topic "${topic}". This might be fine!`)
-                console.error(e)
+                if (!e?.error?.includes('Topic with this name already exists')) {
+                    console.error(`Error creating kafka topic "${topic}". This might be fine!`)
+                    console.error(e)
+                }
             }
         }
 
