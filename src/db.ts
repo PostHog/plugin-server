@@ -220,9 +220,14 @@ export class DB {
 
     public async fetchSessionRecordingEvents(): Promise<PostgresSessionRecordingEvent[] | SessionRecordingEvent[]> {
         if (this.kafkaProducer) {
-            const events = (await this.clickhouse
+            const events = ((await this.clickhouse
                 ?.query(`SELECT * FROM session_recording_events`)
-                .toPromise()) as SessionRecordingEvent[]
+                .toPromise()) as SessionRecordingEvent[]).map((event) => {
+                return {
+                    ...event,
+                    snapshot_data: event.snapshot_data ? JSON.parse(event.snapshot_data) : null,
+                }
+            })
             return events
         } else {
             const result = await this.postgresQuery('SELECT * FROM posthog_sessionrecordingevent')
