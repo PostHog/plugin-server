@@ -151,7 +151,7 @@ jobs:
             - name: Start Kafka, Clickhouse, Zookeeper
               run: |
                   cd posthog/ee
-                  docker-compose -f docker-compose.ch.yml up zookeeper kafka clickhouse
+                  docker-compose -f docker-compose.ch.yml up -d zookeeper kafka clickhouse
 
             - name: Set up Python
               uses: actions/setup-python@v2
