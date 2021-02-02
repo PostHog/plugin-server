@@ -690,7 +690,7 @@ export const createProcessEventTests = (
     })
 
     test('snapshot event stored as session_recording_event', async () => {
-        await processEvent(
+        await eventsProcessor.processEvent(
             'some-id',
             '',
             '',
@@ -703,6 +703,7 @@ export const createProcessEventTests = (
             now,
             new UUIDT().toString()
         )
+        await delayUntilEventIngested(() => server.db.fetchSessionRecordingEvents())
 
         const events = await server.db.fetchEvents()
         expect(events.length).toEqual(0)
