@@ -167,6 +167,7 @@ jobs:
 
             - name: Ping kafka
               run: |
+                  echo "127.0.0.1	kafka" >> /etc/hosts
                   ping -c 4 kafka
 
             - name: Set up Python
