@@ -545,7 +545,10 @@ export class EventsProcessor {
         timestamp: DateTime | string,
         snapshot_data: Record<any, any>
     ): Promise<SessionRecordingEvent | PostgresSessionRecordingEvent> {
-        const timestampString = castTimestampOrNow(timestamp)
+        const timestampString = castTimestampOrNow(
+            timestamp,
+            this.kafkaProducer ? TimestampFormat.ClickHouse : TimestampFormat.ISO
+        )
 
         const data: SessionRecordingEvent = {
             uuid,
