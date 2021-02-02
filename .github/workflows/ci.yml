@@ -129,6 +129,8 @@ jobs:
                     - '9000:9000'
                     - '9440:9440'
                     - '9009:9009'
+                options: -v ${{ github.workspace }}/posthog/ee/idl:/idl -v ${{ github.workspace }}/posthog/docker/clickhouse/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d -v ${{ github.workspace }}/posthog/docker/clickhouse/config.xml:/etc/clickhouse-server/config.xml --name clickhouse
+
             zookeeper:
                 image: wurstmeister/zookeeper
             kafka:
@@ -157,6 +159,11 @@ jobs:
               uses: actions/checkout@v2
               with:
                   path: 'plugin-server'
+
+            - name: Restart clickhouse (with idl protos)
+              uses: docker://docker
+              with:
+                  args: docker restart clickhouse
 
             - name: Set up Python
               uses: actions/setup-python@v2
