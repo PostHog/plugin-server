@@ -122,17 +122,6 @@ jobs:
                     --health-interval 10s
                     --health-timeout 5s
                     --health-retries 5
-            zookeeper:
-                image: wurstmeister/zookeeper
-                ports:
-                    - '2181:2181'
-            kafka:
-                image: wurstmeister/kafka
-                ports:
-                    - '9092:9092'
-                env:
-                    KAFKA_ADVERTISED_HOST_NAME: kafka
-                    KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
 
         env:
             REDIS_URL: 'redis://localhost'
@@ -153,25 +142,16 @@ jobs:
               with:
                   path: 'plugin-server'
 
-            - name: Install clickhouse db with .proto files
-              run: |
-                  docker run \
-                    --detach \
-                    --name clickhouse \
-                    -p 8123:8123 \
-                    -p 9000:9000 \
-                    -p 9440:9440 \
-                    -p 9009:9009 \
-                    -v ${{ github.workspace }}/posthog/ee/idl:/idl \
-                    -v ${{ github.workspace }}/posthog/docker/clickhouse/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d \
-                    -v ${{ github.workspace }}/posthog/docker/clickhouse/config.xml:/etc/clickhouse-server/config.xml \
-                    yandex/clickhouse-server
-
             - name: Fix Kafka Hostname
               run: |
-                  sudo bash -c 'echo "127.0.0.1 kafka zookeeper redis" >> /etc/hosts'
+                  sudo bash -c 'echo "127.0.0.1 kafka zookeeper" >> /etc/hosts'
                   ping -c 1 kafka
                   ping -c 1 zookeeper
+
+            - name: Start Kafka, Clickhouse, Zookeeper
+              run: |
+                  cd posthog/ee
+                  docker-compose -f docker-compose.ch.yml up zookeeper kafka clickhouse
 
             - name: Set up Python
               uses: actions/setup-python@v2
