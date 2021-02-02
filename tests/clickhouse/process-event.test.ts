@@ -19,5 +19,5 @@ describe('process event (clickhouse)', () => {
         await resetTestDatabaseClickhouse(extraServerConfig)
     })
 
-    const server = createProcessEventTests('clickhouse', extraServerConfig)
+    createProcessEventTests('clickhouse', extraServerConfig)
 })
