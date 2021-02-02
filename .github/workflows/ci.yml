@@ -165,10 +165,11 @@ jobs:
                     -v ${{ github.workspace }}/posthog/docker/clickhouse/config.xml:/etc/clickhouse-server/config.xml \
                     yandex/clickhouse-server
 
-            - name: Ping kafka
+            - name: Fix Kafka Hostname
               run: |
-                  sudo bash -c 'echo "127.0.0.1 kafka" >> /etc/hosts'
-                  ping -c 4 kafka
+                  sudo bash -c 'echo "127.0.0.1 kafka zookeeper redis" >> /etc/hosts'
+                  ping -c 1 kafka
+                  ping -c 1 zookeeper
 
             - name: Set up Python
               uses: actions/setup-python@v2
