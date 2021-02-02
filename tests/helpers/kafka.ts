@@ -19,7 +19,7 @@ export class KafkaObserver extends EventEmitter {
         this.kafka = new Kafka({
             clientId: `plugin-server-test-${new UUIDT()}`,
             brokers: (config.KAFKA_HOSTS || '').split(','),
-            logLevel: logLevel.NOTHING,
+            logLevel: logLevel.WARN,
         })
         this.producer = this.kafka.producer()
         this.consumer = this.kafka.consumer({
@@ -115,7 +115,7 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
     const kafka = new Kafka({
         clientId: `plugin-server-test-${new UUIDT()}`,
         brokers: (config.KAFKA_HOSTS || '').split(','),
-        logLevel: logLevel.NOTHING,
+        logLevel: logLevel.WARN,
     })
     const producer = kafka.producer()
     const consumer = kafka.consumer({

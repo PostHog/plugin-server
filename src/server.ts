@@ -83,7 +83,7 @@ export async function createServer(
         kafka = new Kafka({
             clientId: `plugin-server-v${version}-${new UUIDT()}`,
             brokers: serverConfig.KAFKA_HOSTS.split(','),
-            logLevel: logLevel.NOTHING,
+            logLevel: logLevel.WARN,
             ssl: kafkaSsl,
         })
         kafkaProducer = kafka.producer()
