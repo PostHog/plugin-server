@@ -47,10 +47,12 @@ async function createPerson(
     return server.db.createPerson(DateTime.utc(), properties, team.id, null, false, new UUIDT().toString(), distinctIds)
 }
 
+type ReturnWithServer = { server?: PluginsServer; stopServer?: () => Promise<void> }
+
 export const createProcessEventTests = (
     database: 'postgresql' | 'clickhouse',
     extraServerConfig?: Partial<PluginsServerConfig>
-): PluginsServer => {
+): ReturnWithServer => {
     let queryCounter = 0
     let processEventCounter = 0
     let team: Team
@@ -58,6 +60,7 @@ export const createProcessEventTests = (
     let stopServer: () => Promise<void>
     let eventsProcessor: EventsProcessor
     let now = DateTime.utc()
+    const returned: ReturnWithServer = {}
 
     async function getServer(): Promise<[PluginsServer, () => Promise<void>]> {
         const [server, stopServer] = await createServer({
@@ -114,6 +117,8 @@ export const createProcessEventTests = (
         `
         await resetTestDatabase(testCode, extraServerConfig)
         ;[server, stopServer] = await getServer()
+        returned.server = server
+        returned.stopServer = stopServer
         eventsProcessor = new EventsProcessor(server)
         queryCounter = 0
         processEventCounter = 0
@@ -1114,5 +1119,5 @@ export const createProcessEventTests = (
         ).rejects.toEqual(new Error('Not a valid UUID: "null"'))
     })
 
-    return server!
+    return returned
 }

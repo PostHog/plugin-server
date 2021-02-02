@@ -465,7 +465,7 @@ export class EventsProcessor {
         } else {
             let elementsHash = ''
             if (elements && elements.length > 0) {
-                elementsHash = await this.createElementGroup(elements, team.id)
+                elementsHash = await this.db.createElementGroup(elements, team.id)
             }
             const insertResult = await this.db.postgresQuery(
                 'INSERT INTO posthog_event (created_at, event, distinct_id, properties, team_id, timestamp, elements, elements_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
@@ -496,45 +496,6 @@ export class EventsProcessor {
         ])
 
         return data
-    }
-
-    private async createElementGroup(elements: Element[], teamId: number): Promise<string> {
-        const cleanedElements = elements.map((element, index) => ({ ...element, order: index }))
-        const hash = hashElements(cleanedElements)
-
-        try {
-            const insertResult = await this.db.postgresQuery(
-                'INSERT INTO posthog_elementgroup (hash, team_id) VALUES ($1, $2) RETURNING *',
-                [hash, teamId]
-            )
-            const elementGroup = insertResult.rows[0] as ElementGroup
-            for (const element of cleanedElements) {
-                await this.db.postgresQuery(
-                    'INSERT INTO posthog_element (text, tag_name, href, attr_id, nth_child, nth_of_type, attributes, "order", event_id, attr_class, group_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-                    [
-                        element.text,
-                        element.tag_name,
-                        element.href,
-                        element.attr_id,
-                        element.nth_child,
-                        element.nth_of_type,
-                        element.attributes,
-                        element.order,
-                        element.event_id,
-                        element.attr_class,
-                        elementGroup.id,
-                    ]
-                )
-            }
-        } catch (error) {
-            // Throw further if not postgres error nr "23505" == "unique_violation"
-            // https://www.postgresql.org/docs/12/errcodes-appendix.html
-            if (error.code !== '23505') {
-                throw error
-            }
-        }
-
-        return hash
     }
 
     private async createSessionRecordingEvent(
