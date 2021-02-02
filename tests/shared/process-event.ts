@@ -1085,5 +1085,33 @@ export const createProcessEventTests = (
         expect(event.event?.length).toBe(200)
     })
 
+    test('throws with bad uuid', async () => {
+        await expect(
+            processEvent(
+                'xxx',
+                '',
+                '',
+                ({ event: 'E', properties: { price: 299.99, name: 'AirPods Pro' } } as any) as PluginEvent,
+                team.id,
+                DateTime.utc(),
+                DateTime.utc(),
+                'this is not an uuid'
+            )
+        ).rejects.toEqual(new Error('Not a valid UUID: "this is not an uuid"'))
+
+        await expect(
+            processEvent(
+                'xxx',
+                '',
+                '',
+                ({ event: 'E', properties: { price: 299.99, name: 'AirPods Pro' } } as any) as PluginEvent,
+                team.id,
+                DateTime.utc(),
+                DateTime.utc(),
+                null as any
+            )
+        ).rejects.toEqual(new Error('Not a valid UUID: "null"'))
+    })
+
     return server!
 }
