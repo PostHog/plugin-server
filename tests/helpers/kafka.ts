@@ -1,6 +1,10 @@
 import { EventEmitter } from 'events'
 import { Kafka, Consumer, logLevel, EachMessagePayload, Producer } from 'kafkajs'
-import { KAFKA_EVENTS, KAFKA_EVENTS_INGESTION_HANDOFF } from '../../src/ingestion/topics'
+import {
+    KAFKA_EVENTS,
+    KAFKA_EVENTS_INGESTION_HANDOFF,
+    KAFKA_SESSION_RECORDING_EVENTS,
+} from '../../src/ingestion/topics'
 import { parseRawEventMessage } from '../../src/ingestion/utils'
 import { EventMessage, PluginsServerConfig } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
@@ -137,6 +141,25 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
         console.info('connecting producer')
         await producer.connect()
         console.info('subscribing consumer')
+
+        async function createTopic(topic: string) {
+            try {
+                const admin = kafka.admin()
+                await admin.connect()
+                await admin.createTopics({
+                    waitForLeaders: true,
+                    topics: [{ topic }],
+                })
+                await admin.disconnect()
+            } catch (e) {
+                console.error(`Error creating kafka topic "${topic}". This might be fine!`)
+                console.error(e)
+            }
+        }
+
+        await createTopic(KAFKA_EVENTS_INGESTION_HANDOFF)
+        await createTopic(KAFKA_SESSION_RECORDING_EVENTS)
+
         await consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
         console.info('running consumer')
         await consumer.run({
