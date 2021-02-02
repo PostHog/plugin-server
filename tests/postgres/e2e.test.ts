@@ -51,7 +51,7 @@ describe('e2e postgres ingestion', () => {
         expect((await server.db.fetchEvents()).length).toBe(0)
         const uuid = new UUIDT().toString()
         posthog.capture('custom event', { name: 'haha', uuid, randomProperty: 'lololo' })
-        await delayUntilEventIngested(server)
+        await delayUntilEventIngested(() => server.db.fetchEvents())
         const events = await server.db.fetchEvents()
         expect(events.length).toBe(1)
         expect(events[0].properties.processed).toEqual('hell yes')
