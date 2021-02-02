@@ -12,7 +12,7 @@ import {
     Team,
     TimestampFormat,
 } from '../types'
-import { castTimestampOrNow, UUIDT } from '../utils'
+import { castTimestampOrNow, isUUIDFormat, UUIDT } from '../utils'
 import { Event as EventProto, IEvent } from '../idl/protos'
 import { Producer } from 'kafkajs'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
@@ -54,6 +54,9 @@ export class EventsProcessor {
         sentAt: DateTime | null,
         eventUuid: string
     ): Promise<IEvent | SessionRecordingEvent> {
+        if (!isUUIDFormat(eventUuid)) {
+            throw new Error(`Not a valid UUID: "${eventUuid}"`)
+        }
         const singleSaveTimer = new Date()
 
         const properties: Properties = data.properties ?? {}

@@ -279,6 +279,17 @@ export class UUIDT extends UUID {
     }
 }
 
+/**
+ * Returns true if the string looks like an UUID.
+ *
+ * This does not care about RFC4122, since neither does UUIDT above.
+ * https://stackoverflow.com/questions/7905929/how-to-test-valid-uuid-guid
+ */
+export function isUUIDFormat(uuid: string): boolean {
+    // 0177623e-698f-0000-c616-a14493d7897d
+    return !!uuid && !!uuid.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+}
+
 /** Format timestamp for ClickHouse. */
 export function castTimestampOrNow(
     timestamp?: DateTime | string | null,

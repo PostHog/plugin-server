@@ -1078,7 +1078,7 @@ export const createProcessEventTests = (
             team.id,
             DateTime.utc(),
             DateTime.utc(),
-            'uuid'
+            new UUIDT().toString()
         )
 
         const [event] = await server.db.fetchEvents()
