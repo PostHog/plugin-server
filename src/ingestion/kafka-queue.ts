@@ -1,7 +1,6 @@
 import * as Sentry from '@sentry/node'
 import { Kafka, Consumer, Message, EachBatchPayload } from 'kafkajs'
 import { PluginsServer, Queue, RawEventMessage } from 'types'
-import { KAFKA_EVENTS_INGESTION_HANDOFF } from './topics'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import { status } from '../status'
 import { killGracefully } from '../utils'
@@ -85,7 +84,7 @@ export class KafkaQueue implements Queue {
             this.consumer.on(this.consumer.events.CRASH, ({ payload: { error } }) => reject(error))
             status.info('⏬', `Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
             this.wasConsumerRan = true
-            await this.consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
+            await this.consumer.subscribe({ topic: this.pluginsServer.KAFKA_INCOMING_TOPIC! })
             // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
             await this.consumer.run({
                 // TODO: eachBatchAutoResolve: false, // don't autoresolve whole batch in case we exit it early
@@ -104,7 +103,7 @@ export class KafkaQueue implements Queue {
             return
         }
         status.info('⏳', 'Pausing Kafka consumer...')
-        await this.consumer.pause([{ topic: KAFKA_EVENTS_INGESTION_HANDOFF }])
+        await this.consumer.pause([{ topic: this.pluginsServer.KAFKA_INCOMING_TOPIC! }])
         status.info('⏸', 'Kafka consumer paused!')
     }
 
@@ -113,12 +112,12 @@ export class KafkaQueue implements Queue {
             return
         }
         status.info('⏳', 'Resuming Kafka consumer...')
-        await this.consumer.resume([{ topic: KAFKA_EVENTS_INGESTION_HANDOFF }])
+        await this.consumer.resume([{ topic: this.pluginsServer.KAFKA_INCOMING_TOPIC! }])
         status.info('▶️', 'Kafka consumer resumed!')
     }
 
     isPaused(): boolean {
-        return this.consumer.paused().some(({ topic }) => topic === KAFKA_EVENTS_INGESTION_HANDOFF)
+        return this.consumer.paused().some(({ topic }) => topic === this.pluginsServer.KAFKA_INCOMING_TOPIC)
     }
 
     async stop(): Promise<void> {

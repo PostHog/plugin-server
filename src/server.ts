@@ -20,6 +20,7 @@ import { startSchedule } from './services/schedule'
 import { ConnectionOptions } from 'tls'
 import { DB } from './db'
 import { DateTime } from 'luxon'
+import { KAFKA_EVENTS_INGESTION_HANDOFF, KAFKA_EVENTS_WAL } from './ingestion/topics'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
@@ -80,6 +81,14 @@ export async function createServer(
                 database: serverConfig.CLICKHOUSE_DATABASE,
             },
         })
+
+        if (!serverConfig.KAFKA_INCOMING_TOPIC) {
+            // When ingesting events, listen to the "INGESTION_HANDOFF" topic, otherwise listen to the "WAL" and discard
+            serverConfig.KAFKA_INCOMING_TOPIC = serverConfig.PLUGIN_SERVER_INGESTION
+                ? KAFKA_EVENTS_INGESTION_HANDOFF
+                : KAFKA_EVENTS_WAL
+        }
+
         kafka = new Kafka({
             clientId: `plugin-server-v${version}-${new UUIDT()}`,
             brokers: serverConfig.KAFKA_HOSTS.split(','),

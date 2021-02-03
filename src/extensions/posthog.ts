@@ -1,4 +1,3 @@
-import { KAFKA_EVENTS_INGESTION_HANDOFF } from '../ingestion/topics'
 import { Properties } from '@posthog/plugin-scaffold'
 import { DateTime } from 'luxon'
 import { PluginsServer, PluginConfig, RawEventMessage } from 'types'
@@ -31,7 +30,7 @@ export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig)
                 throw new Error('kafkaProducer not configured!')
             }
             server.kafkaProducer.send({
-                topic: KAFKA_EVENTS_INGESTION_HANDOFF,
+                topic: server.KAFKA_INCOMING_TOPIC!,
                 messages: [
                     {
                         key: data.uuid,
