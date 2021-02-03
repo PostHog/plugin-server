@@ -47,12 +47,13 @@ export class KafkaQueue implements Queue {
             ...rawEvent,
             data: JSON.parse(rawEvent.data),
         }))
+        const offsetMap = new Map<string, string>()
         const pluginEvents: PluginEvent[] = rawEvents.map((rawEvent) => {
-            const { data: dataStr, ...restOfRawEvent } = rawEvent
+            const { data: dataStr, kafka_offset: kafkaOffset, ...restOfRawEvent } = rawEvent
             const event = { ...restOfRawEvent, ...JSON.parse(dataStr) }
+            offsetMap.set(event.uuid, kafkaOffset)
             return {
                 ...event,
-                kafka_offset: restOfRawEvent.kafka_offset,
                 site_url: event.site_url || null,
                 ip: event.ip || null,
             }
@@ -71,10 +72,21 @@ export class KafkaQueue implements Queue {
             }
             const singleIngestionTimer = new Date()
             await this.saveEvent(event)
-            resolveOffset(event.kafka_offset!)
+            if (event?.uuid) {
+                const offset = offsetMap.get(event.uuid)
+                if (offset) {
+                    resolveOffset(offset)
+                    offsetMap.delete(event.uuid)
+                }
+            }
             await heartbeat()
             await commitOffsetsIfNecessary()
             this.pluginsServer.statsd?.timing('kafka_queue.single_ingestion', singleIngestionTimer)
+        }
+        for (const removedOffset of offsetMap.values()) {
+            resolveOffset(removedOffset)
+            await heartbeat()
+            await commitOffsetsIfNecessary()
         }
         this.pluginsServer.statsd?.timing('kafka_queue.each_batch', batchProcessingTimer)
     }
