@@ -37,9 +37,14 @@ export class KafkaQueue implements Queue {
         isStale,
     }: EachBatchPayload): Promise<void> {
         const batchProcessingTimer = new Date()
-        const pluginEvents = batch.messages.map((message) => {
+
+        const uuidOrder = new Map<string, number>()
+        const uuidOffset = new Map<string, string>()
+        const pluginEvents = batch.messages.map((message, index) => {
             const { data: dataStr, ...rawEvent } = JSON.parse(message.value!.toString())
             const event = { ...rawEvent, ...JSON.parse(dataStr) }
+            uuidOrder.set(event.uuid, index)
+            uuidOffset.set(event.uuid, message.offset)
             return {
                 ...event,
                 site_url: event.site_url || null,
@@ -48,6 +53,9 @@ export class KafkaQueue implements Queue {
         })
 
         const processedEvents = await this.processEventBatch(pluginEvents)
+        processedEvents.sort(
+            (a, b) => (uuidOrder.get(a.uuid!) || pluginEvents.length) - (uuidOrder.get(b.uuid!) || pluginEvents.length)
+        )
 
         for (const event of processedEvents) {
             if (!isRunning()) {
@@ -60,7 +68,7 @@ export class KafkaQueue implements Queue {
             }
             const singleIngestionTimer = new Date()
             await this.saveEvent(event)
-            const offset = event?.uuid ? offsetMap.get(event.uuid) : null
+            const offset = event?.uuid ? uuidOffset.get(event.uuid) : null
             if (offset) {
                 resolveOffset(offset)
             }
