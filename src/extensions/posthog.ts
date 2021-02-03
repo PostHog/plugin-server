@@ -26,10 +26,11 @@ export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig)
 
     if (server.KAFKA_ENABLED) {
         // Sending event to our Kafka>ClickHouse pipeline
-        const producer = server.kafka!.producer()
         sendEvent = async (data) => {
-            await producer.connect()
-            producer!.send({
+            if (!server.kafkaProducer) {
+                throw new Error('kafkaProducer not configured!')
+            }
+            server.kafkaProducer.send({
                 topic: KAFKA_EVENTS_INGESTION_HANDOFF,
                 messages: [
                     {

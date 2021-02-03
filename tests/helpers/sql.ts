@@ -81,6 +81,7 @@ export async function createUserTeamAndOrganization(
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         personalization: '{}',
+        setup_section_2_completed: true,
     })
     await insertRow(db, 'posthog_organizationmembership', {
         id: organizationMembershipId,

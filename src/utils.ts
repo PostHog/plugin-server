@@ -147,12 +147,24 @@ for (let i = 0; i < 256; i++) {
 }
 
 export class UUID {
-    static validateString(candidate: string): void {
-        if (!candidate.match(/^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i)) {
+    /**
+     * Check whether str
+     *
+     * This does not care about RFC4122, since neither does UUIDT above.
+     * https://stackoverflow.com/questions/7905929/how-to-test-valid-uuid-guid
+     */
+    static validateString(candidate: any, throwOnInvalid = true): boolean {
+        const isValid = Boolean(
+            candidate &&
+                typeof candidate === 'string' &&
+                candidate.match(/^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i)
+        )
+        if (!isValid && throwOnInvalid) {
             throw new Error(
                 'String does not match format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX (where each X is a hexadecimal character)!'
             )
         }
+        return isValid
     }
 
     array: Uint8Array
@@ -299,6 +311,10 @@ export function castTimestampOrNow(
     }
 }
 
+export function clickHouseTimestampToISO(timestamp: string): string {
+    return DateTime.fromFormat(timestamp, 'yyyy-MM-dd HH:mm:ss.u', { zone: 'UTC' }).toISO()
+}
+
 export function delay(ms: number): Promise<void> {
     return new Promise((resolve) => {
         setTimeout(resolve, ms)
@@ -307,5 +323,5 @@ export function delay(ms: number): Promise<void> {
 
 /** Remove all quotes from the provided identifier to prevent SQL injection. */
 export function sanitizeSqlIdentifier(unquotedIdentifier: string): string {
-    return '"' + unquotedIdentifier.replace(/[^\w\d_]+/g, '') + '"'
+    return unquotedIdentifier.replace(/[^\w\d_]+/g, '')
 }

@@ -1,4 +1,4 @@
-import { LogLevel } from '../../src/types'
+import { LogLevel, PluginsServerConfig } from '../../src/types'
 import { resetTestDatabase } from '../helpers/sql'
 import { startPluginsServer } from '../../src/server'
 import { makePiscina } from '../../src/worker/piscina'
@@ -6,14 +6,28 @@ import { PluginsServer } from '../../src/types'
 import { createPosthog, DummyPostHog } from '../../src/extensions/posthog'
 import { pluginConfig39 } from '../helpers/plugins'
 import { delay, UUIDT } from '../../src/utils'
+import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
+import { resetKafka } from '../helpers/kafka'
 import { delayUntilEventIngested } from '../shared/process-event'
 
 jest.setTimeout(60000) // 60 sec timeout
 
-describe('e2e postgres ingestion', () => {
+const extraServerConfig: Partial<PluginsServerConfig> = {
+    KAFKA_ENABLED: true,
+    KAFKA_HOSTS: process.env.KAFKA_HOSTS || 'kafka:9092',
+    WORKER_CONCURRENCY: 2,
+    PLUGIN_SERVER_INGESTION: true,
+    LOG_LEVEL: LogLevel.Log,
+}
+
+describe('e2e clickhouse ingestion', () => {
     let server: PluginsServer
     let stopServer: () => Promise<void>
     let posthog: DummyPostHog
+
+    beforeAll(async () => {
+        await resetKafka(extraServerConfig)
+    })
 
     beforeEach(async () => {
         await resetTestDatabase(`
@@ -23,23 +37,10 @@ describe('e2e postgres ingestion', () => {
                 return event
             }
         `)
-        const startResponse = await startPluginsServer(
-            {
-                WORKER_CONCURRENCY: 2,
-                PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
-                CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
-                PLUGIN_SERVER_INGESTION: true,
-                LOG_LEVEL: LogLevel.Log,
-                KAFKA_ENABLED: false,
-            },
-            makePiscina
-        )
+        await resetTestDatabaseClickhouse(extraServerConfig)
+        const startResponse = await startPluginsServer(extraServerConfig, makePiscina)
         server = startResponse.server
         stopServer = startResponse.stop
-
-        await server.redis.del(server.PLUGINS_CELERY_QUEUE)
-        await server.redis.del(server.CELERY_DEFAULT_QUEUE)
-
         posthog = createPosthog(server, pluginConfig39)
     })
 
@@ -50,7 +51,7 @@ describe('e2e postgres ingestion', () => {
     test('event captured, processed, ingested', async () => {
         expect((await server.db.fetchEvents()).length).toBe(0)
         const uuid = new UUIDT().toString()
-        posthog.capture('custom event', { name: 'haha', uuid, randomProperty: 'lololo' })
+        posthog.capture('custom event', { name: 'haha', uuid })
         await delayUntilEventIngested(() => server.db.fetchEvents())
         const events = await server.db.fetchEvents()
         expect(events.length).toBe(1)

@@ -12,7 +12,7 @@
         "start": "yarn start:dev",
         "start:dist": "node dist/src/index.js --base-dir ../posthog",
         "start:dev": "ts-node-dev --exit-child src/index.ts --base-dir ../posthog",
-        "start:dev:ee": "DATABASE_URL=postgres://posthog:posthog@localhost:5439/posthog KAFKA_ENABLED=true KAFKA_HOSTS=localhost:9092 yarn start:dev",
+        "start:dev:ee": "KAFKA_ENABLED=true KAFKA_HOSTS=localhost:9092 yarn start:dev",
         "build": "yarn clean && yarn compile",
         "clean": "rimraf dist/*",
         "compile:protobuf": "cd src/idl/ && rimraf protos.* && pbjs -t static-module -w commonjs -o protos.js *.proto && pbts -o protos.d.ts protos.js && eslint --fix . && prettier --write .",
@@ -24,8 +24,10 @@
         "prettier:check": "prettier --check .",
         "prepare": "yarn compile:protobuf",
         "prepublishOnly": "yarn build",
-        "setup:dev": "cd ../posthog && (dropdb test_posthog || echo 'no db to drop') && createdb test_posthog && source env/bin/activate && DATABASE_URL=postgres://localhost:5432/test_posthog DEBUG=1 python manage.py migrate",
-        "setup:dev:ee": "export DEBUG=1 PRIMARY_DB=clickhouse DATABASE_URL=postgres://posthog:posthog@localhost:5439/test_posthog PGPASSWORD=posthog && cd ../posthog && (dropdb -p 5439 -h localhost -U posthog test_posthog || echo 'no db to drop') && createdb -p 5439 -h localhost -U posthog test_posthog && source env/bin/activate && python manage.py migrate && python manage.py migrate_clickhouse"
+        "setup:dev:clickhouse": "cd ../posthog && export DEBUG=1 PRIMARY_DB=clickhouse && source env/bin/activate && python manage.py migrate_clickhouse",
+        "setup:test:ee": "yarn setup:test:postgres && yarn setup:test:clickhouse",
+        "setup:test:postgres": "cd ../posthog && (dropdb test_posthog || echo 'no db to drop') && createdb test_posthog && source env/bin/activate && DATABASE_URL=postgres://localhost:5432/test_posthog DEBUG=1 python manage.py migrate",
+        "setup:test:clickhouse": "cd ../posthog && export TEST=1 PRIMARY_DB=clickhouse CLICKHOUSE_DATABASE=posthog_test && source env/bin/activate && python manage.py migrate_clickhouse"
     },
     "bin": {
         "posthog-plugin-server": "bin/posthog-plugin-server"

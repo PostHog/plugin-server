@@ -1,9 +1,13 @@
 import { EventEmitter } from 'events'
 import { Kafka, Consumer, logLevel, EachMessagePayload, Producer } from 'kafkajs'
-import { KAFKA_EVENTS, KAFKA_EVENTS_INGESTION_HANDOFF } from '../../src/ingestion/topics'
+import {
+    KAFKA_EVENTS,
+    KAFKA_EVENTS_INGESTION_HANDOFF,
+    KAFKA_SESSION_RECORDING_EVENTS,
+} from '../../src/ingestion/topics'
 import { parseRawEventMessage } from '../../src/ingestion/utils'
 import { EventMessage, PluginsServerConfig } from '../../src/types'
-import { UUIDT } from '../../src/utils'
+import { delay, UUIDT } from '../../src/utils'
 import { defaultConfig, overrideWithEnv } from '../../src/config'
 
 export class KafkaObserver extends EventEmitter {
@@ -19,7 +23,7 @@ export class KafkaObserver extends EventEmitter {
         this.kafka = new Kafka({
             clientId: `plugin-server-test-${new UUIDT()}`,
             brokers: (config.KAFKA_HOSTS || '').split(','),
-            logLevel: logLevel.NOTHING,
+            logLevel: logLevel.WARN,
         })
         this.producer = this.kafka.producer()
         this.consumer = this.kafka.consumer({
@@ -106,4 +110,77 @@ export class KafkaCollector extends EventEmitter {
             resolveIfCollectedEnough()
         })
     }
+}
+
+/** Clear the kafka queue */
+export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>, delayMs = 2000) {
+    console.log('Resetting Kafka!')
+    const config = { ...overrideWithEnv(defaultConfig, process.env), ...extraServerConfig }
+    const kafka = new Kafka({
+        clientId: `plugin-server-test-${new UUIDT()}`,
+        brokers: (config.KAFKA_HOSTS || '').split(','),
+        logLevel: logLevel.WARN,
+    })
+    const producer = kafka.producer()
+    const consumer = kafka.consumer({
+        groupId: 'clickhouse-ingestion-test',
+    })
+    const messages = []
+
+    async function createTopic(topic: string) {
+        try {
+            const admin = kafka.admin()
+            await admin.connect()
+            await admin.createTopics({
+                waitForLeaders: true,
+                topics: [{ topic }],
+            })
+            await admin.disconnect()
+        } catch (e) {
+            if (!e?.error?.includes('Topic with this name already exists')) {
+                console.error(`Error creating kafka topic "${topic}". This might be fine!`)
+                console.error(e)
+            }
+        }
+    }
+
+    await createTopic(KAFKA_EVENTS_INGESTION_HANDOFF)
+    await createTopic(KAFKA_SESSION_RECORDING_EVENTS)
+
+    const connected = await new Promise<void>(async (resolve, reject) => {
+        console.info('setting group join and crash listeners')
+        const { CONNECT, GROUP_JOIN, CRASH } = consumer.events
+        consumer.on(CONNECT, () => {
+            console.log('consumer connected to kafka')
+        })
+        consumer.on(GROUP_JOIN, () => {
+            console.log('joined group')
+            resolve()
+        })
+        consumer.on(CRASH, ({ payload: { error } }) => reject(error))
+        console.info('connecting producer')
+        await producer.connect()
+        console.info('subscribing consumer')
+
+        await consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
+        console.info('running consumer')
+        await consumer.run({
+            eachMessage: async (payload) => {
+                console.info('message received!')
+                messages.push(payload)
+            },
+        })
+    })
+
+    console.info(`awaiting ${delayMs} ms before disconnecting`)
+    await delay(delayMs)
+
+    console.info('disconnecting producer')
+    await producer.disconnect()
+    console.info('stopping consumer')
+    await consumer.stop()
+    console.info('disconnecting consumer')
+    await consumer.disconnect()
+
+    return true
 }

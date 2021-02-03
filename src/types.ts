@@ -189,6 +189,8 @@ export interface RawEventMessage extends BaseEventMessage {
     now: string
     /** ISO-formatted datetime. May be empty! */
     sent_at: string
+    /** JSON-encoded number. */
+    kafka_offset: string
 }
 
 /** Usable event message. */
@@ -237,7 +239,7 @@ export interface Element {
     attr_class?: string[]
     nth_child?: number
     nth_of_type?: number
-    attributes: Record<string, any>
+    attributes?: Record<string, any>
     event_id?: number
     order?: number
     group_id?: number
@@ -260,6 +262,11 @@ export interface Event {
     distinct_id: string
     elements_hash: string
     created_at: string
+}
+
+export interface ClickHouseEvent extends Omit<Event, 'id' | 'elements' | 'elements_hash'> {
+    uuid: string
+    elements_chain: string
 }
 
 /** Properties shared by RawPerson and Person. */
