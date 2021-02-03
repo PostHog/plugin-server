@@ -81,6 +81,7 @@ export async function createServer(
                 database: serverConfig.CLICKHOUSE_DATABASE,
             },
         })
+        await clickhouse.query('SELECT 1')
 
         if (!serverConfig.KAFKA_INCOMING_TOPIC) {
             // When ingesting events, listen to the "INGESTION_HANDOFF" topic, otherwise listen to the "WAL" and discard
