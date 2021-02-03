@@ -7,6 +7,42 @@ import { status } from '../status'
 
 export type BatchCallback = (messages: Message[]) => Promise<void>
 
+/**
+ * We use this to avoid a situation where the event was discarded and because of that its Kafka offset is not resolved,
+ * potentially causing unnecessary message retries.
+ *
+ * Works in the following way: for each event UUID the algorithm sets the Kafka offset to resolve
+ * based on the last event after it from the Kafka topic that WAS discarded. Example, we've got events:
+ * ```JS
+ * [{ uuid: 'a', offset: 1 }, { uuid: 's', offset: 2 }, { uuid: 'd', offset: 3 }, { uuid: 'f', offset: 4 }]
+ * ```
+ * Now some plugin discards the last two! Returned map for use in resolveOffset() will in result look like this:
+ * ```JS
+ * { 'a': 1, 's': 4, 'd': 4, 'f': 4 }
+ * ```
+ * Because 'd' and 'f' were discarded by a plugin, when we save 's' to the database, we'll know that at the same time
+ * we in fact also covered 'd' and 'f' and should resolve the last offset - belonging to 'f' – not an intermediary one.
+ * As for 'a', we simply resolve its offset outright, because its next event ('s') is not discarded.
+ */
+function aliasEventUuidForDiscardedKafkaOffsets(
+    rawEventMessages: RawEventMessage[],
+    processedEvents: PluginEvent[]
+): Map<string, string> {
+    rawEventMessages = [...rawEventMessages] // Shallow copy to avoid side effects
+    const eventUuidToKafkaOffset = new Map<string, string>()
+    const processedUuids: Set<string> = new Set(processedEvents.map((event) => event.uuid!))
+    rawEventMessages.reverse()
+    // This initial value below is in fact the last message, due to the array being reversed
+    let currentNotDiscardedOffset: string = rawEventMessages.shift()!.kafka_offset
+    for (const rawEventMessage of rawEventMessages) {
+        if (processedUuids.has(rawEventMessage.uuid)) {
+            currentNotDiscardedOffset = rawEventMessage.kafka_offset
+        }
+        eventUuidToKafkaOffset.set(rawEventMessage.uuid, currentNotDiscardedOffset)
+    }
+    return eventUuidToKafkaOffset
+}
+
 export class KafkaQueue implements Queue {
     private pluginsServer: PluginsServer
     private kafka: Kafka
@@ -38,15 +74,15 @@ export class KafkaQueue implements Queue {
         isStale,
     }: EachBatchPayload): Promise<void> {
         const batchProcessingTimer = new Date()
-        const rawEvents: RawEventMessage[] = batch.messages.map((message) => ({
+        const rawEventMessages: RawEventMessage[] = batch.messages.map((message) => ({
             ...JSON.parse(message.value!.toString()),
             kafka_offset: message.offset,
         }))
-        const parsedEvents = rawEvents.map((rawEvent) => ({
+        const parsedEventMessages = rawEventMessages.map((rawEvent) => ({
             ...rawEvent,
             data: JSON.parse(rawEvent.data),
         }))
-        const pluginEvents: PluginEvent[] = parsedEvents.map((parsedEvent) => ({
+        const pluginEvents: PluginEvent[] = parsedEventMessages.map((parsedEvent) => ({
             ...parsedEvent,
             event: parsedEvent.data.event,
             properties: parsedEvent.data.properties,
@@ -54,6 +90,7 @@ export class KafkaQueue implements Queue {
         const processedEvents: PluginEvent[] = (
             await this.processEventBatch(pluginEvents)
         ).filter((event: PluginEvent[] | false | null | undefined) => Boolean(event))
+        const eventUuidToKafkaOffset = aliasEventUuidForDiscardedKafkaOffsets(rawEventMessages, processedEvents)
         for (const event of processedEvents) {
             if (!isRunning()) {
                 status.info('😮', 'Consumer not running anymore, canceling batch processing!')
@@ -65,7 +102,7 @@ export class KafkaQueue implements Queue {
             }
             const singleIngestionTimer = new Date()
             await this.saveEvent(event)
-            resolveOffset(event.kafka_offset!)
+            resolveOffset(eventUuidToKafkaOffset.get(event.uuid!)!)
             await heartbeat()
             await commitOffsetsIfNecessary()
             this.pluginsServer.statsd?.timing('kafka_queue.single_ingestion', singleIngestionTimer)
