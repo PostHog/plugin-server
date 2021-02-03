@@ -91,7 +91,7 @@ export class KafkaQueue implements Queue {
             await this.consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
             // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
             await this.consumer.run({
-                eachBatchAutoResolve: true,
+                eachBatchAutoResolve: true, // commit the last offset of the batch if eachBatch doesn't throw an error
                 autoCommitInterval: 500, // autocommit every 500 ms…
                 autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
                 eachBatch: this.eachBatch.bind(this),
