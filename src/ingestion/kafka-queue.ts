@@ -20,10 +20,10 @@ export type BatchCallback = (messages: Message[]) => Promise<void>
  * ```
  * Now some plugin discards the last two! Returned map for use in resolveOffset() will in result look like this:
  * ```JS
- * { 'a': 1, 's': 4, 'd': 4, 'f': 4}
+ * { 'a': 1, 's': 4, 'd': 4, 'f': 4 }
  * ```
- * Because 'd' and 'f' were discarded by a plugin, when we save 's' to the database, we'll know that we also in fact
- * covered 'd' and 'f' and should resolve the last offset - belonging to 'f' – not an intermediary one.
+ * Because 'd' and 'f' were discarded by a plugin, when we save 's' to the database, we'll know that at the same time
+ * we in fact also covered 'd' and 'f' and should resolve the last offset - belonging to 'f' – not an intermediary one.
  * As for 'a', we simply resolve its offset outright, because its next event ('s') is not discarded.
  */
 function aliasEventUuidForDiscardedKafkaOffsets(
