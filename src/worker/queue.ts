@@ -92,16 +92,18 @@ async function startQueueKafka(
             status.error('❓', 'UUID missing in event received from Kafka!')
             return
         }
-        await server.eventsProcessor.processEvent(
-            distinct_id,
-            ip,
-            site_url,
-            event,
-            team_id,
-            DateTime.fromISO(now),
-            sent_at ? DateTime.fromISO(sent_at) : null,
-            uuid
-        )
+        if (server.PLUGIN_SERVER_INGESTION) {
+            await server.eventsProcessor.processEvent(
+                distinct_id,
+                ip,
+                site_url,
+                event,
+                team_id,
+                DateTime.fromISO(now),
+                sent_at ? DateTime.fromISO(sent_at) : null,
+                uuid
+            )
+        }
     })
 
     await kafkaQueue.start()
