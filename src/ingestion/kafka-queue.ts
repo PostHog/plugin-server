@@ -53,6 +53,9 @@ export class KafkaQueue implements Queue {
         })
 
         const processedEvents = await this.processEventBatch(pluginEvents)
+
+        // Sort in the original order that the events came in, putting any randomly added events to the end.
+        // This is so we would resolve the correct kafka offsets in order.
         processedEvents.sort(
             (a, b) => (uuidOrder.get(a.uuid!) || pluginEvents.length) - (uuidOrder.get(b.uuid!) || pluginEvents.length)
         )
