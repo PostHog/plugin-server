@@ -71,7 +71,7 @@ export class KafkaQueue implements Queue {
             }
             const singleIngestionTimer = new Date()
             await this.saveEvent(event)
-            const offset = event?.uuid ? uuidOffset.get(event.uuid) : null
+            const offset = uuidOffset.get(event.uuid!)
             if (offset) {
                 resolveOffset(offset)
             }
