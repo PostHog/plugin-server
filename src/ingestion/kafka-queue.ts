@@ -72,12 +72,10 @@ export class KafkaQueue implements Queue {
             }
             const singleIngestionTimer = new Date()
             await this.saveEvent(event)
-            if (event?.uuid) {
-                const offset = offsetMap.get(event.uuid)
-                if (offset) {
-                    resolveOffset(offset)
-                    offsetMap.delete(event.uuid)
-                }
+            const offset = event?.uuid ? offsetMap.get(event.uuid) : null
+            if (offset) {
+                resolveOffset(offset)
+                offsetMap.delete(event.uuid!)
             }
             await heartbeat()
             await commitOffsetsIfNecessary()
