@@ -35,12 +35,12 @@ function aliasEventUuidForDiscardedKafkaOffsets(
     const processedUuids: Set<string> = new Set(processedEvents.map((event) => event.uuid!))
     rawEventMessages.reverse()
     // This initial value below is in fact the last message, due to the array being reversed
-    let nextOffsetNotDiscarded: string | null = rawEventMessages.shift()!.kafka_offset
+    let currentNotDiscardedOffset: string = rawEventMessages.shift()!.kafka_offset
     for (const rawEventMessage of rawEventMessages) {
         if (processedUuids.has(rawEventMessage.uuid)) {
-            nextOffsetNotDiscarded = rawEventMessage.kafka_offset
+            currentNotDiscardedOffset = rawEventMessage.kafka_offset
         }
-        eventUuidToKafkaOffset.set(rawEventMessage.uuid, nextOffsetNotDiscarded)
+        eventUuidToKafkaOffset.set(rawEventMessage.uuid, currentNotDiscardedOffset)
     }
     return eventUuidToKafkaOffset
 }
