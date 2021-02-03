@@ -73,7 +73,7 @@ export async function createServer(
             url: `http${serverConfig.CLICKHOUSE_SECURE ? 's' : ''}://$${serverConfig.CLICKHOUSE_HOST}`,
             port: serverConfig.CLICKHOUSE_SECURE ? 8443 : 8123,
             basicAuth: {
-                username: serverConfig.CLICKHOUSE_USERNAME,
+                username: serverConfig.CLICKHOUSE_USER,
                 password: serverConfig.CLICKHOUSE_PASSWORD,
             },
             config: {

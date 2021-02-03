@@ -41,7 +41,7 @@ There's a multitude of settings you can use to control the plugin server. Use th
 | PLUGIN_SERVER_INGESTION       | Whether the plugin server should put events right into the database | `false`                               |
 | CLICKHOUSE_HOST               | ClickHouse host                                                     | `'localhost'`                         |
 | CLICKHOUSE_DATABASE           | ClickHouse database                                                 | `'default'`                           |
-| CLICKHOUSE_USERNAME           | ClickHouse username                                                 | `'default'`                           |
+| CLICKHOUSE_USER               | ClickHouse username                                                 | `'default'`                           |
 | CLICKHOUSE_PASSWORD           | ClickHouse password                                                 | `null`                                |
 | CLICKHOUSE_CA                 | ClickHouse CA certs                                                 | `null`                                |
 | CLICKHOUSE_SECURE             | Secure ClickHouse connection                                        | `false`                               |

@@ -25,7 +25,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     DATABASE_URL: string
     CLICKHOUSE_HOST: string
     CLICKHOUSE_DATABASE: string
-    CLICKHOUSE_USERNAME: string
+    CLICKHOUSE_USER: string
     CLICKHOUSE_PASSWORD: string | null
     CLICKHOUSE_CA: string | null
     CLICKHOUSE_SECURE: boolean
