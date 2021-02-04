@@ -47,6 +47,7 @@ There's a multitude of settings you can use to control the plugin server. Use th
 | CLICKHOUSE_SECURE             | Secure ClickHouse connection                                        | `false`                               |
 | KAFKA_ENABLED                 | use Kafka instead of Celery to ingest events                        | `false`                               |
 | KAFKA_HOSTS                   | comma-delimited Kafka hosts                                         | `null`                                |
+| KAFKA_CONSUMPTION_TOPIC       | Kafka consumption topic override                                    | `null` (automatic)                    |
 | KAFKA_CLIENT_CERT_B64         | Kafka certificate in Base64                                         | `null`                                |
 | KAFKA_CLIENT_CERT_KEY_B64     | Kafka certificate key in Base64                                     | `null`                                |
 | KAFKA_TRUSTED_CERT_B64        | Kafka trusted CA in Base64                                          | `null`                                |
