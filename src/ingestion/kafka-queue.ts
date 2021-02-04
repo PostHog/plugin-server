@@ -6,14 +6,12 @@ import { PluginEvent } from '@posthog/plugin-scaffold'
 import { status } from '../status'
 import { killGracefully } from '../utils'
 
-export type BatchCallback = (messages: Message[]) => Promise<void>
-
 export class KafkaQueue implements Queue {
     private pluginsServer: PluginsServer
     private kafka: Kafka
     private consumer: Consumer
     private wasConsumerRan: boolean
-    private processEventBatch: (batch: PluginEvent[]) => Promise<any>
+    private processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
     private saveEvent: (event: PluginEvent) => Promise<void>
 
     constructor(
@@ -34,32 +32,33 @@ export class KafkaQueue implements Queue {
         resolveOffset,
         heartbeat,
         commitOffsetsIfNecessary,
-        uncommittedOffsets,
         isRunning,
         isStale,
     }: EachBatchPayload): Promise<void> {
         const batchProcessingTimer = new Date()
-        const rawEvents: RawEventMessage[] = batch.messages.map((message) => ({
-            ...JSON.parse(message.value!.toString()),
-            kafka_offset: message.offset,
-        }))
-        const parsedEvents = rawEvents.map((rawEvent) => ({
-            ...rawEvent,
-            data: JSON.parse(rawEvent.data),
-        }))
-        const pluginEvents: PluginEvent[] = rawEvents.map((rawEvent) => {
-            const { data: dataStr, ...restOfRawEvent } = rawEvent
-            const event = { ...restOfRawEvent, ...JSON.parse(dataStr) }
+
+        const uuidOrder = new Map<string, number>()
+        const uuidOffset = new Map<string, string>()
+        const pluginEvents: PluginEvent[] = batch.messages.map((message, index) => {
+            const { data: dataStr, ...rawEvent } = JSON.parse(message.value!.toString())
+            const event = { ...rawEvent, ...JSON.parse(dataStr) }
+            uuidOrder.set(event.uuid, index)
+            uuidOffset.set(event.uuid, message.offset)
             return {
                 ...event,
-                kafka_offset: restOfRawEvent.kafka_offset,
                 site_url: event.site_url || null,
                 ip: event.ip || null,
             }
         })
-        const processedEvents: PluginEvent[] = (
-            await this.processEventBatch(pluginEvents)
-        ).filter((event: PluginEvent[] | false | null | undefined) => Boolean(event))
+
+        const processedEvents = await this.processEventBatch(pluginEvents)
+
+        // Sort in the original order that the events came in, putting any randomly added events to the end.
+        // This is so we would resolve the correct kafka offsets in order.
+        processedEvents.sort(
+            (a, b) => (uuidOrder.get(a.uuid!) || pluginEvents.length) - (uuidOrder.get(b.uuid!) || pluginEvents.length)
+        )
+
         for (const event of processedEvents) {
             if (!isRunning()) {
                 status.info('😮', 'Consumer not running anymore, canceling batch processing!')
@@ -71,12 +70,17 @@ export class KafkaQueue implements Queue {
             }
             const singleIngestionTimer = new Date()
             await this.saveEvent(event)
-            resolveOffset(event.kafka_offset!)
+            const offset = uuidOffset.get(event.uuid!)
+            if (offset) {
+                resolveOffset(offset)
+            }
             await heartbeat()
             await commitOffsetsIfNecessary()
             this.pluginsServer.statsd?.timing('kafka_queue.single_ingestion', singleIngestionTimer)
         }
         this.pluginsServer.statsd?.timing('kafka_queue.each_batch', batchProcessingTimer)
+        resolveOffset(batch.lastOffset())
+        await commitOffsetsIfNecessary()
     }
 
     async start(): Promise<void> {
@@ -88,9 +92,7 @@ export class KafkaQueue implements Queue {
             await this.consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
             // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
             await this.consumer.run({
-                // TODO: eachBatchAutoResolve: false, // don't autoresolve whole batch in case we exit it early
-                // The issue is right now we'd miss some messages and not resolve them as processEventBatch COMPETELY
-                // discards some events, leaving us with no kafka_offset to resolve when in fact it should be resolved.
+                eachBatchAutoResolve: false, // we are resolving the last offset of the batch more deliberately
                 autoCommitInterval: 500, // autocommit every 500 ms…
                 autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
                 eachBatch: this.eachBatch.bind(this),
