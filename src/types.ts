@@ -322,3 +322,8 @@ export enum TimestampFormat {
     ClickHouse = 'clickhouse',
     ISO = 'iso',
 }
+
+export enum Database {
+    ClickHouse = 'clickhouse',
+    Postgres = 'postgres',
+}

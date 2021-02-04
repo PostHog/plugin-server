@@ -1,5 +1,5 @@
 import { Properties } from '@posthog/plugin-scaffold'
-import { ClickHouse, QueryCursor } from 'clickhouse'
+import { ClickHouse } from 'clickhouse'
 import { Producer } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg'
@@ -7,16 +7,18 @@ import { string } from 'yargs'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { chainToElements, hashElements, unparsePersonPartial } from './ingestion/utils'
 import {
+    ClickHouseEvent,
+    Database,
+    Element,
+    ElementGroup,
+    Event,
     Person,
     PersonDistinctId,
-    RawPerson,
-    RawOrganization,
     PostgresSessionRecordingEvent,
-    Event,
-    ClickHouseEvent,
-    Element,
+    RawOrganization,
+    RawPerson,
     SessionRecordingEvent,
-    ElementGroup,
+    TimestampFormat,
 } from './types'
 import { castTimestampOrNow, clickHouseTimestampToISO, sanitizeSqlIdentifier } from './utils'
 
@@ -53,9 +55,15 @@ export class DB {
 
     // Person
 
-    public async fetchPersons(): Promise<Person[]> {
-        const result = await this.postgresQuery('SELECT * FROM posthog_person')
-        return result.rows as Person[]
+    public async fetchPersons(database: Database = Database.Postgres): Promise<Person[]> {
+        if (database === Database.ClickHouse) {
+            return (await this.clickhouseQuery('SELECT * FROM person')) as Person[]
+        } else if (database === Database.Postgres) {
+            const result = await this.postgresQuery('SELECT * FROM posthog_person')
+            return result.rows as Person[]
+        } else {
+            throw new Error(`Can't fetch persons for database: ${database}`)
+        }
     }
 
     public async fetchPerson(teamId: number, distinctId: string): Promise<Person | undefined> {
@@ -95,7 +103,7 @@ export class DB {
         const personCreated = insertResult.rows[0] as Person
         if (this.kafkaProducer) {
             const data = {
-                created_at: castTimestampOrNow(createdAt),
+                created_at: castTimestampOrNow(createdAt, TimestampFormat.ClickHouse),
                 properties: JSON.stringify(properties),
                 team_id: teamId,
                 is_identified: isIdentified,
@@ -125,7 +133,7 @@ export class DB {
         )
         if (this.kafkaProducer) {
             const data = {
-                created_at: castTimestampOrNow(updatedPerson.created_at),
+                created_at: castTimestampOrNow(updatedPerson.created_at, TimestampFormat.ClickHouse),
                 properties: JSON.stringify(updatedPerson.properties),
                 team_id: updatedPerson.team_id,
                 is_identified: updatedPerson.is_identified,
@@ -167,7 +175,9 @@ export class DB {
         if (this.kafkaProducer) {
             await this.kafkaProducer.send({
                 topic: KAFKA_PERSON_UNIQUE_ID,
-                messages: [{ value: Buffer.from(JSON.stringify(personDistinctIdCreated)) }],
+                messages: [
+                    { value: Buffer.from(JSON.stringify({ ...personDistinctIdCreated, person_id: person.uuid })) },
+                ],
             })
         }
     }
