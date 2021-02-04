@@ -290,11 +290,29 @@ export interface Person extends BasePerson {
     created_at: DateTime
 }
 
+/** Clickhouse Person model. */
+export interface ClickHousePerson {
+    id: string
+    created_at: string
+    team_id: number
+    properties: string
+    is_identified: number
+    timestamp: string
+}
+
 /** Usable PersonDistinctId model. */
 export interface PersonDistinctId {
     id: number
     team_id: number
     person_id: number
+    distinct_id: string
+}
+
+/** ClickHouse PersonDistinctId model. */
+export interface ClickHousePersonDistinctId {
+    id: number
+    team_id: number
+    person_id: string
     distinct_id: string
 }
 
@@ -322,4 +340,9 @@ export interface PostgresSessionRecordingEvent extends Omit<SessionRecordingEven
 export enum TimestampFormat {
     ClickHouse = 'clickhouse',
     ISO = 'iso',
+}
+
+export enum Database {
+    ClickHouse = 'clickhouse',
+    Postgres = 'postgres',
 }

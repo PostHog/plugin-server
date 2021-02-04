@@ -8,6 +8,7 @@ import {
     UUID,
     UUIDT,
     sanitizeSqlIdentifier,
+    escapeClickHouseString,
 } from '../src/utils'
 import { randomBytes } from 'crypto'
 import { LogLevel } from '../src/types'
@@ -304,5 +305,15 @@ describe('sanitizeSqlIdentifier', () => {
         const sanitizedIdentifier = sanitizeSqlIdentifier(rawIdentifier)
 
         expect(sanitizedIdentifier).toStrictEqual('some_fieldDROPTABLEactually_an_injection9')
+    })
+})
+
+describe('escapeClickHouseString', () => {
+    it('escapes single quotes and slashes', () => {
+        const rawString = "insert'escape \\"
+
+        const sanitizedString = escapeClickHouseString(rawString)
+
+        expect(sanitizedString).toStrictEqual("insert\\'escape \\\\")
     })
 })
