@@ -62,6 +62,7 @@ describe('postgres parity', () => {
             ['distinct1', 'distinct2']
         )
         await delayUntilEventIngested(() => server.db.fetchPersons(Database.ClickHouse))
+        await delayUntilEventIngested(() => server.db.fetchDistinctIdValues(person, Database.ClickHouse), 2)
 
         const clickHousePersons = await server.db.fetchPersons(Database.ClickHouse)
         expect(clickHousePersons).toEqual([
@@ -94,6 +95,8 @@ describe('postgres parity', () => {
         ])
         const postgresDistinctIds = await server.db.fetchDistinctIdValues(person, Database.Postgres)
         expect(postgresDistinctIds).toEqual(['distinct1', 'distinct2'])
+
+        expect(person).toEqual(postgresPersons[0])
     })
 
     test.skip('updatePerson', async () => {
@@ -126,27 +129,90 @@ describe('postgres parity', () => {
             ['another_distinct_id']
         )
         await delayUntilEventIngested(() => server.db.fetchPersons(Database.ClickHouse))
-
         const [postgresPerson] = await server.db.fetchPersons(Database.Postgres)
 
-        const clickHouseDistinctIds = await server.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse)
-        const postgresDistinctIds = await server.db.fetchDistinctIdValues(postgresPerson, Database.Postgres)
+        await delayUntilEventIngested(() => server.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse), 1)
+        const clickHouseDistinctIdValues = await server.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse)
+        const postgresDistinctIdValues = await server.db.fetchDistinctIdValues(postgresPerson, Database.Postgres)
 
-        expect(clickHouseDistinctIds).toEqual(['distinct1'])
-        expect(postgresDistinctIds).toEqual(['distinct1'])
+        // check that all is in the right format
+
+        expect(clickHouseDistinctIdValues).toEqual(['distinct1'])
+        expect(postgresDistinctIdValues).toEqual(['distinct1'])
+
+        const clickHouseDistinctIds = await server.db.fetchDistinctIds(postgresPerson, Database.ClickHouse)
+        const postgresDistinctIds = await server.db.fetchDistinctIds(postgresPerson, Database.Postgres)
+
+        expect(clickHouseDistinctIds).toEqual([
+            {
+                id: expect.any(Number),
+                distinct_id: 'distinct1',
+                person_id: person.uuid,
+                team_id: team.id,
+                _timestamp: expect.any(String),
+                _offset: expect.any(Number),
+            },
+        ])
+        expect(postgresDistinctIds).toEqual([
+            {
+                id: expect.any(Number),
+                distinct_id: 'distinct1',
+                person_id: person.id,
+                team_id: team.id,
+            },
+        ])
+        expect(clickHouseDistinctIds[0].id).toEqual(postgresDistinctIds[0].id)
+
+        // add 'anotherOne' to person
 
         await server.db.addDistinctId(postgresPerson, 'anotherOne')
 
         await delayUntilEventIngested(() => server.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse), 2)
 
-        const clickHouseDistinctIds2 = await server.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse)
-        const postgresDistinctIds2 = await server.db.fetchDistinctIdValues(postgresPerson, Database.Postgres)
+        const clickHouseDistinctIdValues2 = await server.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse)
+        const postgresDistinctIdValues2 = await server.db.fetchDistinctIdValues(postgresPerson, Database.Postgres)
 
-        expect(clickHouseDistinctIds2).toEqual(['distinct1', 'distinct2', 'anotherOne'])
-        expect(postgresDistinctIds2).toEqual(['distinct1', 'distinct2', 'anotherOne'])
-    })
+        expect(clickHouseDistinctIdValues2).toEqual(['distinct1', 'anotherOne'])
+        expect(postgresDistinctIdValues2).toEqual(['distinct1', 'anotherOne'])
 
-    test.skip('updateDistinctId', async () => {
-        // could be merged with the above one
+        // check anotherPerson for their initial distinct id
+
+        const clickHouseDistinctIdValuesOther = await server.db.fetchDistinctIdValues(
+            anotherPerson,
+            Database.ClickHouse
+        )
+        const postgresDistinctIdValuesOther = await server.db.fetchDistinctIdValues(anotherPerson, Database.Postgres)
+
+        expect(clickHouseDistinctIdValuesOther).toEqual(['another_distinct_id'])
+        expect(postgresDistinctIdValuesOther).toEqual(['another_distinct_id'])
+
+        // move 'distinct1' from person to to anotherPerson
+
+        await server.db.moveDistinctId(postgresPerson, postgresDistinctIds[0], anotherPerson)
+        await delayUntilEventIngested(() => server.db.fetchDistinctIdValues(anotherPerson, Database.ClickHouse), 2)
+
+        // it got added
+
+        const clickHouseDistinctIdValuesMoved = await server.db.fetchDistinctIdValues(
+            anotherPerson,
+            Database.ClickHouse
+        )
+        const postgresDistinctIdValuesMoved = await server.db.fetchDistinctIdValues(anotherPerson, Database.Postgres)
+
+        expect(clickHouseDistinctIdValuesMoved).toEqual(['distinct1', 'another_distinct_id'])
+        expect(postgresDistinctIdValuesMoved).toEqual(['distinct1', 'another_distinct_id'])
+
+        // it got removed
+
+        const clickHouseDistinctIdValuesRemoved = await server.db.fetchDistinctIdValues(
+            postgresPerson,
+            Database.ClickHouse
+        )
+        const postgresDistinctIdValuesRemoved = await server.db.fetchDistinctIdValues(postgresPerson, Database.Postgres)
+
+        // The `distinct1` key is still there in clickhouse, yet ALSO there for the new person.
+        // Eventually this should be compacted away but it's not right now.
+        expect(clickHouseDistinctIdValuesRemoved).toEqual(['distinct1', 'anotherOne'])
+        expect(postgresDistinctIdValuesRemoved).toEqual(['anotherOne'])
     })
 })
