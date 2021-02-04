@@ -96,11 +96,15 @@ describe('postgres parity', () => {
         expect(postgresDistinctIds).toEqual(['distinct1', 'distinct2'])
     })
 
-    // test('createPerson', async () => {})
-    // test('updatePerson', async () => {})
-    // test('deletePerson', async () => {})
+    test.skip('updatePerson', async () => {
+        // TODO
+    })
 
-    test('addDistinctId & updateDistinctId', async () => {
+    test.skip('deletePerson', async () => {
+        // TODO
+    })
+
+    test('addDistinctId', async () => {
         const uuid = new UUIDT().toString()
         const uuid2 = new UUIDT().toString()
         const person = await server.db.createPerson(
@@ -140,5 +144,9 @@ describe('postgres parity', () => {
 
         expect(clickHouseDistinctIds2).toEqual(['distinct1', 'distinct2', 'anotherOne'])
         expect(postgresDistinctIds2).toEqual(['distinct1', 'distinct2', 'anotherOne'])
+    })
+
+    test.skip('updateDistinctId', async () => {
+        // could be merged with the above one
     })
 })
