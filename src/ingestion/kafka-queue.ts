@@ -40,7 +40,7 @@ export class KafkaQueue implements Queue {
 
         const uuidOrder = new Map<string, number>()
         const uuidOffset = new Map<string, string>()
-        const pluginEvents = batch.messages.map((message, index) => {
+        const pluginEvents: PluginEvent[] = batch.messages.map((message, index) => {
             const { data: dataStr, ...rawEvent } = JSON.parse(message.value!.toString())
             const event = { ...rawEvent, ...JSON.parse(dataStr) }
             uuidOrder.set(event.uuid, index)
