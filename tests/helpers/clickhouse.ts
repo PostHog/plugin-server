@@ -7,8 +7,10 @@ export async function resetTestDatabaseClickhouse(extraServerConfig: Partial<Plu
     const clickhouse = new ClickHouse({
         host: config.CLICKHOUSE_HOST,
         port: 8123,
+        dataObjects: true,
         queryOptions: {
             database: config.CLICKHOUSE_DATABASE,
+            output_format_json_quote_64bit_integers: false,
         },
     })
     await clickhouse.querying('TRUNCATE events')

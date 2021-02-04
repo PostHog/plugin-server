@@ -77,9 +77,10 @@ export async function createServer(
             protocol: serverConfig.CLICKHOUSE_SECURE ? 'https:' : 'http:',
             user: serverConfig.CLICKHOUSE_USER,
             password: serverConfig.CLICKHOUSE_PASSWORD || undefined,
-            format: 'JSON',
+            dataObjects: true,
             queryOptions: {
                 database: serverConfig.CLICKHOUSE_DATABASE,
+                output_format_json_quote_64bit_integers: false,
             },
             ca: serverConfig.CLICKHOUSE_CA ? fs.readFileSync(serverConfig.CLICKHOUSE_CA).toString() : undefined,
         })
