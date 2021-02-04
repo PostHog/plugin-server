@@ -63,7 +63,7 @@ export class DB {
     public async fetchPersons(database: Database.ClickHouse): Promise<ClickHousePerson[]>
     public async fetchPersons(database: Database = Database.Postgres): Promise<Person[] | ClickHousePerson[]> {
         if (database === Database.ClickHouse) {
-            return (await this.clickhouseQuery('SELECT * FROM person')) as ClickHousePerson[]
+            return (await this.clickhouseQuery('SELECT * FROM person')).data as ClickHousePerson[]
         } else if (database === Database.Postgres) {
             return ((await this.postgresQuery('SELECT * FROM posthog_person')).rows as RawPerson[]).map(
                 (rawPerson: RawPerson) =>
@@ -188,11 +188,13 @@ export class DB {
         database: Database = Database.Postgres
     ): Promise<PersonDistinctId[] | ClickHousePersonDistinctId[]> {
         if (database === Database.ClickHouse) {
-            return (await this.clickhouseQuery(
-                `SELECT * FROM person_distinct_id WHERE person_id='${escapeClickHouseString(
-                    person.uuid
-                )}' and team_id='${person.team_id}' ORDER BY id`
-            )) as ClickHousePersonDistinctId[]
+            return (
+                await this.clickhouseQuery(
+                    `SELECT * FROM person_distinct_id WHERE person_id='${escapeClickHouseString(
+                        person.uuid
+                    )}' and team_id='${person.team_id}' ORDER BY id`
+                )
+            ).data as ClickHousePersonDistinctId[]
         } else if (database === Database.Postgres) {
             const result = await this.postgresQuery(
                 'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 and team_id=$2 ORDER BY id',
