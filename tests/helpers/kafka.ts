@@ -4,7 +4,7 @@ import { delay, UUIDT } from '../../src/utils'
 import { defaultConfig, overrideWithEnv } from '../../src/config'
 import {
     KAFKA_EVENTS,
-    KAFKA_EVENTS_INGESTION_HANDOFF,
+    KAFKA_EVENTS_PLUGIN_INGESTION,
     KAFKA_EVENTS_WAL,
     KAFKA_PERSON,
     KAFKA_PERSON_UNIQUE_ID,
@@ -28,7 +28,7 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
 
     await createTopics(kafka, [
         KAFKA_EVENTS,
-        KAFKA_EVENTS_INGESTION_HANDOFF,
+        KAFKA_EVENTS_PLUGIN_INGESTION,
         KAFKA_EVENTS_WAL,
         KAFKA_SESSION_RECORDING_EVENTS,
         KAFKA_PERSON,
@@ -50,7 +50,7 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
         await producer.connect()
         console.info('subscribing consumer')
 
-        await consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
+        await consumer.subscribe({ topic: KAFKA_EVENTS_PLUGIN_INGESTION })
         console.info('running consumer')
         await consumer.run({
             eachMessage: async (payload) => {
