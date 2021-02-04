@@ -5,7 +5,7 @@ import { Kafka, logLevel, Producer } from 'kafkajs'
 import { FastifyInstance } from 'fastify'
 import { PluginsServer, PluginsServerConfig, Queue } from './types'
 import { startQueue } from './worker/queue'
-import { ClickHouse } from 'clickhouse'
+import ClickHouse from '@posthog/clickhouse'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { version } from '../package.json'
 import { PluginEvent } from '@posthog/plugin-scaffold'
@@ -20,6 +20,7 @@ import { startSchedule } from './services/schedule'
 import { ConnectionOptions } from 'tls'
 import { DB } from './db'
 import { DateTime } from 'luxon'
+import * as fs from 'fs'
 import { KAFKA_EVENTS_INGESTION_HANDOFF, KAFKA_EVENTS_WAL } from './ingestion/topics'
 
 export async function createServer(
@@ -71,15 +72,16 @@ export async function createServer(
             throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
         }
         clickhouse = new ClickHouse({
-            url: `http${serverConfig.CLICKHOUSE_SECURE ? 's' : ''}://$${serverConfig.CLICKHOUSE_HOST}`,
+            host: serverConfig.CLICKHOUSE_HOST,
             port: serverConfig.CLICKHOUSE_SECURE ? 8443 : 8123,
-            basicAuth: {
-                username: serverConfig.CLICKHOUSE_USER,
-                password: serverConfig.CLICKHOUSE_PASSWORD,
-            },
-            config: {
+            protocol: serverConfig.CLICKHOUSE_SECURE ? 'https:' : 'http:',
+            user: serverConfig.CLICKHOUSE_USER,
+            password: serverConfig.CLICKHOUSE_PASSWORD || undefined,
+            format: 'JSON',
+            queryOptions: {
                 database: serverConfig.CLICKHOUSE_DATABASE,
             },
+            ca: serverConfig.CLICKHOUSE_CA ? fs.readFileSync(serverConfig.CLICKHOUSE_CA).toString() : undefined,
         })
         await clickhouse.query('SELECT 1') // test that the connection works
 

@@ -1,13 +1,13 @@
 import { defaultConfig } from '../../src/config'
-import { ClickHouse } from 'clickhouse'
+import ClickHouse from '@posthog/clickhouse'
 import { PluginsServerConfig } from '../../src/types'
 
 export async function resetTestDatabaseClickhouse(extraServerConfig: Partial<PluginsServerConfig>): Promise<void> {
     const config = { ...defaultConfig, ...extraServerConfig }
     const clickhouse = new ClickHouse({
-        url: `http://$${config.CLICKHOUSE_HOST}`,
+        host: config.CLICKHOUSE_HOST,
         port: 8123,
-        config: {
+        queryOptions: {
             database: config.CLICKHOUSE_DATABASE,
         },
     })

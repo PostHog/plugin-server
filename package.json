@@ -37,10 +37,10 @@
     "license": "MIT",
     "dependencies": {
         "@google-cloud/bigquery": "^5.5.0",
+        "@posthog/clickhouse": "^1.7.0",
         "@sentry/node": "^5.29.0",
         "@sentry/tracing": "^5.29.0",
         "adm-zip": "^0.4.16",
-        "clickhouse": "^2.2.1",
         "fastify": "^3.8.0",
         "hot-shots": "^8.2.1",
         "ioredis": "^4.19.2",

@@ -1,9 +1,8 @@
 import { Properties } from '@posthog/plugin-scaffold'
-import { ClickHouse, QueryCursor } from 'clickhouse'
+import ClickHouse from '@posthog/clickhouse'
 import { Producer } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg'
-import { string } from 'yargs'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { chainToElements, hashElements, unparsePersonPartial } from './ingestion/utils'
 import {
@@ -41,14 +40,17 @@ export class DB {
         queryTextOrConfig: string | QueryConfig<I>,
         values?: I
     ): Promise<QueryResult<R>> {
-        return this.postgres.query(queryTextOrConfig, values)
+        return await this.postgres.query(queryTextOrConfig, values)
     }
 
-    public async clickhouseQuery(query: string, reqParams?: Record<string, any>): Promise<Record<string, any>> {
+    public async clickhouseQuery(
+        query: string,
+        options?: ClickHouse.QueryOptions
+    ): Promise<ClickHouse.QueryResult<Record<string, any>>> {
         if (!this.clickhouse) {
             throw new Error('ClickHouse connection has not been provided to this DB instance!')
         }
-        return this.clickhouse.query(query, reqParams).toPromise()
+        return await this.clickhouse.querying(query, options)
     }
 
     // Person
@@ -205,7 +207,7 @@ export class DB {
 
     public async fetchEvents(): Promise<Event[] | ClickHouseEvent[]> {
         if (this.kafkaProducer) {
-            const events = (await this.clickhouseQuery(`SELECT * FROM events`)) as ClickHouseEvent[]
+            const events = (await this.clickhouseQuery(`SELECT * FROM events`)).data as ClickHouseEvent[]
             return (
                 events?.map(
                     (event) =>
@@ -228,9 +230,8 @@ export class DB {
 
     public async fetchSessionRecordingEvents(): Promise<PostgresSessionRecordingEvent[] | SessionRecordingEvent[]> {
         if (this.kafkaProducer) {
-            const events = ((await this.clickhouseQuery(
-                `SELECT * FROM session_recording_events`
-            )) as SessionRecordingEvent[]).map((event) => {
+            const events = ((await this.clickhouseQuery(`SELECT * FROM session_recording_events`))
+                .data as SessionRecordingEvent[]).map((event) => {
                 return {
                     ...event,
                     snapshot_data: event.snapshot_data ? JSON.parse(event.snapshot_data) : null,
@@ -247,9 +248,11 @@ export class DB {
 
     public async fetchElements(event?: Event): Promise<Element[]> {
         if (this.kafkaProducer) {
-            const events = (await this.clickhouseQuery(
-                `SELECT elements_chain FROM events WHERE uuid='${sanitizeSqlIdentifier((event as any).uuid)}'`
-            )) as ClickHouseEvent[]
+            const events = (
+                await this.clickhouseQuery(
+                    `SELECT elements_chain FROM events WHERE uuid='${sanitizeSqlIdentifier((event as any).uuid)}'`
+                )
+            ).data as ClickHouseEvent[]
             const chain = events?.[0]?.elements_chain
             return chainToElements(chain)
         } else {

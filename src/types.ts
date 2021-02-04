@@ -6,7 +6,7 @@ import { VM } from 'vm2'
 import { DateTime } from 'luxon'
 import { StatsD } from 'hot-shots'
 import { EventsProcessor } from 'ingestion/process-event'
-import { ClickHouse } from 'clickhouse'
+import ClickHouse from '@posthog/clickhouse'
 import { DB } from './db'
 
 export enum LogLevel {
