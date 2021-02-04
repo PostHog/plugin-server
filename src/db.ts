@@ -206,21 +206,20 @@ export class DB {
         }
     }
 
-    public async updateDistinctId(
+    public async moveDistinctId(
+        person: Person,
         personDistinctId: PersonDistinctId,
-        update: Partial<PersonDistinctId>
+        moveToPerson: Person
     ): Promise<void> {
-        const updatedPersonDistinctId: PersonDistinctId = { ...personDistinctId, ...update }
-        await this.postgresQuery(
-            `UPDATE posthog_persondistinctid SET ${Object.keys(update).map(
-                (field, index) => `"${sanitizeSqlIdentifier(field)}" = $${index + 1}`
-            )} WHERE id = $${Object.values(update).length + 1}`,
-            [...Object.values(update), personDistinctId.id]
-        )
+        await this.postgresQuery(`UPDATE posthog_persondistinctid SET person_id = $1 WHERE id = $2`, [
+            moveToPerson.id,
+            personDistinctId.id,
+        ])
         if (this.kafkaProducer) {
+            const clickhouseModel: ClickHousePersonDistinctId = { ...personDistinctId, person_id: moveToPerson.uuid }
             await this.kafkaProducer.send({
                 topic: KAFKA_PERSON_UNIQUE_ID,
-                messages: [{ value: Buffer.from(JSON.stringify(updatedPersonDistinctId)) }],
+                messages: [{ value: Buffer.from(JSON.stringify(clickhouseModel)) }],
             })
         }
     }

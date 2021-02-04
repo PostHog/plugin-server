@@ -288,7 +288,7 @@ export class EventsProcessor {
                 )
             ).rows
             for (const personDistinctId of otherPersonDistinctIds) {
-                await this.db.updateDistinctId(personDistinctId, { person_id: mergeInto.id })
+                await this.db.moveDistinctId(otherPerson, personDistinctId, mergeInto)
             }
 
             const otherCohortPeople: CohortPeople[] = (
