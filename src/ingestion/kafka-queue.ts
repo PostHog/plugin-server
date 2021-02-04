@@ -32,7 +32,6 @@ export class KafkaQueue implements Queue {
         resolveOffset,
         heartbeat,
         commitOffsetsIfNecessary,
-        uncommittedOffsets,
         isRunning,
         isStale,
     }: EachBatchPayload): Promise<void> {
@@ -80,6 +79,8 @@ export class KafkaQueue implements Queue {
             this.pluginsServer.statsd?.timing('kafka_queue.single_ingestion', singleIngestionTimer)
         }
         this.pluginsServer.statsd?.timing('kafka_queue.each_batch', batchProcessingTimer)
+        resolveOffset(batch.lastOffset())
+        await commitOffsetsIfNecessary()
     }
 
     async start(): Promise<void> {
@@ -91,7 +92,7 @@ export class KafkaQueue implements Queue {
             await this.consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
             // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
             await this.consumer.run({
-                eachBatchAutoResolve: true, // commit the last offset of the batch if eachBatch doesn't throw an error
+                eachBatchAutoResolve: false, // we are resolving the last offset of the batch more deliberately
                 autoCommitInterval: 500, // autocommit every 500 ms…
                 autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
                 eachBatch: this.eachBatch.bind(this),
