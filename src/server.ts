@@ -21,7 +21,7 @@ import { ConnectionOptions } from 'tls'
 import { DB } from './db'
 import { DateTime } from 'luxon'
 import * as fs from 'fs'
-import { KAFKA_EVENTS_INGESTION_HANDOFF, KAFKA_EVENTS_WAL } from './ingestion/topics'
+import { KAFKA_EVENTS_PLUGIN_INGESTION, KAFKA_EVENTS_WAL } from './ingestion/topics'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
@@ -89,7 +89,7 @@ export async function createServer(
         if (!serverConfig.KAFKA_CONSUMPTION_TOPIC) {
             // When ingesting events, listen to the "INGESTION_HANDOFF" topic, otherwise listen to the "WAL" and discard
             serverConfig.KAFKA_CONSUMPTION_TOPIC = serverConfig.PLUGIN_SERVER_INGESTION
-                ? KAFKA_EVENTS_INGESTION_HANDOFF
+                ? KAFKA_EVENTS_PLUGIN_INGESTION
                 : KAFKA_EVENTS_WAL
         }
 

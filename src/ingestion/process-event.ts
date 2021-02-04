@@ -265,7 +265,7 @@ export class EventsProcessor {
         }
     }
 
-    private async mergePeople(mergeInto: Person, peopleToMerge: Person[]): Promise<void> {
+    public async mergePeople(mergeInto: Person, peopleToMerge: Person[]): Promise<void> {
         let firstSeen = mergeInto.created_at
 
         // merge the properties
@@ -291,15 +291,10 @@ export class EventsProcessor {
                 await this.db.moveDistinctId(otherPerson, personDistinctId, mergeInto)
             }
 
-            const otherCohortPeople: CohortPeople[] = (
-                await this.db.postgresQuery('SELECT * FROM posthog_cohortpeople WHERE person_id = $1', [otherPerson.id])
-            ).rows
-            for (const cohortPeople of otherCohortPeople) {
-                await this.db.postgresQuery('UPDATE posthog_cohortpeople SET person_id = $1 WHERE id = $2', [
-                    mergeInto.id,
-                    cohortPeople.id,
-                ])
-            }
+            await this.db.postgresQuery('UPDATE posthog_cohortpeople SET person_id = $1 WHERE person_id = $2', [
+                mergeInto.id,
+                otherPerson.id,
+            ])
 
             await this.db.deletePerson(otherPerson)
         }
