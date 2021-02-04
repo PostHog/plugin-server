@@ -1,16 +1,14 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import { createServer } from '../../src/server'
 import {
-    LogLevel,
-    PluginsServer,
-    Team,
+    Database,
     Event,
+    LogLevel,
     Person,
-    Element,
-    PostgresSessionRecordingEvent,
+    PluginsServer,
     PluginsServerConfig,
-    ClickHouseEvent,
     SessionRecordingEvent,
+    Team,
 } from '../../src/types'
 import { createUserTeamAndOrganization, getFirstTeam, getTeams, resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
@@ -124,6 +122,53 @@ export const createProcessEventTests = (
     })
 
     createTests?.(returned)
+
+    test('merge people', async () => {
+        const p0 = await createPerson(server, team, ['person_0'], { $os: 'Microsoft' })
+        await delayUntilEventIngested(() => server.db.fetchPersons(Database.ClickHouse), 1)
+        await server.db.updatePerson(p0, { created_at: DateTime.fromISO('2020-01-01T00:00:00Z') })
+
+        const p1 = await createPerson(server, team, ['person_1'], { $os: 'Chrome' })
+        await delayUntilEventIngested(() => server.db.fetchPersons(Database.ClickHouse), 2)
+        await server.db.updatePerson(p1, { created_at: DateTime.fromISO('2019-07-01T00:00:00Z') })
+
+        await processEvent(
+            'person_1',
+            '',
+            '',
+            ({
+                event: 'user signed up',
+                properties: {},
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        await createPerson(server, team, ['person_2'], { $os: 'Apple', $browser: 'MS Edge' })
+        await createPerson(server, team, ['person_3'], { $os: 'PlayStation' })
+
+        await delayUntilEventIngested(() => server.db.fetchPersons(Database.ClickHouse), 4)
+
+        const [person0, person1, person2, person3] = await server.db.fetchPersons()
+
+        expect((await server.db.fetchPersons(Database.ClickHouse)).length).toEqual(4)
+
+        await eventsProcessor.mergePeople(person0, [person1, person2, person3])
+
+        await delayUntilEventIngested(async () =>
+            (await server.db.fetchPersons(Database.ClickHouse)).length === 1 ? [1] : []
+        )
+
+        expect((await server.db.fetchPersons(Database.ClickHouse)).length).toEqual(1)
+
+        const [person] = await server.db.fetchPersons()
+
+        expect(person.properties).toEqual({ $os: 'Microsoft', $browser: 'MS Edge' })
+        expect(await server.db.fetchDistinctIdValues(person)).toEqual(['person_0', 'person_1', 'person_2', 'person_3'])
+        expect(person.created_at.toISO()).toEqual(DateTime.fromISO('2019-07-01T00:00:00Z').setZone('UTC').toISO())
+    })
 
     test('capture new person', async () => {
         await server.db.postgresQuery(`UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`, [true, team.id])
