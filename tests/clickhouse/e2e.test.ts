@@ -9,7 +9,7 @@ import { delay, UUIDT } from '../../src/utils'
 import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
 import { resetKafka } from '../helpers/kafka'
 import { delayUntilEventIngested } from '../shared/process-event'
-import { KAFKA_EVENTS_INGESTION_HANDOFF } from '../../src/ingestion/topics'
+import { KAFKA_EVENTS_INGESTION } from '../../src/ingestion/topics'
 
 jest.setTimeout(60000) // 60 sec timeout
 
@@ -18,7 +18,7 @@ const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_HOSTS: process.env.KAFKA_HOSTS || 'kafka:9092',
     WORKER_CONCURRENCY: 2,
     PLUGIN_SERVER_INGESTION: true,
-    KAFKA_CONSUMPTION_TOPIC: KAFKA_EVENTS_INGESTION_HANDOFF,
+    KAFKA_CONSUMPTION_TOPIC: KAFKA_EVENTS_INGESTION,
     LOG_LEVEL: LogLevel.Log,
 }
 

@@ -2,7 +2,7 @@ import { Kafka, logLevel } from 'kafkajs'
 import { PluginsServerConfig } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
 import { defaultConfig, overrideWithEnv } from '../../src/config'
-import { KAFKA_EVENTS_INGESTION_HANDOFF, KAFKA_SESSION_RECORDING_EVENTS } from '../../src/ingestion/topics'
+import { KAFKA_EVENTS_INGESTION, KAFKA_SESSION_RECORDING_EVENTS } from '../../src/ingestion/topics'
 
 /** Clear the kafka queue */
 export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>, delayMs = 2000) {
@@ -36,7 +36,7 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
         }
     }
 
-    await createTopic(KAFKA_EVENTS_INGESTION_HANDOFF)
+    await createTopic(KAFKA_EVENTS_INGESTION)
     await createTopic(KAFKA_SESSION_RECORDING_EVENTS)
 
     const connected = await new Promise<void>(async (resolve, reject) => {
@@ -54,7 +54,7 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
         await producer.connect()
         console.info('subscribing consumer')
 
-        await consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION_HANDOFF })
+        await consumer.subscribe({ topic: KAFKA_EVENTS_INGESTION })
         console.info('running consumer')
         await consumer.run({
             eachMessage: async (payload) => {
