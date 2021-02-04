@@ -289,6 +289,16 @@ export interface Person extends BasePerson {
     created_at: DateTime
 }
 
+/** Clickhouse Person model. */
+export interface ClickHousePerson {
+    id: string
+    created_at: string
+    team_id: number
+    properties: string
+    is_identified: number
+    timestamp: string
+}
+
 /** Usable PersonDistinctId model. */
 export interface PersonDistinctId {
     id: number

@@ -359,9 +359,9 @@ export class EventsProcessor {
                     teamId,
                     null,
                     false,
-                    personUuid.toString()
+                    personUuid.toString(),
+                    [distinctId]
                 )
-                await this.db.addDistinctId(personCreated, distinctId)
             } catch {}
         }
 

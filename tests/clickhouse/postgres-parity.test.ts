@@ -50,27 +50,95 @@ describe('postgres parity', () => {
         await stopServer()
     })
 
-    test('createPerson does the same in both databases', async () => {
-        const person = server.db.createPerson(
+    test('createPerson', async () => {
+        const uuid = new UUIDT().toString()
+        const person = await server.db.createPerson(
             DateTime.utc(),
             { userProp: 'propValue' },
             team.id,
             null,
             true,
-            new UUIDT().toString(),
+            uuid,
             ['distinct1', 'distinct2']
         )
         await delayUntilEventIngested(() => server.db.fetchPersons(Database.ClickHouse))
 
         const clickHousePersons = await server.db.fetchPersons(Database.ClickHouse)
-        const postgresPersons = await server.db.fetchPersons(Database.Postgres)
+        expect(clickHousePersons).toEqual([
+            {
+                id: uuid,
+                created_at: expect.any(String), // '2021-02-04 00:18:26.472',
+                team_id: team.id,
+                properties: '{"userProp":"propValue"}',
+                is_identified: 1,
+                _timestamp: expect.any(String),
+                _offset: expect.any(Number),
+            },
+        ])
+        const clickHouseDistinctIds = await server.db.fetchDistinctIdValues(person, Database.ClickHouse)
+        expect(clickHouseDistinctIds).toEqual(['distinct1', 'distinct2'])
 
-        expect(clickHousePersons.length).toEqual(postgresPersons.length)
+        const postgresPersons = await server.db.fetchPersons(Database.Postgres)
+        expect(postgresPersons).toEqual([
+            {
+                id: expect.any(Number),
+                created_at: expect.any(String),
+                properties: {
+                    userProp: 'propValue',
+                },
+                team_id: 2,
+                is_user_id: null,
+                is_identified: true,
+                uuid: uuid,
+            },
+        ])
+        const postgresDistinctIds = await server.db.fetchDistinctIdValues(person, Database.Postgres)
+        expect(postgresDistinctIds).toEqual(['distinct1', 'distinct2'])
     })
 
     // test('createPerson', async () => {})
     // test('updatePerson', async () => {})
     // test('deletePerson', async () => {})
-    // test('addDistinctId', async () => {})
-    // test('updateDistinctId', async () => {})
+
+    test('addDistinctId & updateDistinctId', async () => {
+        const uuid = new UUIDT().toString()
+        const uuid2 = new UUIDT().toString()
+        const person = await server.db.createPerson(
+            DateTime.utc(),
+            { userProp: 'propValue' },
+            team.id,
+            null,
+            true,
+            uuid,
+            ['distinct1']
+        )
+        const anotherPerson = await server.db.createPerson(
+            DateTime.utc(),
+            { userProp: 'propValue' },
+            team.id,
+            null,
+            true,
+            uuid2,
+            ['another_distinct_id']
+        )
+        await delayUntilEventIngested(() => server.db.fetchPersons(Database.ClickHouse))
+
+        const [postgresPerson] = await server.db.fetchPersons(Database.Postgres)
+
+        const clickHouseDistinctIds = await server.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse)
+        const postgresDistinctIds = await server.db.fetchDistinctIdValues(postgresPerson, Database.Postgres)
+
+        expect(clickHouseDistinctIds).toEqual(['distinct1'])
+        expect(postgresDistinctIds).toEqual(['distinct1'])
+
+        await server.db.addDistinctId(postgresPerson, 'anotherOne')
+
+        await delayUntilEventIngested(() => server.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse), 2)
+
+        const clickHouseDistinctIds2 = await server.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse)
+        const postgresDistinctIds2 = await server.db.fetchDistinctIdValues(postgresPerson, Database.Postgres)
+
+        expect(clickHouseDistinctIds2).toEqual(['distinct1', 'distinct2', 'anotherOne'])
+        expect(postgresDistinctIds2).toEqual(['distinct1', 'distinct2', 'anotherOne'])
+    })
 })
