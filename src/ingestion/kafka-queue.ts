@@ -84,7 +84,7 @@ export class KafkaQueue implements Queue {
             this.consumer.on(this.consumer.events.CRASH, ({ payload: { error } }) => reject(error))
             status.info('⏬', `Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
             this.wasConsumerRan = true
-            await this.consumer.subscribe({ topic: this.pluginsServer.KAFKA_INCOMING_TOPIC! })
+            await this.consumer.subscribe({ topic: this.pluginsServer.KAFKA_CONSUMPTION_TOPIC! })
             // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
             await this.consumer.run({
                 // TODO: eachBatchAutoResolve: false, // don't autoresolve whole batch in case we exit it early
@@ -103,7 +103,7 @@ export class KafkaQueue implements Queue {
             return
         }
         status.info('⏳', 'Pausing Kafka consumer...')
-        await this.consumer.pause([{ topic: this.pluginsServer.KAFKA_INCOMING_TOPIC! }])
+        await this.consumer.pause([{ topic: this.pluginsServer.KAFKA_CONSUMPTION_TOPIC! }])
         status.info('⏸', 'Kafka consumer paused!')
     }
 
@@ -112,12 +112,12 @@ export class KafkaQueue implements Queue {
             return
         }
         status.info('⏳', 'Resuming Kafka consumer...')
-        await this.consumer.resume([{ topic: this.pluginsServer.KAFKA_INCOMING_TOPIC! }])
+        await this.consumer.resume([{ topic: this.pluginsServer.KAFKA_CONSUMPTION_TOPIC! }])
         status.info('▶️', 'Kafka consumer resumed!')
     }
 
     isPaused(): boolean {
-        return this.consumer.paused().some(({ topic }) => topic === this.pluginsServer.KAFKA_INCOMING_TOPIC)
+        return this.consumer.paused().some(({ topic }) => topic === this.pluginsServer.KAFKA_CONSUMPTION_TOPIC)
     }
 
     async stop(): Promise<void> {

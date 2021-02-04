@@ -83,9 +83,9 @@ export async function createServer(
         })
         await clickhouse.query('SELECT 1')
 
-        if (!serverConfig.KAFKA_INCOMING_TOPIC) {
+        if (!serverConfig.KAFKA_CONSUMPTION_TOPIC) {
             // When ingesting events, listen to the "INGESTION_HANDOFF" topic, otherwise listen to the "WAL" and discard
-            serverConfig.KAFKA_INCOMING_TOPIC = serverConfig.PLUGIN_SERVER_INGESTION
+            serverConfig.KAFKA_CONSUMPTION_TOPIC = serverConfig.PLUGIN_SERVER_INGESTION
                 ? KAFKA_EVENTS_INGESTION_HANDOFF
                 : KAFKA_EVENTS_WAL
         }
