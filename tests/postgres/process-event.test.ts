@@ -13,6 +13,8 @@ describe('process event (postgresql)', () => {
             const elementsHash = server!.db.createElementGroup(elements, 2)
             const elementGroup = await server!.db.fetchElements()
 
+            console.log(elementGroup)
+
             expect(elementGroup[0].tag_name).toEqual('button')
             expect(elementGroup[1].tag_name).toEqual('div')
             expect(elementGroup.length).toEqual(2)

@@ -288,7 +288,7 @@ export class EventsProcessor {
                 )
             ).rows
             for (const personDistinctId of otherPersonDistinctIds) {
-                await this.db.updateDistinctId(personDistinctId, { person_id: mergeInto.id })
+                await this.db.moveDistinctId(otherPerson, personDistinctId, mergeInto)
             }
 
             const otherCohortPeople: CohortPeople[] = (
@@ -301,7 +301,7 @@ export class EventsProcessor {
                 ])
             }
 
-            await this.db.deletePerson(otherPerson.id)
+            await this.db.deletePerson(otherPerson)
         }
     }
 
@@ -359,9 +359,9 @@ export class EventsProcessor {
                     teamId,
                     null,
                     false,
-                    personUuid.toString()
+                    personUuid.toString(),
+                    [distinctId]
                 )
-                await this.db.addDistinctId(personCreated, distinctId)
             } catch {}
         }
 

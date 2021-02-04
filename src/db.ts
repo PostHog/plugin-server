@@ -1,5 +1,5 @@
 import { Properties } from '@posthog/plugin-scaffold'
-import { ClickHouse, QueryCursor } from 'clickhouse'
+import { ClickHouse } from 'clickhouse'
 import { Producer } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg'
@@ -7,18 +7,22 @@ import { string } from 'yargs'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { chainToElements, hashElements, unparsePersonPartial } from './ingestion/utils'
 import {
+    ClickHouseEvent,
+    ClickHousePerson,
+    ClickHousePersonDistinctId,
+    Database,
+    Element,
+    ElementGroup,
+    Event,
     Person,
     PersonDistinctId,
-    RawPerson,
-    RawOrganization,
     PostgresSessionRecordingEvent,
-    Event,
-    ClickHouseEvent,
-    Element,
+    RawOrganization,
+    RawPerson,
     SessionRecordingEvent,
-    ElementGroup,
+    TimestampFormat,
 } from './types'
-import { castTimestampOrNow, clickHouseTimestampToISO, sanitizeSqlIdentifier } from './utils'
+import { castTimestampOrNow, clickHouseTimestampToISO, escapeClickHouseString, sanitizeSqlIdentifier } from './utils'
 
 /** The recommended way of accessing the database. */
 export class DB {
@@ -53,9 +57,22 @@ export class DB {
 
     // Person
 
-    public async fetchPersons(): Promise<Person[]> {
-        const result = await this.postgresQuery('SELECT * FROM posthog_person')
-        return result.rows as Person[]
+    public async fetchPersons(database?: Database.Postgres): Promise<Person[]>
+    public async fetchPersons(database: Database.ClickHouse): Promise<ClickHousePerson[]>
+    public async fetchPersons(database: Database = Database.Postgres): Promise<Person[] | ClickHousePerson[]> {
+        if (database === Database.ClickHouse) {
+            return (await this.clickhouseQuery('SELECT * FROM person')) as ClickHousePerson[]
+        } else if (database === Database.Postgres) {
+            return ((await this.postgresQuery('SELECT * FROM posthog_person')).rows as RawPerson[]).map(
+                (rawPerson: RawPerson) =>
+                    ({
+                        ...rawPerson,
+                        created_at: DateTime.fromISO(rawPerson.created_at).toUTC(),
+                    } as Person)
+            )
+        } else {
+            throw new Error(`Can't fetch persons for database: ${database}`)
+        }
     }
 
     public async fetchPerson(teamId: number, distinctId: string): Promise<Person | undefined> {
@@ -75,7 +92,7 @@ export class DB {
         )
         if (selectResult.rows.length > 0) {
             const rawPerson: RawPerson = selectResult.rows[0]
-            return { ...rawPerson, created_at: DateTime.fromISO(rawPerson.created_at) }
+            return { ...rawPerson, created_at: DateTime.fromISO(rawPerson.created_at).toUTC() }
         }
     }
 
@@ -92,10 +109,11 @@ export class DB {
             'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
             [createdAt.toISO(), JSON.stringify(properties), teamId, isUserId, isIdentified, uuid]
         )
-        const personCreated = insertResult.rows[0] as Person
+        const personCreated = insertResult.rows[0] as RawPerson
+        const person = { ...personCreated, created_at: DateTime.fromISO(personCreated.created_at).toUTC() } as Person
         if (this.kafkaProducer) {
             const data = {
-                created_at: castTimestampOrNow(createdAt),
+                created_at: castTimestampOrNow(createdAt, TimestampFormat.ClickHouse),
                 properties: JSON.stringify(properties),
                 team_id: teamId,
                 is_identified: isIdentified,
@@ -108,10 +126,9 @@ export class DB {
         }
 
         for (const distinctId of distinctIds || []) {
-            await this.addDistinctId(personCreated, distinctId)
+            await this.addDistinctId(person, distinctId)
         }
-
-        return personCreated
+        return person
     }
 
     public async updatePerson(person: Person, update: Partial<Person>): Promise<Person> {
@@ -123,39 +140,71 @@ export class DB {
             )} WHERE id = $${Object.values(update).length + 1}`,
             values
         )
-        if (this.kafkaProducer) {
-            const data = {
-                created_at: castTimestampOrNow(updatedPerson.created_at),
-                properties: JSON.stringify(updatedPerson.properties),
-                team_id: updatedPerson.team_id,
-                is_identified: updatedPerson.is_identified,
-                id: updatedPerson.uuid.toString(),
+        if (this.clickhouse) {
+            const { is_user_id, id, uuid, ...validUpdates } = update
+            const updateString = Object.entries(validUpdates)
+                .map(([key, value]) => {
+                    let clickhouseValue: string
+                    if (typeof value === 'string') {
+                        clickhouseValue = value
+                    } else if (typeof value === 'boolean') {
+                        clickhouseValue = value ? '1' : '0'
+                    } else if (DateTime.isDateTime(value)) {
+                        clickhouseValue = castTimestampOrNow(value, TimestampFormat.ClickHouse)
+                    } else {
+                        clickhouseValue = JSON.stringify(value)
+                    }
+                    return `${sanitizeSqlIdentifier(key)} = '${escapeClickHouseString(clickhouseValue)}'`
+                })
+                .join(', ')
+            if (updateString.length > 0) {
+                await this.clickhouseQuery(
+                    `ALTER TABLE person UPDATE ${updateString} WHERE id = '${escapeClickHouseString(person.uuid)}'`
+                )
             }
-            await this.kafkaProducer.send({
-                topic: KAFKA_PERSON,
-                messages: [{ value: Buffer.from(JSON.stringify(data)) }],
-            })
         }
         return updatedPerson
     }
 
-    public async deletePerson(personId: number): Promise<void> {
-        await this.postgresQuery('DELETE FROM posthog_persondistinctid WHERE person_id = $1', [personId])
-        await this.postgresQuery('DELETE FROM posthog_person WHERE id = $1', [personId])
+    public async deletePerson(person: Person): Promise<void> {
+        await this.postgresQuery('DELETE FROM posthog_persondistinctid WHERE person_id = $1', [person.id])
+        await this.postgresQuery('DELETE FROM posthog_person WHERE id = $1', [person.id])
         if (this.clickhouse) {
-            await this.clickhouseQuery(`ALTER TABLE person DELETE WHERE id = ${personId}`)
-            await this.clickhouseQuery(`ALTER TABLE person_distinct_id DELETE WHERE person_id = ${personId}`)
+            await this.clickhouseQuery(`ALTER TABLE person DELETE WHERE id = '${escapeClickHouseString(person.uuid)}'`)
+            await this.clickhouseQuery(
+                `ALTER TABLE person_distinct_id DELETE WHERE person_id = '${escapeClickHouseString(person.uuid)}'`
+            )
         }
     }
 
     // PersonDistinctId
 
-    public async fetchDistinctIdValues(person: Person): Promise<string[]> {
-        const result = await this.postgresQuery(
-            'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 and team_id=$2 ORDER BY id',
-            [person.id, person.team_id]
-        )
-        return (result.rows as PersonDistinctId[]).map((pdi) => pdi.distinct_id)
+    public async fetchDistinctIds(person: Person, database?: Database.Postgres): Promise<PersonDistinctId[]>
+    public async fetchDistinctIds(person: Person, database: Database.ClickHouse): Promise<ClickHousePersonDistinctId[]>
+    public async fetchDistinctIds(
+        person: Person,
+        database: Database = Database.Postgres
+    ): Promise<PersonDistinctId[] | ClickHousePersonDistinctId[]> {
+        if (database === Database.ClickHouse) {
+            return (await this.clickhouseQuery(
+                `SELECT * FROM person_distinct_id WHERE person_id='${escapeClickHouseString(
+                    person.uuid
+                )}' and team_id='${person.team_id}' ORDER BY id`
+            )) as ClickHousePersonDistinctId[]
+        } else if (database === Database.Postgres) {
+            const result = await this.postgresQuery(
+                'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 and team_id=$2 ORDER BY id',
+                [person.id, person.team_id]
+            )
+            return result.rows as PersonDistinctId[]
+        } else {
+            throw new Error(`Can't fetch persons for database: ${database}`)
+        }
+    }
+
+    public async fetchDistinctIdValues(person: Person, database: Database = Database.Postgres): Promise<string[]> {
+        const personDistinctIds = await this.fetchDistinctIds(person, database as any)
+        return personDistinctIds.map((pdi) => pdi.distinct_id)
     }
 
     public async addDistinctId(person: Person, distinctId: string): Promise<void> {
@@ -167,26 +216,27 @@ export class DB {
         if (this.kafkaProducer) {
             await this.kafkaProducer.send({
                 topic: KAFKA_PERSON_UNIQUE_ID,
-                messages: [{ value: Buffer.from(JSON.stringify(personDistinctIdCreated)) }],
+                messages: [
+                    { value: Buffer.from(JSON.stringify({ ...personDistinctIdCreated, person_id: person.uuid })) },
+                ],
             })
         }
     }
 
-    public async updateDistinctId(
+    public async moveDistinctId(
+        person: Person,
         personDistinctId: PersonDistinctId,
-        update: Partial<PersonDistinctId>
+        moveToPerson: Person
     ): Promise<void> {
-        const updatedPersonDistinctId: PersonDistinctId = { ...personDistinctId, ...update }
-        await this.postgresQuery(
-            `UPDATE posthog_persondistinctid SET ${Object.keys(update).map(
-                (field, index) => `"${sanitizeSqlIdentifier(field)}" = $${index + 1}`
-            )} WHERE id = $${Object.values(update).length + 1}`,
-            [...Object.values(update), personDistinctId.id]
-        )
+        await this.postgresQuery(`UPDATE posthog_persondistinctid SET person_id = $1 WHERE id = $2`, [
+            moveToPerson.id,
+            personDistinctId.id,
+        ])
         if (this.kafkaProducer) {
+            const clickhouseModel: ClickHousePersonDistinctId = { ...personDistinctId, person_id: moveToPerson.uuid }
             await this.kafkaProducer.send({
                 topic: KAFKA_PERSON_UNIQUE_ID,
-                messages: [{ value: Buffer.from(JSON.stringify(updatedPersonDistinctId)) }],
+                messages: [{ value: Buffer.from(JSON.stringify(clickhouseModel)) }],
             })
         }
     }
@@ -248,7 +298,7 @@ export class DB {
     public async fetchElements(event?: Event): Promise<Element[]> {
         if (this.kafkaProducer) {
             const events = (await this.clickhouseQuery(
-                `SELECT elements_chain FROM events WHERE uuid='${sanitizeSqlIdentifier((event as any).uuid)}'`
+                `SELECT elements_chain FROM events WHERE uuid='${escapeClickHouseString((event as any).uuid)}'`
             )) as ClickHouseEvent[]
             const chain = events?.[0]?.elements_chain
             return chainToElements(chain)

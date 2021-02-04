@@ -2,7 +2,14 @@ import { Kafka, logLevel } from 'kafkajs'
 import { PluginsServerConfig } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
 import { defaultConfig, overrideWithEnv } from '../../src/config'
-import { KAFKA_EVENTS_PLUGIN_INGESTION, KAFKA_SESSION_RECORDING_EVENTS } from '../../src/ingestion/topics'
+import {
+    KAFKA_EVENTS,
+    KAFKA_EVENTS_PLUGIN_INGESTION,
+    KAFKA_EVENTS_WAL,
+    KAFKA_PERSON,
+    KAFKA_PERSON_UNIQUE_ID,
+    KAFKA_SESSION_RECORDING_EVENTS,
+} from '../../src/ingestion/topics'
 
 /** Clear the kafka queue */
 export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>, delayMs = 2000) {
@@ -19,25 +26,14 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
     })
     const messages = []
 
-    async function createTopic(topic: string) {
-        try {
-            const admin = kafka.admin()
-            await admin.connect()
-            await admin.createTopics({
-                waitForLeaders: true,
-                topics: [{ topic }],
-            })
-            await admin.disconnect()
-        } catch (e) {
-            if (!e?.error?.includes('Topic with this name already exists')) {
-                console.error(`Error creating kafka topic "${topic}". This might be fine!`)
-                console.error(e)
-            }
-        }
-    }
-
-    await createTopic(KAFKA_EVENTS_PLUGIN_INGESTION)
-    await createTopic(KAFKA_SESSION_RECORDING_EVENTS)
+    await createTopics(kafka, [
+        KAFKA_EVENTS,
+        KAFKA_EVENTS_PLUGIN_INGESTION,
+        KAFKA_EVENTS_WAL,
+        KAFKA_SESSION_RECORDING_EVENTS,
+        KAFKA_PERSON,
+        KAFKA_PERSON_UNIQUE_ID,
+    ])
 
     const connected = await new Promise<void>(async (resolve, reject) => {
         console.info('setting group join and crash listeners')
@@ -75,4 +71,14 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
     await consumer.disconnect()
 
     return true
+}
+
+async function createTopics(kafka: Kafka, topics: string[]) {
+    const admin = kafka.admin()
+    await admin.connect()
+    await admin.createTopics({
+        waitForLeaders: true,
+        topics: topics.map((topic) => ({ topic })),
+    })
+    await admin.disconnect()
 }

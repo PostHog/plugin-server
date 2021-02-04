@@ -2,7 +2,7 @@ import { makePluginObjects, commonOrganizationId, commonUserId, commonOrganizati
 import { defaultConfig } from '../../src/config'
 import { Pool } from 'pg'
 import { delay, UUIDT } from '../../src/utils'
-import { PluginsServerConfig } from '../../src/types'
+import { PluginsServer, PluginsServerConfig, Team } from '../../src/types'
 
 export async function resetTestDatabase(
     code: string,
@@ -112,4 +112,12 @@ export async function createUserTeamAndOrganization(
         opt_out_capture: false,
         is_demo: false,
     })
+}
+
+export async function getTeams(server: PluginsServer): Promise<Team[]> {
+    return (await server.db.postgresQuery('SELECT * FROM posthog_team ORDER BY id')).rows
+}
+
+export async function getFirstTeam(server: PluginsServer): Promise<Team> {
+    return (await getTeams(server))[0]
 }
