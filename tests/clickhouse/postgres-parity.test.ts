@@ -1,10 +1,10 @@
-import { Database, LogLevel, PluginsServer, PluginsServerConfig, Team } from '../../src/types'
+import { Database, LogLevel, PluginsServer, PluginsServerConfig, Team, TimestampFormat } from '../../src/types'
 import { getFirstTeam, resetTestDatabase } from '../helpers/sql'
 import { startPluginsServer } from '../../src/server'
 import { makePiscina } from '../../src/worker/piscina'
 import { createPosthog, DummyPostHog } from '../../src/extensions/posthog'
 import { pluginConfig39 } from '../helpers/plugins'
-import { UUIDT } from '../../src/utils'
+import { castTimestampOrNow, UUIDT } from '../../src/utils'
 import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
 import { resetKafka } from '../helpers/kafka'
 import { delayUntilEventIngested } from '../shared/process-event'
@@ -83,7 +83,7 @@ describe('postgres parity', () => {
         expect(postgresPersons).toEqual([
             {
                 id: expect.any(Number),
-                created_at: expect.any(String),
+                created_at: expect.any(DateTime),
                 properties: {
                     userProp: 'propValue',
                 },
@@ -99,15 +99,95 @@ describe('postgres parity', () => {
         expect(person).toEqual(postgresPersons[0])
     })
 
-    test.skip('updatePerson', async () => {
-        // TODO
+    test('updatePerson', async () => {
+        const uuid = new UUIDT().toString()
+        const person = await server.db.createPerson(
+            DateTime.utc(),
+            { userProp: 'propValue' },
+            team.id,
+            null,
+            false,
+            uuid,
+            ['distinct1', 'distinct2']
+        )
+        await delayUntilEventIngested(() => server.db.fetchPersons(Database.ClickHouse))
+        await delayUntilEventIngested(() => server.db.fetchDistinctIdValues(person, Database.ClickHouse), 2)
+
+        // update JSON and boolean to true
+
+        await server.db.updatePerson(person, { properties: { replacedUserProp: 'propValue' }, is_identified: true })
+
+        await delayUntilEventIngested(async () =>
+            (await server.db.fetchPersons(Database.ClickHouse)).filter((p) => p.is_identified)
+        )
+
+        const clickHousePersons = await server.db.fetchPersons(Database.ClickHouse)
+        const postgresPersons = await server.db.fetchPersons(Database.Postgres)
+
+        expect(clickHousePersons.length).toEqual(1)
+        expect(postgresPersons.length).toEqual(1)
+
+        expect(postgresPersons[0].is_identified).toEqual(true)
+        expect(postgresPersons[0].properties).toEqual({ replacedUserProp: 'propValue' })
+
+        expect(clickHousePersons[0].is_identified).toEqual(1)
+        expect(clickHousePersons[0].properties).toEqual('{"replacedUserProp":"propValue"}')
+
+        // update date and boolean to false
+
+        const randomDate = DateTime.utc().minus(100000).setZone('UTC')
+        await server.db.updatePerson(person, { created_at: randomDate, is_identified: false })
+
+        await delayUntilEventIngested(async () =>
+            (await server.db.fetchPersons(Database.ClickHouse)).filter((p) => p.is_identified)
+        )
+
+        const clickHousePersons2 = await server.db.fetchPersons(Database.ClickHouse)
+        const postgresPersons2 = await server.db.fetchPersons(Database.Postgres)
+
+        expect(clickHousePersons2.length).toEqual(1)
+        expect(postgresPersons2.length).toEqual(1)
+
+        expect(postgresPersons2[0].is_identified).toEqual(false)
+        expect(postgresPersons2[0].created_at.toISO()).toEqual(randomDate.toISO())
+
+        expect(clickHousePersons2[0].is_identified).toEqual(0)
+        expect(clickHousePersons2[0].created_at).toEqual(castTimestampOrNow(randomDate, TimestampFormat.ClickHouse))
     })
 
-    test.skip('deletePerson', async () => {
-        // TODO
+    test('deletePerson', async () => {
+        const uuid = new UUIDT().toString()
+        const person = await server.db.createPerson(
+            DateTime.utc(),
+            { userProp: 'propValue' },
+            team.id,
+            null,
+            false,
+            uuid,
+            ['distinct1', 'distinct2']
+        )
+        await delayUntilEventIngested(() => server.db.fetchPersons(Database.ClickHouse))
+        await delayUntilEventIngested(() => server.db.fetchDistinctIdValues(person, Database.ClickHouse), 2)
+
+        await server.db.deletePerson(person)
+
+        await delayUntilEventIngested(async () =>
+            (await server.db.fetchPersons(Database.ClickHouse)).length === 0 ? ['deleted!'] : []
+        )
+
+        const clickHousePersons = await server.db.fetchPersons(Database.ClickHouse)
+        const postgresPersons = await server.db.fetchPersons(Database.Postgres)
+
+        expect(clickHousePersons.length).toEqual(0)
+        expect(postgresPersons.length).toEqual(0)
+
+        const clickHouseDistinctIdValues = await server.db.fetchDistinctIdValues(person, Database.ClickHouse)
+        const postgresDistinctIdValues = await server.db.fetchDistinctIdValues(person, Database.Postgres)
+        expect(clickHouseDistinctIdValues.length).toEqual(0)
+        expect(postgresDistinctIdValues.length).toEqual(0)
     })
 
-    test('addDistinctId', async () => {
+    test('addDistinctId & moveDistinctId', async () => {
         const uuid = new UUIDT().toString()
         const uuid2 = new UUIDT().toString()
         const person = await server.db.createPerson(

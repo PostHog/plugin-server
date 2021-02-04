@@ -325,3 +325,10 @@ export function delay(ms: number): Promise<void> {
 export function sanitizeSqlIdentifier(unquotedIdentifier: string): string {
     return unquotedIdentifier.replace(/[^\w\d_]+/g, '')
 }
+
+/** Escape single quotes and slashes */
+export function escapeClickHouseString(string: string): string {
+    // In string literals, you need to escape at least `'` and `\`.
+    // https://clickhouse.tech/docs/en/sql-reference/syntax/
+    return string.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+}

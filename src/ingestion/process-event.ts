@@ -301,7 +301,7 @@ export class EventsProcessor {
                 ])
             }
 
-            await this.db.deletePerson(otherPerson.id)
+            await this.db.deletePerson(otherPerson)
         }
     }
 
