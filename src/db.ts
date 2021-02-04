@@ -9,6 +9,7 @@ import { chainToElements, hashElements, unparsePersonPartial } from './ingestion
 import {
     ClickHouseEvent,
     ClickHousePerson,
+    ClickHousePersonDistinctId,
     Database,
     Element,
     ElementGroup,
@@ -161,24 +162,32 @@ export class DB {
 
     // PersonDistinctId
 
-    public async fetchDistinctIdValues(person: Person, database: Database = Database.Postgres): Promise<string[]> {
+    public async fetchDistinctIds(person: Person, database?: Database.Postgres): Promise<PersonDistinctId[]>
+    public async fetchDistinctIds(person: Person, database: Database.ClickHouse): Promise<ClickHousePersonDistinctId[]>
+    public async fetchDistinctIds(
+        person: Person,
+        database: Database = Database.Postgres
+    ): Promise<PersonDistinctId[] | ClickHousePersonDistinctId[]> {
         if (database === Database.ClickHouse) {
-            return (
-                await this.clickhouseQuery(
-                    `SELECT * FROM person_distinct_id WHERE person_id='${sanitizeSqlIdentifier(
-                        person.uuid
-                    )}' and team_id='${person.team_id}' ORDER BY id`
-                )
-            ).map((row: PersonDistinctId) => row.distinct_id)
+            return (await this.clickhouseQuery(
+                `SELECT * FROM person_distinct_id WHERE person_id='${sanitizeSqlIdentifier(
+                    person.uuid
+                )}' and team_id='${person.team_id}' ORDER BY id`
+            )) as ClickHousePersonDistinctId[]
         } else if (database === Database.Postgres) {
             const result = await this.postgresQuery(
                 'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 and team_id=$2 ORDER BY id',
                 [person.id, person.team_id]
             )
-            return (result.rows as PersonDistinctId[]).map((pdi) => pdi.distinct_id)
+            return result.rows as PersonDistinctId[]
         } else {
             throw new Error(`Can't fetch persons for database: ${database}`)
         }
+    }
+
+    public async fetchDistinctIdValues(person: Person, database: Database = Database.Postgres): Promise<string[]> {
+        const personDistinctIds = await this.fetchDistinctIds(person, database as any)
+        return personDistinctIds.map((pdi) => pdi.distinct_id)
     }
 
     public async addDistinctId(person: Person, distinctId: string): Promise<void> {

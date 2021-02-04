@@ -308,6 +308,14 @@ export interface PersonDistinctId {
     distinct_id: string
 }
 
+/** ClickHouse PersonDistinctId model. */
+export interface ClickHousePersonDistinctId {
+    id: number
+    team_id: number
+    person_id: string
+    distinct_id: string
+}
+
 /** Usable CohortPeople model. */
 export interface CohortPeople {
     id: number
