@@ -233,8 +233,6 @@ export class DB {
             personDistinctId.id,
         ])
         if (this.kafkaProducer) {
-            // The "ALTER TABLE" statement fails with "Cannot UPDATE key column `person_id`", so just add another row
-            // ... even though the django version does nothing in this case!
             const clickhouseModel: ClickHousePersonDistinctId = { ...personDistinctId, person_id: moveToPerson.uuid }
             await this.kafkaProducer.send({
                 topic: KAFKA_PERSON_UNIQUE_ID,
