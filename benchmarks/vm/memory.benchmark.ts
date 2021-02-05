@@ -1,10 +1,10 @@
-import { createPluginConfigVM } from '../src/vm'
-import { Plugin, PluginConfig, PluginConfigVMReponse } from '../src/types'
-import { createServer } from '../src/server'
+import { createPluginConfigVM } from '../../src/vm'
+import { Plugin, PluginConfig, PluginConfigVMReponse } from '../../src/types'
+import { createServer } from '../../src/server'
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
-import { commonOrganizationId } from '../tests/helpers/plugins'
+import { commonOrganizationId } from '../../tests/helpers/plugins'
 
-jest.mock('../src/sql')
+jest.mock('../../src/sql')
 jest.setTimeout(600000) // 600 sec timeout
 
 function createEvent(index: number): PluginEvent {
