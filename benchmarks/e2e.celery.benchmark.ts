@@ -1,4 +1,4 @@
-import { LogLevel, Queue } from '../src/types'
+import { LogLevel, PluginsServerConfig, Queue } from '../src/types'
 import { resetTestDatabase } from '../tests/helpers/sql'
 import { startPluginsServer } from '../src/server'
 import { makePiscina } from '../src/worker/piscina'
@@ -11,7 +11,16 @@ import { performance } from 'perf_hooks'
 
 jest.setTimeout(600000) // 10min timeout
 
-describe('e2e postgres benchmark', () => {
+const extraServerConfig: Partial<PluginsServerConfig> = {
+    WORKER_CONCURRENCY: 4,
+    PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
+    CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
+    PLUGIN_SERVER_INGESTION: true,
+    LOG_LEVEL: LogLevel.Log,
+    KAFKA_ENABLED: false,
+}
+
+describe('e2e celery & postgres benchmark', () => {
     let queue: Queue
     let server: PluginsServer
     let stopServer: () => Promise<void>
@@ -25,17 +34,8 @@ describe('e2e postgres benchmark', () => {
                 return event
             }
         `)
-        const startResponse = await startPluginsServer(
-            {
-                WORKER_CONCURRENCY: 4,
-                PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
-                CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
-                PLUGIN_SERVER_INGESTION: true,
-                LOG_LEVEL: LogLevel.Log,
-                KAFKA_ENABLED: false,
-            },
-            makePiscina
-        )
+
+        const startResponse = await startPluginsServer(extraServerConfig, makePiscina)
         server = startResponse.server
         stopServer = startResponse.stop
         queue = startResponse.queue
@@ -50,7 +50,7 @@ describe('e2e postgres benchmark', () => {
         await stopServer()
     })
 
-    test('e2e plugin + ingestion performance', async () => {
+    test('measure performance', async () => {
         console.debug = () => null
 
         const count = 3000
@@ -76,7 +76,11 @@ describe('e2e postgres benchmark', () => {
         console.log('Finished!')
 
         const n = (n: number) => `${Math.round(n * 100) / 100}`
-        console.log(`Ingested ${count} events in ${n(timeMs / 1000)}s (${n(timeMs / count)}ms per event)`)
+        console.log(
+            `[Celery & Postgres] Ingested ${count} events in ${n(timeMs / 1000)}s (${n(
+                1000 / (timeMs / count)
+            )} events/sec, ${n(timeMs / count)}ms per event)`
+        )
 
         const events = await server.db.fetchEvents()
         expect(events[count - 1].properties.upperUuid).toEqual(events[count - 1].properties.uuid.toUpperCase())

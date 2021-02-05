@@ -27,7 +27,11 @@
         "setup:dev:clickhouse": "cd ../posthog && export DEBUG=1 PRIMARY_DB=clickhouse && source env/bin/activate && python manage.py migrate_clickhouse",
         "setup:test:ee": "yarn setup:test:postgres && yarn setup:test:clickhouse",
         "setup:test:postgres": "cd ../posthog && (dropdb test_posthog || echo 'no db to drop') && createdb test_posthog && source env/bin/activate && DATABASE_URL=postgres://localhost:5432/test_posthog DEBUG=1 python manage.py migrate",
-        "setup:test:clickhouse": "cd ../posthog && export TEST=1 PRIMARY_DB=clickhouse CLICKHOUSE_DATABASE=posthog_test && source env/bin/activate && python manage.py migrate_clickhouse"
+        "setup:test:clickhouse": "cd ../posthog && export TEST=1 PRIMARY_DB=clickhouse CLICKHOUSE_DATABASE=posthog_test && source env/bin/activate && python manage.py migrate_clickhouse",
+        "services:start": "cd ../posthog && docker-compose -f ee/docker-compose.ch.yml up zookeeper kafka clickhouse",
+        "services:stop": "cd ../posthog && docker-compose -f ee/docker-compose.ch.yml down",
+        "services:clean": "cd ../posthog && docker-compose -f ee/docker-compose.ch.yml rm -v zookeeper kafka clickhouse",
+        "services": "yarn services:stop && yarn services:clean && yarn services:start"
     },
     "bin": {
         "posthog-plugin-server": "bin/posthog-plugin-server"
