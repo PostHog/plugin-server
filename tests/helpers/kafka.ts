@@ -13,7 +13,7 @@ import { PluginsServerConfig } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
 
 /** Clear the kafka queue */
-export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>, delayMs = 2000) {
+export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>, delayMs = 2000): true {
     console.log('Resetting Kafka!')
     const config = { ...overrideWithEnv(defaultConfig, process.env), ...extraServerConfig }
     const kafka = new Kafka({
