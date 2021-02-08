@@ -158,9 +158,9 @@ export class EventsProcessor {
                     teamId,
                     null,
                     true,
-                    new UUIDT().toString()
+                    new UUIDT().toString(),
+                    [distinctId]
                 )
-                await this.db.addDistinctId(personCreated, distinctId)
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
@@ -181,15 +181,15 @@ export class EventsProcessor {
         let personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
             try {
-                const personCreated = await this.db.createPerson(
+                personFound = await this.db.createPerson(
                     DateTime.utc(),
                     properties,
                     teamId,
                     null,
                     false,
-                    new UUIDT().toString()
+                    new UUIDT().toString(),
+                    [distinctId]
                 )
-                await this.db.addDistinctId(personCreated, distinctId)
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
@@ -245,10 +245,9 @@ export class EventsProcessor {
                     teamId,
                     null,
                     false,
-                    new UUIDT().toString()
+                    new UUIDT().toString(),
+                    [distinctId, previousDistinctId]
                 )
-                await this.db.addDistinctId(personCreated, distinctId)
-                await this.db.addDistinctId(personCreated, previousDistinctId)
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
