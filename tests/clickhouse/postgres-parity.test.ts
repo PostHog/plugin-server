@@ -153,7 +153,9 @@ describe('postgres parity', () => {
         expect(postgresPersons2[0].created_at.toISO()).toEqual(randomDate.toISO())
 
         expect(clickHousePersons2[0].is_identified).toEqual(0)
-        expect(clickHousePersons2[0].created_at).toEqual(castTimestampOrNow(randomDate, TimestampFormat.ClickHouse))
+        expect(clickHousePersons2[0].created_at).toEqual(
+            castTimestampOrNow(randomDate, TimestampFormat.ClickHouseSecondPrecision)
+        )
     })
 
     test('deletePerson', async () => {
