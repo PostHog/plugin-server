@@ -110,14 +110,14 @@ jobs:
                 env:
                     DATABASE_URL: 'postgres://posthog:posthog@db:5432/posthog'
                     PGBOUNCER_AUTH_TYPE: 'md5'
-                ports: ['6439:5432']
+                ports: ['5432:5432']
             postgres:
                 image: postgres:12
                 env:
                     POSTGRES_USER: postgres
                     POSTGRES_PASSWORD: postgres
                     POSTGRES_DB: test_posthog
-                ports: ['5432:5432']
+                ports: ['5439:5432']
                 options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
             redis:
                 image: redis
