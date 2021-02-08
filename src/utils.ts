@@ -1,11 +1,12 @@
-import { Readable } from 'stream'
-import * as tar from 'tar-stream'
 import AdmZip from 'adm-zip'
-import * as zlib from 'zlib'
-import { LogLevel, TimestampFormat } from './types'
 import { randomBytes } from 'crypto'
 import { DateTime } from 'luxon'
+import { Readable } from 'stream'
+import * as tar from 'tar-stream'
+import * as zlib from 'zlib'
+
 import { status } from './status'
+import { LogLevel, TimestampFormat } from './types'
 
 /** Time until autoexit (due to error) gives up on graceful exit and kills the process right away. */
 const GRACEFUL_EXIT_PERIOD_SECONDS = 5
@@ -302,7 +303,9 @@ export function castTimestampOrNow(
         timestamp = DateTime.fromISO(timestamp)
     }
     timestamp = timestamp.toUTC()
-    if (timestampFormat === TimestampFormat.ClickHouse) {
+    if (timestampFormat === TimestampFormat.ClickHouseSecondPrecision) {
+        return timestamp.toFormat('yyyy-MM-dd HH:mm:ss')
+    } else if (timestampFormat === TimestampFormat.ClickHouse) {
         return timestamp.toFormat('yyyy-MM-dd HH:mm:ss.u')
     } else if (timestampFormat === TimestampFormat.ISO) {
         return timestamp.toUTC().toISO()
