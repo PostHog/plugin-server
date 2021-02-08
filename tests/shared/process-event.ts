@@ -1,4 +1,9 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
+import { DateTime } from 'luxon'
+
+import { IEvent } from '../../src/idl/protos'
+import { EventsProcessor } from '../../src/ingestion/process-event'
+import { hashElements } from '../../src/ingestion/utils'
 import { createServer } from '../../src/server'
 import {
     Database,
@@ -10,13 +15,8 @@ import {
     SessionRecordingEvent,
     Team,
 } from '../../src/types'
-import { createUserTeamAndOrganization, getFirstTeam, getTeams, onQuery, resetTestDatabase } from '../helpers/sql'
-import { EventsProcessor } from '../../src/ingestion/process-event'
-import { DateTime } from 'luxon'
 import { delay, UUIDT } from '../../src/utils'
-import { IEvent } from '../../src/idl/protos'
-import { hashElements } from '../../src/ingestion/utils'
-import { PoolClient } from 'pg'
+import { createUserTeamAndOrganization, getFirstTeam, getTeams, onQuery, resetTestDatabase } from '../helpers/sql'
 
 jest.setTimeout(600000) // 600 sec timeout
 
