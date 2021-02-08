@@ -178,6 +178,9 @@ describe('postgres parity', () => {
         await delayUntilEventIngested(async () =>
             (await server.db.fetchPersons(Database.ClickHouse)).length === 0 ? ['deleted!'] : []
         )
+        await delayUntilEventIngested(async () =>
+            (await server.db.fetchDistinctIdValues(person, Database.ClickHouse)).length === 0 ? ['deleted!'] : []
+        )
 
         const clickHousePersons = await server.db.fetchPersons(Database.ClickHouse)
         const postgresPersons = await server.db.fetchPersons(Database.Postgres)
