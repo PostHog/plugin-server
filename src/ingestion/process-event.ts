@@ -196,8 +196,13 @@ export class EventsProcessor {
                 personFound = await this.db.fetchPerson(teamId, distinctId)
             }
         }
-        const updatedProperties: Properties = { ...propertiesOnce, ...personFound!.properties, ...properties }
-        return await this.db.updatePerson(personFound!, { properties: updatedProperties })
+        if (!personFound) {
+            throw new Error(
+                `Could not find person with distinct id "${distinctId}" in team "${teamId}", even after trying to insert them`
+            )
+        }
+        const updatedProperties: Properties = { ...propertiesOnce, ...personFound.properties, ...properties }
+        return await this.db.updatePerson(personFound, { properties: updatedProperties })
     }
 
     private async alias(
