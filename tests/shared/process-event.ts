@@ -178,7 +178,6 @@ export const createProcessEventTests = (
     })
 
     test('capture new person', async () => {
-        onQuery(server, console.log)
         await server.db.postgresQuery(`UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`, [true, team.id])
         team = await getFirstTeam(server)
 
