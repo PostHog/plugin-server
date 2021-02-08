@@ -2,7 +2,7 @@ import { Team } from '../../src/types'
 import { createUserTeamAndOrganization } from '../helpers/sql'
 import { createProcessEventTests } from '../shared/process-event'
 
-jest.setTimeout(600000) // 600 sec timeout
+jest.setTimeout(600000) // 600 sec timeout.
 
 describe('process event (postgresql)', () => {
     createProcessEventTests('postgresql', {}, (response) => {
