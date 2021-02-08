@@ -140,7 +140,7 @@ describe('postgres parity', () => {
         await server.db.updatePerson(person, { created_at: randomDate, is_identified: false })
 
         await delayUntilEventIngested(async () =>
-            (await server.db.fetchPersons(Database.ClickHouse)).filter((p) => p.is_identified)
+            (await server.db.fetchPersons(Database.ClickHouse)).filter((p) => !p.is_identified)
         )
 
         const clickHousePersons2 = await server.db.fetchPersons(Database.ClickHouse)
