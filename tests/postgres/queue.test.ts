@@ -1,9 +1,10 @@
+// eslint-disable-next-line
+import { redisFactory } from '../helpers/redis'
 import Client from '../../src/celery/client'
 import { runPlugins } from '../../src/plugins'
 import { createServer } from '../../src/server'
 import { LogLevel, PluginsServer } from '../../src/types'
 import { startQueue } from '../../src/worker/queue'
-import { redisFactory } from '../helpers/redis'
 
 jest.mock('ioredis', () => redisFactory())
 
