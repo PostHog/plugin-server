@@ -18,7 +18,7 @@ import {
 import { delay, UUIDT } from '../../src/utils'
 import { createUserTeamAndOrganization, getFirstTeam, getTeams, resetTestDatabase } from '../helpers/sql'
 
-jest.setTimeout(600000) // 600 sec timeout
+jest.setTimeout(600000) // 600 sec timeout.
 
 export async function delayUntilEventIngested(
     fetchEvents: () => Promise<any[] | any>,
