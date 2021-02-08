@@ -1,8 +1,8 @@
 import { Properties } from '@posthog/plugin-scaffold'
 import ClickHouse from '@posthog/clickhouse'
-import { Producer } from 'kafkajs'
+import { Producer, ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
-import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg'
+import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { chainToElements, hashElements, unparsePersonPartial } from './ingestion/utils'
 import {
@@ -107,30 +107,62 @@ export class DB {
         uuid: string,
         distinctIds?: string[]
     ): Promise<Person> {
-        const insertResult = await this.postgresQuery(
-            'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [createdAt.toISO(), JSON.stringify(properties), teamId, isUserId, isIdentified, uuid]
-        )
-        const personCreated = insertResult.rows[0] as RawPerson
-        const person = { ...personCreated, created_at: DateTime.fromISO(personCreated.created_at).toUTC() } as Person
-        if (this.kafkaProducer) {
-            const data = {
-                created_at: castTimestampOrNow(createdAt, TimestampFormat.ClickHouse),
-                properties: JSON.stringify(properties),
-                team_id: teamId,
-                is_identified: isIdentified,
-                id: uuid,
-            }
-            await this.kafkaProducer.send({
-                topic: KAFKA_PERSON,
-                messages: [{ value: Buffer.from(JSON.stringify(data)) }],
-            })
-        }
+        const client = await this.postgres.connect()
+        try {
+            await client.query('BEGIN')
 
-        for (const distinctId of distinctIds || []) {
-            await this.addDistinctId(person, distinctId)
+            const kafkaMessages: ProducerRecord[] = []
+            const insertResult = await client.query(
+                'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+                [createdAt.toISO(), JSON.stringify(properties), teamId, isUserId, isIdentified, uuid]
+            )
+            const personCreated = insertResult.rows[0] as RawPerson
+            const person = {
+                ...personCreated,
+                created_at: DateTime.fromISO(personCreated.created_at).toUTC(),
+            } as Person
+
+            if (this.kafkaProducer) {
+                kafkaMessages.push({
+                    topic: KAFKA_PERSON,
+                    messages: [
+                        {
+                            value: Buffer.from(
+                                JSON.stringify({
+                                    created_at: castTimestampOrNow(createdAt, TimestampFormat.ClickHouse),
+                                    properties: JSON.stringify(properties),
+                                    team_id: teamId,
+                                    is_identified: isIdentified,
+                                    id: uuid,
+                                })
+                            ),
+                        },
+                    ],
+                })
+            }
+
+            for (const distinctId of distinctIds || []) {
+                const kafkaMessage = await this.addDistinctIdPooled(client, person, distinctId)
+                if (kafkaMessage) {
+                    kafkaMessages.push(kafkaMessage)
+                }
+            }
+
+            await client.query('COMMIT')
+
+            if (this.kafkaProducer) {
+                for (const kafkaMessage of kafkaMessages) {
+                    await this.kafkaProducer.send(kafkaMessage)
+                }
+            }
+
+            return person
+        } catch (e) {
+            await client.query('ROLLBACK')
+            throw e
+        } finally {
+            client.release()
         }
-        return person
     }
 
     public async updatePerson(person: Person, update: Partial<Person>): Promise<Person> {
@@ -212,18 +244,30 @@ export class DB {
     }
 
     public async addDistinctId(person: Person, distinctId: string): Promise<void> {
-        const insertResult = await this.postgresQuery(
+        const kafkaMessage = await this.addDistinctIdPooled(this.postgres, person, distinctId)
+        if (this.kafkaProducer && kafkaMessage) {
+            await this.kafkaProducer.send(kafkaMessage)
+        }
+    }
+
+    public async addDistinctIdPooled(
+        client: PoolClient | Pool,
+        person: Person,
+        distinctId: string
+    ): Promise<ProducerRecord | void> {
+        const insertResult = await client.query(
             'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3) RETURNING *',
             [distinctId, person.id, person.team_id]
         )
+
         const personDistinctIdCreated = insertResult.rows[0] as PersonDistinctId
         if (this.kafkaProducer) {
-            await this.kafkaProducer.send({
+            return {
                 topic: KAFKA_PERSON_UNIQUE_ID,
                 messages: [
                     { value: Buffer.from(JSON.stringify({ ...personDistinctIdCreated, person_id: person.uuid })) },
                 ],
-            })
+            }
         }
     }
 
