@@ -38,7 +38,7 @@ export class DB {
         this.clickhouse = clickhouse
     }
 
-    // Direct queries
+    // Postgres
 
     public async postgresQuery<R extends QueryResultRow = any, I extends any[] = any[]>(
         queryTextOrConfig: string | QueryConfig<I>,
@@ -46,6 +46,23 @@ export class DB {
     ): Promise<QueryResult<R>> {
         return await this.postgres.query(queryTextOrConfig, values)
     }
+
+    public async postgresTransaction<ReturnType extends any>(
+        transaction: (client: PoolClient) => Promise<ReturnType>
+    ): Promise<ReturnType> {
+        const client = await this.postgres.connect()
+        try {
+            // await client.query('BEGIN')
+            return await transaction(client)
+        } catch (e) {
+            // await client.query('ROLLBACK')
+            throw e
+        } finally {
+            client.release()
+        }
+    }
+
+    // ClickHouse
 
     public async clickhouseQuery(
         query: string,
@@ -107,11 +124,9 @@ export class DB {
         uuid: string,
         distinctIds?: string[]
     ): Promise<Person> {
-        const client = await this.postgres.connect()
-        try {
-            await client.query('BEGIN')
+        const kafkaMessages: ProducerRecord[] = []
 
-            const kafkaMessages: ProducerRecord[] = []
+        const person = await this.postgresTransaction(async (client) => {
             const insertResult = await client.query(
                 'INSERT INTO posthog_person (created_at, properties, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
                 [createdAt.toISO(), JSON.stringify(properties), teamId, isUserId, isIdentified, uuid]
@@ -148,21 +163,16 @@ export class DB {
                 }
             }
 
-            await client.query('COMMIT')
-
-            if (this.kafkaProducer) {
-                for (const kafkaMessage of kafkaMessages) {
-                    await this.kafkaProducer.send(kafkaMessage)
-                }
-            }
-
             return person
-        } catch (e) {
-            await client.query('ROLLBACK')
-            throw e
-        } finally {
-            client.release()
+        })
+
+        if (this.kafkaProducer) {
+            for (const kafkaMessage of kafkaMessages) {
+                await this.kafkaProducer.send(kafkaMessage)
+            }
         }
+
+        return person
     }
 
     public async updatePerson(person: Person, update: Partial<Person>): Promise<Person> {

@@ -1,6 +1,6 @@
 import { makePluginObjects, commonOrganizationId, commonUserId, commonOrganizationMembershipId } from './plugins'
 import { defaultConfig } from '../../src/config'
-import { Pool } from 'pg'
+import { Pool, PoolClient } from 'pg'
 import { delay, UUIDT } from '../../src/utils'
 import { PluginsServer, PluginsServerConfig, Team } from '../../src/types'
 
@@ -120,4 +120,24 @@ export async function getTeams(server: PluginsServer): Promise<Team[]> {
 
 export async function getFirstTeam(server: PluginsServer): Promise<Team> {
     return (await getTeams(server))[0]
+}
+
+export function onQuery(server: PluginsServer, callback: (queryText: string) => any) {
+    function countQueryCalls(client: any, count: (queryText: string) => void) {
+        const query = client.query.bind(client)
+        client.query = (queryText: any, values?: any, callback?: any): any => {
+            count(queryText)
+            return query(queryText, values, callback)
+        }
+    }
+
+    countQueryCalls(server.postgres, callback)
+
+    const postgresTransaction = server.db.postgresTransaction.bind(server.db)
+    server.db.postgresTransaction = async (transaction: (client: PoolClient) => Promise<any>): Promise<any> => {
+        return await postgresTransaction(async (client: PoolClient) => {
+            countQueryCalls(client, callback)
+            return await transaction(client)
+        })
+    }
 }

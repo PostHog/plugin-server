@@ -10,7 +10,7 @@ import {
     SessionRecordingEvent,
     Team,
 } from '../../src/types'
-import { createUserTeamAndOrganization, getFirstTeam, getTeams, resetTestDatabase } from '../helpers/sql'
+import { createUserTeamAndOrganization, getFirstTeam, getTeams, onQuery, resetTestDatabase } from '../helpers/sql'
 import { EventsProcessor } from '../../src/ingestion/process-event'
 import { DateTime } from 'luxon'
 import { delay, UUIDT } from '../../src/utils'
@@ -65,22 +65,7 @@ export const createProcessEventTests = (
         await server.redis.del(server.PLUGINS_CELERY_QUEUE)
         await server.redis.del(server.CELERY_DEFAULT_QUEUE)
 
-        const query = server.postgres.query.bind(server.postgres)
-        server.postgres.query = (queryText: any, values?: any, callback?: any): any => {
-            queryCounter++
-            return query(queryText, values, callback)
-        }
-        const connect = server.postgres.connect.bind(server.postgres)
-        server.postgres.connect = async (): Promise<PoolClient> => {
-            const client = await connect()
-            const query = client.query.bind(client)
-            client.query = (queryText: any, values?: any, callback?: any): any => {
-                queryCounter++
-                return query(queryText, values, callback)
-            }
-
-            return client
-        }
+        onQuery(server, () => queryCounter++)
 
         return [server, stopServer]
     }
