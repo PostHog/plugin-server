@@ -44,7 +44,7 @@ describe('process event (postgresql)', () => {
 
             const elementsHash3 = await server!.db.createElementGroup(elements2, 3)
             const elementGroup3 = await server!.db.fetchElements()
-            console.log(elementGroup3)
+
             // created new elements as it's different team even if the hash is the same
             expect(elementGroup3.length).toEqual(4)
             expect(elementsHash).toEqual(elementsHash2)
