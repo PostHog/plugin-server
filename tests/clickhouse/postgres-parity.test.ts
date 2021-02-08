@@ -154,7 +154,8 @@ describe('postgres parity', () => {
 
         expect(clickHousePersons2[0].is_identified).toEqual(0)
         expect(clickHousePersons2[0].created_at).toEqual(
-            castTimestampOrNow(randomDate, TimestampFormat.ClickHouseSecondPrecision)
+            // TODO: get rid of `+ '.000'` by removing the need for ClickHouseSecondPrecision on CH persons
+            castTimestampOrNow(randomDate, TimestampFormat.ClickHouseSecondPrecision) + '.000'
         )
     })
 
