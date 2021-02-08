@@ -122,22 +122,23 @@ export async function getFirstTeam(server: PluginsServer): Promise<Team> {
     return (await getTeams(server))[0]
 }
 
-export function onQuery(server: PluginsServer, callback: (queryText: string) => any): void {
-    function countQueryCalls(client: any, count: (queryText: string) => void) {
+/** Inject code onto `server` which runs a callback whenever a postgres query is performed */
+export function onQuery(server: PluginsServer, onQueryCallback: (queryText: string) => any): void {
+    function spyOnQueryFunction(client: any) {
         const query = client.query.bind(client)
         client.query = (queryText: any, values?: any, callback?: any): any => {
-            count(queryText)
+            onQueryCallback(queryText)
             return query(queryText, values, callback)
         }
     }
 
-    countQueryCalls(server.postgres, callback)
+    spyOnQueryFunction(server.postgres)
 
     const postgresTransaction = server.db.postgresTransaction.bind(server.db)
     server.db.postgresTransaction = async (transaction: (client: PoolClient) => Promise<any>): Promise<any> => {
         return await postgresTransaction(async (client: PoolClient) => {
             const query = client.query
-            countQueryCalls(client, callback)
+            spyOnQueryFunction(client)
             const response = await transaction(client)
             client.query = query
             return response
