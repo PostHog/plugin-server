@@ -52,10 +52,10 @@ export class DB {
     ): Promise<ReturnType> {
         const client = await this.postgres.connect()
         try {
-            // await client.query('BEGIN')
+            await client.query('BEGIN')
             return await transaction(client)
         } catch (e) {
-            // await client.query('ROLLBACK')
+            await client.query('ROLLBACK')
             throw e
         } finally {
             client.release()
