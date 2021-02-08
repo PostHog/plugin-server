@@ -152,7 +152,7 @@ export class EventsProcessor {
         let personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
             try {
-                const personCreated = await this.db.createPerson(
+                personFound = await this.db.createPerson(
                     DateTime.utc(),
                     {},
                     teamId,
@@ -244,15 +244,10 @@ export class EventsProcessor {
 
         if (!oldPerson && !newPerson) {
             try {
-                const personCreated = await this.db.createPerson(
-                    DateTime.utc(),
-                    {},
-                    teamId,
-                    null,
-                    false,
-                    new UUIDT().toString(),
-                    [distinctId, previousDistinctId]
-                )
+                await this.db.createPerson(DateTime.utc(), {}, teamId, null, false, new UUIDT().toString(), [
+                    distinctId,
+                    previousDistinctId,
+                ])
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
@@ -352,15 +347,9 @@ export class EventsProcessor {
         if (!pdiCount) {
             // Catch race condition where in between getting and creating, another request already created this user
             try {
-                const personCreated: Person = await this.db.createPerson(
-                    sentAt || DateTime.utc(),
-                    {},
-                    teamId,
-                    null,
-                    false,
-                    personUuid.toString(),
-                    [distinctId]
-                )
+                await this.db.createPerson(sentAt || DateTime.utc(), {}, teamId, null, false, personUuid.toString(), [
+                    distinctId,
+                ])
             } catch {}
         }
 
@@ -465,7 +454,7 @@ export class EventsProcessor {
             if (elements && elements.length > 0) {
                 elementsHash = await this.db.createElementGroup(elements, team.id)
             }
-            const insertResult = await this.db.postgresQuery(
+            await this.db.postgresQuery(
                 'INSERT INTO posthog_event (created_at, event, distinct_id, properties, team_id, timestamp, elements, elements_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
                 [
                     data.createdAt,
@@ -478,7 +467,6 @@ export class EventsProcessor {
                     elementsHash,
                 ]
             )
-            const eventCreated = insertResult.rows[0] as Event
         }
 
         this.celery.sendTask('ee.tasks.webhooks_ee.post_event_to_webhook_ee', [
