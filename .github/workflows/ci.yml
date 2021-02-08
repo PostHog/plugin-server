@@ -108,8 +108,9 @@ jobs:
             pgbouncer:
                 image: edoburu/pgbouncer:1.12.0
                 env:
-                    DATABASE_URL: 'postgres://postgres:postgres@localhost:5439/test_posthog'
-                ports: ['5432:5432']
+                    DATABASE_URL: 'postgres://posthog:posthog@db:5432/posthog'
+                    PGBOUNCER_AUTH_TYPE: 'md5'
+                ports: ['6439:5432']
             postgres:
                 image: postgres:12
                 env:
