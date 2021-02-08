@@ -122,7 +122,7 @@ export async function getFirstTeam(server: PluginsServer): Promise<Team> {
     return (await getTeams(server))[0]
 }
 
-export function onQuery(server: PluginsServer, callback: (queryText: string) => any) {
+export function onQuery(server: PluginsServer, callback: (queryText: string) => any): void {
     function countQueryCalls(client: any, count: (queryText: string) => void) {
         const query = client.query.bind(client)
         client.query = (queryText: any, values?: any, callback?: any): any => {
