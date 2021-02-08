@@ -53,7 +53,9 @@ export class DB {
         const client = await this.postgres.connect()
         try {
             await client.query('BEGIN')
-            return await transaction(client)
+            const response = await transaction(client)
+            await client.query('COMMIT')
+            return response
         } catch (e) {
             await client.query('ROLLBACK')
             throw e
