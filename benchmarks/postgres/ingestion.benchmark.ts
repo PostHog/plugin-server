@@ -1,12 +1,13 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
-import { performance } from 'perf_hooks'
-import { LogLevel, PluginsServer, SessionRecordingEvent, Team } from '../../src/types'
-import { getFirstTeam, resetTestDatabase } from '../../tests/helpers/sql'
-import { EventsProcessor } from '../../src/ingestion/process-event'
 import { DateTime } from 'luxon'
-import { createServer } from '../../src/server'
-import { UUIDT } from '../../src/utils'
+import { performance } from 'perf_hooks'
+
 import { IEvent } from '../../src/idl/protos'
+import { EventsProcessor } from '../../src/ingestion/process-event'
+import { createServer } from '../../src/server'
+import { LogLevel, PluginsServer, SessionRecordingEvent, Team } from '../../src/types'
+import { UUIDT } from '../../src/utils'
+import { getFirstTeam, resetTestDatabase } from '../../tests/helpers/sql'
 
 jest.mock('../../src/sql')
 jest.setTimeout(600000) // 600 sec timeout

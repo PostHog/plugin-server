@@ -1,13 +1,14 @@
-import { LogLevel, PluginsServerConfig, Queue } from '../../src/types'
-import { resetTestDatabase } from '../../tests/helpers/sql'
-import { startPluginsServer } from '../../src/server'
-import { makePiscina } from '../../src/worker/piscina'
-import { PluginsServer } from '../../src/types'
-import { createPosthog, DummyPostHog } from '../../src/extensions/posthog'
-import { pluginConfig39 } from '../../tests/helpers/plugins'
-import { delay, UUIDT } from '../../src/utils'
-import { delayUntilEventIngested } from '../../tests/shared/process-event'
 import { performance } from 'perf_hooks'
+
+import { createPosthog, DummyPostHog } from '../../src/extensions/posthog'
+import { startPluginsServer } from '../../src/server'
+import { LogLevel, PluginsServerConfig, Queue } from '../../src/types'
+import { PluginsServer } from '../../src/types'
+import { delay, UUIDT } from '../../src/utils'
+import { makePiscina } from '../../src/worker/piscina'
+import { pluginConfig39 } from '../../tests/helpers/plugins'
+import { resetTestDatabase } from '../../tests/helpers/sql'
+import { delayUntilEventIngested } from '../../tests/shared/process-event'
 
 jest.setTimeout(600000) // 10min timeout
 
