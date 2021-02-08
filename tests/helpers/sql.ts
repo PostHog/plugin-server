@@ -136,8 +136,11 @@ export function onQuery(server: PluginsServer, callback: (queryText: string) => 
     const postgresTransaction = server.db.postgresTransaction.bind(server.db)
     server.db.postgresTransaction = async (transaction: (client: PoolClient) => Promise<any>): Promise<any> => {
         return await postgresTransaction(async (client: PoolClient) => {
+            const query = client.query
             countQueryCalls(client, callback)
-            return await transaction(client)
+            const response = await transaction(client)
+            client.query = query
+            return response
         })
     }
 }
