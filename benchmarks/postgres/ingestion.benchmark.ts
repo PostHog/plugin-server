@@ -8,6 +8,7 @@ import { createServer } from '../../src/server'
 import { LogLevel, PluginsServer, SessionRecordingEvent, Team } from '../../src/types'
 import { UUIDT } from '../../src/utils'
 import { getFirstTeam, resetTestDatabase } from '../../tests/helpers/sql'
+import { endLog,startLog } from '../utils'
 
 jest.mock('../../src/sql')
 jest.setTimeout(600000) // 600 sec timeout
@@ -19,8 +20,8 @@ describe('ingestion benchmarks', () => {
     let eventsProcessor: EventsProcessor
     let now = DateTime.utc()
 
-    function processOneEvent(): Promise<IEvent | SessionRecordingEvent> {
-        return eventsProcessor.processEvent(
+    async function processOneEvent(): Promise<IEvent | SessionRecordingEvent> {
+        return await eventsProcessor.processEvent(
             'my_id',
             '127.0.0.1',
             'http://localhost',
@@ -64,25 +65,27 @@ describe('ingestion benchmarks', () => {
 
     test('basic sequential ingestion', async () => {
         const count = 3000
-        const startTime = performance.now()
+
+        startLog('Postgres', 'Await Ingested', 'event', 'events')
+
         for (let i = 0; i < count; i++) {
             await processOneEvent()
         }
-        const timeMs = performance.now() - startTime
-        const n = (n: number) => `${Math.round(n * 100) / 100}`
-        console.log(`Ingested ${count} events in ${n(timeMs / 1000)}s (${n(timeMs / count)}ms per event)`)
+
+        endLog(count)
     })
 
     test('basic parallel ingestion', async () => {
         const count = 3000
-        const startTime = performance.now()
         const promises = []
+
+        startLog('Postgres', 'Promise.all Ingested', 'event', 'events')
+
         for (let i = 0; i < count; i++) {
             promises.push(processOneEvent())
         }
         await Promise.all(promises)
-        const timeMs = performance.now() - startTime
-        const n = (n: number) => `${Math.round(n * 100) / 100}`
-        console.log(`Ingested ${count} events in ${n(timeMs / 1000)}s (${n(timeMs / count)}ms per event)`)
+
+        endLog(count)
     })
 })
