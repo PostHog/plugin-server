@@ -1,5 +1,6 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import { DateTime } from 'luxon'
+import os from 'os'
 import { performance } from 'perf_hooks'
 
 import { IEvent } from '../../src/idl/protos'
@@ -8,7 +9,8 @@ import { createServer } from '../../src/server'
 import { LogLevel, PluginsServer, SessionRecordingEvent, Team } from '../../src/types'
 import { UUIDT } from '../../src/utils'
 import { getFirstTeam, resetTestDatabase } from '../../tests/helpers/sql'
-import { endLog,startLog } from '../utils'
+import { endLog, startLog } from './helpers/log'
+import { ingestCountEvents, setupPiscina } from './helpers/piscina'
 
 jest.mock('../../src/sql')
 jest.setTimeout(600000) // 600 sec timeout
@@ -87,5 +89,41 @@ describe('ingestion benchmarks', () => {
         await Promise.all(promises)
 
         endLog(count)
+    })
+
+    test('piscina ingestion', async () => {
+        const coreCount = os.cpus().length
+        const workerThreads = [1, 2, 4, 8, 12, 16].filter((threads) => threads <= coreCount)
+        const rounds = 1
+
+        const events = 10000
+
+        const result: Record<string, any> = {
+            coreCount,
+            events,
+        }
+
+        const results = []
+        for (const threads of workerThreads) {
+            await resetTestDatabase('const processEvent = e => e')
+            const piscina = setupPiscina(threads, 10)
+
+            // warmup
+            await ingestCountEvents(piscina, threads * 4)
+
+            // start
+            const startTime = performance.now()
+            for (let i = 0; i < rounds; i++) {
+                await ingestCountEvents(piscina, events)
+            }
+            result[`${threads} thread${threads === 1 ? '' : 's'}`] = Math.round(
+                1000 / ((performance.now() - startTime) / events / rounds)
+            )
+
+            await piscina.destroy()
+            console.log(JSON.stringify({ result }, null, 2))
+        }
+        results.push(result)
+        console.table(results)
     })
 })
