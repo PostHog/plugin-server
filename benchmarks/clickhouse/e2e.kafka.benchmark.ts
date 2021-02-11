@@ -21,6 +21,7 @@ const extraServerConfig: Partial<PluginsServerConfig> = {
     WORKER_CONCURRENCY: 4,
     PLUGIN_SERVER_INGESTION: true,
     KAFKA_CONSUMPTION_TOPIC: KAFKA_EVENTS_PLUGIN_INGESTION,
+    KAFKA_BATCH_PARALELL_PROCESSING: true,
     LOG_LEVEL: LogLevel.Log,
 }
 
@@ -32,10 +33,13 @@ describe('e2e kafka & clickhouse benchmark', () => {
 
     beforeEach(async () => {
         await resetTestDatabase(`
-            async function processEvent (event) {
-                event.properties.processed = 'hell yes'
-                event.properties.upperUuid = event.properties.uuid?.toUpperCase()
-                return event
+            async function processEventBatch (batch) {
+                // console.log(\`Received batch of \${batch.length} events\`)
+                return batch.map(event => {
+                    event.properties.processed = 'hell yes'
+                    event.properties.upperUuid = event.properties.uuid?.toUpperCase()
+                    return event
+                })
             }
         `)
         await resetKafka(extraServerConfig)
