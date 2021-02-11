@@ -1,6 +1,6 @@
 # PostHog Plugin Server
 
-[![npm package](https://img.shields.io/npm/v/posthog-plugin-server?style=flat-square)](https://www.npmjs.com/package/posthog-plugin-server)
+[![npm package](https://img.shields.io/npm/v/@posthog/plugin-server?style=flat-square)](https://www.npmjs.com/package/@posthog/plugin-server)
 [![MIT License](https://img.shields.io/badge/License-MIT-red.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
 This service takes care of processing events with plugins and more.
@@ -59,6 +59,11 @@ There's a multitude of settings you can use to control the plugin server. Use th
 | STATSD_HOST                   | StatsD host - integration disabled if this is not provided          | `null`                                |
 | STATSD_PORT                   | StatsD port                                                         | `8125`                                |
 | STATSD_PREFIX                 | StatsD prefix                                                       | `'plugin-server.'`                    |
+
+
+## Releasing a new version
+
+It's magic! Just bump up `version` in `package.json` on the main branch and the new version will be published automatically, on GitHub and on npm. Courtesy of GitHub Actions.
 
 ## Questions?
 
