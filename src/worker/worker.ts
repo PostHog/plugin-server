@@ -44,12 +44,7 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
             response = cloneObject(server.pluginSchedule)
         }
         if (task === 'ingestEvent') {
-            try {
-                await ingestEvent(server, args.event)
-                response = { success: true }
-            } catch (e) {
-                response = { error: cloneObject(e.message) }
-            }
+            response = cloneObject(await ingestEvent(server, args.event))
         }
         if (task.startsWith('runEvery')) {
             const { pluginConfigId } = args
