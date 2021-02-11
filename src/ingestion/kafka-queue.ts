@@ -4,7 +4,7 @@ import { Consumer, EachBatchPayload, Kafka, Message } from 'kafkajs'
 import { PluginsServer, Queue, RawEventMessage } from 'types'
 
 import { status } from '../status'
-import { killGracefully } from '../utils'
+import { killGracefully, runInParallelBatches } from '../utils'
 
 export class KafkaQueue implements Queue {
     private pluginsServer: PluginsServer
@@ -51,7 +51,16 @@ export class KafkaQueue implements Queue {
             }
         })
 
-        const processedEvents = await this.processEventBatch(pluginEvents)
+        const maxBatchSize = Math.max(
+            1,
+            Math.min(
+                100,
+                Math.ceil(
+                    pluginEvents.length / this.pluginsServer.WORKER_CONCURRENCY / this.pluginsServer.TASKS_PER_WORKER
+                )
+            )
+        )
+        const processedEvents = await runInParallelBatches(pluginEvents, maxBatchSize, this.processEventBatch)
 
         // Sort in the original order that the events came in, putting any randomly added events to the end.
         // This is so we would resolve the correct kafka offsets in order.
