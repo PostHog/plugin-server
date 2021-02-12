@@ -132,6 +132,7 @@ jobs:
 
             - name: Create main repo pull request
               if: steps.version.outputs.IS_NEW_VERSION == 'true'
+              id: main-repo-pr
               uses: peter-evans/create-pull-request@v3
               with:
                   path: posthog/
@@ -145,4 +146,4 @@ jobs:
             - name: Output pull request result
               if: steps.version.outputs.IS_NEW_VERSION == 'true'
               run: |
-                  echo "PostHog pull request for plugin server version ${{ steps.version.outputs.PACKAGE_VERSION }} ready: ${{ steps.cpr.outputs.pull-request-url }}"
+                  echo "PostHog pull request for plugin server version ${{ steps.version.outputs.PACKAGE_VERSION }} ready: ${{ steps.main-repo-pr.outputs.pull-request-url }}"
