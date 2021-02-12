@@ -141,7 +141,12 @@ jobs:
                   branch: plugin-server-${{ steps.version.outputs.PACKAGE_VERSION_TAG }}
                   delete-branch: true
                   title: Update plugin server to ${{ steps.version.outputs.PACKAGE_VERSION }}
-                  body: "[`@posthog/plugin-server`](https://www.npmjs.com/package/@posthog/plugin-server) version ${{ steps.version.outputs.PACKAGE_VERSION }} has been released. This updates PostHog to use it."
+                  body: |
+                      ## Changes
+
+                      Plugin server version ${{ steps.version.outputs.PACKAGE_VERSION }} has been released. This updates PostHog to use it.
+
+                      [npm releases](https://www.npmjs.com/package/@posthog/plugin-server?activeTab=version) • [GitHub releases](https://github.com/PostHog/plugin-server/releases) • [commit history](https://github.com/PostHog/plugin-server/commits/)
 
             - name: Output pull request result
               if: steps.version.outputs.IS_NEW_VERSION == 'true'
