@@ -87,7 +87,11 @@ export class KafkaQueue implements Queue {
                 await this.saveEvent(event)
                 this.pluginsServer.statsd?.timing('kafka_queue.single_ingestion', singleIngestionTimer)
             }
-            const batches = groupIntoBatches(processedEvents, 100)
+            const maxIngestionBatch = Math.max(
+                this.pluginsServer.WORKER_CONCURRENCY * this.pluginsServer.TASKS_PER_WORKER,
+                100
+            )
+            const batches = groupIntoBatches(processedEvents, maxIngestionBatch)
             for (const batch of batches) {
                 await Promise.all(batch.map(ingestOneEvent))
                 const offset = uuidOffset.get(batch[batch.length - 1].uuid!)
