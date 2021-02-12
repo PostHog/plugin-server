@@ -3,6 +3,7 @@ import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import { Producer } from 'kafkajs'
 import { DateTime, Duration } from 'luxon'
+import * as fetch from 'node-fetch'
 import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
 
 import Client from '../celery/client'
@@ -38,7 +39,7 @@ export class EventsProcessor {
         this.clickhouse = pluginsServer.clickhouse!
         this.kafkaProducer = pluginsServer.kafkaProducer!
         this.celery = new Client(pluginsServer.redis, pluginsServer.CELERY_DEFAULT_QUEUE)
-        this.posthog = nodePostHog('sTMFPsFhdP1Ssg')
+        this.posthog = nodePostHog('sTMFPsFhdP1Ssg', { fetch })
         if (process.env.NODE_ENV === 'test') {
             this.posthog.optOut()
         }
