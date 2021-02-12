@@ -131,6 +131,7 @@ jobs:
                   yarn
 
             - name: Create main repo pull request
+              if: steps.version.outputs.IS_NEW_VERSION == 'true'
               uses: peter-evans/create-pull-request@v3
               with:
                   path: posthog/
@@ -142,5 +143,6 @@ jobs:
                   body: "[`@posthog/plugin-server`](https://www.npmjs.com/package/@posthog/plugin-server) version ${{ steps.version.outputs.PACKAGE_VERSION }} has been released. This updates PostHog to use it."
 
             - name: Output pull request result
+              if: steps.version.outputs.IS_NEW_VERSION == 'true'
               run: |
                   echo "PostHog pull request for plugin server version ${{ steps.version.outputs.PACKAGE_VERSION }} ready: ${{ steps.cpr.outputs.pull-request-url }}"
