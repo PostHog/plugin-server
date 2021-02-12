@@ -188,10 +188,14 @@ export async function startPluginsServer(
     config: Partial<PluginsServerConfig>,
     makePiscina: (config: PluginsServerConfig) => Piscina
 ): Promise<ServerInstance> {
-    status.info('⚡', `posthog-plugin-server v${version}`)
-    status.info('ℹ️', `${config.WORKER_CONCURRENCY} workers with ${config.TASKS_PER_WORKER} tasks per worker`)
+    const serverConfig: PluginsServerConfig = {
+        ...defaultConfig,
+        ...config,
+    }
 
-    let serverConfig: PluginsServerConfig | undefined
+    status.info('⚡', `posthog-plugin-server v${version}`)
+    status.info('ℹ️', `${serverConfig.WORKER_CONCURRENCY} workers, ${serverConfig.TASKS_PER_WORKER} tasks per worker`)
+
     let pubSub: Redis.Redis | undefined
     let server: PluginsServer | undefined
     let fastifyInstance: FastifyInstance | undefined
@@ -238,10 +242,6 @@ export async function startPluginsServer(
     }
 
     try {
-        serverConfig = {
-            ...defaultConfig,
-            ...config,
-        }
         ;[server, closeServer] = await createServer(serverConfig, null)
 
         piscina = makePiscina(serverConfig)
