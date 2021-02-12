@@ -66,7 +66,7 @@ export class KafkaQueue implements Queue {
             `Took too long to run plugins on ${pluginEvents.length} events! Timeout after 30 sec!`
         )
         const processedEvents = await runInParallelBatches(pluginEvents, maxBatchSize, this.processEventBatch)
-        window.clearTimeout(processingTimeout)
+        clearTimeout(processingTimeout)
 
         // Sort in the original order that the events came in, putting any randomly added events to the end.
         // This is so we would resolve the correct kafka offsets in order.
@@ -109,7 +109,7 @@ export class KafkaQueue implements Queue {
             }
         }
 
-        window.clearTimeout(ingestionTimeout)
+        clearTimeout(ingestionTimeout)
 
         this.pluginsServer.statsd?.timing('kafka_queue.each_batch', batchProcessingTimer)
         resolveOffset(batch.lastOffset())
