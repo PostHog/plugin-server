@@ -334,6 +334,10 @@ export class EventsProcessor {
         const teamQueryResult = await this.db.postgresQuery('SELECT * FROM posthog_team WHERE id = $1', [teamId])
         const team: Team = teamQueryResult.rows[0]
 
+        if (!team) {
+            throw new Error(`No team found with ID ${teamId}. Can't ingest event.`)
+        }
+
         if (!team.anonymize_ips && !('$ip' in properties)) {
             properties['$ip'] = ip
         }
