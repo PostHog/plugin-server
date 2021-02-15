@@ -30,7 +30,7 @@ export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig)
             if (!server.kafkaProducer) {
                 throw new Error('kafkaProducer not configured!')
             }
-            server.kafkaProducer.send({
+            await server.kafkaProducer.send({
                 topic: server.KAFKA_CONSUMPTION_TOPIC!,
                 messages: [
                     {

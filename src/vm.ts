@@ -1,3 +1,4 @@
+import { transform } from '@babel/standalone'
 import fetch from 'node-fetch'
 import { VM } from 'vm2'
 
@@ -16,6 +17,18 @@ export async function createPluginConfigVM(
 ): Promise<PluginConfigVMReponse> {
     const vm = new VM({
         sandbox: {},
+    })
+
+    const { code } = transform(`${libJs};${indexJs}`, {
+        envName: 'production',
+        filename: undefined,
+        cwd: undefined,
+        code: true,
+        ast: false,
+        sourceMaps: false,
+        babelrc: false,
+        configFile: false,
+        presets: [['env', { targets: { node: process.versions.node } }]],
     })
 
     // our own stuff
@@ -53,8 +66,7 @@ export async function createPluginConfigVM(
         const __getExported = (key) => __getExportDestinations().find(a => a[key])?.[key];
 
         // the plugin JS code
-        ${libJs};
-        ${indexJs};
+        ${code};
 
         // inject the meta object + shareable 'global' to the end of each exported function
         const __pluginMeta = {
