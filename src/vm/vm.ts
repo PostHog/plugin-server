@@ -9,6 +9,7 @@ import { createGoogle } from './extensions/google'
 import { createPosthog } from './extensions/posthog'
 import { createStorage } from './extensions/storage'
 import { loopTimeout } from './transforms/loop-timeout'
+import { promiseTimeout } from './transforms/promise-timeout'
 
 export async function createPluginConfigVM(
     server: PluginsServer,
@@ -27,7 +28,7 @@ export async function createPluginConfigVM(
         babelrc: false,
         configFile: false,
         presets: [['env', { targets: { node: process.versions.node } }]],
-        plugins: [loopTimeout(server)],
+        plugins: [loopTimeout(server), promiseTimeout(server)],
     })
 
     // create virtual machine
@@ -47,6 +48,19 @@ export async function createPluginConfigVM(
     if (process.env.NODE_ENV === 'test') {
         vm.freeze(setTimeout, '__jestSetTimeout')
     }
+
+    vm.freeze(async (promise: () => Promise<any>) => {
+        const timeout = server.TASK_TIMEOUT
+        const message = `Script execution timed out after promise waited for ${timeout} second${
+            timeout === 1 ? '' : 's'
+        }`
+        const response = await Promise.race([
+            promise,
+            new Promise((resolve, reject) => setTimeout(() => reject(new Error(message)), timeout * 1000)),
+        ])
+        return response
+    }, '__asyncGuard')
+
     vm.freeze(
         {
             cache: createCache(
@@ -60,6 +74,7 @@ export async function createPluginConfigVM(
         },
         '__pluginHostMeta'
     )
+
     vm.run(
         `
         // two ways packages could export themselves (plus "global")
@@ -69,6 +84,7 @@ export async function createPluginConfigVM(
         // helpers to get globals
         const __getExportDestinations = () => [exports, module.exports, global]
         const __getExported = (key) => __getExportDestinations().find(a => a[key])?.[key];
+        const __asyncFunctionGuard = (func) => (...args) => __asyncGuard(func(...args))
 
         // the plugin JS code
         ${code};
@@ -111,8 +127,8 @@ export async function createPluginConfigVM(
 
         // export various functions
         const __methods = {
-            processEvent: __bindMeta('processEvent'),
-            processEventBatch: __bindMeta('processEventBatch')
+            processEvent: __asyncFunctionGuard(__bindMeta('processEvent')),
+            processEventBatch: __asyncFunctionGuard(__bindMeta('processEventBatch'))
         };
 
         // gather the runEveryX commands and export in __tasks

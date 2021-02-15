@@ -204,13 +204,17 @@ describe('vm timeout tests', () => {
         expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3')
     })
 
-    test.skip('small promises', async () => {
+    test('small promises', async () => {
         const indexJs = `
             async function processEvent (event, meta) {
-                await new Promise(resolve => __jestSetTimeout(() => resolve(), 1000))
-                await new Promise(resolve => __jestSetTimeout(() => resolve(), 1000))
-                await new Promise(resolve => __jestSetTimeout(() => resolve(), 1000))
-                await new Promise(resolve => __jestSetTimeout(() => resolve(), 1000))
+                const data = await fetch('https://www.example.com').then(response => response.json()).then(data => {
+                    return data
+                })
+
+                await new Promise(resolve => __jestSetTimeout(() => resolve(), 800))
+                await new Promise(resolve => __jestSetTimeout(() => resolve(), 800))
+                await new Promise(resolve => __jestSetTimeout(() => resolve(), 800))
+                await new Promise(resolve => __jestSetTimeout(() => resolve(), 800))
 
                 event.properties.processed = 'yup'
                 return event
@@ -218,16 +222,19 @@ describe('vm timeout tests', () => {
         `
         await resetTestDatabase(indexJs)
         const vm = await createPluginConfigVM(server, pluginConfig39, indexJs)
+        const date = new Date()
         let errorMessage = undefined
         try {
             await vm.methods.processEvent({ ...defaultEvent })
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('Long Promise Timeout')
+        expect(new Date().valueOf() - date.valueOf()).toBeGreaterThan(1000)
+        expect(new Date().valueOf() - date.valueOf()).toBeLessThan(4000)
+        expect(errorMessage!).toEqual('Script execution timed out after promise waited for 1 second')
     })
 
-    test.skip('long promise', async () => {
+    test('long promise', async () => {
         const indexJs = `
             async function processEvent (event, meta) {
                 await new Promise(resolve => __jestSetTimeout(() => resolve(), 4000))
@@ -243,6 +250,6 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('Long Promise Timeout')
+        expect(errorMessage!).toEqual('Script execution timed out after promise waited for 1 second')
     })
 })
