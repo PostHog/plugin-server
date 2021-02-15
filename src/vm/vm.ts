@@ -8,6 +8,7 @@ import { createConsole } from './extensions/console'
 import { createGoogle } from './extensions/google'
 import { createPosthog } from './extensions/posthog'
 import { createStorage } from './extensions/storage'
+import { whileLoopTimeout } from './transforms/while'
 
 export async function createPluginConfigVM(
     server: PluginsServer,
@@ -30,6 +31,7 @@ export async function createPluginConfigVM(
         babelrc: false,
         configFile: false,
         presets: [['env', { targets: { node: process.versions.node } }]],
+        plugins: [whileLoopTimeout(server.TASK_TIMEOUT)],
     })
 
     // our own stuff
