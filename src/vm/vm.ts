@@ -2,12 +2,12 @@ import { transform } from '@babel/standalone'
 import fetch from 'node-fetch'
 import { VM } from 'vm2'
 
+import { PluginConfig, PluginConfigVMReponse, PluginsServer } from '../types'
 import { createCache } from './extensions/cache'
 import { createConsole } from './extensions/console'
 import { createGoogle } from './extensions/google'
 import { createPosthog } from './extensions/posthog'
 import { createStorage } from './extensions/storage'
-import { PluginConfig, PluginConfigVMReponse, PluginsServer } from './types'
 
 export async function createPluginConfigVM(
     server: PluginsServer,

@@ -2,9 +2,9 @@ import { Properties } from '@posthog/plugin-scaffold'
 import { DateTime } from 'luxon'
 import { PluginConfig, PluginsServer, RawEventMessage } from 'types'
 
-import Client from '../celery/client'
-import { UUIDT } from '../utils'
-import { version } from '../version'
+import Client from '../../celery/client'
+import { UUIDT } from '../../utils'
+import { version } from '../../version'
 
 interface InternalData {
     distinct_id: string
