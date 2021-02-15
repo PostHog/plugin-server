@@ -21,7 +21,8 @@ export async function createPluginConfigVM(
         sandbox: {},
     })
 
-    const { code } = transform(`${libJs};${indexJs}`, {
+    const source = libJs ? `${libJs};${indexJs}` : indexJs
+    const { code } = transform(source, {
         envName: 'production',
         filename: undefined,
         cwd: undefined,
