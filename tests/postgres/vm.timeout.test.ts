@@ -31,7 +31,7 @@ describe('vm timeout tests', () => {
     test('while loop', async () => {
         const indexJs = `
             async function processEvent (event, meta) {
-                while(1){}
+                while(1) {}
                 event.properties.processed = 'yup'
                 return event
             }
@@ -44,7 +44,27 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('While Loop Timeout')
+        expect(errorMessage!).toEqual('1 second loop timeout on line 3')
+    })
+
+    test('while loop no body', async () => {
+        const indexJs = `
+            async function processEvent (event, meta) {
+                let i = 0
+                while(1) i++;
+                event.properties.processed = 'yup'
+                return event
+            }
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(server, pluginConfig39, indexJs)
+        let errorMessage = undefined
+        try {
+            await vm.methods.processEvent({ ...defaultEvent })
+        } catch (e) {
+            errorMessage = e.message
+        }
+        expect(errorMessage!).toEqual('1 second loop timeout on line 4')
     })
 
     test('while loop in promise', async () => {
@@ -63,10 +83,10 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('While Loop Timeout')
+        expect(errorMessage!).toEqual('1 second loop timeout on line 3')
     })
 
-    test.skip('do..while loop', async () => {
+    test('do..while loop', async () => {
         const indexJs = `
             async function processEvent (event, meta) {
                 do {} while (true);
@@ -82,10 +102,30 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('While Loop Timeout')
+        expect(errorMessage!).toEqual('1 second loop timeout on line 3')
     })
 
-    test.skip('do..while loop in promise', async () => {
+    test('do..while loop no body', async () => {
+        const indexJs = `
+            async function processEvent (event, meta) {
+                let i = 0;
+                do i++; while (true);
+                event.properties.processed = 'yup'
+                return event
+            }
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(server, pluginConfig39, indexJs)
+        let errorMessage = undefined
+        try {
+            await vm.methods.processEvent({ ...defaultEvent })
+        } catch (e) {
+            errorMessage = e.message
+        }
+        expect(errorMessage!).toEqual('1 second loop timeout on line 4')
+    })
+
+    test('do..while loop in promise', async () => {
         const indexJs = `
             async function processEvent (event, meta) {
                 await Promise.resolve().then(() => { do {} while (true); })
@@ -101,13 +141,13 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('While Loop Timeout')
+        expect(errorMessage!).toEqual('1 second loop timeout on line 3')
     })
 
-    test.skip('for loop', async () => {
+    test('for loop', async () => {
         const indexJs = `
             async function processEvent (event, meta) {
-                for(let i = 0; i > 1; i--){}
+                for(let i = 0; i < 1; i--) {}
                 event.properties.processed = 'yup'
                 return event
             }
@@ -120,13 +160,14 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('While Loop Timeout')
+        expect(errorMessage!).toEqual('1 second loop timeout on line 3')
     })
 
-    test.skip('for loop in promise', async () => {
+    test('for loop no body', async () => {
         const indexJs = `
             async function processEvent (event, meta) {
-                await Promise.resolve().then(() => { for(let i = 0; i > 1; i--){}; })
+                let a = 0
+                for(let i = 0; i < 1; i--) a++
                 event.properties.processed = 'yup'
                 return event
             }
@@ -139,7 +180,26 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('While Loop Timeout')
+        expect(errorMessage!).toEqual('1 second loop timeout on line 4')
+    })
+
+    test('for loop in promise', async () => {
+        const indexJs = `
+            async function processEvent (event, meta) {
+                await Promise.resolve().then(() => { for(let i = 0; i < 1; i--) {}; })
+                event.properties.processed = 'yup'
+                return event
+            }
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(server, pluginConfig39, indexJs)
+        let errorMessage = undefined
+        try {
+            await vm.methods.processEvent({ ...defaultEvent })
+        } catch (e) {
+            errorMessage = e.message
+        }
+        expect(errorMessage!).toEqual('1 second loop timeout on line 3')
     })
 
     test.skip('long promise', async () => {
@@ -158,6 +218,6 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('While Loop Timeout')
+        expect(errorMessage!).toEqual('Long Promise Timeout')
     })
 })
