@@ -1,4 +1,4 @@
-import ClickHouse from '@posthog/clickhouse'
+import * as ClickHouse from '@posthog/clickhouse'
 
 import { defaultConfig } from '../../src/config'
 import { PluginsServerConfig } from '../../src/types'

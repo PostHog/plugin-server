@@ -1,10 +1,10 @@
 import { performance } from 'perf_hooks'
 
-import { createPosthog, DummyPostHog } from '../../src/extensions/posthog'
 import { startPluginsServer } from '../../src/server'
 import { LogLevel, PluginsServerConfig, Queue } from '../../src/types'
 import { PluginsServer } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
+import { createPosthog, DummyPostHog } from '../../src/vm/extensions/posthog'
 import { makePiscina } from '../../src/worker/piscina'
 import { pluginConfig39 } from '../../tests/helpers/plugins'
 import { resetTestDatabase } from '../../tests/helpers/sql'
