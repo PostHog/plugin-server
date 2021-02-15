@@ -16,11 +16,6 @@ export async function createPluginConfigVM(
     indexJs: string,
     libJs = ''
 ): Promise<PluginConfigVMReponse> {
-    const vm = new VM({
-        timeout: server.TASK_TIMEOUT * 1000,
-        sandbox: {},
-    })
-
     const source = libJs ? `${libJs};${indexJs}` : indexJs
     const { code } = transform(source, {
         envName: 'production',
@@ -33,6 +28,12 @@ export async function createPluginConfigVM(
         configFile: false,
         presets: [['env', { targets: { node: process.versions.node } }]],
         plugins: [loopTimeout(server)],
+    })
+
+    // create virtual machine
+    const vm = new VM({
+        timeout: server.TASK_TIMEOUT * 1000 + 1,
+        sandbox: {},
     })
 
     // our own stuff
