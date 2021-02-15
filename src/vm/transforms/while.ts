@@ -25,7 +25,9 @@ export const whileLoopTimeout = (timeoutSeconds: number) => (babel: any) => {
                             t.callExpression(t.memberExpression(t.identifier('Date'), t.identifier('now')), []),
                             lhs
                         ),
-                        t.throwStatement(t.stringLiteral('While Loop Timeout')),
+                        t.throwStatement(
+                            t.NewExpression(t.identifier('Error'), [t.stringLiteral('While Loop Timeout')])
+                        ),
                         null
                     )
                 )
