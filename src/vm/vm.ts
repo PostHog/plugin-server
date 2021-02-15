@@ -16,6 +16,7 @@ export async function createPluginConfigVM(
     libJs = ''
 ): Promise<PluginConfigVMReponse> {
     const vm = new VM({
+        timeout: server.TASK_TIMEOUT * 1000,
         sandbox: {},
     })
 
