@@ -18,7 +18,7 @@ const generateInside = ({ t, id, line, ch, timeout }: any = {}) => {
                 t.callExpression(t.memberExpression(t.identifier('Date'), t.identifier('now')), []),
                 id
             ),
-            t.numericLiteral(timeout)
+            t.numericLiteral(timeout * 1000)
         ),
         t.throwStatement(
             t.NewExpression(t.identifier('Error'), [t.stringLiteral(`${timeout} second loop timeout on line ${line}`)])

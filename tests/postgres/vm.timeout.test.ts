@@ -38,12 +38,14 @@ describe('vm timeout tests', () => {
         `
         await resetTestDatabase(indexJs)
         const vm = await createPluginConfigVM(server, pluginConfig39, indexJs)
+        const date = new Date()
         let errorMessage = undefined
         try {
             await vm.methods.processEvent({ ...defaultEvent })
         } catch (e) {
             errorMessage = e.message
         }
+        expect(new Date().valueOf() - date.valueOf()).toBeGreaterThan(1000)
         expect(errorMessage!).toEqual('1 second loop timeout on line 3')
     })
 
