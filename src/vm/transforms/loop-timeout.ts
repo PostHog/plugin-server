@@ -21,7 +21,13 @@ const generateInside = ({ t, id, line, ch, timeout }: any = {}) => {
             t.numericLiteral(timeout * 1000)
         ),
         t.throwStatement(
-            t.NewExpression(t.identifier('Error'), [t.stringLiteral(`${timeout} second loop timeout on line ${line}`)])
+            t.NewExpression(t.identifier('Error'), [
+                t.stringLiteral(
+                    `Script execution timed out after looping for ${timeout} second${
+                        timeout === 1 ? '' : 's'
+                    } on line ${line}`
+                ),
+            ])
         )
     )
 }
