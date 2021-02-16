@@ -81,13 +81,13 @@ export async function createPluginConfigVM(
         const module = { exports: {} };
         let exports = {};
 
+        // the plugin JS code
+        ${code};
+
         // helpers to get globals
         const __getExportDestinations = () => [exports, module.exports, global]
         const __getExported = (key) => __getExportDestinations().find(a => a[key])?.[key];
-        const __asyncFunctionGuard = (func) => (...args) => __asyncGuard(func(...args))
-
-        // the plugin JS code
-        ${code};
+        const __asyncFunctionGuard = (func) => func ? (...args) => __asyncGuard(func(...args)) : func
 
         // inject the meta object + shareable 'global' to the end of each exported function
         const __pluginMeta = {
@@ -146,11 +146,11 @@ export async function createPluginConfigVM(
         }
 
         // run the plugin setup script, if present
-        const __setupPlugin = async () => __callWithMeta('setupPlugin');
+        const __setupPlugin = __asyncFunctionGuard(async () => __callWithMeta('setupPlugin'));
         `
     )
 
-    await vm.run('__setupPlugin')()
+    await vm.run('__setupPlugin()')
 
     return {
         vm,
