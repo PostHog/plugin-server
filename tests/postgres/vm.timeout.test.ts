@@ -45,7 +45,7 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(new Date().valueOf() - date.valueOf()).toBeGreaterThan(1000)
+        expect(new Date().valueOf() - date.valueOf()).toBeGreaterThanOrEqual(1000)
         expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:16')
     })
 
@@ -229,7 +229,7 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(new Date().valueOf() - date.valueOf()).toBeGreaterThan(1000)
+        expect(new Date().valueOf() - date.valueOf()).toBeGreaterThanOrEqual(1000)
         expect(new Date().valueOf() - date.valueOf()).toBeLessThan(4000)
         expect(errorMessage!).toEqual('Script execution timed out after promise waited for 1 second')
     })
@@ -261,7 +261,7 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(new Date().valueOf() - date.valueOf()).toBeGreaterThan(1000)
+        expect(new Date().valueOf() - date.valueOf()).toBeGreaterThanOrEqual(1000)
         expect(new Date().valueOf() - date.valueOf()).toBeLessThan(4000)
         expect(errorMessage!).toEqual('Script execution timed out after promise waited for 1 second')
     })
