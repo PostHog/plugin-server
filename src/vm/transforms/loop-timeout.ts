@@ -25,7 +25,7 @@ const generateInside = ({ t, id, line, ch, timeout }: any = {}) => {
                 t.stringLiteral(
                     `Script execution timed out after looping for ${timeout} second${
                         timeout === 1 ? '' : 's'
-                    } on line ${line}`
+                    } on line ${line}:${ch}`
                 ),
             ])
         )
