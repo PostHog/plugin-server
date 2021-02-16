@@ -2,7 +2,7 @@ import { performance } from 'perf_hooks'
 
 import { KAFKA_EVENTS_PLUGIN_INGESTION } from '../../src/ingestion/topics'
 import { startPluginsServer } from '../../src/server'
-import { LogLevel, PluginsServerConfig, Queue } from '../../src/types'
+import { ClickHouseEvent, LogLevel, PluginsServerConfig, Queue } from '../../src/types'
 import { PluginsServer } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
 import { createPosthog, DummyPostHog } from '../../src/vm/extensions/posthog'
@@ -19,6 +19,7 @@ const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_ENABLED: true,
     KAFKA_HOSTS: process.env.KAFKA_HOSTS || 'kafka:9092',
     WORKER_CONCURRENCY: 4,
+    TASK_TIMEOUT: 10,
     PLUGIN_SERVER_INGESTION: true,
     KAFKA_CONSUMPTION_TOPIC: KAFKA_EVENTS_PLUGIN_INGESTION,
     KAFKA_BATCH_PARALELL_PROCESSING: true,
@@ -26,38 +27,15 @@ const extraServerConfig: Partial<PluginsServerConfig> = {
 }
 
 describe('e2e kafka & clickhouse benchmark', () => {
-    let queue: Queue
-    let server: PluginsServer
-    let stopServer: () => Promise<void>
-    let posthog: DummyPostHog
-
-    beforeEach(async () => {
-        await resetTestDatabase(`
-            async function processEventBatch (batch) {
-                // console.log(\`Received batch of \${batch.length} events\`)
-                return batch.map(event => {
-                    event.properties.processed = 'hell yes'
-                    event.properties.upperUuid = event.properties.uuid?.toUpperCase()
-                    return event
-                })
-            }
-        `)
+    async function measurePerformance(code: string): Promise<[PluginsServer, () => Promise<void>]> {
+        await resetTestDatabase(code)
         await resetKafka(extraServerConfig)
         await resetTestDatabaseClickhouse(extraServerConfig)
 
-        const startResponse = await startPluginsServer(extraServerConfig, makePiscina)
-        server = startResponse.server
-        stopServer = startResponse.stop
-        queue = startResponse.queue
+        const { server, stop: stopServer, queue } = await startPluginsServer(extraServerConfig, makePiscina)
 
-        posthog = createPosthog(server, pluginConfig39)
-    })
+        const posthog = createPosthog(server, pluginConfig39)
 
-    afterEach(async () => {
-        await stopServer()
-    })
-
-    test('measure performance', async () => {
         console.debug = () => null
 
         const count = 3000
@@ -89,7 +67,41 @@ describe('e2e kafka & clickhouse benchmark', () => {
             )} events/sec, ${n(timeMs / count)}ms per event)`
         )
 
+        return [server, stopServer]
+    }
+
+    test('sync batch', async () => {
+        const [server, stopServer] = await measurePerformance(`
+            async function processEventBatch (batch) {
+                console.log(\`Received batch of \${batch.length} events\`)
+                return batch.map(event => {
+                    event.properties.processed = 'hell yes'
+                    event.properties.upperUuid = event.properties.uuid?.toUpperCase()
+                    return event
+                })
+            }
+        `)
+
         const events = await server.db.fetchEvents()
-        expect(events[count - 1].properties.upperUuid).toEqual(events[count - 1].properties.uuid.toUpperCase())
+        expect(events[2999].properties.upperUuid).toEqual(events[2999].properties.uuid.toUpperCase())
+
+        await stopServer()
+    })
+
+    test('bad delay', async () => {
+        // Delay up to 30sec in processEvent, while TASK_TIMEOUT=10
+        // Effectively two thirds of the events should time out
+        const [server, stopServer] = await measurePerformance(`
+            async function processEvent (event) {
+                await new Promise(resolve => __jestSetTimeout(() => resolve(), 30000 * Math.random()))
+                event.properties.timeout = 'no timeout'
+                return event
+            }
+        `)
+        const events = (await server.db.fetchEvents()) as ClickHouseEvent[]
+        const props = events.map((e) => e.properties.timeout)
+        console.log(`${props.filter((p) => p).length} events out of 3000 took under 10sec, the rest were timed out`)
+
+        await stopServer()
     })
 })
