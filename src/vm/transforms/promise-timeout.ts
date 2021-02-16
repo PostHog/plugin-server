@@ -1,10 +1,11 @@
 // inspired by: https://github.com/treywood/babel-plugin-bluebird-async-functions/
+import * as types from '@babel/types'
+
 import { PluginsServer } from '../../types'
 
 const REPLACED = Symbol()
 
-export const promiseTimeout = (server: PluginsServer) => (babel: any) => {
-    const t = babel.types
+export const promiseTimeout = (server: PluginsServer) => ({ types: t }: { types: typeof types }) => {
     return {
         visitor: {
             // changes: bla.then --> __asyncGuard(bla).then
@@ -21,7 +22,7 @@ export const promiseTimeout = (server: PluginsServer) => (babel: any) => {
                             t.callExpression(t.identifier('__asyncGuard'), [node.object]),
                             t.identifier('then')
                         )
-                        newCall[REPLACED] = true
+                        ;(newCall as any)[REPLACED] = true
                         path.replaceWith(newCall)
                     }
                 },
@@ -35,7 +36,7 @@ export const promiseTimeout = (server: PluginsServer) => (babel: any) => {
                         const newAwait = t.awaitExpression(
                             t.callExpression(t.identifier('__asyncGuard'), [node.argument])
                         )
-                        newAwait[REPLACED] = true
+                        ;(newAwait as any)[REPLACED] = true
                         path.replaceWith(newAwait)
                     }
                 },
