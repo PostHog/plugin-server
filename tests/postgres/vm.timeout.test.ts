@@ -234,6 +234,38 @@ describe('vm timeout tests', () => {
         expect(errorMessage!).toEqual('Script execution timed out after promise waited for 1 second')
     })
 
+    test('small promises and overriding async guard', async () => {
+        const indexJs = `
+            // const __asyncGuard = false
+            async function processEvent (event, meta) {
+                const __asyncGuard = (a) => a
+                const data = await fetch('https://www.example.com').then(response => response.json()).then(data => {
+                    return data
+                })
+
+                await new Promise(resolve => __jestSetTimeout(() => resolve(), 800))
+                await new Promise(resolve => __jestSetTimeout(() => resolve(), 800))
+                await new Promise(resolve => __jestSetTimeout(() => resolve(), 800))
+                await new Promise(resolve => __jestSetTimeout(() => resolve(), 800))
+
+                event.properties.processed = 'yup'
+                return event
+            }
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(server, pluginConfig39, indexJs)
+        const date = new Date()
+        let errorMessage = undefined
+        try {
+            await vm.methods.processEvent({ ...defaultEvent })
+        } catch (e) {
+            errorMessage = e.message
+        }
+        expect(new Date().valueOf() - date.valueOf()).toBeGreaterThan(1000)
+        expect(new Date().valueOf() - date.valueOf()).toBeLessThan(4000)
+        expect(errorMessage!).toEqual('Script execution timed out after promise waited for 1 second')
+    })
+
     test('long promise', async () => {
         const indexJs = `
             async function processEvent (event, meta) {

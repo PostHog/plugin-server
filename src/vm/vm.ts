@@ -50,9 +50,9 @@ export async function createPluginConfigVM(
         vm.freeze(setTimeout, '__jestSetTimeout')
     }
 
-    vm.freeze(async (promise: () => Promise<any>) => {
+    const asyncGuard = async (promise: () => Promise<any>) => {
         const timeout = server.TASK_TIMEOUT
-        const response = await Promise.race([
+        return await Promise.race([
             promise,
             new Promise((resolve, reject) =>
                 setTimeout(() => {
@@ -63,8 +63,9 @@ export async function createPluginConfigVM(
                 }, timeout * 1000)
             ),
         ])
-        return response
-    }, '__asyncGuard')
+    }
+
+    vm.freeze(asyncGuard, '__asyncGuard')
 
     vm.freeze(
         {
@@ -92,7 +93,11 @@ export async function createPluginConfigVM(
     const responseVar = `__pluginDetails${randomBytes(64).toString('hex')}`
 
     vm.run(`
-        const ${responseVar} = (() => {
+        if (typeof global.${responseVar} !== 'undefined') {
+            throw new Error("Plugin created variable ${responseVar} that is reserved for the VM.")
+        }
+        let ${responseVar} = undefined;
+        ((__asyncGuard) => {
             // helpers to get globals
             const __getExportDestinations = () => [exports, module.exports, global]
             const __getExported = (key) => __getExportDestinations().find(a => a[key])?.[key];
@@ -157,13 +162,13 @@ export async function createPluginConfigVM(
             // run the plugin setup script, if present
             const __setupPlugin = __asyncFunctionGuard(async () => __callWithMeta('setupPlugin'));
 
-            return {
+            ${responseVar} = {
                 __methods,
                 __tasks,
                 __setupPlugin
             }
-        })();
-    `)
+        })
+    `)(asyncGuard)
 
     await vm.run(`${responseVar}.__setupPlugin()`)
 
