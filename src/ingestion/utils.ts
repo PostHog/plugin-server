@@ -156,9 +156,9 @@ export function chainToElements(chain: string): Element[] {
     return elements
 }
 
-export function timeoutGuard(message: string): NodeJS.Timeout {
+export function timeoutGuard(message: string, timeout = 30000): NodeJS.Timeout {
     return setTimeout(() => {
         console.log(`⌛⌛⌛ ${message}`)
         Sentry.captureMessage(message)
-    }, 30000)
+    }, timeout)
 }

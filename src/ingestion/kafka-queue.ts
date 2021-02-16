@@ -63,7 +63,7 @@ export class KafkaQueue implements Queue {
         )
 
         const processingTimeout = timeoutGuard(
-            `Took too long to run plugins on ${pluginEvents.length} events! Timeout after 30 sec!`
+            `Still running plugins on ${pluginEvents.length} events. Timeout warning after 30 sec!`
         )
         const batches = groupIntoBatches(pluginEvents, maxBatchSize)
         const processedEvents = (await Promise.all(batches.map(this.processEventBatch))).flat()
@@ -77,7 +77,7 @@ export class KafkaQueue implements Queue {
         )
 
         const ingestionTimeout = timeoutGuard(
-            `Took too long to ingest ${processedEvents.length} events! Timeout after 30 sec!`
+            `Still ingesting ${processedEvents.length} events. Timeout warning after 30 sec!`
         )
 
         // TODO: add chunking into groups of 500 or so. Might start too many promises at once now
