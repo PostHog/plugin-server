@@ -50,6 +50,9 @@ export async function createPluginConfigVM(
         vm.freeze(setTimeout, '__jestSetTimeout')
     }
 
+    // Creating this outside the vm (so not in a babel plugin for example)
+    // because `setTimeout` is not available inside the vm... and we don't want to
+    // make it available for now, as it makes it easier to create malicious code
     const asyncGuard = async (promise: () => Promise<any>) => {
         const timeout = server.TASK_TIMEOUT
         return await Promise.race([
@@ -92,6 +95,10 @@ export async function createPluginConfigVM(
 
     const responseVar = `__pluginDetails${randomBytes(64).toString('hex')}`
 
+    // Explicitly passing __asyncGuard to the returned function from `vm.run` in order
+    // to make it harder to override the global `__asyncGuard = noop` inside plugins.
+    // This way even if promises inside plugins are unbounded, the `processEvent` function
+    // itself will still terminate after TASK_TIMEOUT seconds, not clogging the entire ingestion.
     vm.run(`
         if (typeof global.${responseVar} !== 'undefined') {
             throw new Error("Plugin created variable ${responseVar} that is reserved for the VM.")
