@@ -1,4 +1,5 @@
 import { transform } from '@babel/standalone'
+import { randomBytes } from 'crypto'
 import fetch from 'node-fetch'
 import { VM } from 'vm2'
 
@@ -51,12 +52,16 @@ export async function createPluginConfigVM(
 
     vm.freeze(async (promise: () => Promise<any>) => {
         const timeout = server.TASK_TIMEOUT
-        const message = `Script execution timed out after promise waited for ${timeout} second${
-            timeout === 1 ? '' : 's'
-        }`
         const response = await Promise.race([
             promise,
-            new Promise((resolve, reject) => setTimeout(() => reject(new Error(message)), timeout * 1000)),
+            new Promise((resolve, reject) =>
+                setTimeout(() => {
+                    const message = `Script execution timed out after promise waited for ${timeout} second${
+                        timeout === 1 ? '' : 's'
+                    }`
+                    reject(new Error(message))
+                }, timeout * 1000)
+            ),
         ])
         return response
     }, '__asyncGuard')
@@ -75,86 +80,96 @@ export async function createPluginConfigVM(
         '__pluginHostMeta'
     )
 
-    vm.run(
-        `
+    vm.run(`
         // two ways packages could export themselves (plus "global")
         const module = { exports: {} };
         let exports = {};
 
         // the plugin JS code
         ${code};
+    `)
 
-        // helpers to get globals
-        const __getExportDestinations = () => [exports, module.exports, global]
-        const __getExported = (key) => __getExportDestinations().find(a => a[key])?.[key];
-        const __asyncFunctionGuard = (func) => func ? (...args) => __asyncGuard(func(...args)) : func
+    const responseVar = `__pluginDetails${randomBytes(64).toString('hex')}`
 
-        // inject the meta object + shareable 'global' to the end of each exported function
-        const __pluginMeta = {
-            ...__pluginHostMeta,
-            global: {}
-        };
-        function __bindMeta (keyOrFunc) {
-            const func = typeof keyOrFunc === 'function' ? keyOrFunc : __getExported(keyOrFunc);
-            if (func) return (...args) => func(...args, __pluginMeta);
-        }
-        function __callWithMeta (keyOrFunc, ...args) {
-            const func = __bindMeta(keyOrFunc);
-            if (func) return func(...args);
-        }
+    vm.run(`
+        const ${responseVar} = (() => {
+            // helpers to get globals
+            const __getExportDestinations = () => [exports, module.exports, global]
+            const __getExported = (key) => __getExportDestinations().find(a => a[key])?.[key];
+            const __asyncFunctionGuard = (func) => func ? (...args) => __asyncGuard(func(...args)) : func
 
-        // we have processEvent, but not processEventBatch
-        if (!__getExported('processEventBatch') && __getExported('processEvent')) {
-            exports.processEventBatch = async function processEventBatch (batch, meta) {
-                const processEvent = __getExported('processEvent');
-                let waitFor = false
-                const processedEvents = batch.map(event => {
-                    const e = processEvent(event, meta)
-                    if (e && typeof e.then !== 'undefined') {
-                        waitFor = true
-                    }
-                    return e
-                })
-                const response = waitFor ? (await Promise.all(processedEvents)) : processedEvents;
-                return response.filter(r => r)
+            // inject the meta object + shareable 'global' to the end of each exported function
+            const __pluginMeta = {
+                ...__pluginHostMeta,
+                global: {}
+            };
+            function __bindMeta (keyOrFunc) {
+                const func = typeof keyOrFunc === 'function' ? keyOrFunc : __getExported(keyOrFunc);
+                if (func) return (...args) => func(...args, __pluginMeta);
             }
-        // we have processEventBatch, but not processEvent
-        } else if (!__getExported('processEvent') && __getExported('processEventBatch')) {
-            exports.processEvent = async function processEvent (event, meta) {
-                return (await (__getExported('processEventBatch'))([event], meta))?.[0]
+            function __callWithMeta (keyOrFunc, ...args) {
+                const func = __bindMeta(keyOrFunc);
+                if (func) return func(...args);
             }
-        }
 
-        // export various functions
-        const __methods = {
-            processEvent: __asyncFunctionGuard(__bindMeta('processEvent')),
-            processEventBatch: __asyncFunctionGuard(__bindMeta('processEventBatch'))
-        };
+            // we have processEvent, but not processEventBatch
+            if (!__getExported('processEventBatch') && __getExported('processEvent')) {
+                exports.processEventBatch = async function processEventBatch (batch, meta) {
+                    const processEvent = __getExported('processEvent');
+                    let waitFor = false
+                    const processedEvents = batch.map(event => {
+                        const e = processEvent(event, meta)
+                        if (e && typeof e.then !== 'undefined') {
+                            waitFor = true
+                        }
+                        return e
+                    })
+                    const response = waitFor ? (await Promise.all(processedEvents)) : processedEvents;
+                    return response.filter(r => r)
+                }
+            // we have processEventBatch, but not processEvent
+            } else if (!__getExported('processEvent') && __getExported('processEventBatch')) {
+                exports.processEvent = async function processEvent (event, meta) {
+                    return (await (__getExported('processEventBatch'))([event], meta))?.[0]
+                }
+            }
 
-        // gather the runEveryX commands and export in __tasks
-        const __tasks = {};
-        for (const exportDestination of __getExportDestinations().reverse()) {
-            for (const [name, value] of Object.entries(exportDestination)) {
-                if (name.startsWith("runEvery") && typeof value === 'function') {
-                    __tasks[name] = {
-                        name: name,
-                        type: 'runEvery',
-                        exec: __bindMeta(value)
+            // export various functions
+            const __methods = {
+                processEvent: __asyncFunctionGuard(__bindMeta('processEvent')),
+                processEventBatch: __asyncFunctionGuard(__bindMeta('processEventBatch'))
+            };
+
+            // gather the runEveryX commands and export in __tasks
+            const __tasks = {};
+            for (const exportDestination of __getExportDestinations().reverse()) {
+                for (const [name, value] of Object.entries(exportDestination)) {
+                    if (name.startsWith("runEvery") && typeof value === 'function') {
+                        __tasks[name] = {
+                            name: name,
+                            type: 'runEvery',
+                            exec: __bindMeta(value)
+                        }
                     }
                 }
             }
-        }
 
-        // run the plugin setup script, if present
-        const __setupPlugin = __asyncFunctionGuard(async () => __callWithMeta('setupPlugin'));
-        `
-    )
+            // run the plugin setup script, if present
+            const __setupPlugin = __asyncFunctionGuard(async () => __callWithMeta('setupPlugin'));
 
-    await vm.run('__setupPlugin()')
+            return {
+                __methods,
+                __tasks,
+                __setupPlugin
+            }
+        })();
+    `)
+
+    await vm.run(`${responseVar}.__setupPlugin()`)
 
     return {
         vm,
-        methods: vm.run('__methods'),
-        tasks: vm.run('__tasks'),
+        methods: vm.run(`${responseVar}.__methods`),
+        tasks: vm.run(`${responseVar}.__tasks`),
     }
 }
