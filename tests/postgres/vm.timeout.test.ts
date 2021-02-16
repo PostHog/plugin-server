@@ -46,7 +46,7 @@ describe('vm timeout tests', () => {
             errorMessage = e.message
         }
         expect(new Date().valueOf() - date.valueOf()).toBeGreaterThan(1000)
-        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3')
+        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:16')
     })
 
     test('while loop no body', async () => {
@@ -66,7 +66,7 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 4')
+        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 4:16')
     })
 
     test('while loop in promise', async () => {
@@ -85,7 +85,7 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3')
+        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:53')
     })
 
     test('do..while loop', async () => {
@@ -104,7 +104,7 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3')
+        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:16')
     })
 
     test('do..while loop no body', async () => {
@@ -124,7 +124,7 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 4')
+        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 4:16')
     })
 
     test('do..while loop in promise', async () => {
@@ -143,7 +143,7 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3')
+        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:53')
     })
 
     test('for loop', async () => {
@@ -162,7 +162,7 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3')
+        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:16')
     })
 
     test('for loop no body', async () => {
@@ -182,7 +182,7 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 4')
+        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 4:16')
     })
 
     test('for loop in promise', async () => {
@@ -201,7 +201,7 @@ describe('vm timeout tests', () => {
         } catch (e) {
             errorMessage = e.message
         }
-        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3')
+        expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:53')
     })
 
     test('small promises', async () => {
