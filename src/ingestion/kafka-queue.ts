@@ -66,7 +66,16 @@ export class KafkaQueue implements Queue {
             `Still running plugins on ${pluginEvents.length} events. Timeout warning after 30 sec!`
         )
         const batches = groupIntoBatches(pluginEvents, maxBatchSize)
-        const processedEvents = (await Promise.all(batches.map(this.processEventBatch))).flat()
+        const processedEvents = (
+            await Promise.all(
+                batches.map(async (batch) => {
+                    const timer = new Date()
+                    const processedBatch = this.processEventBatch(batch)
+                    this.pluginsServer.statsd?.timing('kafka_queue.single_event_batch', timer)
+                    return processedBatch
+                })
+            )
+        ).flat()
 
         clearTimeout(processingTimeout)
 
