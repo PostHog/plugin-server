@@ -19,7 +19,7 @@ const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_ENABLED: true,
     KAFKA_HOSTS: process.env.KAFKA_HOSTS || 'kafka:9092',
     WORKER_CONCURRENCY: 4,
-    TASK_TIMEOUT: 10,
+    TASK_TIMEOUT: 5,
     PLUGIN_SERVER_INGESTION: true,
     KAFKA_CONSUMPTION_TOPIC: KAFKA_EVENTS_PLUGIN_INGESTION,
     KAFKA_BATCH_PARALELL_PROCESSING: true,
@@ -89,18 +89,22 @@ describe('e2e kafka & clickhouse benchmark', () => {
     })
 
     test('bad delay', async () => {
-        // Delay up to 30sec in processEvent, while TASK_TIMEOUT=10
+        // Delay up to 15sec in processEvent, while TASK_TIMEOUT=5
         // Effectively two thirds of the events should time out
         const [server, stopServer] = await measurePerformance(`
             async function processEvent (event) {
-                await new Promise(resolve => __jestSetTimeout(() => resolve(), 30000 * Math.random()))
+                await new Promise(resolve => __jestSetTimeout(() => resolve(), 15000 * Math.random()))
                 event.properties.timeout = 'no timeout'
                 return event
             }
         `)
         const events = (await server.db.fetchEvents()) as ClickHouseEvent[]
-        const props = events.map((e) => e.properties.timeout)
-        console.log(`${props.filter((p) => p).length} events out of 3000 took under 10sec, the rest were timed out`)
+        const passedEvents = events.filter((e) => e.properties.timeout).length
+        console.log(
+            `Out of 3000 events: ${passedEvents} took under 5sec, ${
+                3000 - passedEvents
+            } timed out. This should be a 1:2 ratio.`
+        )
 
         await stopServer()
     })
