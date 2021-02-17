@@ -13,7 +13,7 @@ import { pluginConfig39 } from '../../tests/helpers/plugins'
 import { resetTestDatabase } from '../../tests/helpers/sql'
 import { delayUntilEventIngested } from '../../tests/shared/process-event'
 
-jest.setTimeout(1200000) // 20min timeout
+jest.setTimeout(600000) // 10min timeout
 
 const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_ENABLED: true,
@@ -88,7 +88,7 @@ describe('e2e kafka & clickhouse benchmark', () => {
         await stopServer()
     })
 
-    test('bad delay', async () => {
+    test.skip('bad delay', async () => {
         // Delay up to 15sec in processEvent, while TASK_TIMEOUT=5
         // Effectively two thirds of the events should time out
         const [server, stopServer] = await measurePerformance(`
