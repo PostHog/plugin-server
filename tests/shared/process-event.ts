@@ -33,7 +33,7 @@ export async function delayUntilEventIngested(
         const events = await fetchEvents()
         if (debug) {
             console.log(
-                `Waiting. ${Math.round((performance.now() - timer) / 100) * 10}s since the start. ${
+                `Waiting. ${Math.round((performance.now() - timer) / 100) / 10}s since the start. ${
                     typeof events === 'number' ? events : events.length
                 } events.`
             )
