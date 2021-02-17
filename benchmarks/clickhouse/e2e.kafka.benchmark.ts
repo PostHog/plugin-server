@@ -13,7 +13,7 @@ import { pluginConfig39 } from '../../tests/helpers/plugins'
 import { resetTestDatabase } from '../../tests/helpers/sql'
 import { delayUntilEventIngested } from '../../tests/shared/process-event'
 
-jest.setTimeout(600000) // 10min timeout
+jest.setTimeout(1200000) // 20min timeout
 
 const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_ENABLED: true,
