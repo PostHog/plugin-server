@@ -24,7 +24,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         KAFKA_CLIENT_CERT_KEY_B64: null,
         KAFKA_TRUSTED_CERT_B64: null,
         KAFKA_CONSUMPTION_TOPIC: null,
-        KAFKA_BATCH_PARALELL_PROCESSING: false,
+        KAFKA_BATCH_PARALELL_PROCESSING: true,
         PLUGIN_SERVER_INGESTION: false,
         PLUGINS_CELERY_QUEUE: 'posthog-plugins',
         REDIS_URL: 'redis://127.0.0.1',
