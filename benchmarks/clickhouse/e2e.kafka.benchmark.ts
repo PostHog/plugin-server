@@ -56,7 +56,7 @@ describe('e2e kafka & clickhouse benchmark', () => {
 
         console.log('Starting timer')
         const startTime = performance.now()
-        await delayUntilEventIngested(() => server.db.fetchEvents(), count, 500, count)
+        await delayUntilEventIngested(() => server.db.fetchEvents(), count, 500, count, true)
         const timeMs = performance.now() - startTime
         console.log('Finished!')
 
