@@ -2,7 +2,7 @@ import { performance } from 'perf_hooks'
 
 import { KAFKA_EVENTS_PLUGIN_INGESTION } from '../../src/ingestion/topics'
 import { startPluginsServer } from '../../src/server'
-import { LogLevel, PluginsServerConfig, Queue } from '../../src/types'
+import { ClickHouseEvent, LogLevel, PluginsServerConfig, Queue } from '../../src/types'
 import { PluginsServer } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
 import { createPosthog, DummyPostHog } from '../../src/vm/extensions/posthog'
@@ -76,18 +76,22 @@ describe('e2e kafka processing timeout benchmark', () => {
 
         console.log('Starting timer')
         const startTime = performance.now()
-        await delayUntilEventIngested(() => server.db.fetchEvents(), count, 500, count, true)
+        await delayUntilEventIngested(() => server.db.fetchEvents(), count, 500, count)
         const timeMs = performance.now() - startTime
         console.log('Finished!')
 
         const n = (n: number) => `${Math.round(n * 100) / 100}`
         console.log(
-            `[Kafka & ClickHouse] Ingested ${count} events in ${n(timeMs / 1000)}s (${n(
+            `ℹ️️ [Kafka & ClickHouse] Ingested ${count} events in ${n(timeMs / 1000)}s (${n(
                 1000 / (timeMs / count)
             )} events/sec, ${n(timeMs / count)}ms per event)`
         )
-
-        const events = await server.db.fetchEvents()
-        expect(events[count - 1].properties.upperUuid).toEqual(events[count - 1].properties.uuid.toUpperCase())
+        const events = (await server.db.fetchEvents()) as ClickHouseEvent[]
+        const passedEvents = events.filter((e) => e.properties.timeout).length
+        console.log(
+            `ℹ️ Out of 3000 events: ${passedEvents} took under 5sec, ${
+                3000 - passedEvents
+            } timed out. This should be a 1:2 ratio.`
+        )
     })
 })

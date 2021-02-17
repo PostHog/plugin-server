@@ -78,13 +78,13 @@ describe('e2e kafka & clickhouse benchmark', () => {
 
         console.log('Starting timer')
         const startTime = performance.now()
-        await delayUntilEventIngested(() => server.db.fetchEvents(), count, 500, count, true)
+        await delayUntilEventIngested(() => server.db.fetchEvents(), count, 500, count)
         const timeMs = performance.now() - startTime
         console.log('Finished!')
 
         const n = (n: number) => `${Math.round(n * 100) / 100}`
         console.log(
-            `[Kafka & ClickHouse] Ingested ${count} events in ${n(timeMs / 1000)}s (${n(
+            `ℹ️️ [Kafka & ClickHouse] Ingested ${count} events in ${n(timeMs / 1000)}s (${n(
                 1000 / (timeMs / count)
             )} events/sec, ${n(timeMs / count)}ms per event)`
         )
