@@ -70,7 +70,7 @@ describe('e2e kafka & clickhouse timeout benchmark', () => {
         return [server, stopServer]
     }
 
-    test('bad delay', async () => {
+    test.skip('bad delay', async () => {
         console.log('Starting "bad delay" test')
         // Delay up to 15sec in processEvent, while TASK_TIMEOUT=5
         // Effectively two thirds of the events should time out
