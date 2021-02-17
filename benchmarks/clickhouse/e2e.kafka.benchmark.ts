@@ -5,7 +5,7 @@ import { startPluginsServer } from '../../src/server'
 import { ClickHouseEvent, LogLevel, PluginsServerConfig, Queue } from '../../src/types'
 import { PluginsServer } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
-import { createPosthog, DummyPostHog } from '../../src/vm/extensions/posthog'
+import { createPosthog } from '../../src/vm/extensions/posthog'
 import { makePiscina } from '../../src/worker/piscina'
 import { resetTestDatabaseClickhouse } from '../../tests/helpers/clickhouse'
 import { resetKafka } from '../../tests/helpers/kafka'
@@ -71,6 +71,7 @@ describe('e2e kafka & clickhouse benchmark', () => {
     }
 
     test('sync batch', async () => {
+        console.log('Starting "sync batch" test')
         const [server, stopServer] = await measurePerformance(`
             async function processEventBatch (batch) {
                 console.log(\`Received batch of \${batch.length} events\`)
@@ -86,9 +87,11 @@ describe('e2e kafka & clickhouse benchmark', () => {
         expect(events[2999].properties.upperUuid).toEqual(events[2999].properties.uuid.toUpperCase())
 
         await stopServer()
+        console.log('Stopping "sync batch" test')
     })
 
     test.skip('bad delay', async () => {
+        console.log('Starting "bad delay" test')
         // Delay up to 15sec in processEvent, while TASK_TIMEOUT=5
         // Effectively two thirds of the events should time out
         const [server, stopServer] = await measurePerformance(`
@@ -107,5 +110,6 @@ describe('e2e kafka & clickhouse benchmark', () => {
         )
 
         await stopServer()
+        console.log('Stopping "bad delay" test')
     })
 })
