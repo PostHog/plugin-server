@@ -2,6 +2,7 @@
 // https://medium.com/@bvjebin/js-infinite-loops-killing-em-e1c2f5f2db7f
 // https://github.com/jsbin/loop-protect/blob/master/lib/index.js
 
+import { PluginObj } from '@babel/core'
 import * as types from '@babel/types'
 
 import { PluginsServer } from '../../types'
@@ -73,12 +74,16 @@ const protect = (t: typeof types, timeout: number) => (path: any): void => {
     body.unshiftContainer('body', inside)
 }
 
-export const loopTimeout = (server: PluginsServer) => ({ types: t }: { types: typeof types }) => {
-    return {
-        visitor: {
-            WhileStatement: protect(t, server.TASK_TIMEOUT),
-            ForStatement: protect(t, server.TASK_TIMEOUT),
-            DoWhileStatement: protect(t, server.TASK_TIMEOUT),
-        },
+export type BabelPlugin = ({ types: t }: { types: typeof types }) => PluginObj
+
+export function loopTimeout(server: PluginsServer): BabelPlugin {
+    return ({ types: t }) => {
+        return {
+            visitor: {
+                WhileStatement: protect(t, server.TASK_TIMEOUT),
+                ForStatement: protect(t, server.TASK_TIMEOUT),
+                DoWhileStatement: protect(t, server.TASK_TIMEOUT),
+            },
+        }
     }
 }
