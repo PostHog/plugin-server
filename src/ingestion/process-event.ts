@@ -443,7 +443,7 @@ export class EventsProcessor {
                 }
             }
             await this.pluginsServer.redis.set(hooksCacheKey, shouldSendHooksTask.toString())
-            await this.pluginsServer.redis.expire(hooksCacheKey, 120)
+            await this.pluginsServer.redis.expire(hooksCacheKey, 10)
         }
         return shouldSendHooksTask
     }
