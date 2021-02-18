@@ -442,8 +442,8 @@ export class EventsProcessor {
                     }
                 }
             }
-            this.pluginsServer.redis.set(hooksCacheKey, shouldSendHooksTask.toString())
-            this.pluginsServer.redis.expire(hooksCacheKey, 120)
+            await this.pluginsServer.redis.set(hooksCacheKey, shouldSendHooksTask.toString())
+            await this.pluginsServer.redis.expire(hooksCacheKey, 120)
         }
         return shouldSendHooksTask
     }
