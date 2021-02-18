@@ -2,7 +2,7 @@ import { performance } from 'perf_hooks'
 
 import { KAFKA_EVENTS_PLUGIN_INGESTION } from '../../src/ingestion/topics'
 import { startPluginsServer } from '../../src/server'
-import { LogLevel, PluginsServerConfig, Queue } from '../../src/types'
+import { ClickHouseEvent, LogLevel, PluginsServerConfig, Queue } from '../../src/types'
 import { PluginsServer } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
 import { createPosthog, DummyPostHog } from '../../src/vm/extensions/posthog'
@@ -19,13 +19,14 @@ const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_ENABLED: true,
     KAFKA_HOSTS: process.env.KAFKA_HOSTS || 'kafka:9092',
     WORKER_CONCURRENCY: 4,
+    TASK_TIMEOUT: 5,
     PLUGIN_SERVER_INGESTION: true,
     KAFKA_CONSUMPTION_TOPIC: KAFKA_EVENTS_PLUGIN_INGESTION,
     KAFKA_BATCH_PARALELL_PROCESSING: true,
     LOG_LEVEL: LogLevel.Log,
 }
 
-describe('e2e kafka & clickhouse benchmark', () => {
+describe('e2e kafka processing timeout benchmark', () => {
     let queue: Queue
     let server: PluginsServer
     let stopServer: () => Promise<void>
@@ -33,13 +34,10 @@ describe('e2e kafka & clickhouse benchmark', () => {
 
     beforeEach(async () => {
         await resetTestDatabase(`
-            async function processEventBatch (batch) {
-                // console.log(\`Received batch of \${batch.length} events\`)
-                return batch.map(event => {
-                    event.properties.processed = 'hell yes'
-                    event.properties.upperUuid = event.properties.uuid?.toUpperCase()
-                    return event
-                })
+            async function processEvent (event) {
+                await new Promise(resolve => __jestSetTimeout(() => resolve(), 15000 * Math.random()))
+                event.properties.timeout = 'no timeout'
+                return event
             }
         `)
         await resetKafka(extraServerConfig)
@@ -88,8 +86,12 @@ describe('e2e kafka & clickhouse benchmark', () => {
                 1000 / (timeMs / count)
             )} events/sec, ${n(timeMs / count)}ms per event)`
         )
-
-        const events = await server.db.fetchEvents()
-        expect(events[count - 1].properties.upperUuid).toEqual(events[count - 1].properties.uuid.toUpperCase())
+        const events = (await server.db.fetchEvents()) as ClickHouseEvent[]
+        const passedEvents = events.filter((e) => e.properties.timeout).length
+        console.log(
+            `ℹ️ Out of 3000 events: ${passedEvents} took under 5sec, ${
+                3000 - passedEvents
+            } timed out. This should be a 1:2 ratio.`
+        )
     })
 })
