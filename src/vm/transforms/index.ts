@@ -1,8 +1,8 @@
 import { transform } from '@babel/standalone'
 
 import { PluginsServer } from '../../types'
-import { loopTimeout } from './transforms/loop-timeout'
-import { promiseTimeout } from './transforms/promise-timeout'
+import { loopTimeout } from './loop-timeout'
+import { promiseTimeout } from './promise-timeout'
 
 export function secureCode(rawCode: string, server: PluginsServer): string {
     const { code } = transform(rawCode, {
