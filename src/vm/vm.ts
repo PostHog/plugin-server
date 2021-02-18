@@ -1,4 +1,3 @@
-import { transform } from '@babel/standalone'
 import { randomBytes } from 'crypto'
 import fetch from 'node-fetch'
 import { VM } from 'vm2'
@@ -9,8 +8,7 @@ import { createConsole } from './extensions/console'
 import { createGoogle } from './extensions/google'
 import { createPosthog } from './extensions/posthog'
 import { createStorage } from './extensions/storage'
-import { loopTimeout } from './transforms/loop-timeout'
-import { promiseTimeout } from './transforms/promise-timeout'
+import { secureCode } from './transforms'
 
 export async function createPluginConfigVM(
     server: PluginsServer,
@@ -19,15 +17,7 @@ export async function createPluginConfigVM(
     libJs = ''
 ): Promise<PluginConfigVMReponse> {
     const rawCode = libJs ? `${libJs};${indexJs}` : indexJs
-
-    const { code } = transform(rawCode, {
-        envName: 'production',
-        code: true,
-        babelrc: false,
-        configFile: false,
-        presets: [['env', { targets: { node: process.versions.node } }]],
-        plugins: [loopTimeout(server), promiseTimeout(server)],
-    })
+    const securedCode = secureCode(rawCode, server)
 
     // Create virtual machine
     const vm = new VM({
@@ -87,7 +77,7 @@ export async function createPluginConfigVM(
         let exports = {};
 
         // the plugin JS code
-        ${code};
+        ${securedCode};
     `)
 
     const responseVar = `__pluginDetails${randomBytes(64).toString('hex')}`
