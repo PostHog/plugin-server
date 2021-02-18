@@ -431,7 +431,7 @@ export class EventsProcessor {
                 // Using KAFKA_ENABLED as a proxy for running enterprise edition
                 try {
                     const hookQueryResult = await this.db.postgresQuery(
-                        `SELECT COUNT(*) FROM ee_hooks WHERE team_id = $1 AND event = 'action_performed' LIMIT 1`,
+                        `SELECT COUNT(*) FROM ee_hook WHERE team_id = $1 AND event = 'action_performed' LIMIT 1`,
                         [team.id]
                     )
                     shouldSendHooksTask = !!hookQueryResult.rows[0].count
