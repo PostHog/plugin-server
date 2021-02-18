@@ -437,7 +437,7 @@ export class EventsProcessor {
                     shouldSendHooksTask = !!hookQueryResult.rows[0].count
                 } catch (error) {
                     // In FOSS PostHog ee_hook does not exist. If the error is other than that, rethrow it
-                    if (String(error).includes('relation "ee_hook" does not exist')) {
+                    if (!String(error).includes('relation "ee_hook" does not exist')) {
                         throw error
                     }
                 }
