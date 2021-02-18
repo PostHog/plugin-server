@@ -221,7 +221,7 @@ export const createProcessEventTests = (
         )
 
         if (database === 'clickhouse') {
-            expect(queryCounter).toBe(8)
+            expect(queryCounter).toBe(9)
         } else if (database === 'postgresql') {
             expect(queryCounter).toBe(12)
         }
