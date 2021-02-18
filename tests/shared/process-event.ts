@@ -128,6 +128,10 @@ export const createProcessEventTests = (
         processEventCounter = 0
         team = await getFirstTeam(server)
         now = DateTime.utc()
+
+        // clear the webhook redis cache
+        const hooksCacheKey = `@posthog/plugin-server/hooks/${team.id}`
+        await server.redis.del(hooksCacheKey)
     })
 
     afterEach(async () => {
