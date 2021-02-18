@@ -144,7 +144,7 @@ jobs:
 
                       Plugin server version ${{ env.REPO_VERSION }} has been released. This updates PostHog to use it.
 
-                      https://github.com/PostHog/plugin-server/compare/${{ env.PUBLISHED_VERSION }}...${{ env.REPO_VERSION }} • [GitHub releases](https://github.com/PostHog/plugin-server/releases) • [npm releases](https://www.npmjs.com/package/@posthog/plugin-server?activeTab=version)
+                      https://github.com/PostHog/plugin-server/compare/v${{ env.PUBLISHED_VERSION }}...v${{ env.REPO_VERSION }} • [GitHub releases](https://github.com/PostHog/plugin-server/releases) • [npm releases](https://www.npmjs.com/package/@posthog/plugin-server?activeTab=version)
 
             - name: Output pull request result
               run: |
