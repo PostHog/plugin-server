@@ -418,6 +418,36 @@ export class EventsProcessor {
         }
     }
 
+    private async shouldSendHooksTask(team: Team): Promise<boolean> {
+        const hooksCacheKey = `@posthog/plugin-server/hooks/${team.id}`
+        const hooksCacheValue = await this.pluginsServer.redis.get(hooksCacheKey)
+        let shouldSendHooksTask = false
+        if (hooksCacheValue) {
+            shouldSendHooksTask = hooksCacheValue === 'true'
+        } else {
+            if (team.slack_incoming_webhook) {
+                shouldSendHooksTask = true
+            } else if (this.pluginsServer.KAFKA_ENABLED) {
+                // Using KAFKA_ENABLED as a proxy for running enterprise edition
+                try {
+                    const hookQueryResult = await this.db.postgresQuery(
+                        `SELECT COUNT(*) FROM ee_hooks WHERE team_id = $1 AND event = 'action_performed' LIMIT 1`,
+                        [team.id]
+                    )
+                    shouldSendHooksTask = !!hookQueryResult.rows[0].count
+                } catch (error) {
+                    // In FOSS PostHog ee_hook does not exist. If the error is other than that, rethrow it
+                    if (String(error).includes('relation "ee_hook" does not exist')) {
+                        throw error
+                    }
+                }
+            }
+            this.pluginsServer.redis.set(hooksCacheKey, shouldSendHooksTask.toString())
+            this.pluginsServer.redis.expire(hooksCacheKey, 120)
+        }
+        return shouldSendHooksTask
+    }
+
     private async createEvent(
         uuid: string,
         event: string,
@@ -475,23 +505,7 @@ export class EventsProcessor {
             )
         }
 
-        let sendHookTask = !!team.slack_incoming_webhook
-        if (!sendHookTask && this.pluginsServer.KAFKA_ENABLED) {
-            // Using KAFKA_ENABLED as a proxy for running enterprise edition
-            try {
-                const hookQueryResult = await this.db.postgresQuery(
-                    `SELECT COUNT(*) FROM ee_hooks WHERE team_id = $1 AND event = 'action_performed' LIMIT 1`,
-                    [team.id]
-                )
-                sendHookTask = !!hookQueryResult.rows[0].count
-            } catch (error) {
-                // In FOSS PostHog ee_hook does not exist. If the error is other than that, rethrow it
-                if (!(error.toString() as string).includes('relation "ee_hook" does not exist')) {
-                    throw error
-                }
-            }
-        }
-        if (sendHookTask) {
+        if (this.shouldSendHooksTask(team)) {
             this.celery.sendTask('ee.tasks.webhooks_ee.post_event_to_webhook_ee', [
                 {
                     event,
