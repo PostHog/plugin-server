@@ -475,17 +475,34 @@ export class EventsProcessor {
             )
         }
 
-        this.celery.sendTask('ee.tasks.webhooks_ee.post_event_to_webhook_ee', [
-            {
-                event,
-                properties,
-                distinct_id: distinctId,
-                timestamp,
-                elements_list: elements,
-            },
-            team.id,
-            siteUrl,
-        ])
+        let sendHookTask = !!team.slack_incoming_webhook
+        if (!sendHookTask) {
+            try {
+                const hookQueryResult = await this.db.postgresQuery(
+                    `SELECT COUNT(*) FROM ee_hooks WHERE team_id = $1 AND event = 'action_performed' LIMIT 1`,
+                    [team.id]
+                )
+                sendHookTask = !!hookQueryResult.rows[0].count
+            } catch (error) {
+                // In FOSS PostHog ee_hook does not exist. If the error is other than that, rethrow it
+                if (!(error.toString() as string).includes('relation "ee_hook" does not exist')) {
+                    throw error
+                }
+            }
+        }
+        if (sendHookTask) {
+            this.celery.sendTask('ee.tasks.webhooks_ee.post_event_to_webhook_ee', [
+                {
+                    event,
+                    properties,
+                    distinct_id: distinctId,
+                    timestamp,
+                    elements_list: elements,
+                },
+                team.id,
+                siteUrl,
+            ])
+        }
 
         return data
     }
