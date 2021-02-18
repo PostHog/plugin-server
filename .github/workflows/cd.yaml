@@ -125,7 +125,7 @@ jobs:
                   rm package.old.json
                   for i in {1..5}
                       # Update yarn.lock, retrying up to 5 times (with a 5 s wait) in case of npm version inconsistency
-                      do yarn && break || sleep 5
+                      do yarn && break || $( [ $i -ne 5 ] && sleep 5 || false )
                   done
 
             - name: Create main repo pull request
