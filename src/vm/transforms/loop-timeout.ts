@@ -2,13 +2,12 @@
 // https://medium.com/@bvjebin/js-infinite-loops-killing-em-e1c2f5f2db7f
 // https://github.com/jsbin/loop-protect/blob/master/lib/index.js
 
-import { PluginObj } from '@babel/core'
 import * as types from '@babel/types'
 
-import { PluginsServer } from '../../types'
+import { PluginGen } from './common'
 
 const generateBefore = (t: typeof types, id: any) =>
-    t.variableDeclaration('var', [
+    t.variableDeclaration('const', [
         t.variableDeclarator(id, t.callExpression(t.memberExpression(t.identifier('Date'), t.identifier('now')), [])),
     ])
 
@@ -49,10 +48,8 @@ const generateInside = ({
 
 const protect = (t: typeof types, timeout: number) => (path: any): void => {
     if (!path.node.loc) {
-        // I don't really know _how_ we get into this state
-        // but https://jsbin.com/mipesawapi/1/ triggers it
-        // and the node, I'm guessing after translation,
-        // doesn't have a line in the code, so this blows up.
+        // I don't really know _how_ we get into this state, but https://jsbin.com/mipesawapi/1/ triggers it,
+        // and the node, I'm guessing after translation, doesn't have a line in the code, so this blows up.
         return
     }
     const id = path.scope.generateUidIdentifier('LP')
@@ -74,16 +71,10 @@ const protect = (t: typeof types, timeout: number) => (path: any): void => {
     body.unshiftContainer('body', inside)
 }
 
-export type BabelPlugin = ({ types: t }: { types: typeof types }) => PluginObj
-
-export function loopTimeout(server: PluginsServer): BabelPlugin {
-    return ({ types: t }) => {
-        return {
-            visitor: {
-                WhileStatement: protect(t, server.TASK_TIMEOUT),
-                ForStatement: protect(t, server.TASK_TIMEOUT),
-                DoWhileStatement: protect(t, server.TASK_TIMEOUT),
-            },
-        }
-    }
-}
+export const loopTimeout: PluginGen = (server) => ({ types: t }) => ({
+    visitor: {
+        WhileStatement: protect(t, server.TASK_TIMEOUT),
+        ForStatement: protect(t, server.TASK_TIMEOUT),
+        DoWhileStatement: protect(t, server.TASK_TIMEOUT),
+    },
+})
