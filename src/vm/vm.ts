@@ -18,31 +18,28 @@ export async function createPluginConfigVM(
     indexJs: string,
     libJs = ''
 ): Promise<PluginConfigVMReponse> {
-    const source = libJs ? `${libJs};${indexJs}` : indexJs
-    const { code } = transform(source, {
+    const rawCode = libJs ? `${libJs};${indexJs}` : indexJs
+
+    const { code } = transform(rawCode, {
         envName: 'production',
-        filename: undefined,
-        cwd: undefined,
         code: true,
-        ast: false,
-        sourceMaps: false,
         babelrc: false,
         configFile: false,
         presets: [['env', { targets: { node: process.versions.node } }]],
         plugins: [loopTimeout(server), promiseTimeout(server)],
     })
 
-    // create virtual machine
+    // Create virtual machine
     const vm = new VM({
         timeout: server.TASK_TIMEOUT * 1000 + 1,
         sandbox: {},
     })
 
-    // our own stuff
+    // Add PostHog utilities to virtual machine
     vm.freeze(createConsole(), 'console')
     vm.freeze(createPosthog(server, pluginConfig), 'posthog')
 
-    // exported node packages
+    // Add non-PostHog utilities to virtual machine
     vm.freeze(fetch, 'fetch')
     vm.freeze(createGoogle(), 'google')
 
