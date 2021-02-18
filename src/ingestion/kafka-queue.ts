@@ -112,7 +112,6 @@ export class KafkaQueue implements Queue {
             if (offset) {
                 resolveOffset(offset)
             }
-            await heartbeat()
             await commitOffsetsIfNecessary()
         }
 
@@ -131,8 +130,8 @@ export class KafkaQueue implements Queue {
         )
 
         resolveOffset(batch.lastOffset())
-        await heartbeat()
         await commitOffsetsIfNecessary()
+        await heartbeat()
     }
 
     async start(): Promise<void> {
@@ -199,6 +198,7 @@ export class KafkaQueue implements Queue {
     private static buildConsumer(kafka: Kafka): Consumer {
         const consumer = kafka.consumer({
             groupId: 'clickhouse-ingestion',
+            sessionTimeout: 60000,
             readUncommitted: false,
         })
         const { GROUP_JOIN, CRASH, CONNECT, DISCONNECT } = consumer.events
