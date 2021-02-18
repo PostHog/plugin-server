@@ -476,8 +476,8 @@ export class EventsProcessor {
         }
 
         let sendHookTask = !!team.slack_incoming_webhook
-        if (!sendHookTask && this.kafkaProducer) {
-            // Using kafkaProducer as proxy for EE being enabled
+        if (!sendHookTask && this.pluginsServer.KAFKA_ENABLED) {
+            // Using KAFKA_ENABLED as a proxy for running enterprise edition
             try {
                 const hookQueryResult = await this.db.postgresQuery(
                     `SELECT COUNT(*) FROM ee_hooks WHERE team_id = $1 AND event = 'action_performed' LIMIT 1`,
