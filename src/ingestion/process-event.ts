@@ -437,13 +437,16 @@ export class EventsProcessor {
     }
 
     private async shouldSendHooksTask(team: Team): Promise<boolean> {
+        if (team.slack_incoming_webhook) {
+            return true
+        }
+        if (!this.pluginsServer.KAFKA_ENABLED) {
+            return false
+        }
         const timeout = timeoutGuard(`Still running "shouldSendHooksTask". Timeout warning after 30 sec!`)
         try {
             const hookQueryResult = await this.db.postgresQuery(
-                `SELECT COUNT(*)
-                             FROM ee_hook
-                             WHERE team_id = $1
-                               AND event = 'action_performed' LIMIT 1`,
+                `SELECT COUNT(*) FROM ee_hook WHERE team_id = $1 AND event = 'action_performed' LIMIT 1`,
                 [team.id]
             )
             return !!hookQueryResult.rows[0].count
