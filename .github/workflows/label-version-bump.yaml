@@ -50,6 +50,7 @@ jobs:
                   rm package.old.json
 
             - name: Commit bump
+              if: steps.bump-type.outputs.bump-type != 'null'
               uses: EndBug/add-and-commit@v7
               with:
                   author_name: PostHog Bot
