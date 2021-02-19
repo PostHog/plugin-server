@@ -130,11 +130,11 @@ jobs:
                   jq --indent 4 '.dependencies."@posthog/plugin-server" = "${{ env.REPO_VERSION }}"' package.old.json > package.json
                   rm package.old.json
                   for i in $(seq 1 $RETRY_TIMES)
-                      # Update yarn.lock, retrying up to 5 times (with a 5 s wait) in case of npm version inconsistency
-                      do yarn && break || $( [ $i -ne 5 ] && $( echo "Waiting $RETRY_WAIT_SECONDS to retry... [$i/$RETRY_TIMES]." && sleep $RETRY_WAIT_SECONDS ) || $( echo "All retries failed! Aborting release." && false ) )
+                      # Retry loop because of npm being _eventually_ consistent
+                      do yarn && break || $( yarn cache clean && [ $i -ne $RETRY_TIMES ] && sleep $RETRY_WAIT_SECONDS || false )
                   done
               env:
-                  RETRY_TIMES: 5
+                  RETRY_TIMES: 10
                   RETRY_WAIT_SECONDS: 10
 
             - name: Create main repo pull request
