@@ -232,11 +232,6 @@ export class DB {
                     return `${sanitizeSqlIdentifier(key)} = '${escapeClickHouseString(clickhouseValue)}'`
                 })
                 .join(', ')
-            if (updateString.length > 0) {
-                await this.clickhouseQuery(
-                    `ALTER TABLE person UPDATE ${updateString} WHERE id = '${escapeClickHouseString(person.uuid)}'`
-                )
-            }
         }
         return updatedPerson
     }
