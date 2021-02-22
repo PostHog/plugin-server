@@ -111,14 +111,14 @@ export class DB {
 
     // Redis
 
-    public async redisGet(key: string, defaultValue: unknown): Promise<unknown> {
+    public async redisGet(key: string, defaultValue: unknown, parseJSON = true): Promise<unknown> {
         const timeout = timeoutGuard(`Getting redis key delayed. Waiting over 30 sec to get key: ${key}`)
         try {
             const value = await this.redis.get(key)
             if (typeof value === 'undefined') {
                 return defaultValue
             }
-            return value ? JSON.parse(value) : null
+            return value ? (parseJSON ? JSON.parse(value) : value) : null
         } catch (error) {
             if (error instanceof SyntaxError) {
                 // invalid json
@@ -131,13 +131,14 @@ export class DB {
         }
     }
 
-    public async redisSet(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
+    public async redisSet(key: string, value: unknown, ttlSeconds?: number, stringify = true): Promise<void> {
         const timeout = timeoutGuard(`Setting redis key delayed. Waiting over 30 sec to set key: ${key}`)
         try {
+            const serializedValue = stringify ? JSON.stringify(value) : (value as string)
             if (ttlSeconds) {
-                await this.redis.set(key, JSON.stringify(value), 'EX', ttlSeconds)
+                await this.redis.set(key, serializedValue, 'EX', ttlSeconds)
             } else {
-                await this.redis.set(key, JSON.stringify(value))
+                await this.redis.set(key, serializedValue)
             }
         } finally {
             clearTimeout(timeout)
