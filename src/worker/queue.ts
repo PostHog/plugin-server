@@ -17,7 +17,7 @@ export type WorkerMethods = {
 
 function pauseQueueIfWorkerFull(queue: Queue | undefined, server: PluginsServer, piscina?: Piscina) {
     if (queue && (piscina?.queueSize || 0) > (server.WORKER_CONCURRENCY || 4) * (server.WORKER_CONCURRENCY || 4)) {
-        queue.pause()
+        void queue.pause()
     }
 }
 

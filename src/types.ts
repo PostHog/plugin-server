@@ -73,7 +73,7 @@ export interface PluginsServer extends PluginsServerConfig {
 }
 
 export interface Pausable {
-    pause: () => void
+    pause: () => Promise<void>
     resume: () => void
     isPaused: () => boolean
 }

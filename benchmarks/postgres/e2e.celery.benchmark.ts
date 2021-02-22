@@ -61,7 +61,7 @@ describe('e2e celery & postgres benchmark', () => {
             const uuid = new UUIDT().toString()
             posthog.capture('custom event', { name: 'haha', uuid, randomProperty: 'lololo' })
         }
-        queue.pause()
+        await queue.pause()
         expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toEqual(0)
         for (let i = 0; i < count; i++) {
             createEvent()

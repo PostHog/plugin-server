@@ -67,7 +67,7 @@ describe('e2e kafka & clickhouse benchmark', () => {
             const uuid = new UUIDT().toString()
             posthog.capture('custom event', { name: 'haha', uuid, randomProperty: 'lololo' })
         }
-        queue.pause()
+        await queue.pause()
         for (let i = 0; i < count; i++) {
             createEvent()
         }

@@ -167,22 +167,21 @@ export class KafkaQueue implements Queue {
         return await startPromise
     }
 
-    pause(): void {
-        if (!this.wasConsumerRan || this.isPaused()) {
-            return
+    async pause(): Promise<void> {
+        if (this.wasConsumerRan && !this.isPaused()) {
+            status.info('⏳', 'Pausing Kafka consumer...')
+            this.consumer.pause([{ topic: this.pluginsServer.KAFKA_CONSUMPTION_TOPIC! }])
+            status.info('⏸', 'Kafka consumer paused!')
         }
-        status.info('⏳', 'Pausing Kafka consumer...')
-        this.consumer.pause([{ topic: this.pluginsServer.KAFKA_CONSUMPTION_TOPIC! }])
-        status.info('⏸', 'Kafka consumer paused!')
+        return Promise.resolve()
     }
 
     resume(): void {
-        if (!this.wasConsumerRan || !this.isPaused()) {
-            return
+        if (this.wasConsumerRan && this.isPaused()) {
+            status.info('⏳', 'Resuming Kafka consumer...')
+            this.consumer.resume([{ topic: this.pluginsServer.KAFKA_CONSUMPTION_TOPIC! }])
+            status.info('▶️', 'Kafka consumer resumed!')
         }
-        status.info('⏳', 'Resuming Kafka consumer...')
-        this.consumer.resume([{ topic: this.pluginsServer.KAFKA_CONSUMPTION_TOPIC! }])
-        status.info('▶️', 'Kafka consumer resumed!')
     }
 
     isPaused(): boolean {
