@@ -22,7 +22,7 @@ export interface DummyPostHog {
 export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig): DummyPostHog {
     const distinctId = pluginConfig.plugin?.name || `plugin-id-${pluginConfig.plugin_id}`
 
-    let sendEvent: (data: InternalData) => Promise<void>
+    let sendEvent: (data: InternalData) => Promise<void> | void
 
     if (server.KAFKA_ENABLED) {
         // Sending event to our Kafka>ClickHouse pipeline
@@ -52,7 +52,7 @@ export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig)
     } else {
         // Sending event to our Redis>Postgres pipeline
         const client = new Client(server.db, server.PLUGINS_CELERY_QUEUE)
-        sendEvent = async (data) => {
+        sendEvent = (data) => {
             client.sendTask(
                 'posthog.tasks.process_event.process_event_with_plugins',
                 [data.distinct_id, null, null, data, pluginConfig.team_id, data.timestamp, data.timestamp],

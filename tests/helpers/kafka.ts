@@ -55,6 +55,7 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
         console.info('running consumer')
         await consumer.run({
             eachMessage: async (payload) => {
+                await Promise.resolve()
                 console.info('message received!')
                 messages.push(payload)
             },
