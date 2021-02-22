@@ -163,6 +163,25 @@ export class DB {
         }
     }
 
+    public async redisLPush(key: string, value: unknown, stringify = true): Promise<number> {
+        const timeout = timeoutGuard(`LPushing redis key delayed. Waiting over 30 sec to lpush key: ${key}`)
+        try {
+            const serializedValue = stringify ? JSON.stringify(value) : (value as string)
+            return await this.redis.lpush(key, serializedValue)
+        } finally {
+            clearTimeout(timeout)
+        }
+    }
+
+    public async redisBRPop(key1: string, key2: string): Promise<[string, string]> {
+        const timeout = timeoutGuard(`BRPoping redis key delayed. Waiting over 30 sec to brpop keys: ${key1}, ${key2}`)
+        try {
+            return await this.redis.brpop(key1, key2)
+        } finally {
+            clearTimeout(timeout)
+        }
+    }
+
     // Person
 
     public async fetchPersons(database?: Database.Postgres): Promise<Person[]>
