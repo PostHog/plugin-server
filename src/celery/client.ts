@@ -108,10 +108,7 @@ export default class Client extends Base {
     public sendTask(taskName: string, args?: Array<any>, kwargs?: Record<string, any>, taskId?: string): void {
         taskId = taskId || v4()
         const message = this.createTaskMessage(taskId, taskName, args, kwargs)
-        this.sendTaskMessage(taskName, message)
-            .then(() => true)
-            .catch((error) => {
-                throw error
-            })
+        // run in the background
+        void this.sendTaskMessage(taskName, message)
     }
 }
