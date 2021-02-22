@@ -215,24 +215,6 @@ export class DB {
             )} WHERE id = $${Object.values(update).length + 1}`,
             values
         )
-        if (this.clickhouse) {
-            const { is_user_id, id, uuid, ...validUpdates } = update
-            const updateString = Object.entries(validUpdates)
-                .map(([key, value]) => {
-                    let clickhouseValue: string
-                    if (typeof value === 'string') {
-                        clickhouseValue = value
-                    } else if (typeof value === 'boolean') {
-                        clickhouseValue = value ? '1' : '0'
-                    } else if (DateTime.isDateTime(value)) {
-                        clickhouseValue = castTimestampOrNow(value, TimestampFormat.ClickHouseSecondPrecision)
-                    } else {
-                        clickhouseValue = JSON.stringify(value)
-                    }
-                    return `${sanitizeSqlIdentifier(key)} = '${escapeClickHouseString(clickhouseValue)}'`
-                })
-                .join(', ')
-        }
         return updatedPerson
     }
 
