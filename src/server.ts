@@ -129,7 +129,7 @@ export async function createServer(
               }
             : undefined,
     })
-    const db = new DB(postgres, kafkaProducer, clickhouse)
+    const db = new DB(postgres, redis, kafkaProducer, clickhouse)
 
     let statsd: StatsD | undefined
     if (serverConfig.STATSD_HOST) {
