@@ -17,6 +17,7 @@ export async function startFastifyInstance(pluginsServer: PluginsServer): Promis
     status.info('👾', 'Starting web server…')
     const fastifyInstance = buildFastifyInstance()
     try {
+        // eslint-disable-next-line
         const address = await fastifyInstance.listen(pluginsServer.WEB_PORT, pluginsServer.WEB_HOSTNAME)
         status.info('✅', `Web server listening on ${address}!`)
     } catch (error) {

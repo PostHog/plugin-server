@@ -210,7 +210,7 @@ test('pause and resume queue', async () => {
     expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
     expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(0)
 
-    await queue.pause()
+    queue.pause()
 
     expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
     expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
@@ -225,7 +225,7 @@ test('pause and resume queue', async () => {
     expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
     expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
 
-    await queue.resume()
+    queue.resume()
 
     expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
     expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
@@ -240,13 +240,13 @@ test('pause and resume queue', async () => {
     expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
     expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(2)
 
-    await queue.pause()
+    queue.pause()
     await advanceOneTick()
 
     expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
     expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
 
-    await queue.pause()
+    queue.pause()
     await advanceOneTick()
 
     expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
@@ -257,7 +257,7 @@ test('pause and resume queue', async () => {
     expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
     expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
 
-    await queue.resume()
+    queue.resume()
 
     expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
     expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)

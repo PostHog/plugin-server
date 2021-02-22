@@ -22,32 +22,36 @@ export interface DummyPostHog {
 export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig): DummyPostHog {
     const distinctId = pluginConfig.plugin?.name || `plugin-id-${pluginConfig.plugin_id}`
 
-    let sendEvent: (data: InternalData) => Promise<void> | void
+    let sendEvent: (data: InternalData) => void
 
     if (server.KAFKA_ENABLED) {
         // Sending event to our Kafka>ClickHouse pipeline
-        sendEvent = async (data) => {
+        sendEvent = (data) => {
             if (!server.kafkaProducer) {
                 throw new Error('kafkaProducer not configured!')
             }
-            await server.kafkaProducer.send({
-                topic: server.KAFKA_CONSUMPTION_TOPIC!,
-                messages: [
-                    {
-                        key: data.uuid,
-                        value: JSON.stringify({
-                            distinct_id: data.distinct_id,
-                            ip: '',
-                            site_url: '',
-                            data: JSON.stringify(data),
-                            team_id: pluginConfig.team_id,
-                            now: data.timestamp,
-                            sent_at: data.timestamp,
-                            uuid: data.uuid,
-                        } as RawEventMessage),
-                    },
-                ],
-            })
+            server.kafkaProducer
+                .send({
+                    topic: server.KAFKA_CONSUMPTION_TOPIC!,
+                    messages: [
+                        {
+                            key: data.uuid,
+                            value: JSON.stringify({
+                                distinct_id: data.distinct_id,
+                                ip: '',
+                                site_url: '',
+                                data: JSON.stringify(data),
+                                team_id: pluginConfig.team_id,
+                                now: data.timestamp,
+                                sent_at: data.timestamp,
+                                uuid: data.uuid,
+                            } as RawEventMessage),
+                        },
+                    ],
+                })
+                .finally(() => {
+                    // ignore the promise, run in the background just like with celery
+                })
         }
     } else {
         // Sending event to our Redis>Postgres pipeline

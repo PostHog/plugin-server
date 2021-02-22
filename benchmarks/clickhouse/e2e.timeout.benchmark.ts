@@ -65,14 +65,14 @@ describe('e2e kafka processing timeout benchmark', () => {
             const uuid = new UUIDT().toString()
             posthog.capture('custom event', { name: 'haha', uuid, randomProperty: 'lololo' })
         }
-        await queue.pause()
+        queue.pause()
         for (let i = 0; i < count; i++) {
             createEvent()
         }
 
         // hope that 5sec is enough to load kafka with all the events (posthog.capture can't be awaited)
         await delay(5000)
-        await queue.resume()
+        queue.resume()
 
         console.log('Starting timer')
         const startTime = performance.now()

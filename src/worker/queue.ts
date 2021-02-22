@@ -43,7 +43,7 @@ export async function startQueue(
         if (server.KAFKA_ENABLED) {
             return await startQueueKafka(server, mergedWorkerMethods)
         } else {
-            return startQueueRedis(server, piscina, mergedWorkerMethods)
+            return await startQueueRedis(server, piscina, mergedWorkerMethods)
         }
     } catch (error) {
         status.error('💥', 'Failed to start event queue:\n', error)
@@ -51,7 +51,11 @@ export async function startQueue(
     }
 }
 
-function startQueueRedis(server: PluginsServer, piscina: Piscina | undefined, workerMethods: WorkerMethods): Queue {
+async function startQueueRedis(
+    server: PluginsServer,
+    piscina: Piscina | undefined,
+    workerMethods: WorkerMethods
+): Promise<Queue> {
     const celeryQueue = new Worker(server.db, server.PLUGINS_CELERY_QUEUE)
     const client = new Client(server.db, server.CELERY_DEFAULT_QUEUE)
 
@@ -93,7 +97,7 @@ function startQueueRedis(server: PluginsServer, piscina: Piscina | undefined, wo
         }
     )
 
-    celeryQueue.start()
+    await celeryQueue.start()
 
     return celeryQueue
 }

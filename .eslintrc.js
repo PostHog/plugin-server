@@ -18,6 +18,9 @@ module.exports = {
         '@typescript-eslint/no-explicit-any': 'off',
         'require-await': 'off',
         '@typescript-eslint/require-await': 'error',
+        '@typescript-eslint/await-thenable': 'error',
+        '@typescript-eslint/no-floating-promises': 'error',
+        '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
         curly: 'error',
     },
     overrides: [
