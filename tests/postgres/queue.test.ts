@@ -211,6 +211,7 @@ test('pause and resume queue', async () => {
     expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(0)
 
     queue.pause()
+    await advanceOneTick()
 
     expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
     expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
