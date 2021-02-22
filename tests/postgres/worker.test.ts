@@ -136,7 +136,7 @@ test('pause the queue if too many tasks', async () => {
 
     expect(pluginsServer.piscina.queueSize).toBe(0)
 
-    const client = new Client(pluginsServer.server.redis, pluginsServer.server.PLUGINS_CELERY_QUEUE)
+    const client = new Client(pluginsServer.server.db, pluginsServer.server.PLUGINS_CELERY_QUEUE)
     for (let i = 0; i < 2; i++) {
         client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
     }
@@ -177,6 +177,7 @@ test('pause the queue if too many tasks', async () => {
             await delay(100)
         }
     }
+    await delay(100)
 
     expect(await pluginsServer.server.redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(32)
     expect(await pluginsServer.server.redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(10)

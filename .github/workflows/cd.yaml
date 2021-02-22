@@ -126,18 +126,22 @@ jobs:
                   token: ${{ secrets.POSTHOG_BOT_GITHUB_TOKEN }}
 
             - name: Install new plugin server version in main repo
+              id: yarn-upgrade
               run: |
                   cd plugins/
-                  mv package.json package.old.json
-                  jq --indent 4 '.dependencies."@posthog/plugin-server" = "${{ env.REPO_VERSION }}"' package.old.json > package.json
-                  rm package.old.json
-                  for i in $(seq 1 $RETRY_TIMES)
+                  OUTGOING_VERSION=$(jq '.dependencies["@posthog/plugin-server"]' package.json -r)
+                  echo "::set-output name=outgoing-version::$OUTGOING_VERSION"
+                  for i in $(seq 1 $RETRY_TIMES); do
                       # Retry loop because of npm being _eventually_ consistent
-                      do yarn && break || $( yarn cache clean && [ $i -ne $RETRY_TIMES ] && sleep $RETRY_WAIT_SECONDS || false )
+                      if yarn upgrade @posthog/plugin-server@${{ env.REPO_VERSION }}; then
+                          break
+                      else
+                          [ $i -ne $RETRY_TIMES ] && sleep $RETRY_WAIT_SECONDS || false
+                      fi
                   done
               env:
-                  RETRY_TIMES: 10
-                  RETRY_WAIT_SECONDS: 10
+                  RETRY_TIMES: 20
+                  RETRY_WAIT_SECONDS: 5
 
             - name: Create main repo pull request
               id: main-repo-pr
@@ -153,7 +157,7 @@ jobs:
 
                       Plugin server version ${{ env.REPO_VERSION }} has been released. This updates PostHog to use it.
 
-                      https://github.com/PostHog/plugin-server/compare/v${{ env.PUBLISHED_VERSION }}...v${{ env.REPO_VERSION }} • [GitHub releases](https://github.com/PostHog/plugin-server/releases) • [npm releases](https://www.npmjs.com/package/@posthog/plugin-server?activeTab=version)
+                      https://github.com/PostHog/plugin-server/compare/v${{ steps.yarn-upgrade.outputs.outgoing-version }}...v${{ env.REPO_VERSION }} • [GitHub releases](https://github.com/PostHog/plugin-server/releases) • [npm releases](https://www.npmjs.com/package/@posthog/plugin-server?activeTab=version)
 
             - name: Output pull request result
               run: |
