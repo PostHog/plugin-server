@@ -94,7 +94,7 @@ function startQueueRedis(server: PluginsServer, piscina: Piscina | undefined, wo
     )
 
     // run in the background
-    celeryQueue.start().finally(() => true)
+    void celeryQueue.start()
 
     return celeryQueue
 }
