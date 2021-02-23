@@ -371,7 +371,7 @@ export async function tryTwice<T extends any>(
     }
 }
 
-export async function createRedis(serverConfig: PluginsServerConfig) {
+export async function createRedis(serverConfig: PluginsServerConfig): Promise<Redis.Redis> {
     const redis = new Redis(serverConfig.REDIS_URL, { maxRetriesPerRequest: -1 })
     redis
         .on('error', (error) => {
