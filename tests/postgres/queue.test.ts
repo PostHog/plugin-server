@@ -203,18 +203,23 @@ test('pause and resume queue', async () => {
 
     await queue.pause()
 
-    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(4)
-    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(2)
+    const pluginQueue = await redis.llen(server.PLUGINS_CELERY_QUEUE)
+    const defaultQueue = await redis.llen(server.CELERY_DEFAULT_QUEUE)
+
+    expect(pluginQueue + defaultQueue).toBe(6)
+
+    expect(pluginQueue).not.toBe(0)
+    expect(defaultQueue).not.toBe(0)
 
     await delay(100)
 
-    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(4)
-    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(2)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(pluginQueue)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(defaultQueue)
 
     await delay(100)
 
-    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(4)
-    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(2)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(pluginQueue)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(defaultQueue)
 
     queue.resume()
 
