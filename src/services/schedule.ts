@@ -6,6 +6,7 @@ import Redlock from 'redlock'
 import { processError } from '../error'
 import { status } from '../status'
 import { PluginConfigId, PluginsServer } from '../types'
+import { createRedis } from '../utils'
 
 const LOCKED_RESOURCE = 'plugin-server:locks:schedule'
 
@@ -25,7 +26,8 @@ export async function startSchedule(
     const retryDelay = lockTTL / 10 // 6 sec
     const extendDelay = lockTTL / 2 // 30 sec
 
-    const redis = await server.redisPool.acquire()
+    // use another redis connection for redlock
+    const redis = await createRedis(server)
 
     const redlock = new Redlock([redis], {
         // we handle retires ourselves to have a way to cancel the promises on quit
@@ -102,7 +104,7 @@ export async function startSchedule(
         runEveryMinuteJob && schedule.cancelJob(runEveryMinuteJob)
 
         await lock?.unlock().catch(Sentry.captureException)
-        await server.redisPool.release(redis)
+        await redis.quit()
         await waitForTasksToFinish(server!)
     }
 
