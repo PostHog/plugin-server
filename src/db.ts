@@ -1,5 +1,6 @@
 import ClickHouse from '@posthog/clickhouse'
 import { Properties } from '@posthog/plugin-scaffold'
+import { createPool,Pool as GenericPool } from 'generic-pool'
 import Redis from 'ioredis'
 import { Producer, ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
@@ -7,6 +8,7 @@ import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './ingestion/utils'
+import { status } from './status'
 import {
     ClickHouseEvent,
     ClickHousePerson,
@@ -36,7 +38,8 @@ export class DB {
     /** Postgres connection pool for primary database access. */
     postgres: Pool
     /** Redis used for various caches. */
-    redis: Redis.Redis
+    redisPool: GenericPool<Redis.Redis>
+
     /** Kafka producer used for syncing Postgres and ClickHouse person data. */
     kafkaProducer?: Producer
     /** ClickHouse used for syncing Postgres and ClickHouse person data. */
@@ -44,9 +47,19 @@ export class DB {
 
     constructor(postgres: Pool, redis: Redis.Redis, kafkaProducer?: Producer, clickhouse?: ClickHouse) {
         this.postgres = postgres
-        this.redis = redis
         this.kafkaProducer = kafkaProducer
         this.clickhouse = clickhouse
+        this.redisPool = createPool<Redis.Redis>(
+            {
+                create: () => Promise.resolve(redis),
+                destroy: () => Promise.resolve(undefined),
+            },
+            {
+                min: 1,
+                max: 1,
+                autostart: true,
+            }
+        )
     }
 
     // Postgres
@@ -118,10 +131,11 @@ export class DB {
     // Redis
 
     public async redisGet(key: string, defaultValue: unknown, parseJSON = true): Promise<unknown> {
+        const client = await this.redisPool.acquire()
         const timeout = timeoutGuard(`Getting redis key delayed. Waiting over 30 sec to get key: ${key}`)
         try {
             const value = await tryTwice(
-                async () => await this.redis.get(key),
+                async () => await client.get(key),
                 `Waited 5 sec to get redis key: ${key}, retrying once!`
             )
             if (typeof value === 'undefined') {
@@ -137,57 +151,68 @@ export class DB {
             }
         } finally {
             clearTimeout(timeout)
+            await this.redisPool.release(client)
         }
     }
 
     public async redisSet(key: string, value: unknown, ttlSeconds?: number, stringify = true): Promise<void> {
+        const client = await this.redisPool.acquire()
         const timeout = timeoutGuard(`Setting redis key delayed. Waiting over 30 sec to set key: ${key}`)
         try {
             const serializedValue = stringify ? JSON.stringify(value) : (value as string)
             if (ttlSeconds) {
-                await this.redis.set(key, serializedValue, 'EX', ttlSeconds)
+                await client.set(key, serializedValue, 'EX', ttlSeconds)
             } else {
-                await this.redis.set(key, serializedValue)
+                await client.set(key, serializedValue)
             }
         } finally {
             clearTimeout(timeout)
+            await this.redisPool.release(client)
         }
     }
 
     public async redisIncr(key: string): Promise<number> {
+        const client = await this.redisPool.acquire()
         const timeout = timeoutGuard(`Incrementing redis key delayed. Waiting over 30 sec to incr key: ${key}`)
         try {
-            return await this.redis.incr(key)
+            return await client.incr(key)
         } finally {
             clearTimeout(timeout)
+            await this.redisPool.release(client)
         }
     }
 
     public async redisExpire(key: string, ttlSeconds: number): Promise<boolean> {
+        const client = await this.redisPool.acquire()
         const timeout = timeoutGuard(`Expiring redis key delayed. Waiting over 30 sec to expire key: ${key}`)
         try {
-            return (await this.redis.expire(key, ttlSeconds)) === 1
+            return (await client.expire(key, ttlSeconds)) === 1
         } finally {
             clearTimeout(timeout)
+            await this.redisPool.release(client)
         }
     }
 
     public async redisLPush(key: string, value: unknown, stringify = true): Promise<number> {
+        const client = await this.redisPool.acquire()
         const timeout = timeoutGuard(`LPushing redis key delayed. Waiting over 30 sec to lpush key: ${key}`)
         try {
             const serializedValue = stringify ? JSON.stringify(value) : (value as string)
-            return await this.redis.lpush(key, serializedValue)
+            return await client.lpush(key, serializedValue)
         } finally {
             clearTimeout(timeout)
+            await this.redisPool.release(client)
         }
     }
 
     public async redisBRPop(key1: string, key2: string): Promise<[string, string]> {
+        const client = await this.redisPool.acquire()
         const timeout = timeoutGuard(`BRPoping redis key delayed. Waiting over 30 sec to brpop keys: ${key1}, ${key2}`)
         try {
-            return await this.redis.brpop(key1, key2)
+            return await client.brpop(key1, key2)
         } finally {
             clearTimeout(timeout)
+            await this.redisPool.release(client)
         }
     }
 
