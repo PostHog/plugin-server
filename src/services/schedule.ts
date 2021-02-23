@@ -82,6 +82,12 @@ export async function startSchedule(
 
     server.pluginSchedule = await piscina.runTask({ task: 'getPluginSchedule' })
 
+    if (!stopped) {
+        runTasksDebounced(server!, piscina!, 'runEveryMinute')
+        runTasksDebounced(server!, piscina!, 'runEveryHour')
+        runTasksDebounced(server!, piscina!, 'runEveryDay')
+    }
+
     const runEveryMinuteJob = schedule.scheduleJob('* * * * *', () => {
         !stopped && weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryMinute')
     })
