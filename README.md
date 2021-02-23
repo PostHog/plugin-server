@@ -38,7 +38,7 @@ There's a multitude of settings you can use to control the plugin server. Use th
 | CELERY_DEFAULT_QUEUE          | Celery outgoing queue                                               | `'celery'`                            |
 | PLUGINS_CELERY_QUEUE          | Celery incoming queue                                               | `'posthog-plugins'`                   |
 | PLUGINS_RELOAD_PUBSUB_CHANNEL | Redis channel for reload events                                     | `'reload-plugins'`                    |
-| PLUGIN_SERVER_INGESTION       | Whether the plugin server should put events right into the database | `false`                               |
+| PLUGIN_SERVER_INGESTION       | Whether the plugin server should put events right into the database | `true`                                |
 | CLICKHOUSE_HOST               | ClickHouse host                                                     | `'localhost'`                         |
 | CLICKHOUSE_DATABASE           | ClickHouse database                                                 | `'default'`                           |
 | CLICKHOUSE_USER               | ClickHouse username                                                 | `'default'`                           |
