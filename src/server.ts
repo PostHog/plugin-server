@@ -20,26 +20,10 @@ import { KAFKA_EVENTS_PLUGIN_INGESTION, KAFKA_EVENTS_WAL } from './ingestion/top
 import { startSchedule } from './services/schedule'
 import { status } from './status'
 import { PluginsServer, PluginsServerConfig, Queue } from './types'
-import { delay, UUIDT } from './utils'
+import { delay, getIORedisConnection, UUIDT } from './utils'
 import { version } from './version'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { startQueue } from './worker/queue'
-
-async function getIORedisConnection(serverConfig: PluginsServerConfig): Promise<Redis.Redis> {
-    const redis = new Redis(serverConfig.REDIS_URL, { maxRetriesPerRequest: -1 })
-    redis
-        .on('error', (error) => {
-            Sentry.captureException(error)
-            status.error('🔴', 'Redis error encountered! Trying to reconnect...\n', error)
-        })
-        .on('ready', () => {
-            if (process.env.NODE_ENV !== 'test') {
-                status.info('✅', 'Connected to Redis!')
-            }
-        })
-    await redis.info()
-    return redis
-}
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
