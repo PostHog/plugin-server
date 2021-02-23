@@ -80,6 +80,8 @@ export const createProcessEventTests = (
             ...(extraServerConfig ?? {}),
         })
 
+        redis = await server.redisPool.acquire()
+
         await redis.del(server.PLUGINS_CELERY_QUEUE)
         await redis.del(server.CELERY_DEFAULT_QUEUE)
 
@@ -130,7 +132,6 @@ export const createProcessEventTests = (
         processEventCounter = 0
         team = await getFirstTeam(server)
         now = DateTime.utc()
-        redis = await server.redisPool.acquire()
 
         // clear the webhook redis cache
         const hooksCacheKey = `@posthog/plugin-server/hooks/${team.id}`
