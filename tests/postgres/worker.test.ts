@@ -153,7 +153,7 @@ test('pause the queue if too many tasks', async () => {
     expect(pluginsServer.piscina.completed).toBe(baseCompleted)
     expect(pluginsServer.queue.isPaused()).toBe(false)
 
-    await delay(3000)
+    await delay(5000)
 
     expect(pluginsServer.piscina.queueSize).toBe(0)
     expect(pluginsServer.piscina.completed).toBe(baseCompleted + 2)
@@ -211,5 +211,6 @@ test('pause the queue if too many tasks', async () => {
     expect(await redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(0)
     expect(await redis.llen(pluginsServer.server.CELERY_DEFAULT_QUEUE)).toBe(52)
 
+    await pluginsServer.server.redisPool.release(redis)
     await pluginsServer.stop()
 })
