@@ -152,14 +152,6 @@ export class EventsProcessor {
             if (properties['$anon_distinct_id']) {
                 await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
             }
-            if (properties['$set'] || properties['$set_once']) {
-                await this.updatePersonProperties(
-                    teamId,
-                    distinctId,
-                    properties['$set'] || {},
-                    properties['$set_once'] || {}
-                )
-            }
             await this.setIsIdentified(teamId, distinctId)
         }
     }
@@ -371,6 +363,15 @@ export class EventsProcessor {
                     distinctId,
                 ])
             } catch {}
+        }
+
+        if (properties['$set'] || properties['$set_once']) {
+            await this.updatePersonProperties(
+                teamId,
+                distinctId,
+                properties['$set'] || {},
+                properties['$set_once'] || {}
+            )
         }
 
         return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elementsList, siteUrl)
