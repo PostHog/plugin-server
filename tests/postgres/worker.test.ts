@@ -110,8 +110,8 @@ test('pause the queue if too many tasks', async () => {
         {
             WORKER_CONCURRENCY: 2,
             TASKS_PER_WORKER: 2,
-            REDIS_POOL_MIN_SIZE: 1,
-            REDIS_POOL_MAX_SIZE: 1,
+            REDIS_POOL_MIN_SIZE: 2,
+            REDIS_POOL_MAX_SIZE: 2,
             PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
             CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
             LOG_LEVEL: LogLevel.Debug,
