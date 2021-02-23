@@ -1,4 +1,5 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
+import * as IORedis from 'ioredis'
 import { DateTime } from 'luxon'
 import { performance } from 'perf_hooks'
 
@@ -66,6 +67,7 @@ export const createProcessEventTests = (
     let team: Team
     let server: PluginsServer
     let stopServer: () => Promise<void>
+    let redis: IORedis.Redis
     let eventsProcessor: EventsProcessor
     let now = DateTime.utc()
     const returned: ReturnWithServer = {}
@@ -78,8 +80,8 @@ export const createProcessEventTests = (
             ...(extraServerConfig ?? {}),
         })
 
-        await server.redis.del(server.PLUGINS_CELERY_QUEUE)
-        await server.redis.del(server.CELERY_DEFAULT_QUEUE)
+        await redis.del(server.PLUGINS_CELERY_QUEUE)
+        await redis.del(server.CELERY_DEFAULT_QUEUE)
 
         onQuery(server, () => queryCounter++)
 
@@ -128,13 +130,15 @@ export const createProcessEventTests = (
         processEventCounter = 0
         team = await getFirstTeam(server)
         now = DateTime.utc()
+        redis = await server.redisPool.acquire()
 
         // clear the webhook redis cache
         const hooksCacheKey = `@posthog/plugin-server/hooks/${team.id}`
-        await server.redis.del(hooksCacheKey)
+        await redis.del(hooksCacheKey)
     })
 
     afterEach(async () => {
+        await server.redisPool.release(redis)
         await stopServer?.()
     })
 

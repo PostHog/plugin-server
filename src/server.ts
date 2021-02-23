@@ -126,8 +126,8 @@ export async function createServer(
             },
         },
         {
-            min: 1,
-            max: 3,
+            min: serverConfig.REDIS_POOL_MIN_SIZE,
+            max: serverConfig.REDIS_POOL_MAX_SIZE,
             autostart: true,
         }
     )
