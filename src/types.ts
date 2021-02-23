@@ -1,5 +1,6 @@
 import ClickHouse from '@posthog/clickhouse'
 import { PluginAttachment, PluginConfigSchema, PluginEvent, Properties } from '@posthog/plugin-scaffold'
+import { Pool as GenericPool } from 'generic-pool'
 import { StatsD } from 'hot-shots'
 import { EventsProcessor } from 'ingestion/process-event'
 import { Redis } from 'ioredis'
@@ -57,7 +58,7 @@ export interface PluginsServer extends PluginsServerConfig {
     // active connections to Postgres, Redis, ClickHouse, Kafka, StatsD
     db: DB
     postgres: Pool
-    redis: Redis
+    redisPool: GenericPool<Redis>
     clickhouse?: ClickHouse
     kafka?: Kafka
     kafkaProducer?: Producer

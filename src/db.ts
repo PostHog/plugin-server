@@ -1,6 +1,6 @@
 import ClickHouse from '@posthog/clickhouse'
 import { Properties } from '@posthog/plugin-scaffold'
-import { createPool, Pool as GenericPool } from 'generic-pool'
+import { Pool as GenericPool } from 'generic-pool'
 import Redis from 'ioredis'
 import { Producer, ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
@@ -8,7 +8,6 @@ import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './ingestion/utils'
-import { status } from './status'
 import {
     ClickHouseEvent,
     ClickHousePerson,
@@ -28,6 +27,7 @@ import {
 import {
     castTimestampOrNow,
     clickHouseTimestampToISO,
+    createRedis,
     escapeClickHouseString,
     sanitizeSqlIdentifier,
     tryTwice,
@@ -45,21 +45,16 @@ export class DB {
     /** ClickHouse used for syncing Postgres and ClickHouse person data. */
     clickhouse?: ClickHouse
 
-    constructor(postgres: Pool, redis: Redis.Redis, kafkaProducer?: Producer, clickhouse?: ClickHouse) {
+    constructor(
+        postgres: Pool,
+        redisPool: GenericPool<Redis.Redis>,
+        kafkaProducer?: Producer,
+        clickhouse?: ClickHouse
+    ) {
         this.postgres = postgres
         this.kafkaProducer = kafkaProducer
         this.clickhouse = clickhouse
-        this.redisPool = createPool<Redis.Redis>(
-            {
-                create: () => Promise.resolve(redis),
-                destroy: () => Promise.resolve(undefined),
-            },
-            {
-                min: 1,
-                max: 1,
-                autostart: true,
-            }
-        )
+        this.redisPool = redisPool
     }
 
     // Postgres
