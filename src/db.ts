@@ -1,6 +1,6 @@
 import ClickHouse from '@posthog/clickhouse'
 import { Properties } from '@posthog/plugin-scaffold'
-import { createPool,Pool as GenericPool } from 'generic-pool'
+import { createPool, Pool as GenericPool } from 'generic-pool'
 import Redis from 'ioredis'
 import { Producer, ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
