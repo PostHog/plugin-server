@@ -25,15 +25,7 @@ import { version } from './version'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { startQueue } from './worker/queue'
 
-export async function createServer(
-    config: Partial<PluginsServerConfig> = {},
-    threadId: number | null = null
-): Promise<[PluginsServer, () => Promise<void>]> {
-    const serverConfig: PluginsServerConfig = {
-        ...defaultConfig,
-        ...config,
-    }
-
+async function getIORedisConnection(serverConfig: PluginsServerConfig): Promise<Redis.Redis> {
     const redis = new Redis(serverConfig.REDIS_URL, { maxRetriesPerRequest: -1 })
     redis
         .on('error', (error) => {
@@ -46,6 +38,19 @@ export async function createServer(
             }
         })
     await redis.info()
+    return redis
+}
+
+export async function createServer(
+    config: Partial<PluginsServerConfig> = {},
+    threadId: number | null = null
+): Promise<[PluginsServer, () => Promise<void>]> {
+    const serverConfig: PluginsServerConfig = {
+        ...defaultConfig,
+        ...config,
+    }
+
+    const redis = await getIORedisConnection(serverConfig)
 
     let kafkaSsl: ConnectionOptions | undefined
     if (
