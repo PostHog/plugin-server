@@ -259,7 +259,8 @@ export async function startPluginsServer(
             queue?.resume()
         })
 
-        pubSub = new Redis(server.REDIS_URL, { enableAutoPipelining: true })
+        // use one extra connection for redis pubsub
+        pubSub = await createRedis(server)
         await pubSub.subscribe(server.PLUGINS_RELOAD_PUBSUB_CHANNEL)
         pubSub.on('message', async (channel: string, message) => {
             if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
