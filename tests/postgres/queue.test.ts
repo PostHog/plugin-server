@@ -19,15 +19,18 @@ async function getServer(): Promise<[PluginsServer, () => Promise<void>]> {
         LOG_LEVEL: LogLevel.Log,
     })
 
-    await server.redis.del(server.PLUGINS_CELERY_QUEUE)
-    await server.redis.del(server.CELERY_DEFAULT_QUEUE)
+    const redis = await server.redisPool.acquire()
+    await redis.del(server.PLUGINS_CELERY_QUEUE)
+    await redis.del(server.CELERY_DEFAULT_QUEUE)
+    await server.redisPool.release(redis)
     return [server, stopServer]
 }
 
 test('worker and task passing via redis', async () => {
     const [server, stopServer] = await getServer()
+    const redis = await server.redisPool.acquire()
     // Nothing in the redis queue
-    const queue1 = await server.redis.llen(server.PLUGINS_CELERY_QUEUE)
+    const queue1 = await redis.llen(server.PLUGINS_CELERY_QUEUE)
     expect(queue1).toBe(0)
 
     const kwargs = {
@@ -50,11 +53,12 @@ test('worker and task passing via redis', async () => {
     client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
 
     // It's there
-    const queue2 = await server.redis.llen(server.PLUGINS_CELERY_QUEUE)
+    await advanceOneTick()
+    const queue2 = await redis.llen(server.PLUGINS_CELERY_QUEUE)
     expect(queue2).toBe(1)
 
-    const item2 = await server.redis.lpop(server.PLUGINS_CELERY_QUEUE)
-    await server.redis.lpush(server.PLUGINS_CELERY_QUEUE, item2)
+    const item2 = await redis.lpop(server.PLUGINS_CELERY_QUEUE)
+    await redis.lpush(server.PLUGINS_CELERY_QUEUE, item2)
     const item = JSON.parse(item2)
 
     expect(item['content-type']).toBe('application/json')
@@ -77,10 +81,10 @@ test('worker and task passing via redis', async () => {
     await advanceOneTick()
 
     // get the new processed task from CELERY_DEFAULT_QUEUE
-    const queue3 = await server.redis.llen(server.CELERY_DEFAULT_QUEUE)
+    const queue3 = await redis.llen(server.CELERY_DEFAULT_QUEUE)
     expect(queue3).toBe(1)
-    const item3 = await server.redis.lpop(server.CELERY_DEFAULT_QUEUE)
-    await server.redis.lpush(server.CELERY_DEFAULT_QUEUE, item3)
+    const item3 = await redis.lpop(server.CELERY_DEFAULT_QUEUE)
+    await redis.lpush(server.CELERY_DEFAULT_QUEUE, item3)
     const processedItem = JSON.parse(item3)
 
     expect(processedItem['content-type']).toBe('application/json')
@@ -94,18 +98,20 @@ test('worker and task passing via redis', async () => {
     expect(args3).toEqual([])
     expect(kwargs3).toEqual(kwargs)
 
-    const queue4 = await server.redis.llen(server.PLUGINS_CELERY_QUEUE)
-    const queue5 = await server.redis.llen(server.CELERY_DEFAULT_QUEUE)
+    const queue4 = await redis.llen(server.PLUGINS_CELERY_QUEUE)
+    const queue5 = await redis.llen(server.CELERY_DEFAULT_QUEUE)
     await advanceOneTick()
 
     await queue.stop()
+    await server.redisPool.release(redis)
     await stopServer()
 })
 
 test('process multiple tasks', async () => {
     const [server, stopServer] = await getServer()
+    const redis = await server.redisPool.acquire()
     // Nothing in the redis queue
-    const queue1 = await server.redis.llen(server.PLUGINS_CELERY_QUEUE)
+    const queue1 = await redis.llen(server.PLUGINS_CELERY_QUEUE)
     expect(queue1).toBe(0)
 
     const kwargs = {
@@ -128,10 +134,11 @@ test('process multiple tasks', async () => {
     client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
     client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
     client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
+    await advanceOneTick()
 
     // There'll be a "tick lag" with the events moving from one queue to the next. :this_is_fine:
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(0)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(0)
 
     const queue = await startQueue(server, undefined, {
         processEvent: (event) => runPlugins(server, event),
@@ -140,36 +147,38 @@ test('process multiple tasks', async () => {
     })
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(2)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(0)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(2)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(0)
 
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(1)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(2)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
 
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(0)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(2)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(1)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(2)
 
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(0)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(0)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
 
-    const defaultQueue = ((await server.redis.get(server.CELERY_DEFAULT_QUEUE)) as any) as string[]
+    const defaultQueue = ((await redis.get(server.CELERY_DEFAULT_QUEUE)) as any) as string[]
 
     expect(defaultQueue.map((q) => JSON.parse(q)['headers']['lang']).join('-o-')).toBe('js-o-js-o-js')
 
     await queue.stop()
+    await server.redisPool.release(redis)
     await stopServer()
 })
 
 test('pause and resume queue', async () => {
     const [server, stopServer] = await getServer()
+    const redis = await server.redisPool.acquire()
     // Nothing in the redis queue
-    const queue1 = await server.redis.llen(server.PLUGINS_CELERY_QUEUE)
+    const queue1 = await redis.llen(server.PLUGINS_CELERY_QUEUE)
     expect(queue1).toBe(0)
 
     const kwargs = {
@@ -195,10 +204,11 @@ test('pause and resume queue', async () => {
     client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
     client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
     client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
+    await advanceOneTick()
 
     // There'll be a "tick lag" with the events moving from one queue to the next. :this_is_fine:
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(6)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(0)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(6)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(0)
 
     const queue = await startQueue(server, undefined, {
         processEvent: (event) => runPlugins(server, event),
@@ -207,85 +217,89 @@ test('pause and resume queue', async () => {
     })
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(0)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(0)
 
     await queue.pause()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
 
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
 
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
 
     queue.resume()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(5)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
 
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(4)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(4)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(1)
 
     await advanceOneTick()
+    await Promise.resolve(true)
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(2)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(2)
 
     await queue.pause()
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
 
     await queue.pause()
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
 
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
 
     queue.resume()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(3)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
 
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(2)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(2)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(3)
+
+    await advanceOneTick()
+    await Promise.resolve(true)
+
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(1)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(4)
+
+    await advanceOneTick()
+    await Promise.resolve(true)
+
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(0)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(5)
 
     await advanceOneTick()
 
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(1)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(4)
+    expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(0)
+    expect(await redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(6)
 
-    await advanceOneTick()
-
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(0)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(5)
-
-    await advanceOneTick()
-
-    expect(await server.redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(0)
-    expect(await server.redis.llen(server.CELERY_DEFAULT_QUEUE)).toBe(6)
-
-    const defaultQueue = ((await server.redis.get(server.CELERY_DEFAULT_QUEUE)) as any) as string[]
+    const defaultQueue = ((await redis.get(server.CELERY_DEFAULT_QUEUE)) as any) as string[]
 
     expect(defaultQueue.map((q) => JSON.parse(q)['headers']['lang']).join('-o-')).toBe('js-o-js-o-js-o-js-o-js-o-js')
 
     await queue.stop()
+    await server.redisPool.release(redis)
     await stopServer()
 })
