@@ -57,6 +57,7 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
+                  ref: setup-test-environment-fix
 
             - name: Check out plugin server
               uses: actions/checkout@v2
@@ -136,6 +137,7 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
+                  ref: setup-test-environment-fix
 
             - name: Check out plugin server
               uses: actions/checkout@v2
@@ -227,6 +229,7 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
+                  ref: setup-test-environment-fix
 
             - name: Check out plugin server
               uses: actions/checkout@v2
@@ -318,6 +321,7 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
+                  ref: setup-test-environment-fix
 
             - name: Check out plugin server
               uses: actions/checkout@v2
@@ -405,6 +409,7 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
+                  ref: setup-test-environment-fix
 
             - name: Check out plugin server
               uses: actions/checkout@v2
@@ -480,6 +485,7 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
+                  ref: setup-test-environment-fix
 
             - name: Check out plugin server
               uses: actions/checkout@v2
@@ -555,6 +561,7 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
+                  ref: setup-test-environment-fix
 
             - name: Check out plugin server
               uses: actions/checkout@v2
