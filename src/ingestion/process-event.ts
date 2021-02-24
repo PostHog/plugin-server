@@ -1,6 +1,7 @@
 import ClickHouse from '@posthog/clickhouse'
 import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
+import equal from 'fast-deep-equal'
 import { Producer } from 'kafkajs'
 import { DateTime, Duration } from 'luxon'
 import * as fetch from 'node-fetch'
@@ -210,6 +211,11 @@ export class EventsProcessor {
             )
         }
         const updatedProperties: Properties = { ...propertiesOnce, ...personFound.properties, ...properties }
+
+        if (equal(personFound.properties, updatedProperties)) {
+            return personFound
+        }
+
         return await this.db.updatePerson(personFound, { properties: updatedProperties })
     }
 
