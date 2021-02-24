@@ -1191,9 +1191,38 @@ export const createProcessEventTests = (
         ).rejects.toEqual(new Error('Not a valid UUID: "null"'))
     })
 
-    test('any event can do $set on props', async () => {
+    test('any event can do $set on props (user exists)', async () => {
         await createPerson(server, team, ['distinct_id'])
 
+        await processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: 'some_event',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $set: { a_prop: 'test-1', c_prop: 'test-1' },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect((await server.db.fetchEvents()).length).toBe(1)
+
+        const [event] = await server.db.fetchEvents()
+        expect(event.properties['$set']).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
+
+        const [person] = await server.db.fetchPersons()
+        expect(await server.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+        expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
+    })
+
+    test('any event can do $set on props (new user)', async () => {
         await processEvent(
             'distinct_id',
             '',
