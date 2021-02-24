@@ -210,7 +210,7 @@ export const createProcessEventTests = (
 
         await processEvent(
             '2',
-            '',
+            '127.0.0.1',
             '',
             ({
                 event: '$autocapture',
@@ -238,7 +238,7 @@ export const createProcessEventTests = (
         // capture a second time to verify e.g. event_names is not ['$autocapture', '$autocapture']
         await processEvent(
             '2',
-            '',
+            '127.0.0.1',
             '',
             ({
                 event: '$autocapture',
@@ -1103,7 +1103,7 @@ export const createProcessEventTests = (
 
         await processEvent(
             'xxx',
-            '',
+            '127.0.0.1',
             '',
             ({ event: 'purchase', properties: { price: 299.99, name: 'AirPods Pro' } } as any) as PluginEvent,
             team.id,
