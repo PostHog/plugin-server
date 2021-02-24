@@ -403,6 +403,26 @@ export const createProcessEventTests = (
         expect(difference).toBeLessThan(1)
     })
 
+    test('ip none', async () => {
+        await createPerson(server, team, ['asdfasdfasdf'])
+
+        await processEvent(
+            'asdfasdfasdf',
+            (null as any) as string, // TODO: update types
+            '',
+            ({
+                event: '$pageview',
+                properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+        const [event] = await server.db.fetchEvents()
+        expect(Object.keys(event.properties)).not.toContain('$ip')
+    })
+
     test('ip capture', async () => {
         await createPerson(server, team, ['asdfasdfasdf'])
 
