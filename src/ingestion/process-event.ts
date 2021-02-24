@@ -454,7 +454,7 @@ export class EventsProcessor {
                 `SELECT COUNT(*) FROM ee_hook WHERE team_id = $1 AND event = 'action_performed' LIMIT 1`,
                 [team.id]
             )
-            return !!hookQueryResult.rows[0].count
+            return parseInt(hookQueryResult.rows[0].count) > 0
         } catch (error) {
             // In FOSS PostHog ee_hook does not exist. If the error is other than that, rethrow it
             if (!String(error).includes('relation "ee_hook" does not exist')) {
@@ -524,6 +524,7 @@ export class EventsProcessor {
         }
 
         if (await this.shouldSendHooksTask(team)) {
+            this.pluginsServer.statsd?.increment(`hooks.send_task`)
             this.celery.sendTask('ee.tasks.webhooks_ee.post_event_to_webhook_ee', [
                 {
                     event,
