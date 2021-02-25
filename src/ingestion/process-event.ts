@@ -356,7 +356,7 @@ export class EventsProcessor {
         await this.storeNamesAndProperties(team, event, properties)
 
         const pdiSelectResult = await this.db.postgresQuery(
-            'SELECT COUNT(1) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
+            'SELECT COUNT(*) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
             [teamId, distinctId]
         )
         const pdiCount = parseInt(pdiSelectResult.rows[0].pdicount)
