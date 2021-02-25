@@ -17,7 +17,7 @@ export function createPluginConfigVM(
 ): PluginConfigLazyVMResponse {
     const createVmPromise = createActualVM(server, pluginConfig, indexJs)
 
-    return {
+    const lazyResponse: PluginConfigLazyVMResponse = {
         vmPromise: createVmPromise.then((vm) => vm.vm),
         methods: {
             processEvent: (event) => createVmPromise.then((vm) => vm.methods.processEvent(event)),
@@ -25,6 +25,12 @@ export function createPluginConfigVM(
         },
         tasks: {}, // new Proxy(),
     }
+
+    void createVmPromise.then(({ tasks }) => {
+        lazyResponse.tasks = tasks
+    })
+
+    return lazyResponse
 }
 
 export async function createActualVM(

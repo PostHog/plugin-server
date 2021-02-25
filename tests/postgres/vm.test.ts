@@ -652,6 +652,9 @@ test('runEvery', async () => {
     await resetTestDatabase(indexJs)
     const vm = createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
+    expect(Object.keys(vm.tasks)).toEqual([])
+    await vm.vmPromise
+
     expect(Object.keys(vm.tasks)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
     expect(Object.values(vm.tasks).map((v) => v?.name)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
     expect(Object.values(vm.tasks).map((v) => v?.type)).toEqual(['runEvery', 'runEvery', 'runEvery'])
@@ -669,6 +672,9 @@ test('runEvery must be a function', async () => {
     await resetTestDatabase(indexJs)
     const vm = createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
+    expect(Object.keys(vm.tasks)).toEqual([])
+    await vm.vmPromise
+
     expect(Object.keys(vm.tasks)).toEqual(['runEveryMinute'])
     expect(Object.values(vm.tasks).map((v) => v?.name)).toEqual(['runEveryMinute'])
     expect(Object.values(vm.tasks).map((v) => v?.type)).toEqual(['runEvery'])
@@ -684,6 +690,7 @@ test('posthog in runEvery', async () => {
     `
     await resetTestDatabase(indexJs)
     const vm = createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    await vm.vmPromise
 
     expect(Client).not.toHaveBeenCalled
 
@@ -723,6 +730,7 @@ test('posthog in runEvery with timestamp', async () => {
     `
     await resetTestDatabase(indexJs)
     const vm = createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    await vm.vmPromise
 
     expect(Client).not.toHaveBeenCalled
 
