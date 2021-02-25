@@ -71,21 +71,8 @@ function startQueueRedis(server: PluginsServer, piscina: Piscina | undefined, wo
                 pauseQueueIfWorkerFull(celeryQueue, server, piscina)
                 const processedEvent = await workerMethods.processEvent(event)
                 if (processedEvent) {
-                    if (server.PLUGIN_SERVER_INGESTION) {
-                        pauseQueueIfWorkerFull(celeryQueue, server, piscina)
-                        await workerMethods.ingestEvent(processedEvent)
-                    } else {
-                        const { distinct_id, ip, site_url, team_id, now, sent_at, ...data } = processedEvent
-                        client.sendTask('posthog.tasks.process_event.process_event', [], {
-                            distinct_id,
-                            ip,
-                            site_url,
-                            data,
-                            team_id,
-                            now,
-                            sent_at,
-                        })
-                    }
+                    pauseQueueIfWorkerFull(celeryQueue, server, piscina)
+                    await workerMethods.ingestEvent(processedEvent)
                 }
             } catch (e) {
                 Sentry.captureException(e)
