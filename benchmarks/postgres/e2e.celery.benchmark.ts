@@ -71,7 +71,7 @@ describe('e2e celery & postgres benchmark', () => {
         for (let i = 0; i < count; i++) {
             createEvent()
         }
-        await delay(1000)
+        await delay(3000)
         expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toEqual(count)
         queue.resume()
 
