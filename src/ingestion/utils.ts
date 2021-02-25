@@ -1,3 +1,4 @@
+import { Properties } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import crypto from 'crypto'
 
@@ -168,14 +169,15 @@ const campaignParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content
 const initialParams = ['$browser', '$browser_version', '$current_url', '$os', '$referring_domain', '$referrer']
 
 /** If we get new UTM params, make sure we set those  **/
-export function userInitialAndUTMProperties(properties: Record<string, any>): Record<string, any> {
+export function personInitialAndUTMProperties(properties: Record<string, any>): Record<string, any> {
+    const propertiesCopy = { ...properties }
     const maybeSet = Object.entries(properties).filter(([key, value]) => campaignParams.indexOf(key) > -1)
     const maybeSetInitial = Object.entries(properties)
         .filter(([key, value]) => [...campaignParams, ...initialParams].indexOf(key) > -1)
         .map(([key, value]) => [`$initial_${key.replace('$', '')}`, value])
     if (Object.keys(maybeSet).length > 0) {
-        properties.$set = { ...(properties.$set || {}), ...Object.fromEntries(maybeSet) }
-        properties.$set_once = { ...(properties.$set_once || {}), ...Object.fromEntries(maybeSetInitial) }
+        propertiesCopy.$set = { ...(properties.$set || {}), ...Object.fromEntries(maybeSet) }
+        propertiesCopy.$set_once = { ...(properties.$set_once || {}), ...Object.fromEntries(maybeSetInitial) }
     }
-    return properties
+    return propertiesCopy
 }

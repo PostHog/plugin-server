@@ -24,7 +24,7 @@ import {
 } from '../types'
 import { castTimestampOrNow, UUID, UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { elementsToString, sanitizeEventName, timeoutGuard, userInitialAndUTMProperties } from './utils'
+import { elementsToString, personInitialAndUTMProperties,sanitizeEventName, timeoutGuard } from './utils'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
@@ -356,7 +356,7 @@ export class EventsProcessor {
         await this.storeNamesAndProperties(team, event, properties)
 
         const pdiSelectResult = await this.db.postgresQuery(
-            'SELECT COUNT(1) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
+            'SELECT COUNT(*) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
             [teamId, distinctId]
         )
         const pdiCount = parseInt(pdiSelectResult.rows[0].pdicount)
@@ -370,7 +370,7 @@ export class EventsProcessor {
             } catch {}
         }
 
-        properties = userInitialAndUTMProps(properties)
+        properties = personInitialAndUTMProps(properties)
 
         if (properties['$set'] || properties['$set_once']) {
             await this.updatePersonProperties(
