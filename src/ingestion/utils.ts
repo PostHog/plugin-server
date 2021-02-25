@@ -177,13 +177,14 @@ export function userInitialProperties(properties: Record<string, any>): Record<s
     )
 }
 
-    const maybeSet = Object.entries(properties).filter(([key, value]) => campaignParams.indexOf(key) > -1)
-    const maybeSetInitial = maybeSet.map(([key, value]) => [`$initial_${key.replace('$', '')}`, value])
-    if (Object.keys(maybeSet).length > 0) {
-        properties.$set = { ...(properties.$set || {}), ...Object.fromEntries(maybeSet) }
-        properties.$set_once = { ...(properties.$set_once || {}), ...Object.fromEntries(maybeSetInitial) }
 /** Return new properties object with $set and $set_once including UTM tags - if UTM tags present in properties. */
 export function ensurePersonUpdateOnUtm(properties: Properties): Properties {
+    const propertiesCopy = { ...properties }
+    const setEntries = Object.entries(propertiesCopy).filter(([key]) => campaignParams.includes(key))
+    const setInitialEntries = setEntries.map(([key, value]) => [`$initial_${key.replace(/^\$/, '')}`, value])
+    if (Object.keys(setEntries).length > 0) {
+        propertiesCopy.$set = { ...propertiesCopy.$set, ...Object.fromEntries(setEntries) }
+        propertiesCopy.$set_once = { ...propertiesCopy.$set_once, ...Object.fromEntries(setInitialEntries) }
     }
-    return properties
+    return propertiesCopy
 }
