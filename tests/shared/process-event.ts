@@ -92,7 +92,7 @@ export const createProcessEventTests = (
 
     async function processEvent(
         distinctId: string,
-        ip: string,
+        ip: string | null,
         siteUrl: string,
         data: PluginEvent,
         teamId: number,
@@ -408,7 +408,7 @@ export const createProcessEventTests = (
 
         await processEvent(
             'asdfasdfasdf',
-            (null as any) as string, // TODO: update types
+            null,
             '',
             ({
                 event: '$pageview',
