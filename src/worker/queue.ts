@@ -8,6 +8,7 @@ import { IngestEventResponse } from '../ingestion/ingest-event'
 import { KafkaQueue } from '../ingestion/kafka-queue'
 import { status } from '../status'
 import { PluginsServer, Queue } from '../types'
+import { UUIDT } from '../utils'
 
 export type WorkerMethods = {
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
@@ -66,7 +67,16 @@ function startQueueRedis(server: PluginsServer, piscina: Piscina | undefined, wo
             now: string,
             sent_at?: string
         ) => {
-            const event = { distinct_id, ip, site_url, team_id, now, sent_at, ...data } as PluginEvent
+            const event = {
+                distinct_id,
+                ip,
+                site_url,
+                team_id,
+                now,
+                sent_at,
+                uuid: new UUIDT().toString(),
+                ...data,
+            } as PluginEvent
             try {
                 pauseQueueIfWorkerFull(celeryQueue, server, piscina)
                 const processedEvent = await workerMethods.processEvent(event)
