@@ -1,3 +1,4 @@
+import { Properties } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import crypto from 'crypto'
 
@@ -176,13 +177,13 @@ export function userInitialProperties(properties: Record<string, any>): Record<s
     )
 }
 
-/** If we get new UTM params, make sure we set those  **/
-export function userShouldSetUTM(properties: Record<string, any>): Record<string, any> {
     const maybeSet = Object.entries(properties).filter(([key, value]) => campaignParams.indexOf(key) > -1)
     const maybeSetInitial = maybeSet.map(([key, value]) => [`$initial_${key.replace('$', '')}`, value])
     if (Object.keys(maybeSet).length > 0) {
         properties.$set = { ...(properties.$set || {}), ...Object.fromEntries(maybeSet) }
         properties.$set_once = { ...(properties.$set_once || {}), ...Object.fromEntries(maybeSetInitial) }
+/** Return new properties object with $set and $set_once including UTM tags - if UTM tags present in properties. */
+export function ensurePersonUpdateOnUtm(properties: Properties): Properties {
     }
     return properties
 }
