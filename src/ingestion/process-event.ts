@@ -24,7 +24,7 @@ import {
 } from '../types'
 import { castTimestampOrNow, UUID, UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { elementsToString, sanitizeEventName, timeoutGuard, userInitialProperties, userShouldSetUTM } from './utils'
+import { elementsToString, sanitizeEventName, timeoutGuard, userInitialAndUTMProperties } from './utils'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
@@ -364,19 +364,13 @@ export class EventsProcessor {
         if (!pdiCount) {
             // Catch race condition where in between getting and creating, another request already created this user
             try {
-                await this.db.createPerson(
-                    sentAt || DateTime.utc(),
-                    userInitialProperties(properties),
-                    teamId,
-                    null,
-                    false,
-                    personUuid.toString(),
-                    [distinctId]
-                )
+                await this.db.createPerson(sentAt || DateTime.utc(), {}, teamId, null, false, personUuid.toString(), [
+                    distinctId,
+                ])
             } catch {}
         }
 
-        properties = userShouldSetUTM(properties)
+        properties = userInitialAndUTMProps(properties)
 
         if (properties['$set'] || properties['$set_once']) {
             await this.updatePersonProperties(

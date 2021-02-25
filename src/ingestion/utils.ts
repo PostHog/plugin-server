@@ -165,21 +165,14 @@ export function timeoutGuard(message: string, timeout = defaultConfig.TASK_TIMEO
 }
 
 const campaignParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']
-
-/** These params will be set on the user as $initial_{} **/
-export function userInitialProperties(properties: Record<string, any>): Record<string, any> {
-    const initialParams = ['$browser', '$browser_version', '$current_url', '$os', '$referring_domain', '$referrer']
-    return Object.fromEntries(
-        Object.entries(properties)
-            .filter(([key, value]) => [...initialParams, ...campaignParams].indexOf(key) > -1)
-            .map(([key, value]) => [`$initial_${key.replace('$', '')}`, value])
-    )
-}
+const initialParams = ['$browser', '$browser_version', '$current_url', '$os', '$referring_domain', '$referrer']
 
 /** If we get new UTM params, make sure we set those  **/
-export function userShouldSetUTM(properties: Record<string, any>): Record<string, any> {
+export function userInitialAndUTMProperties(properties: Record<string, any>): Record<string, any> {
     const maybeSet = Object.entries(properties).filter(([key, value]) => campaignParams.indexOf(key) > -1)
-    const maybeSetInitial = maybeSet.map(([key, value]) => [`$initial_${key.replace('$', '')}`, value])
+    const maybeSetInitial = Object.entries(properties)
+        .filter(([key, value]) => [...campaignParams, ...initialParams].indexOf(key) > -1)
+        .map(([key, value]) => [`$initial_${key.replace('$', '')}`, value])
     if (Object.keys(maybeSet).length > 0) {
         properties.$set = { ...(properties.$set || {}), ...Object.fromEntries(maybeSet) }
         properties.$set_once = { ...(properties.$set_once || {}), ...Object.fromEntries(maybeSetInitial) }
