@@ -803,7 +803,11 @@ test('posthog.capture accepts user-defined distinct id', async () => {
         expect.objectContaining({
             distinct_id: 'custom id',
             event: 'my-new-event',
-            properties: expect.objectContaining({ $lib: 'posthog-plugin-server', random: 'properties' }),
+            properties: expect.objectContaining({
+                $lib: 'posthog-plugin-server',
+                random: 'properties',
+                distinct_id: 'custom id',
+            }),
         }),
         2,
         mockSendTask.mock.calls[0][1][5],
