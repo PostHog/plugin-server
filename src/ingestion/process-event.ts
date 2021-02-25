@@ -24,7 +24,13 @@ import {
 } from '../types'
 import { castTimestampOrNow, UUID, UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { elementsToString, sanitizeEventName, timeoutGuard, userInitialProperties, ensurePersonUpdateOnUtm } from './utils'
+import {
+    elementsToString,
+    ensurePersonUpdateOnUtm,
+    sanitizeEventName,
+    timeoutGuard,
+    userInitialProperties,
+} from './utils'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
