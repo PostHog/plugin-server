@@ -7,6 +7,7 @@
     "scripts": {
         "test": "jest --runInBand tests/**/*.test.ts",
         "test:postgres": "jest --runInBand tests/postgres/*.test.ts tests/*.test.ts",
+        "test:clickhouse": "yarn test:clickhouse:1 && yarn test:clickhouse:2",
         "test:clickhouse:1": "jest --runInBand tests/clickhouse/postgres-parity.test.ts tests/clickhouse/e2e.test.ts tests/clickhouse/ingestion-utils.test.ts",
         "test:clickhouse:2": "jest --runInBand tests/clickhouse/process-event.test.ts",
         "benchmark": "yarn run benchmarks:clickhouse && yarn run benchmark:postgres && yarn run benchmarks:vm",
