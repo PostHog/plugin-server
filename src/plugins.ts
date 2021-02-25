@@ -130,7 +130,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
             const indexJs = fs.readFileSync(jsPath).toString()
 
             try {
-                pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs)
+                pluginConfig.vm = createPluginConfigVM(server, pluginConfig, indexJs)
                 status.info('🔌', `Loaded local plugin "${plugin.name}" from "${pluginPath}"!`)
                 await clearError(server, pluginConfig)
                 return true
@@ -154,7 +154,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
 
             if (indexJs) {
                 try {
-                    pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs)
+                    pluginConfig.vm = createPluginConfigVM(server, pluginConfig, indexJs)
                     status.info('🔌', `Loaded plugin "${plugin.name}"!`)
                     await clearError(server, pluginConfig)
                     return true
@@ -166,7 +166,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
             }
         } else if (plugin.plugin_type === 'source' && plugin.source) {
             try {
-                pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, plugin.source)
+                pluginConfig.vm = createPluginConfigVM(server, pluginConfig, plugin.source)
                 status.info('🔌', `Loaded plugin "${plugin.name}"!`)
                 await clearError(server, pluginConfig)
                 return true

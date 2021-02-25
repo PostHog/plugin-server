@@ -119,7 +119,7 @@ export interface PluginConfig {
     config: Record<string, unknown>
     error?: PluginError
     attachments?: Record<string, PluginAttachment>
-    vm?: PluginConfigVMReponse | null
+    vm?: PluginConfigLazyVMResponse | null
 }
 
 export interface PluginJsonConfig {
@@ -156,7 +156,16 @@ export interface PluginTask {
     exec: () => Promise<any>
 }
 
-export interface PluginConfigVMReponse {
+export interface PluginConfigLazyVMResponse {
+    vmPromise: Promise<VM>
+    methods: {
+        processEvent: (event: PluginEvent) => Promise<PluginEvent>
+        processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
+    }
+    tasks: Record<string, PluginTask>
+}
+
+export interface PluginConfigVMResponse {
     vm: VM
     methods: {
         processEvent: (event: PluginEvent) => Promise<PluginEvent>

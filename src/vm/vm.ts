@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import fetch from 'node-fetch'
 import { VM } from 'vm2'
 
-import { PluginConfig, PluginConfigVMReponse, PluginsServer } from '../types'
+import { PluginConfig, PluginConfigLazyVMResponse, PluginConfigVMResponse, PluginsServer } from '../types'
 import { createCache } from './extensions/cache'
 import { createConsole } from './extensions/console'
 import { createGoogle } from './extensions/google'
@@ -10,11 +10,28 @@ import { createPosthog } from './extensions/posthog'
 import { createStorage } from './extensions/storage'
 import { secureCode } from './transforms'
 
-export async function createPluginConfigVM(
+export function createPluginConfigVM(
     server: PluginsServer,
     pluginConfig: PluginConfig, // NB! might have team_id = 0
     indexJs: string
-): Promise<PluginConfigVMReponse> {
+): PluginConfigLazyVMResponse {
+    const createVmPromise = createActualVM(server, pluginConfig, indexJs)
+
+    return {
+        vmPromise: createVmPromise.then((vm) => vm.vm),
+        methods: {
+            processEvent: (event) => createVmPromise.then((vm) => vm.methods.processEvent(event)),
+            processEventBatch: (batch) => createVmPromise.then((vm) => vm.methods.processEventBatch(batch)),
+        },
+        tasks: {}, // new Proxy(),
+    }
+}
+
+export async function createActualVM(
+    server: PluginsServer,
+    pluginConfig: PluginConfig, // NB! might have team_id = 0
+    indexJs: string
+): Promise<PluginConfigVMResponse> {
     const securedCode = secureCode(indexJs, server)
 
     // Create virtual machine
