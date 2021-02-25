@@ -146,8 +146,8 @@ export async function createActualVM(
 
             // export various functions
             const __methods = {
-                processEvent: __asyncFunctionGuard(__bindMeta('processEvent')),
-                processEventBatch: __asyncFunctionGuard(__bindMeta('processEventBatch'))
+                processEvent: __asyncFunctionGuard(__bindMeta('processEvent')) || ((event) => event),
+                processEventBatch: __asyncFunctionGuard(__bindMeta('processEventBatch')) || ((batch) => batch)
             };
 
             // gather the runEveryX commands and export in __tasks
