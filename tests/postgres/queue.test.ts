@@ -17,7 +17,6 @@ async function getServer(): Promise<[PluginsServer, () => Promise<void>]> {
         REDIS_POOL_MAX_SIZE: 3,
         PLUGINS_CELERY_QUEUE: 'ttt-test-plugins-celery-queue',
         CELERY_DEFAULT_QUEUE: 'ttt-test-celery-default-queue',
-        PLUGIN_SERVER_INGESTION: false,
         LOG_LEVEL: LogLevel.Log,
     })
 

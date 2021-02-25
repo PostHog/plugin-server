@@ -19,7 +19,6 @@ const extraServerConfig: Partial<PluginsServerConfig> = {
     REDIS_POOL_MAX_SIZE: 3,
     PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
     CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
-    PLUGIN_SERVER_INGESTION: true,
     LOG_LEVEL: LogLevel.Log,
     KAFKA_ENABLED: false,
 }
