@@ -24,7 +24,7 @@ import {
 } from '../types'
 import { castTimestampOrNow, UUID, UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { elementsToString, sanitizeEventName, timeoutGuard } from './utils'
+import { elementsToString, sanitizeEventName, timeoutGuard, userInitialProperties, userShouldSetUTM } from './utils'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
@@ -326,7 +326,6 @@ export class EventsProcessor {
         sentAt: DateTime | null
     ): Promise<IEvent> {
         event = sanitizeEventName(event)
-
         const elements: Record<string, any>[] | undefined = properties['$elements']
         let elementsList: Element[] = []
         if (elements && elements.length) {
@@ -357,7 +356,7 @@ export class EventsProcessor {
         await this.storeNamesAndProperties(team, event, properties)
 
         const pdiSelectResult = await this.db.postgresQuery(
-            'SELECT COUNT(*) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
+            'SELECT COUNT(1) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
             [teamId, distinctId]
         )
         const pdiCount = parseInt(pdiSelectResult.rows[0].pdicount)
@@ -365,11 +364,19 @@ export class EventsProcessor {
         if (!pdiCount) {
             // Catch race condition where in between getting and creating, another request already created this user
             try {
-                await this.db.createPerson(sentAt || DateTime.utc(), {}, teamId, null, false, personUuid.toString(), [
-                    distinctId,
-                ])
+                await this.db.createPerson(
+                    sentAt || DateTime.utc(),
+                    userInitialProperties(properties),
+                    teamId,
+                    null,
+                    false,
+                    personUuid.toString(),
+                    [distinctId]
+                )
             } catch {}
         }
+
+        properties = userShouldSetUTM(properties)
 
         if (properties['$set'] || properties['$set_once']) {
             await this.updatePersonProperties(
