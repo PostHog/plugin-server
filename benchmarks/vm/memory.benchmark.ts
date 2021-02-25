@@ -1,7 +1,7 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 
 import { createServer } from '../../src/server'
-import { Plugin, PluginConfig, PluginConfigVMReponse } from '../../src/types'
+import { Plugin, PluginConfig, PluginConfigLazyVMResponse, PluginConfigVMResponse } from '../../src/types'
 import { createPluginConfigVM } from '../../src/vm/vm'
 import { commonOrganizationId } from '../../tests/helpers/plugins'
 
@@ -71,10 +71,10 @@ test('test vm memory usage', async () => {
     const usedAtStart = getUsed()
 
     let used = usedAtStart
-    const vms: PluginConfigVMReponse[] = []
+    const vms: PluginConfigLazyVMResponse[] = []
 
     for (let i = 0; i < numVMs; i++) {
-        const vm = await createPluginConfigVM(server, mockConfig, indexJs)
+        const vm = createPluginConfigVM(server, mockConfig, indexJs)
         vms.push(vm)
 
         if (debug || i === numVMs - 1) {
