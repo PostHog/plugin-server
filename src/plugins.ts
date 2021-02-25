@@ -129,14 +129,8 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
             const jsPath = path.resolve(pluginPath, config['main'] || 'index.js')
             const indexJs = fs.readFileSync(jsPath).toString()
 
-            const libPath = path.resolve(pluginPath, config['lib'] || 'lib.js')
-            const libJs = fs.existsSync(libPath) ? fs.readFileSync(libPath).toString() : ''
-            if (libJs) {
-                console.warn(`⚠️ Using "lib.js" is deprecated! Used by: ${plugin.name} (${plugin.url})`)
-            }
-
             try {
-                pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs, libJs)
+                pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs)
                 status.info('🔌', `Loaded local plugin "${plugin.name}" from "${pluginPath}"!`)
                 await clearError(server, pluginConfig)
                 return true
@@ -157,14 +151,10 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
             }
 
             const indexJs = await getFileFromArchive(archive, config['main'] || 'index.js')
-            const libJs = await getFileFromArchive(archive, config['lib'] || 'lib.js')
-            if (libJs) {
-                console.warn(`⚠️ Using "lib.js" is deprecated! Used by: ${plugin.name} (${plugin.url})`)
-            }
 
             if (indexJs) {
                 try {
-                    pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs, libJs || '')
+                    pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs)
                     status.info('🔌', `Loaded plugin "${plugin.name}"!`)
                     await clearError(server, pluginConfig)
                     return true
