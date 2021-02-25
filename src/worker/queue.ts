@@ -90,13 +90,7 @@ async function startQueueKafka(server: PluginsServer, workerMethods: WorkerMetho
     const kafkaQueue: Queue = new KafkaQueue(
         server,
         (batch: PluginEvent[]) => workerMethods.processEventBatch(batch),
-        server.PLUGIN_SERVER_INGESTION
-            ? async (event) => {
-                  await workerMethods.ingestEvent(event)
-              }
-            : async () => {
-                  // no op, but defining to avoid undefined issues
-              }
+        async (event) => void (await workerMethods.ingestEvent(event))
     )
     await kafkaQueue.start()
 
