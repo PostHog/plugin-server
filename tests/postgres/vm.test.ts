@@ -797,7 +797,7 @@ test('posthog.capture accepts user-defined distinct id', async () => {
 
     expect(mockSendTask.mock.calls[0][0]).toEqual('posthog.tasks.process_event.process_event_with_plugins')
     expect(mockSendTask.mock.calls[0][1]).toEqual([
-        'plugin-id-60',
+        'custom id',
         null,
         null,
         expect.objectContaining({
