@@ -115,7 +115,7 @@ describe('transformCode', () => {
         `)
     })
 
-    it('secures block for loops with timeouts avoiding _LP collision', () => {
+    it('transforms TypeScript to plain JavaScript', () => {
         const rawCode = code`
             interface Y {
               a: int
@@ -126,8 +126,8 @@ describe('transformCode', () => {
                 return \`a * 10 is {a * 10}, while b is just {b}\`
             }
 
-            let x: int = 2
-            console.log(k({ a: x, b: 'tomato' }))
+            let a: int = 2
+            console.log(k({ a, b: 'tomato' }))
         `
 
         const transformedCode = transformCode(rawCode, server)
@@ -142,9 +142,9 @@ describe('transformCode', () => {
               return \`a * 10 is {a * 10}, while b is just {b}\`;
             }
 
-            let x = 2;
+            let a = 2;
             console.log(k({
-              a: x,
+              a,
               b: 'tomato'
             }));
         `)
