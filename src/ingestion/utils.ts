@@ -165,15 +165,16 @@ export function timeoutGuard(message: string, timeout = defaultConfig.TASK_TIMEO
     }, timeout)
 }
 
-const campaignParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']
-const initialParams = ['$browser', '$browser_version', '$current_url', '$os', '$referring_domain', '$referrer']
+const campaignParams = new Set(['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'])
+const initialParams = new Set(['$browser', '$browser_version', '$current_url', '$os', '$referring_domain', '$referrer'])
+const combinedParams = new Set([...campaignParams, ...initialParams])
 
 /** If we get new UTM params, make sure we set those  **/
 export function personInitialAndUTMProperties(properties: Record<string, any>): Record<string, any> {
     const propertiesCopy = { ...properties }
-    const maybeSet = Object.entries(properties).filter(([key, value]) => campaignParams.indexOf(key) > -1)
+    const maybeSet = Object.entries(properties).filter(([key, value]) => campaignParams.has(key))
     const maybeSetInitial = Object.entries(properties)
-        .filter(([key, value]) => [...campaignParams, ...initialParams].indexOf(key) > -1)
+        .filter(([key, value]) => combinedParams.has(key))
         .map(([key, value]) => [`$initial_${key.replace('$', '')}`, value])
     if (Object.keys(maybeSet).length > 0) {
         propertiesCopy.$set = { ...(properties.$set || {}), ...Object.fromEntries(maybeSet) }
