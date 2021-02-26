@@ -144,7 +144,7 @@ test('archive plugin with broken index.js does not do much', async () => {
     const error = setError.mock.calls[0][1]!
     expect(error.message).toContain(': Unexpected token, expected ","')
     expect(error.name).toEqual('SyntaxError')
-    expect(error.stack).toContain('SyntaxError: unknown')
+    expect(error.stack).toContain('SyntaxError: ')
     expect(error.time).toBeDefined()
     expect(setError.mock.calls[0][2]).toEqual(pluginConfigs.get(39))
     expect(pluginConfigs.get(39)!.vm).toEqual(null)
@@ -172,7 +172,7 @@ test('local plugin with broken index.js does not do much', async () => {
     const error = setError.mock.calls[0][1]!
     expect(error.message).toContain(': Unexpected token, expected ","')
     expect(error.name).toEqual('SyntaxError')
-    expect(error.stack).toContain('SyntaxError: unknown')
+    expect(error.stack).toContain('SyntaxError: ')
     expect(error.time).toBeDefined()
     expect(setError.mock.calls[0][2]).toEqual(pluginConfigs.get(39))
     expect(pluginConfigs.get(39)!.vm).toEqual(null)
