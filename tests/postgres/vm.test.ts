@@ -728,7 +728,11 @@ test('posthog in runEvery', async () => {
         expect.objectContaining({
             distinct_id: 'plugin-id-60',
             event: 'my-new-event',
-            properties: expect.objectContaining({ $lib: 'posthog-plugin-server', random: 'properties' }),
+            properties: expect.objectContaining({
+                $lib: 'posthog-plugin-server',
+                random: 'properties',
+                distinct_id: 'plugin-id-60',
+            }),
         }),
         2,
         mockSendTask.mock.calls[0][1][5],

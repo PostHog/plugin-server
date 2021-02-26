@@ -74,6 +74,7 @@ export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig)
                     $lib: 'posthog-plugin-server',
                     $lib_version: version,
                     ...otherProperties,
+                    distinct_id: properties['distinct_id'] || distinctId,
                 },
                 team_id: pluginConfig.team_id,
                 uuid: new UUIDT().toString(),
