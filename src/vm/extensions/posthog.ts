@@ -65,16 +65,16 @@ export function createPosthog(server: PluginsServer, pluginConfig: PluginConfig)
 
     return {
         capture(event, properties = {}) {
-            const { timestamp = DateTime.utc().toISO(), ...otherProperties } = properties
+            const { timestamp = DateTime.utc().toISO(), distinct_id = distinctId, ...otherProperties } = properties
             const data: InternalData = {
-                distinct_id: properties['distinct_id'] || distinctId,
+                distinct_id,
                 event,
                 timestamp,
                 properties: {
                     $lib: 'posthog-plugin-server',
                     $lib_version: version,
+                    distinct_id,
                     ...otherProperties,
-                    distinct_id: properties['distinct_id'] || distinctId,
                 },
                 team_id: pluginConfig.team_id,
                 uuid: new UUIDT().toString(),
