@@ -4,7 +4,7 @@ import { PluginsServer } from '../../types'
 import { loopTimeout } from './loop-timeout'
 import { promiseTimeout } from './promise-timeout'
 
-export function secureCode(rawCode: string, server: PluginsServer): string {
+export function transformCode(rawCode: string, server: PluginsServer): string {
     const { code } = transform(rawCode, {
         envName: 'production',
         code: true,
@@ -14,7 +14,7 @@ export function secureCode(rawCode: string, server: PluginsServer): string {
         plugins: [loopTimeout(server), promiseTimeout(server)],
     })
     if (!code) {
-        throw new Error(`Babel transform gone wrong! Could not secure the following code:\n${rawCode}`)
+        throw new Error(`Babel transform gone wrong! Could not process the following code:\n${rawCode}`)
     }
     return code
 }

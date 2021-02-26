@@ -1,7 +1,7 @@
 import { createServer } from '../src/server'
 import { PluginsServer } from '../src/types'
 import { code } from '../src/utils'
-import { secureCode } from '../src/vm/transforms'
+import { transformCode } from '../src/vm/transforms'
 import { resetTestDatabase } from './helpers/sql'
 
 let server: PluginsServer
@@ -14,7 +14,7 @@ afterEach(async () => {
     await closeServer()
 })
 
-describe('secureCode', () => {
+describe('transformCode', () => {
     it('secures awaits by wrapping promises in __asyncGuard', () => {
         const rawCode = code`
             async function x() {
@@ -22,9 +22,9 @@ describe('secureCode', () => {
             }
         `
 
-        const securedCode = secureCode(rawCode, server)
+        const transformedCode = transformCode(rawCode, server)
 
-        expect(securedCode).toStrictEqual(code`
+        expect(transformedCode).toStrictEqual(code`
             "use strict";
 
             async function x() {
@@ -39,9 +39,9 @@ describe('secureCode', () => {
             x.then(() => null)
         `
 
-        const securedCode = secureCode(rawCode, server)
+        const transformedCode = transformCode(rawCode, server)
 
-        expect(securedCode).toStrictEqual(code`
+        expect(transformedCode).toStrictEqual(code`
             "use strict";
 
             async function x() {}
@@ -57,9 +57,9 @@ describe('secureCode', () => {
             }
         `
 
-        const securedCode = secureCode(rawCode, server)
+        const transformedCode = transformCode(rawCode, server)
 
-        expect(securedCode).toStrictEqual(code`
+        expect(transformedCode).toStrictEqual(code`
             "use strict";
 
             const _LP = Date.now();
@@ -76,9 +76,9 @@ describe('secureCode', () => {
             for (let i = 0; i < i + 1; i++) console.log(i)
         `
 
-        const securedCode = secureCode(rawCode, server)
+        const transformedCode = transformCode(rawCode, server)
 
-        expect(securedCode).toStrictEqual(code`
+        expect(transformedCode).toStrictEqual(code`
             "use strict";
 
             const _LP = Date.now();
@@ -99,9 +99,9 @@ describe('secureCode', () => {
             }
         `
 
-        const securedCode = secureCode(rawCode, server)
+        const transformedCode = transformCode(rawCode, server)
 
-        expect(securedCode).toStrictEqual(code`
+        expect(transformedCode).toStrictEqual(code`
             "use strict";
 
             const _LP = 0;
