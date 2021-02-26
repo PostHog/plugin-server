@@ -114,4 +114,39 @@ describe('transformCode', () => {
             }
         `)
     })
+
+    it('secures block for loops with timeouts avoiding _LP collision', () => {
+        const rawCode = code`
+            interface Y {
+              a: int
+              b: string
+            }
+
+            function k({ a, b }: Y): string {
+                return \`a * 10 is {a * 10}, while b is just {b}\`
+            }
+
+            let x: int = 2
+            console.log(k({ a: x, b: 'tomato' }))
+        `
+
+        const transformedCode = transformCode(rawCode, server)
+
+        expect(transformedCode).toStrictEqual(code`
+            "use strict";
+
+            function k({
+              a,
+              b
+            }) {
+              return \`a * 10 is {a * 10}, while b is just {b}\`;
+            }
+
+            let x = 2;
+            console.log(k({
+              a: x,
+              b: 'tomato'
+            }));
+        `)
+    })
 })
