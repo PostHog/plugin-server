@@ -170,7 +170,7 @@ const initialParams = new Set(['$browser', '$browser_version', '$current_url', '
 const combinedParams = new Set([...campaignParams, ...initialParams])
 
 /** If we get new UTM params, make sure we set those  **/
-export function personInitialAndUTMProperties(properties: Record<string, any>): Record<string, any> {
+export function personInitialAndUTMProperties(properties: Properties): Properties {
     const propertiesCopy = { ...properties }
     const maybeSet = Object.entries(properties).filter(([key, value]) => campaignParams.has(key))
     const maybeSetInitial = Object.entries(properties)
