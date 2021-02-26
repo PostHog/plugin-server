@@ -24,7 +24,7 @@ import {
 } from '../types'
 import { castTimestampOrNow, UUID, UUIDT } from '../utils'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { elementsToString, personInitialAndUTMProperties,sanitizeEventName, timeoutGuard } from './utils'
+import { elementsToString, personInitialAndUTMProperties, sanitizeEventName, timeoutGuard } from './utils'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
@@ -370,7 +370,7 @@ export class EventsProcessor {
             } catch {}
         }
 
-        properties = personInitialAndUTMProps(properties)
+        properties = personInitialAndUTMProperties(properties)
 
         if (properties['$set'] || properties['$set_once']) {
             await this.updatePersonProperties(
