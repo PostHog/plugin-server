@@ -21,9 +21,10 @@ import { startSchedule } from './services/schedule'
 import { status } from './status'
 import { PluginsServer, PluginsServerConfig, Queue } from './types'
 import { createRedis, delay, UUIDT } from './utils'
-import { version } from './version'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { startQueue } from './worker/queue'
+
+const { version } = require('../package.json')
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
