@@ -10,7 +10,7 @@ export function secureCode(rawCode: string, server: PluginsServer): string {
         code: true,
         babelrc: false,
         configFile: false,
-        presets: [['env', { targets: { node: process.versions.node } }]],
+        presets: ['@babel/preset-typescript', ['env', { targets: { node: process.versions.node } }]],
         plugins: [loopTimeout(server), promiseTimeout(server)],
     })
     if (!code) {
