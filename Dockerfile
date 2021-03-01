@@ -9,7 +9,7 @@ RUN yarn install --frozen-lockfile
 COPY ./ ./
 RUN yarn compile:typescript
 
-FROM node:14
+FROM node:14 AS runner
 
 WORKDIR /code/
 COPY --from=builder /code/ ./
