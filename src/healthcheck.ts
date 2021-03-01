@@ -8,7 +8,7 @@ const healthStatus = new Status('HLTH')
 const redis = new Redis(defaultConfig.REDIS_URL).on('ready', async () => {
     const ping = await redis.get('@posthog-plugin-server/ping')
     if (ping) {
-        healthStatus.error('💔'`Redis key @posthog-plugin-server/ping found with value ${ping}`)
+        healthStatus.error('💔', `Redis key @posthog-plugin-server/ping found with value ${ping}`)
         process.exit(0)
     } else {
         healthStatus.error('💚', 'Redis key @posthog-plugin-server/ping not found! Plugin server seems to be offline')
