@@ -248,7 +248,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
 
         let returnedEvents: PluginEvent[] = teamEvents
 
-        for (const pluginConfig of pluginsToRun.reverse()) {
+        for (const pluginConfig of pluginsToRun) {
             const timer = new Date()
             const { processEventBatch } = pluginConfig.vm?.methods || {}
             if (processEventBatch && returnedEvents.length > 0) {
