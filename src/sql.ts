@@ -6,7 +6,7 @@ export async function getPluginRows(server: PluginsServer): Promise<Plugin[]> {
             (SELECT posthog_pluginconfig.plugin_id
                 FROM posthog_pluginconfig
                 LEFT JOIN posthog_team ON posthog_team.id = posthog_pluginconfig.team_id
-                WHERE (posthog_team.id IS NULL OR posthog_team.plugins_opt_in='t') AND posthog_pluginconfig.enabled='t'
+                WHERE posthog_pluginconfig.enabled='t'
                 GROUP BY posthog_pluginconfig.plugin_id)`
     )
     return pluginRows
@@ -18,7 +18,7 @@ export async function getPluginAttachmentRows(server: PluginsServer): Promise<Pl
             (SELECT posthog_pluginconfig.id
                 FROM posthog_pluginconfig
                 LEFT JOIN posthog_team ON posthog_team.id = posthog_pluginconfig.team_id
-                WHERE (posthog_team.id IS NULL OR posthog_team.plugins_opt_in='t') AND posthog_pluginconfig.enabled='t')`
+                WHERE posthog_pluginconfig.enabled='t')`
     )
     return rows
 }
@@ -28,7 +28,7 @@ export async function getPluginConfigRows(server: PluginsServer): Promise<Plugin
         `SELECT posthog_pluginconfig.*
             FROM posthog_pluginconfig
             LEFT JOIN posthog_team ON posthog_team.id = posthog_pluginconfig.team_id
-            WHERE (posthog_team.id IS NULL OR posthog_team.plugins_opt_in='t') AND posthog_pluginconfig.enabled='t'`
+            WHERE posthog_pluginconfig.enabled='t'`
     )
     return rows
 }
