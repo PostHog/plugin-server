@@ -6,7 +6,7 @@ import { clearError, processError } from './error'
 import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows } from './sql'
 import { status } from './status'
 import { PluginConfig, PluginJsonConfig, PluginsServer, PluginTask, TeamId } from './types'
-import { getFileFromArchive } from './utils'
+import { getFileFromArchive, pluginDigest } from './utils'
 import { createPluginConfigVM } from './vm/vm'
 
 export async function setupPlugins(server: PluginsServer): Promise<void> {
@@ -119,7 +119,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                     await processError(
                         server,
                         pluginConfig,
-                        `Could not load posthog config at "${configPath}" for plugin "${plugin.name}"`
+                        `Could not load posthog config at "${configPath}" for ${pluginDigest(plugin)}`
                     )
                     return false
                 }
@@ -129,7 +129,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                 await processError(
                     server,
                     pluginConfig,
-                    `No "main" config key or "index.js" file found for plugin "${plugin.name}"`
+                    `No "main" config key or "index.js" file found for ${pluginDigest(plugin)}`
                 )
                 return false
             }
@@ -145,7 +145,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
 
             try {
                 pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs, libJs)
-                status.info('🔌', `Loaded local plugin "${plugin.name}" from "${pluginPath}"!`)
+                status.info('🔌', `Loaded local ${pluginDigest(plugin)} from "${pluginPath}"!`)
                 await clearError(server, pluginConfig)
                 return true
             } catch (error) {
@@ -159,7 +159,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                 try {
                     config = JSON.parse(json)
                 } catch (error) {
-                    await processError(server, pluginConfig, `Can not load plugin.json for plugin "${plugin.name}"`)
+                    await processError(server, pluginConfig, `Can not load plugin.json for ${pluginDigest(plugin)}`)
                     return false
                 }
             }
@@ -173,19 +173,19 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
             if (indexJs) {
                 try {
                     pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs, libJs || '')
-                    status.info('🔌', `Loaded plugin "${plugin.name}"!`)
+                    status.info('🔌', `Loaded ${pluginDigest(plugin)}!`)
                     await clearError(server, pluginConfig)
                     return true
                 } catch (error) {
                     await processError(server, pluginConfig, error)
                 }
             } else {
-                await processError(server, pluginConfig, `Could not load index.js for plugin "${plugin.name}"!`)
+                await processError(server, pluginConfig, `Could not load index.js for ${pluginDigest(plugin)}!`)
             }
         } else if (plugin.plugin_type === 'source' && plugin.source) {
             try {
                 pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, plugin.source)
-                status.info('🔌', `Loaded plugin "${plugin.name}"!`)
+                status.info('🔌', `Loaded ${pluginDigest(plugin)}!`)
                 await clearError(server, pluginConfig)
                 return true
             } catch (error) {
@@ -195,7 +195,7 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
             await processError(
                 server,
                 pluginConfig,
-                `Un-downloaded remote plugins not supported! Plugin: "${plugin.name}"`
+                `Un-downloaded remote plugins not supported! Tried with ${pluginDigest(plugin)}`
             )
         }
     } catch (error) {
