@@ -8,7 +8,7 @@ import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
 
 import { status } from './status'
-import { LogLevel, PluginsServerConfig, TimestampFormat } from './types'
+import { LogLevel, Plugin, PluginsServerConfig, TimestampFormat } from './types'
 
 /** Time until autoexit (due to error) gives up on graceful exit and kills the process right away. */
 const GRACEFUL_EXIT_PERIOD_SECONDS = 5
@@ -385,4 +385,12 @@ export async function createRedis(serverConfig: PluginsServerConfig): Promise<Re
         })
     await redis.info()
     return redis
+}
+
+export function pluginDigest(plugin: Plugin): string {
+    const extras = [`organization ${plugin.organization_id}`]
+    if (plugin.is_global) {
+        extras.push('GLOBAL')
+    }
+    return `plugin "${plugin.name}" (${extras.join(' - ')})`
 }
