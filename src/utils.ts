@@ -388,10 +388,9 @@ export async function createRedis(serverConfig: PluginsServerConfig): Promise<Re
 }
 
 export function pluginDigest(plugin: Plugin): string {
-    const extras = []
+    const extras = [`organization ${plugin.organization_id}`]
     if (plugin.is_global) {
-        extras.push('global')
+        extras.push('GLOBAL')
     }
-    extras.push(`organization ${plugin.organization_id}`)
-    return `plugin "${plugin.name}" ${extras.join(' - ')}`
+    return `plugin "${plugin.name}" (${extras.join(' - ')})`
 }
