@@ -43,6 +43,7 @@ export const plugin60: Plugin = {
     error: undefined,
     from_json: false,
     from_web: false,
+    is_global: false,
 }
 
 export const pluginAttachment1: PluginAttachmentDB = {
