@@ -536,21 +536,21 @@ export class EventsProcessor {
             if (elements && elements.length > 0) {
                 elementsHash = await this.db.createElementGroup(elements, team.id)
             }
-            const event = (
-                await this.db.postgresQuery(
-                    'INSERT INTO posthog_event (created_at, event, distinct_id, properties, team_id, timestamp, elements, elements_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-                    [
-                        data.createdAt,
-                        data.event,
-                        distinctId,
-                        data.properties,
-                        data.teamId,
-                        data.timestamp,
-                        JSON.stringify(elements || []),
-                        elementsHash,
-                    ]
-                )
-            ).rows[0]
+            const {
+                rows: [event],
+            } = await this.db.postgresQuery(
+                'INSERT INTO posthog_event (created_at, event, distinct_id, properties, team_id, timestamp, elements, elements_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+                [
+                    data.createdAt,
+                    data.event,
+                    distinctId,
+                    data.properties,
+                    data.teamId,
+                    data.timestamp,
+                    JSON.stringify(elements || []),
+                    elementsHash,
+                ]
+            )
             if (await this.shouldSendHooksTask(team)) {
                 this.pluginsServer.statsd?.increment(`hooks.send_task`)
                 this.celery.sendTask('posthog.tasks.webhooks.post_event_to_webhook', [event.id, siteUrl], {})
