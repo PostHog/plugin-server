@@ -127,7 +127,6 @@ async function loadPluginSchedule(piscina: Piscina): Promise<PluginsServer['plug
             string,
             PluginConfigId[]
         > | null
-        console.info('fetching schedule', schedule)
         if (schedule) {
             return schedule
         }
