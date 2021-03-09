@@ -5,8 +5,8 @@ import Redlock from 'redlock'
 
 import { processError } from '../error'
 import { status } from '../status'
-import { PluginConfigId, PluginsServer } from '../types'
-import { createRedis } from '../utils'
+import { PluginConfigId, PluginsServer, ScheduleControl } from '../types'
+import { createRedis, delay } from '../utils'
 
 export const LOCKED_RESOURCE = 'plugin-server:locks:schedule'
 
@@ -14,7 +14,7 @@ export async function startSchedule(
     server: PluginsServer,
     piscina: Piscina,
     onLock?: () => void
-): Promise<() => Promise<void>> {
+): Promise<ScheduleControl> {
     status.info('⏰', 'Starting scheduling service...')
 
     let stopped = false
@@ -82,9 +82,9 @@ export async function startSchedule(
         }
     }
 
-    lockTimeout = setTimeout(tryToGetTheLock, 0)
+    server.pluginSchedule = await loadPluginSchedule(piscina)
 
-    server.pluginSchedule = await piscina.runTask({ task: 'getPluginSchedule' })
+    lockTimeout = setTimeout(tryToGetTheLock, 0)
 
     const runEveryMinuteJob = schedule.scheduleJob('* * * * *', () => {
         !stopped && weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryMinute')
@@ -108,7 +108,31 @@ export async function startSchedule(
         await waitForTasksToFinish(server!)
     }
 
-    return stopSchedule
+    const reloadSchedule = async () => {
+        lockTimeout && clearTimeout(lockTimeout)
+        weHaveTheLock = false
+        await lock?.unlock().catch(Sentry.captureException)
+
+        server.pluginSchedule = await loadPluginSchedule(piscina)
+
+        lockTimeout = setTimeout(tryToGetTheLock, 0)
+    }
+
+    return { stopSchedule, reloadSchedule }
+}
+
+async function loadPluginSchedule(piscina: Piscina): Promise<PluginsServer['pluginSchedule']> {
+    while (true) {
+        const schedule = (await piscina.runTask({ task: 'getPluginSchedule' })) as Record<
+            string,
+            PluginConfigId[]
+        > | null
+        console.info('fetching schedule', schedule)
+        if (schedule) {
+            return schedule
+        }
+        await delay(200)
+    }
 }
 
 export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskName: string): void {
