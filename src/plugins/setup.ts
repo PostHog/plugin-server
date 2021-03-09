@@ -103,16 +103,19 @@ export async function loadSchedule(server: PluginsServer): Promise<void> {
     // gather runEvery* tasks into a schedule
     const pluginSchedule: Record<string, PluginConfigId[]> = { runEveryMinute: [], runEveryHour: [], runEveryDay: [] }
 
+    let count = 0
+
     for (const [id, pluginConfig] of server.pluginConfigs) {
         const tasks = (await pluginConfig.vm?.getTasks()) ?? {}
         for (const [taskName, task] of Object.entries(tasks)) {
             if (task && taskName in pluginSchedule) {
                 pluginSchedule[taskName].push(id)
+                count++
             }
         }
     }
 
-    status.info('🔌', 'Finished loading plugin scheduled tasks')
+    status.info('🔌', `Loaded ${count} scheduled tasks`)
 
     server.pluginSchedule = pluginSchedule
 }
