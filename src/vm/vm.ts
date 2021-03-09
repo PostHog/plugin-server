@@ -2,13 +2,42 @@ import { randomBytes } from 'crypto'
 import fetch from 'node-fetch'
 import { VM } from 'vm2'
 
-import { PluginConfig, PluginConfigVMReponse, PluginsServer } from '../types'
+import { processError } from '../error'
+import { status } from '../status'
+import { LazyPluginVM, PluginConfig, PluginConfigVMReponse, PluginsServer } from '../types'
 import { createCache } from './extensions/cache'
 import { createConsole } from './extensions/console'
 import { createGoogle } from './extensions/google'
 import { createPosthog } from './extensions/posthog'
 import { createStorage } from './extensions/storage'
 import { transformCode } from './transforms'
+
+export function createLazyPluginVM(
+    server: PluginsServer,
+    pluginConfig: PluginConfig,
+    indexJs: string,
+    libJs = '',
+    logInfo = ''
+): LazyPluginVM {
+    const promise = createPluginConfigVM(server, pluginConfig, indexJs, libJs)
+        .then((vm) => {
+            status.info('🔌', `Loaded ${logInfo}`)
+            return vm
+        })
+        .catch(async (error) => {
+            console.warn(`⚠️ Failed to load ${logInfo}`)
+            await processError(server, pluginConfig, error)
+            return null
+        })
+
+    return {
+        promise,
+        getProcessEvent: async () => (await promise)?.methods.processEvent || null,
+        getProcessEventBatch: async () => (await promise)?.methods.processEventBatch || null,
+        getTask: async (name: string) => (await promise)?.tasks[name] || null,
+        getTasks: async () => (await promise)?.tasks || {},
+    }
+}
 
 export async function createPluginConfigVM(
     server: PluginsServer,

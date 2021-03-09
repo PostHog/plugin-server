@@ -5,9 +5,9 @@ import * as path from 'path'
 import { clearError, processError } from './error'
 import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows } from './sql'
 import { status } from './status'
-import { PluginConfig, PluginJsonConfig, PluginsServer, PluginTask, TeamId } from './types'
+import { PluginConfig, PluginConfigId, PluginJsonConfig, PluginsServer, TeamId } from './types'
 import { getFileFromArchive } from './utils'
-import { createPluginConfigVM } from './vm/vm'
+import { createLazyPluginVM } from './vm/vm'
 
 export async function setupPlugins(server: PluginsServer): Promise<void> {
     const pluginRows = await getPluginRows(server)
@@ -74,16 +74,6 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         }
     }
 
-    // gather runEvery* tasks into a schedule
-    server.pluginSchedule = { runEveryMinute: [], runEveryHour: [], runEveryDay: [] }
-    for (const [id, pluginConfig] of server.pluginConfigs) {
-        for (const [taskName, task] of Object.entries(pluginConfig.vm?.tasks ?? {})) {
-            if (task && taskName in server.pluginSchedule) {
-                server.pluginSchedule[taskName].push(pluginConfig.id)
-            }
-        }
-    }
-
     const sortFunction = (a: PluginConfig, b: PluginConfig) => a.order - b.order
     for (const teamId of server.pluginConfigsPerTeam.keys()) {
         if (server.defaultConfigs.length > 0) {
@@ -96,6 +86,29 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
             server.pluginConfigsPerTeam.get(teamId)?.sort(sortFunction)
         }
     }
+
+    // :TODO: Do this really asynchronously
+    await loadSchedule(server)
+}
+
+async function loadSchedule(server: PluginsServer) {
+    server.pluginSchedule = null
+
+    // gather runEvery* tasks into a schedule
+    const pluginSchedule: Record<string, PluginConfigId[]> = { runEveryMinute: [], runEveryHour: [], runEveryDay: [] }
+
+    for (const [id, pluginConfig] of server.pluginConfigs) {
+        const tasks = (await pluginConfig.vm?.getTasks()) ?? {}
+        for (const [taskName, task] of Object.entries(tasks)) {
+            if (task && taskName in pluginSchedule) {
+                pluginSchedule[taskName].push(id)
+            }
+        }
+    }
+
+    status.info('🔌', 'Finished loading plugin scheduled tasks')
+
+    server.pluginSchedule = pluginSchedule
 }
 
 async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Promise<boolean> {
@@ -143,14 +156,15 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
                 console.warn(`⚠️ Using "lib.js" is deprecated! Used by: ${plugin.name} (${plugin.url})`)
             }
 
-            try {
-                pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs, libJs)
-                status.info('🔌', `Loaded local plugin "${plugin.name}" from "${pluginPath}"!`)
-                await clearError(server, pluginConfig)
-                return true
-            } catch (error) {
-                await processError(server, pluginConfig, error)
-            }
+            pluginConfig.vm = createLazyPluginVM(
+                server,
+                pluginConfig,
+                indexJs,
+                libJs,
+                `local plugin "${plugin.name}" from "${pluginPath}"!`
+            )
+            await clearError(server, pluginConfig) // :TODO: Only clear after successful setup.
+            return true
         } else if (plugin.archive) {
             let config: PluginJsonConfig = {}
             const archive = Buffer.from(plugin.archive)
@@ -171,26 +185,28 @@ async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Pr
             }
 
             if (indexJs) {
-                try {
-                    pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, indexJs, libJs || '')
-                    status.info('🔌', `Loaded plugin "${plugin.name}"!`)
-                    await clearError(server, pluginConfig)
-                    return true
-                } catch (error) {
-                    await processError(server, pluginConfig, error)
-                }
+                pluginConfig.vm = createLazyPluginVM(
+                    server,
+                    pluginConfig,
+                    indexJs,
+                    libJs || '',
+                    `Loaded plugin "${plugin.name}"!`
+                )
+                await clearError(server, pluginConfig)
+                return true
             } else {
                 await processError(server, pluginConfig, `Could not load index.js for plugin "${plugin.name}"!`)
             }
         } else if (plugin.plugin_type === 'source' && plugin.source) {
-            try {
-                pluginConfig.vm = await createPluginConfigVM(server, pluginConfig, plugin.source)
-                status.info('🔌', `Loaded plugin "${plugin.name}"!`)
-                await clearError(server, pluginConfig)
-                return true
-            } catch (error) {
-                await processError(server, pluginConfig, error)
-            }
+            pluginConfig.vm = createLazyPluginVM(
+                server,
+                pluginConfig,
+                plugin.source,
+                '',
+                `Loaded plugin "${plugin.name}"!`
+            )
+            await clearError(server, pluginConfig)
+            return true
         } else {
             await processError(
                 server,
@@ -209,10 +225,11 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
     let returnedEvent: PluginEvent | null = event
 
     for (const pluginConfig of pluginsToRun) {
-        if (pluginConfig.vm?.methods?.processEvent) {
+        const processEvent = await pluginConfig.vm?.getProcessEvent()
+
+        if (processEvent) {
             const timer = new Date()
 
-            const { processEvent } = pluginConfig.vm.methods
             try {
                 returnedEvent = (await processEvent(returnedEvent)) || null
             } catch (error) {
@@ -250,7 +267,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
 
         for (const pluginConfig of pluginsToRun) {
             const timer = new Date()
-            const { processEventBatch } = pluginConfig.vm?.methods || {}
+            const processEventBatch = await pluginConfig.vm?.getProcessEventBatch()
             if (processEventBatch && returnedEvents.length > 0) {
                 try {
                     returnedEvents = (await processEventBatch(returnedEvents)) || []
@@ -273,7 +290,7 @@ export async function runPluginTask(server: PluginsServer, taskName: string, plu
     let response
     try {
         const pluginConfig = server.pluginConfigs.get(pluginConfigId)
-        const task = pluginConfig?.vm?.tasks[taskName]
+        const task = await pluginConfig?.vm?.getTask(taskName)
         response = await task?.exec()
     } catch (error) {
         await processError(server, pluginConfigId, error)
