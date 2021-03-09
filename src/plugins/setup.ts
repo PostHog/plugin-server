@@ -64,17 +64,15 @@ async function loadPluginsFromDB(
     }
 
     const pluginConfigRows = await getPluginConfigRows(server)
-    const foundPluginConfigs = new Map<number, boolean>()
 
     const pluginConfigs = new Map<PluginConfigId, PluginConfig>()
     const pluginConfigsPerTeam = new Map<TeamId, PluginConfig[]>()
 
     for (const row of pluginConfigRows) {
-        const plugin = server.plugins.get(row.plugin_id)
+        const plugin = plugins.get(row.plugin_id)
         if (!plugin) {
             continue
         }
-        foundPluginConfigs.set(row.id, true)
         const pluginConfig: PluginConfig = {
             ...row,
             plugin: plugin,
