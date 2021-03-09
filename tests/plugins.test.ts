@@ -2,7 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import { mocked } from 'ts-jest/utils'
 
 import { clearError, processError } from '../src/error'
-import { runPlugins, setupPlugins } from '../src/plugins'
+import { loadSchedule, runPlugins, setupPlugins } from '../src/plugins'
 import { createServer } from '../src/server'
 import { LogLevel, PluginsServer } from '../src/types'
 import {
@@ -309,4 +309,31 @@ test('plugin config order', async () => {
 
     const returnedEvent2 = await runPlugins(mockServer, { ...event, properties: { ...event.properties } })
     expect(returnedEvent2!.properties!.plugins).toEqual([61, 60, 62])
+})
+
+describe('loadSchedule()', () => {
+    const mockConfig = (tasks) => ({ vm: { getTasks: () => Promise.resolve(tasks) } })
+
+    const mockServer = {
+        pluginConfigs: new Map(
+            Object.entries({
+                1: {},
+                2: mockConfig({ runEveryMinute: null, runEveryHour: () => 123 }),
+                3: mockConfig({ runEveryMinute: () => 123, foo: () => 'bar' }),
+            })
+        ),
+    } as any
+
+    it('sets server.pluginSchedule once all plugins are ready', async () => {
+        const promise = loadSchedule(mockServer)
+        expect(mockServer.pluginSchedule).toEqual(null)
+
+        await promise
+
+        expect(mockServer.pluginSchedule).toEqual({
+            runEveryMinute: ['3'],
+            runEveryHour: ['2'],
+            runEveryDay: [],
+        })
+    })
 })
