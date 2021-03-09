@@ -114,7 +114,7 @@ export async function startSchedule(
 export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskName: string): void {
     const runTask = (pluginConfigId: PluginConfigId) => piscina.runTask({ task: taskName, args: { pluginConfigId } })
 
-    for (const pluginConfigId of server.pluginSchedule[taskName]) {
+    for (const pluginConfigId of server.pluginSchedule?.[taskName] || []) {
         // last task still running? skip rerunning!
         if (server.pluginSchedulePromises[taskName][pluginConfigId]) {
             continue

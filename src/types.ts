@@ -69,7 +69,7 @@ export interface PluginsServer extends PluginsServerConfig {
     pluginConfigs: Map<PluginConfigId, PluginConfig>
     pluginConfigsPerTeam: Map<TeamId, PluginConfig[]>
     defaultConfigs: PluginConfig[]
-    pluginSchedule: Record<string, PluginConfigId[]>
+    pluginSchedule: Record<string, PluginConfigId[]> | null
     pluginSchedulePromises: Record<string, Record<PluginConfigId, Promise<any> | null>>
     eventsProcessor: EventsProcessor
 }
@@ -121,7 +121,7 @@ export interface PluginConfig {
     config: Record<string, unknown>
     error?: PluginError
     attachments?: Record<string, PluginAttachment>
-    vm?: PluginConfigVMReponse | null
+    vm?: LazyPluginVM | null
     created_at: string
     updated_at: string
 }
@@ -167,6 +167,14 @@ export interface PluginConfigVMReponse {
         processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
     }
     tasks: Record<string, PluginTask>
+}
+
+export interface LazyPluginVM {
+    promise: Promise<PluginConfigVMReponse | null>
+    getProcessEvent: () => Promise<PluginConfigVMReponse['methods']['processEvent'] | null>
+    getProcessEventBatch: () => Promise<PluginConfigVMReponse['methods']['processEventBatch'] | null>
+    getTask: (name: string) => Promise<PluginTask | null>
+    getTasks: () => Promise<Record<string, PluginTask>>
 }
 
 export interface EventUsage {
