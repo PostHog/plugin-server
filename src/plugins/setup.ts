@@ -13,7 +13,7 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         const prevConfig = server.pluginConfigs.get(id)
         const prevPlugin = prevConfig ? server.plugins.get(pluginConfig.plugin_id) : null
 
-        // :TRICKY: This forces a reload for plugin VMs which have either been added or changedW
+        // :TRICKY: This forces a reload for plugin VMs which have either been added or changed
         if (
             prevConfig &&
             pluginConfig.updated_at === prevConfig.updated_at &&

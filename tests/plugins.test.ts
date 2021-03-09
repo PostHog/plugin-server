@@ -2,6 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import { mocked } from 'ts-jest/utils'
 
 import { clearError, processError } from '../src/error'
+import { loadPlugin } from '../src/plugins/loadPlugin'
 import { runPlugins } from '../src/plugins/run'
 import { loadSchedule, setupPlugins } from '../src/plugins/setup'
 import { createServer } from '../src/server'
@@ -18,6 +19,10 @@ import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows, setError }
 jest.mock('../src/sql')
 jest.mock('../src/status')
 jest.mock('../src/error')
+jest.mock('../src/plugins/loadPlugin', () => {
+    const { loadPlugin } = jest.requireActual('../src/plugins/loadPlugin')
+    return { loadPlugin: jest.fn().mockImplementation(loadPlugin) }
+})
 
 let mockServer: PluginsServer
 let closeServer: () => Promise<void>
@@ -309,6 +314,82 @@ test('plugin config order', async () => {
 
     const returnedEvent2 = await runPlugins(mockServer, { ...event, properties: { ...event.properties } })
     expect(returnedEvent2!.properties!.plugins).toEqual([61, 60, 62])
+})
+
+test('reloading plugins after config changes', async () => {
+    const makePlugin = (id: number, updated_at = '2020-11-02'): any => ({
+        ...plugin60,
+        id,
+        plugin_type: 'source',
+        archive: null,
+        source: setOrderCode(60),
+        updated_at,
+    })
+    const makeConfig = (plugin_id: number, id: number, order: number, updated_at = '2020-11-02'): any => ({
+        ...pluginConfig39,
+        plugin_id,
+        id,
+        order,
+        updated_at,
+    })
+
+    const setOrderCode = (id: number) => {
+        return `
+            function processEvent(event) {
+                if (!event.properties.plugins) { event.properties.plugins = [] }
+                event.properties.plugins.push(${id})
+                return event
+            }
+        `
+    }
+
+    getPluginRows.mockReturnValue([makePlugin(60), makePlugin(61), makePlugin(62), makePlugin(63)])
+    getPluginAttachmentRows.mockReturnValue([])
+    getPluginConfigRows.mockReturnValue([
+        makeConfig(60, 39, 0),
+        makeConfig(61, 41, 1),
+        makeConfig(62, 40, 3),
+        makeConfig(63, 42, 2),
+    ])
+
+    await setupPlugins(mockServer)
+    await loadSchedule(mockServer)
+
+    expect(loadPlugin).toHaveBeenCalledTimes(4)
+    expect(Array.from(mockServer.plugins.keys())).toEqual(expect.arrayContaining([60, 61, 62, 63]))
+    expect(Array.from(mockServer.pluginConfigs.keys())).toEqual(expect.arrayContaining([39, 40, 41, 42]))
+
+    expect(mockServer.pluginConfigsPerTeam.get(pluginConfig39.team_id)?.map((c) => [c.id, c.order])).toEqual([
+        [39, 0],
+        [41, 1],
+        [42, 2],
+        [40, 3],
+    ])
+
+    getPluginRows.mockReturnValue([makePlugin(60), makePlugin(61), makePlugin(63, '2021-02-02'), makePlugin(64)])
+    getPluginAttachmentRows.mockReturnValue([])
+    getPluginConfigRows.mockReturnValue([
+        makeConfig(60, 39, 0),
+        makeConfig(61, 41, 3, '2021-02-02'),
+        makeConfig(63, 42, 2),
+        makeConfig(64, 43, 1),
+    ])
+
+    mocked(loadPlugin).mockReset()
+
+    await setupPlugins(mockServer)
+    await loadSchedule(mockServer)
+
+    expect(loadPlugin).toHaveBeenCalledTimes(3)
+    expect(Array.from(mockServer.plugins.keys())).toEqual(expect.arrayContaining([60, 61, 63, 64]))
+    expect(Array.from(mockServer.pluginConfigs.keys())).toEqual(expect.arrayContaining([39, 41, 42, 43]))
+
+    expect(mockServer.pluginConfigsPerTeam.get(pluginConfig39.team_id)?.map((c) => [c.id, c.order])).toEqual([
+        [39, 0],
+        [43, 1],
+        [42, 2],
+        [41, 3],
+    ])
 })
 
 describe('loadSchedule()', () => {
