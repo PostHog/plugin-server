@@ -127,13 +127,13 @@ describe('startSchedule', () => {
         let lock2 = false
         let lock3 = false
 
-        const stopSchedule1 = await startSchedule(server, piscina, () => {
+        const schedule1 = await startSchedule(server, piscina, () => {
             lock1 = true
         })
-        const stopSchedule2 = await startSchedule(server, piscina, () => {
+        const schedule2 = await startSchedule(server, piscina, () => {
             lock2 = true
         })
-        const stopSchedule3 = await startSchedule(server, piscina, () => {
+        const schedule3 = await startSchedule(server, piscina, () => {
             lock3 = true
         })
 
@@ -143,22 +143,22 @@ describe('startSchedule', () => {
         expect(lock2).toBe(false)
         expect(lock3).toBe(false)
 
-        await stopSchedule1()
+        await schedule1.stopSchedule()
 
         await delay(1500)
 
         expect(lock2 || lock3).toBe(true)
 
         if (lock3) {
-            await stopSchedule3()
+            await schedule3.stopSchedule()
             await delay(1000)
             expect(lock2).toBe(true)
-            await stopSchedule2()
+            await schedule2.stopSchedule()
         } else {
-            await stopSchedule2()
+            await schedule2.stopSchedule()
             await delay(1000)
             expect(lock3).toBe(true)
-            await stopSchedule3()
+            await schedule3.stopSchedule()
         }
     })
 
@@ -166,10 +166,10 @@ describe('startSchedule', () => {
         let lock1 = false
         let lock2 = false
 
-        const stopSchedule1 = await startSchedule(server, piscina, () => {
+        const schedule1 = await startSchedule(server, piscina, () => {
             lock1 = true
         })
-        const stopSchedule2 = await startSchedule(server, piscina, () => {
+        const schedule2 = await startSchedule(server, piscina, () => {
             lock2 = true
         })
 
@@ -178,7 +178,7 @@ describe('startSchedule', () => {
         expect(lock1).toBe(true)
         expect(lock2).toBe(false)
 
-        await stopSchedule1()
-        await stopSchedule2()
+        await schedule1.stopSchedule()
+        await schedule2.stopSchedule()
     })
 })

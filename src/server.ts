@@ -19,7 +19,7 @@ import { DB } from './db'
 import { EventsProcessor } from './ingestion/process-event'
 import { startSchedule } from './services/schedule'
 import { status } from './status'
-import { PluginsServer, PluginsServerConfig, Queue } from './types'
+import { PluginsServer, PluginsServerConfig, Queue, ScheduleControl } from './types'
 import { createRedis, delay, UUIDT } from './utils'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { startQueue } from './worker/queue'
@@ -201,7 +201,7 @@ export async function startPluginsServer(
     let piscina: Piscina | undefined
     let queue: Queue | undefined
     let closeServer: () => Promise<void> | undefined
-    let stopSchedule: () => Promise<void> | undefined
+    let scheduleControl: ScheduleControl | undefined
 
     let shutdownStatus = 0
 
@@ -224,7 +224,7 @@ export async function startPluginsServer(
         await pubSub?.quit()
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
-        await stopSchedule?.()
+        await scheduleControl?.stopSchedule()
         if (piscina) {
             await stopPiscina(piscina)
         }
@@ -246,7 +246,7 @@ export async function startPluginsServer(
             fastifyInstance = await startFastifyInstance(server)
         }
 
-        stopSchedule = await startSchedule(server, piscina)
+        scheduleControl = await startSchedule(server, piscina)
         queue = await startQueue(server, piscina)
         piscina.on('drain', () => {
             queue?.resume()
@@ -259,13 +259,13 @@ export async function startPluginsServer(
             if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
                 status.info('⚡', 'Reloading plugins!')
                 await queue?.stop()
-                await stopSchedule?.()
+                await scheduleControl?.stopSchedule()
                 if (piscina) {
                     await stopPiscina(piscina)
                 }
                 piscina = makePiscina(serverConfig!)
                 queue = await startQueue(server!, piscina)
-                stopSchedule = await startSchedule(server!, piscina)
+                scheduleControl = await startSchedule(server!, piscina)
             }
         })
 

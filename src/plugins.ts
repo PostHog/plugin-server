@@ -87,8 +87,7 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         }
     }
 
-    // :TODO: Do this really asynchronously
-    await loadSchedule(server)
+    void loadSchedule(server)
 }
 
 export async function loadSchedule(server: PluginsServer): Promise<void> {

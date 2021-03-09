@@ -363,3 +363,8 @@ export enum Database {
     ClickHouse = 'clickhouse',
     Postgres = 'postgres',
 }
+
+export interface ScheduleControl {
+    stopSchedule: () => Promise<void>
+    reloadSchedule: () => Promise<void>
+}
