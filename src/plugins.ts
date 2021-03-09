@@ -5,21 +5,38 @@ import * as path from 'path'
 import { clearError, processError } from './error'
 import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows } from './sql'
 import { status } from './status'
-import { PluginConfig, PluginConfigId, PluginJsonConfig, PluginsServer, TeamId } from './types'
+import { Plugin, PluginConfig, PluginConfigId, PluginId, PluginJsonConfig, PluginsServer, TeamId } from './types'
 import { getFileFromArchive } from './utils'
 import { createLazyPluginVM } from './vm/lazy'
 
 export async function setupPlugins(server: PluginsServer): Promise<void> {
-    const pluginRows = await getPluginRows(server)
-    const foundPlugins = new Map<number, boolean>()
-    for (const row of pluginRows) {
-        foundPlugins.set(row.id, true)
-        server.plugins.set(row.id, row)
-    }
-    for (const [id, plugin] of server.plugins) {
-        if (!foundPlugins.has(id)) {
-            server.plugins.delete(id)
+    const { plugins, pluginConfigs, pluginConfigsPerTeam } = await loadPluginsFromDB(server)
+
+    server.plugins = plugins
+    server.pluginConfigs = pluginConfigs
+    server.pluginConfigsPerTeam = pluginConfigsPerTeam
+
+    for (const [id, pluginConfig] of server.pluginConfigs) {
+        if (!pluginConfig.vm) {
+            await loadPlugin(server, pluginConfig)
         }
+    }
+
+    for (const teamId of server.pluginConfigsPerTeam.keys()) {
+        server.pluginConfigsPerTeam.get(teamId)?.sort((a, b) => a.order - b.order)
+    }
+
+    void loadSchedule(server)
+}
+
+export async function loadPluginsFromDB(
+    server: PluginsServer
+): Promise<Pick<PluginsServer, 'plugins' | 'pluginConfigs' | 'pluginConfigsPerTeam'>> {
+    const pluginRows = await getPluginRows(server)
+    const plugins = new Map<PluginId, Plugin>()
+
+    for (const row of pluginRows) {
+        plugins.set(row.id, row)
     }
 
     const pluginAttachmentRows = await getPluginAttachmentRows(server)
@@ -39,8 +56,10 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
 
     const pluginConfigRows = await getPluginConfigRows(server)
     const foundPluginConfigs = new Map<number, boolean>()
-    server.pluginConfigsPerTeam.clear()
-    server.defaultConfigs = []
+
+    const pluginConfigs = new Map<PluginConfigId, PluginConfig>()
+    const pluginConfigsPerTeam = new Map<TeamId, PluginConfig[]>()
+
     for (const row of pluginConfigRows) {
         const plugin = server.plugins.get(row.plugin_id)
         if (!plugin) {
@@ -53,41 +72,22 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
             attachments: attachmentsPerConfig.get(row.id) || {},
             vm: null,
         }
-        server.pluginConfigs.set(row.id, pluginConfig)
+        pluginConfigs.set(row.id, pluginConfig)
 
         if (!row.team_id) {
-            server.defaultConfigs.push(row)
-        } else {
-            let teamConfigs = server.pluginConfigsPerTeam.get(row.team_id)
-            if (!teamConfigs) {
-                teamConfigs = []
-                server.pluginConfigsPerTeam.set(row.team_id, teamConfigs)
-            }
-            teamConfigs.push(pluginConfig)
+            console.error(`🔴 PluginConfig(id=${row.id}) without team_id!`)
+            continue
         }
-    }
-    for (const [id, pluginConfig] of server.pluginConfigs) {
-        if (!foundPluginConfigs.has(id)) {
-            server.pluginConfigs.delete(id)
-        } else if (!pluginConfig.vm) {
-            await loadPlugin(server, pluginConfig)
+
+        let teamConfigs = pluginConfigsPerTeam.get(row.team_id)
+        if (!teamConfigs) {
+            teamConfigs = []
+            pluginConfigsPerTeam.set(row.team_id, teamConfigs)
         }
+        teamConfigs.push(pluginConfig)
     }
 
-    const sortFunction = (a: PluginConfig, b: PluginConfig) => a.order - b.order
-    for (const teamId of server.pluginConfigsPerTeam.keys()) {
-        if (server.defaultConfigs.length > 0) {
-            const combinedPluginConfigs = [
-                ...(server.pluginConfigsPerTeam.get(teamId) || []),
-                ...server.defaultConfigs,
-            ].sort(sortFunction)
-            server.pluginConfigsPerTeam.set(teamId, combinedPluginConfigs)
-        } else {
-            server.pluginConfigsPerTeam.get(teamId)?.sort(sortFunction)
-        }
-    }
-
-    void loadSchedule(server)
+    return { plugins, pluginConfigs, pluginConfigsPerTeam }
 }
 
 export async function loadSchedule(server: PluginsServer): Promise<void> {
@@ -300,5 +300,5 @@ export async function runPluginTask(server: PluginsServer, taskName: string, plu
 }
 
 function getPluginsForTeam(server: PluginsServer, teamId: number): PluginConfig[] {
-    return server.pluginConfigsPerTeam.get(teamId) || server.defaultConfigs
+    return server.pluginConfigsPerTeam.get(teamId) || []
 }

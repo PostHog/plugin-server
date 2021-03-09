@@ -68,7 +68,6 @@ export interface PluginsServer extends PluginsServerConfig {
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>
     pluginConfigsPerTeam: Map<TeamId, PluginConfig[]>
-    defaultConfigs: PluginConfig[]
     pluginSchedule: Record<string, PluginConfigId[]> | null
     pluginSchedulePromises: Record<string, Record<PluginConfigId, Promise<any> | null>>
     eventsProcessor: EventsProcessor
