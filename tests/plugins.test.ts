@@ -2,7 +2,8 @@ import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import { mocked } from 'ts-jest/utils'
 
 import { clearError, processError } from '../src/error'
-import { loadSchedule, runPlugins, setupPlugins } from '../src/plugins'
+import { runPlugins } from '../src/plugins/run'
+import { loadSchedule, setupPlugins } from '../src/plugins/setup'
 import { createServer } from '../src/server'
 import { LogLevel, PluginsServer } from '../src/types'
 import {
