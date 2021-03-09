@@ -7,7 +7,7 @@ import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows } from './s
 import { status } from './status'
 import { PluginConfig, PluginConfigId, PluginJsonConfig, PluginsServer, TeamId } from './types'
 import { getFileFromArchive } from './utils'
-import { createLazyPluginVM } from './vm/vm'
+import { createLazyPluginVM } from './vm/lazy'
 
 export async function setupPlugins(server: PluginsServer): Promise<void> {
     const pluginRows = await getPluginRows(server)
