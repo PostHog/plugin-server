@@ -257,14 +257,9 @@ export async function startPluginsServer(
         pubSub.on('message', async (channel: string, message) => {
             if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
                 status.info('⚡', 'Reloading plugins!')
-                await queue?.stop()
-                await scheduleControl?.stopSchedule()
-                if (piscina) {
-                    await stopPiscina(piscina)
-                }
-                piscina = makePiscina(serverConfig!)
-                queue = await startQueue(server!, piscina)
-                scheduleControl = await startSchedule(server!, piscina)
+
+                await piscina?.broadcastTask({ task: 'reloadPlugins' })
+                await scheduleControl?.reloadSchedule()
             }
         })
 

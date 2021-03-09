@@ -48,6 +48,9 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
             const { pluginConfigId } = args
             response = cloneObject(await runPluginTask(server, task, pluginConfigId))
         }
+        if (task === 'reloadPlugins') {
+            await setupPlugins(server)
+        }
         server.statsd?.timing(`piscina_task.${task}`, timer)
         return response
     }
