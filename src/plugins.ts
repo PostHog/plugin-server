@@ -12,15 +12,28 @@ import { createLazyPluginVM } from './vm/lazy'
 export async function setupPlugins(server: PluginsServer): Promise<void> {
     const { plugins, pluginConfigs, pluginConfigsPerTeam } = await loadPluginsFromDB(server)
 
-    server.plugins = plugins
-    server.pluginConfigs = pluginConfigs
-    server.pluginConfigsPerTeam = pluginConfigsPerTeam
+    for (const [id, pluginConfig] of pluginConfigs) {
+        const plugin = plugins.get(pluginConfig.plugin_id)
+        const prevConfig = server.pluginConfigs.get(id)
+        const prevPlugin = prevConfig ? server.plugins.get(pluginConfig.plugin_id) : null
 
-    for (const [id, pluginConfig] of server.pluginConfigs) {
+        // :TRICKY: This forces a reload for plugin VMs which have either been added or changedW
+        if (
+            prevConfig &&
+            pluginConfig.updated_at === prevConfig.updated_at &&
+            plugin?.updated_at == prevPlugin?.updated_at
+        ) {
+            pluginConfig.vm = prevConfig.vm
+        }
+
         if (!pluginConfig.vm) {
             await loadPlugin(server, pluginConfig)
         }
     }
+
+    server.plugins = plugins
+    server.pluginConfigs = pluginConfigs
+    server.pluginConfigsPerTeam = pluginConfigsPerTeam
 
     for (const teamId of server.pluginConfigsPerTeam.keys()) {
         server.pluginConfigsPerTeam.get(teamId)?.sort((a, b) => a.order - b.order)
