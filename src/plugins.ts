@@ -91,7 +91,7 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
     await loadSchedule(server)
 }
 
-async function loadSchedule(server: PluginsServer) {
+export async function loadSchedule(server: PluginsServer): Promise<void> {
     server.pluginSchedule = null
 
     // gather runEvery* tasks into a schedule
