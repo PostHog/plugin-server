@@ -1,6 +1,7 @@
 import { ingestEvent } from '../ingestion/ingest-event'
 import { initApp } from '../init'
-import { runPlugins, runPluginsOnBatch, runPluginTask, setupPlugins } from '../plugins'
+import { runPlugins, runPluginsOnBatch, runPluginTask } from '../plugins/run'
+import { setupPlugins } from '../plugins/setup'
 import { createServer } from '../server'
 import { status } from '../status'
 import { PluginsServerConfig } from '../types'
