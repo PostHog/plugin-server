@@ -35,13 +35,12 @@ test('setupPlugins and runPlugins', async () => {
     getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
 
     await setupPlugins(mockServer)
-    const { plugins, pluginConfigs, defaultConfigs } = mockServer
+    const { plugins, pluginConfigs } = mockServer
 
     expect(getPluginRows).toHaveBeenCalled()
     expect(getPluginAttachmentRows).toHaveBeenCalled()
     expect(getPluginConfigRows).toHaveBeenCalled()
 
-    expect(defaultConfigs).toEqual([]) // this will be used with global plugins
     expect(Array.from(plugins.entries())).toEqual([[60, plugin60]])
     expect(Array.from(pluginConfigs.keys())).toEqual([39])
 
@@ -295,7 +294,7 @@ test('plugin config order', async () => {
     ])
 
     await setupPlugins(mockServer)
-    const { pluginConfigsPerTeam, defaultConfigs } = mockServer
+    const { pluginConfigsPerTeam } = mockServer
 
     expect(pluginConfigsPerTeam.get(pluginConfig39.team_id)?.map((c) => [c.id, c.order])).toEqual([
         [40, 1],
@@ -313,7 +312,7 @@ test('plugin config order', async () => {
 })
 
 describe('loadSchedule()', () => {
-    const mockConfig = (tasks) => ({ vm: { getTasks: () => Promise.resolve(tasks) } })
+    const mockConfig = (tasks: any) => ({ vm: { getTasks: () => Promise.resolve(tasks) } })
 
     const mockServer = {
         pluginConfigs: new Map(
