@@ -1,5 +1,7 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
+import { mocked } from 'ts-jest/utils'
 
+import { clearError, processError } from '../src/error'
 import { runPlugins, setupPlugins } from '../src/plugins'
 import { createServer } from '../src/server'
 import { LogLevel, PluginsServer } from '../src/types'
@@ -11,12 +13,16 @@ import {
     pluginConfig39,
 } from './helpers/plugins'
 import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows, setError } from './helpers/sqlMock'
+
 jest.mock('../src/sql')
+jest.mock('../src/status')
+jest.mock('../src/error')
 
 let mockServer: PluginsServer
 let closeServer: () => Promise<void>
 beforeEach(async () => {
     ;[mockServer, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
+    console.warn = jest.fn() as any
 })
 afterEach(async () => {
     await closeServer()
@@ -28,12 +34,11 @@ test('setupPlugins and runPlugins', async () => {
     getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
 
     await setupPlugins(mockServer)
-    const { plugins, pluginConfigs, pluginConfigsPerTeam, defaultConfigs } = mockServer
+    const { plugins, pluginConfigs, defaultConfigs } = mockServer
 
     expect(getPluginRows).toHaveBeenCalled()
     expect(getPluginAttachmentRows).toHaveBeenCalled()
     expect(getPluginConfigRows).toHaveBeenCalled()
-    expect(setError).toHaveBeenCalled()
 
     expect(defaultConfigs).toEqual([]) // this will be used with global plugins
     expect(Array.from(plugins.entries())).toEqual([[60, plugin60]])
@@ -57,14 +62,12 @@ test('setupPlugins and runPlugins', async () => {
         },
     })
     expect(pluginConfig.vm).toBeDefined()
-    expect(Object.keys(pluginConfig.vm!.methods)).toEqual(['processEvent', 'processEventBatch'])
+    const vm = await pluginConfig.vm!.promise
+    expect(Object.keys(vm!.methods)).toEqual(['processEvent', 'processEventBatch'])
 
-    expect(setError).toHaveBeenCalled()
-    expect(setError.mock.calls[0][0]).toEqual(mockServer)
-    expect(setError.mock.calls[0][1]).toEqual(null)
-    expect(setError.mock.calls[0][2]).toEqual(pluginConfig)
+    expect(clearError).toHaveBeenCalledWith(mockServer, pluginConfig)
 
-    const processEvent = pluginConfig.vm!.methods['processEvent']
+    const processEvent = vm!.methods['processEvent']
     const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
     await processEvent(event)
 
@@ -135,19 +138,16 @@ test('archive plugin with broken index.js does not do much', async () => {
     await setupPlugins(mockServer)
     const { pluginConfigs } = mockServer
 
+    const pluginConfig = pluginConfigs.get(39)!
+    expect(await pluginConfig.vm!.promise).toEqual(null)
+
     const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
     const returnedEvent = await runPlugins(mockServer, { ...event })
     expect(returnedEvent).toEqual(event)
 
-    expect(setError).toHaveBeenCalled()
-    expect(setError.mock.calls[0][0]).toEqual(mockServer)
-    const error = setError.mock.calls[0][1]!
+    expect(processError).toHaveBeenCalledWith(mockServer, pluginConfig, expect.any(SyntaxError))
+    const error = mocked(processError).mock.calls[0][2]! as Error
     expect(error.message).toContain(': Unexpected token, expected ","')
-    expect(error.name).toEqual('SyntaxError')
-    expect(error.stack).toContain('SyntaxError: ')
-    expect(error.time).toBeDefined()
-    expect(setError.mock.calls[0][2]).toEqual(pluginConfigs.get(39))
-    expect(pluginConfigs.get(39)!.vm).toEqual(null)
 })
 
 test('local plugin with broken index.js does not do much', async () => {
@@ -163,19 +163,16 @@ test('local plugin with broken index.js does not do much', async () => {
     await setupPlugins(mockServer)
     const { pluginConfigs } = mockServer
 
+    const pluginConfig = pluginConfigs.get(39)!
+    expect(await pluginConfig.vm!.promise).toEqual(null)
+
     const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
     const returnedEvent = await runPlugins(mockServer, { ...event })
     expect(returnedEvent).toEqual(event)
 
-    expect(setError).toHaveBeenCalled()
-    expect(setError.mock.calls[0][0]).toEqual(mockServer)
-    const error = setError.mock.calls[0][1]!
+    expect(processError).toHaveBeenCalledWith(mockServer, pluginConfig, expect.any(SyntaxError))
+    const error = mocked(processError).mock.calls[0][2]! as Error
     expect(error.message).toContain(': Unexpected token, expected ","')
-    expect(error.name).toEqual('SyntaxError')
-    expect(error.stack).toContain('SyntaxError: ')
-    expect(error.time).toBeDefined()
-    expect(setError.mock.calls[0][2]).toEqual(pluginConfigs.get(39))
-    expect(pluginConfigs.get(39)!.vm).toEqual(null)
 
     unlink()
 })
@@ -197,10 +194,11 @@ test('archive plugin with broken plugin.json does not do much', async () => {
     await setupPlugins(mockServer)
     const { pluginConfigs } = mockServer
 
-    expect(setError).toHaveBeenCalled()
-    expect(setError.mock.calls[0][0]).toEqual(mockServer)
-    expect(setError.mock.calls[0][1]!.message).toEqual('Can not load plugin.json for plugin "test-maxmind-plugin"')
-    expect(setError.mock.calls[0][1]!.time).toBeDefined()
+    expect(processError).toHaveBeenCalledWith(
+        mockServer,
+        pluginConfigs.get(39)!,
+        'Can not load plugin.json for plugin "test-maxmind-plugin"'
+    )
     expect(pluginConfigs.get(39)!.vm).toEqual(null)
 })
 
@@ -220,10 +218,11 @@ test('local plugin with broken plugin.json does not do much', async () => {
     await setupPlugins(mockServer)
     const { pluginConfigs } = mockServer
 
-    expect(setError).toHaveBeenCalled()
-    expect(setError.mock.calls[0][0]).toEqual(mockServer)
-    expect(setError.mock.calls[0][1]!.message).toContain('Could not load posthog config at ')
-    expect(setError.mock.calls[0][1]!.time).toBeDefined()
+    expect(processError).toHaveBeenCalledWith(
+        mockServer,
+        pluginConfigs.get(39)!,
+        expect.stringContaining('Could not load posthog config at ')
+    )
     expect(pluginConfigs.get(39)!.vm).toEqual(null)
 
     unlink()
@@ -242,12 +241,11 @@ test('plugin with http urls must have an archive', async () => {
     const { pluginConfigs } = mockServer
 
     expect(pluginConfigs.get(39)!.plugin!.url).toContain('https://')
-    expect(setError).toHaveBeenCalled()
-    expect(setError.mock.calls[0][0]).toEqual(mockServer)
-    expect(setError.mock.calls[0][1]!.message).toEqual(
+    expect(processError).toHaveBeenCalledWith(
+        mockServer,
+        pluginConfigs.get(39)!,
         'Un-downloaded remote plugins not supported! Plugin: "test-maxmind-plugin"'
     )
-    expect(setError.mock.calls[0][1]!.time).toBeDefined()
     expect(pluginConfigs.get(39)!.vm).toEqual(null)
 })
 
@@ -264,10 +262,11 @@ test("plugin with broken archive doesn't load", async () => {
     const { pluginConfigs } = mockServer
 
     expect(pluginConfigs.get(39)!.plugin!.url).toContain('https://')
-    expect(setError).toHaveBeenCalled()
-    expect(setError.mock.calls[0][0]).toEqual(mockServer)
-    expect(setError.mock.calls[0][1]!.message).toEqual('Could not read archive as .zip or .tgz')
-    expect(setError.mock.calls[0][1]!.time).toBeDefined()
+    expect(processError).toHaveBeenCalledWith(
+        mockServer,
+        pluginConfigs.get(39)!,
+        Error('Could not read archive as .zip or .tgz')
+    )
     expect(pluginConfigs.get(39)!.vm).toEqual(null)
 })
 
