@@ -58,7 +58,6 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
                 libJs,
                 `local plugin "${plugin.name}" from "${pluginPath}"!`
             )
-            await clearError(server, pluginConfig) // :TODO: Only clear after successful setup.
             return true
         } else if (plugin.archive) {
             let config: PluginJsonConfig = {}
@@ -87,14 +86,12 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
                     libJs || '',
                     `plugin "${plugin.name}"!`
                 )
-                await clearError(server, pluginConfig)
                 return true
             } else {
                 await processError(server, pluginConfig, `Could not load index.js for plugin "${plugin.name}"!`)
             }
         } else if (plugin.plugin_type === 'source' && plugin.source) {
             pluginConfig.vm = createLazyPluginVM(server, pluginConfig, plugin.source, '', `plugin "${plugin.name}"!`)
-            await clearError(server, pluginConfig)
             return true
         } else {
             await processError(

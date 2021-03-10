@@ -1,4 +1,4 @@
-import { processError } from '../error'
+import { clearError, processError } from '../error'
 import { status } from '../status'
 import { LazyPluginVM, PluginConfig, PluginsServer } from '../types'
 import { createPluginConfigVM } from './vm'
@@ -11,8 +11,9 @@ export function createLazyPluginVM(
     logInfo = ''
 ): LazyPluginVM {
     const promise = createPluginConfigVM(server, pluginConfig, indexJs, libJs)
-        .then((vm) => {
+        .then(async (vm) => {
             status.info('🔌', `Loaded ${logInfo}`)
+            await clearError(server, pluginConfig)
             return vm
         })
         .catch(async (error) => {
