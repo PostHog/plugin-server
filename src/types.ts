@@ -106,14 +106,8 @@ export interface Plugin {
     error?: PluginError
     from_json?: boolean
     from_web?: boolean
-<<<<<<< HEAD
     created_at: string
     updated_at: string
-=======
-
-    created_at?: string
-    updated_at?: string
->>>>>>> a07fd3f... Add updated_at, created_at to types
 }
 
 export interface PluginConfig {
@@ -127,14 +121,8 @@ export interface PluginConfig {
     error?: PluginError
     attachments?: Record<string, PluginAttachment>
     vm?: LazyPluginVM | null
-<<<<<<< HEAD
     created_at: string
     updated_at: string
-=======
-
-    created_at?: string
-    updated_at?: string
->>>>>>> a07fd3f... Add updated_at, created_at to types
 }
 
 export interface PluginJsonConfig {

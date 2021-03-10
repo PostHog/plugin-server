@@ -2,7 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 
 import { createServer } from '../src/server'
 import { LOCKED_RESOURCE, runTasksDebounced, startSchedule, waitForTasksToFinish } from '../src/services/schedule'
-import { LogLevel } from '../src/types'
+import { LogLevel, ScheduleControl } from '../src/types'
 import { delay } from '../src/utils'
 import { resetTestDatabase } from './helpers/sql'
 import { setupPiscina } from './helpers/worker'
@@ -180,5 +180,40 @@ describe('startSchedule', () => {
 
         await schedule1.stopSchedule()
         await schedule2.stopSchedule()
+    })
+
+    describe('loading the schedule', () => {
+        let schedule: ScheduleControl
+
+        beforeEach(async () => {
+            schedule = await startSchedule(server, piscina)
+            console.log('Schedule started!')
+        })
+
+        afterEach(async () => {
+            await schedule.stopSchedule()
+        })
+
+        test('loads successfully', async () => {
+            expect(server.pluginSchedule).toEqual({
+                runEveryMinute: [39],
+                runEveryHour: [],
+                runEveryDay: [],
+            })
+
+            await resetTestDatabase(`
+                async function runEveryDay (meta) {
+                    throw new Error('lol')
+                }
+            `)
+
+            await schedule.reloadSchedule()
+
+            expect(server.pluginSchedule).toEqual({
+                runEveryMinute: [39],
+                runEveryHour: [],
+                runEveryDay: [],
+            })
+        })
     })
 })
