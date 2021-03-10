@@ -7,6 +7,7 @@ import { PluginsServer } from '../../src/types'
 import { delay } from '../../src/utils'
 import { createPluginConfigVM } from '../../src/vm/vm'
 import { pluginConfig39 } from '../helpers/plugins'
+import { resetTestDatabase } from '../helpers/sql'
 
 jest.mock('../../src/celery/client')
 
@@ -53,6 +54,7 @@ test('setupPlugin sync', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const newEvent = await vm.methods.processEvent({ ...defaultEvent })
     expect(newEvent.event).toEqual('haha')
@@ -69,6 +71,7 @@ test('setupPlugin async', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const newEvent = await vm.methods.processEvent({ ...defaultEvent })
     expect(newEvent.event).toEqual('haha')
@@ -81,6 +84,7 @@ test('processEvent', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
     expect(vm.methods.processEventBatch).not.toEqual(undefined)
@@ -113,6 +117,7 @@ test('async processEvent', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
     expect(vm.methods.processEventBatch).not.toEqual(undefined)
@@ -147,6 +152,7 @@ test('processEventBatch', async () => {
             })
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
     expect(vm.methods.processEventBatch).not.toEqual(undefined)
@@ -181,6 +187,7 @@ test('async processEventBatch', async () => {
             })
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
     expect(vm.methods.processEventBatch).not.toEqual(undefined)
@@ -219,6 +226,7 @@ test('processEvent && processEventBatch', async () => {
             })
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
     expect(vm.methods.processEventBatch).not.toEqual(undefined)
@@ -250,6 +258,7 @@ test('processEvent without returning', async () => {
             event.event = 'changed event'
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
 
@@ -274,6 +283,7 @@ test('async processEvent', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
     const event: PluginEvent = {
@@ -293,6 +303,7 @@ test('module.exports override', async () => {
         }
         module.exports = { processEvent: myProcessEventFunction }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
     const event: PluginEvent = {
@@ -312,6 +323,7 @@ test('module.exports set', async () => {
         }
         module.exports.processEvent = myProcessEventFunction
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
     const event: PluginEvent = {
@@ -331,6 +343,7 @@ test('exports override', async () => {
         }
         exports = { processEvent: myProcessEventFunction }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
@@ -349,6 +362,7 @@ test('exports set', async () => {
         }
         exports.processEvent = myProcessEventFunction
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
@@ -366,6 +380,7 @@ test('meta.config', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
@@ -389,6 +404,7 @@ test('meta.cache set/get', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
@@ -426,6 +442,7 @@ test('meta.storage set/get', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
@@ -456,6 +473,7 @@ test('meta.cache expire', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
@@ -487,6 +505,7 @@ test('meta.cache set ttl', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
@@ -517,6 +536,7 @@ test('meta.cache incr', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
@@ -572,6 +592,7 @@ test('console.log', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
@@ -594,6 +615,7 @@ test('fetch', async () => {
             return event
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
@@ -650,6 +672,7 @@ test('runEvery', async () => {
 
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
     expect(Object.keys(vm.tasks)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
@@ -666,6 +689,7 @@ test('runEvery must be a function', async () => {
         const runEveryHour = false
         const runEveryDay = { some: 'object' }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
     expect(Object.keys(vm.tasks)).toEqual(['runEveryMinute'])
@@ -681,6 +705,7 @@ test('posthog in runEvery', async () => {
             return 'haha'
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
     expect(Client).not.toHaveBeenCalled
@@ -723,6 +748,7 @@ test('posthog in runEvery with timestamp', async () => {
             return 'haha'
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
     expect(Client).not.toHaveBeenCalled
@@ -762,6 +788,7 @@ test('posthog.capture accepts user-defined distinct id', async () => {
             return 'haha'
         }
     `
+    await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
     expect(Client).not.toHaveBeenCalled
