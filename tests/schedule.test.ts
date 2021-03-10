@@ -1,7 +1,13 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 
 import { createServer } from '../src/server'
-import { LOCKED_RESOURCE, runTasksDebounced, startSchedule, waitForTasksToFinish } from '../src/services/schedule'
+import {
+    loadPluginSchedule,
+    LOCKED_RESOURCE,
+    runTasksDebounced,
+    startSchedule,
+    waitForTasksToFinish,
+} from '../src/services/schedule'
 import { LogLevel, ScheduleControl } from '../src/types'
 import { delay } from '../src/utils'
 import { resetTestDatabase } from './helpers/sql'
@@ -46,7 +52,7 @@ test('runTasksDebounced', async () => {
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
 
     const [server, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
-    server.pluginSchedule = await getPluginSchedule()
+    server.pluginSchedule = await loadPluginSchedule(piscina)
     expect(server.pluginSchedule).toEqual({ runEveryDay: [], runEveryHour: [], runEveryMinute: [39] })
 
     const event1 = await processEvent(createEvent())
@@ -82,7 +88,7 @@ test('runTasksDebounced exception', async () => {
 
     const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
     const [server, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
-    server.pluginSchedule = await getPluginSchedule()
+    server.pluginSchedule = await loadPluginSchedule(piscina)
 
     runTasksDebounced(server, piscina, 'runEveryMinute')
 

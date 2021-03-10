@@ -2,6 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 
 import Client from '../../src/celery/client'
 import { startPluginsServer } from '../../src/server'
+import { loadPluginSchedule } from '../../src/services/schedule'
 import { LogLevel } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
 import { makePiscina } from '../../src/worker/piscina'
@@ -9,6 +10,7 @@ import { resetTestDatabase } from '../helpers/sql'
 import { setupPiscina } from '../helpers/worker'
 
 jest.mock('../../src/sql')
+jest.mock('../../src/status')
 jest.setTimeout(600000) // 600 sec timeout
 
 function createEvent(index = 0): PluginEvent {
@@ -22,6 +24,10 @@ function createEvent(index = 0): PluginEvent {
         properties: { key: 'value', index },
     }
 }
+
+beforeEach(() => {
+    console.debug = jest.fn()
+})
 
 test('piscina worker test', async () => {
     const workerThreads = 2
@@ -40,10 +46,9 @@ test('piscina worker test', async () => {
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
     const processEventBatch = (batch: PluginEvent[]) => piscina.runTask({ task: 'processEventBatch', args: { batch } })
     const runEveryDay = (pluginConfigId: number) => piscina.runTask({ task: 'runEveryDay', args: { pluginConfigId } })
-    const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
     const ingestEvent = (event: PluginEvent) => piscina.runTask({ task: 'ingestEvent', args: { event } })
 
-    const pluginSchedule = await getPluginSchedule()
+    const pluginSchedule = await loadPluginSchedule(piscina)
     expect(pluginSchedule).toEqual({ runEveryDay: [39], runEveryHour: [], runEveryMinute: [] })
 
     const event = await processEvent(createEvent())

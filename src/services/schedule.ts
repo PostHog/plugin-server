@@ -121,7 +121,7 @@ export async function startSchedule(
     return { stopSchedule, reloadSchedule }
 }
 
-async function loadPluginSchedule(piscina: Piscina): Promise<PluginsServer['pluginSchedule']> {
+export async function loadPluginSchedule(piscina: Piscina): Promise<PluginsServer['pluginSchedule']> {
     while (true) {
         const schedule = (await piscina.runTask({ task: 'getPluginSchedule' })) as Record<
             string,
