@@ -10,7 +10,7 @@ jest.mock('../../src/error')
 jest.mock('../../src/status')
 
 describe('createLazyPluginVM()', () => {
-    const createVM = () => createLazyPluginVM('mockServer' as any, 'mockConfig' as any, '', '', 'some plugin')
+    const createVM = () => createLazyPluginVM('mockServer' as any, 'mockConfig' as any, '', 'some plugin')
 
     describe('VM creation succeeds', () => {
         const mockVM = {

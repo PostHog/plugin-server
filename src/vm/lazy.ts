@@ -7,10 +7,9 @@ export function createLazyPluginVM(
     server: PluginsServer,
     pluginConfig: PluginConfig,
     indexJs: string,
-    libJs = '',
     logInfo = ''
 ): LazyPluginVM {
-    const promise = createPluginConfigVM(server, pluginConfig, indexJs, libJs)
+    const promise = createPluginConfigVM(server, pluginConfig, indexJs)
         .then((vm) => {
             status.info('🔌', `Loaded ${logInfo}`)
             void clearError(server, pluginConfig)
