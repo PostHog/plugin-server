@@ -5902,9 +5902,15 @@ pirates@^4.0.1:
   dependencies:
     node-modules-regexp "^1.0.0"
 
-"piscina@link:../piscina":
-  version "0.0.0"
-  uid ""
+"piscina@https://github.com/PostHog/piscina.git#broadcast-release":
+  version "2.2.0"
+  resolved "https://github.com/PostHog/piscina.git#f8584a8e4409057f74b7ae0bf4cf6185e61530b6"
+  dependencies:
+    eventemitter-asyncresource "^1.0.0"
+    hdr-histogram-js "^2.0.1"
+    hdr-histogram-percentiles-obj "^3.0.0"
+  optionalDependencies:
+    nice-napi "^1.0.2"
 
 pkg-dir@^2.0.0:
   version "2.0.0"
