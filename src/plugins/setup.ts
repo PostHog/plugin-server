@@ -8,6 +8,7 @@ import { loadPlugin } from './loadPlugin'
 export async function setupPlugins(server: PluginsServer): Promise<void> {
     const { plugins, pluginConfigs, pluginConfigsPerTeam } = await loadPluginsFromDB(server)
 
+    const pluginVMLoadPromises: Array<Promise<any>> = []
     for (const [id, pluginConfig] of pluginConfigs) {
         const plugin = plugins.get(pluginConfig.plugin_id)
         const prevConfig = server.pluginConfigs.get(id)
@@ -23,9 +24,11 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         }
 
         if (!pluginConfig.vm) {
-            await loadPlugin(server, pluginConfig)
+            pluginVMLoadPromises.push(loadPlugin(server, pluginConfig))
         }
     }
+
+    await Promise.all(pluginVMLoadPromises)
 
     server.plugins = plugins
     server.pluginConfigs = pluginConfigs
