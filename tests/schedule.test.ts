@@ -10,6 +10,7 @@ import {
 } from '../src/services/schedule'
 import { LogLevel, ScheduleControl } from '../src/types'
 import { delay } from '../src/utils'
+import { createPromise } from './helpers/promises'
 import { resetTestDatabase } from './helpers/sql'
 import { setupPiscina } from './helpers/worker'
 
@@ -48,7 +49,6 @@ test('runTasksDebounced', async () => {
     `
     await resetTestDatabase(testCode)
     const piscina = setupPiscina(workerThreads, 10)
-    const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
 
     const [server, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
@@ -86,7 +86,6 @@ test('runTasksDebounced exception', async () => {
     await resetTestDatabase(testCode)
     const piscina = setupPiscina(workerThreads, 10)
 
-    const getPluginSchedule = () => piscina.runTask({ task: 'getPluginSchedule' })
     const [server, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
     server.pluginSchedule = await loadPluginSchedule(piscina)
 
@@ -129,63 +128,49 @@ describe('startSchedule', () => {
     })
 
     test('redlock', async () => {
+        const promises = [createPromise(), createPromise(), createPromise()]
+
         let lock1 = false
         let lock2 = false
         let lock3 = false
 
         const schedule1 = await startSchedule(server, piscina, () => {
             lock1 = true
-        })
-        const schedule2 = await startSchedule(server, piscina, () => {
-            lock2 = true
-        })
-        const schedule3 = await startSchedule(server, piscina, () => {
-            lock3 = true
+            promises.shift()!.resolve()
         })
 
-        await delay(1500)
+        await promises[0].promise
 
         expect(lock1).toBe(true)
         expect(lock2).toBe(false)
         expect(lock3).toBe(false)
 
+        const schedule2 = await startSchedule(server, piscina, () => {
+            lock2 = true
+            promises.shift()!.resolve()
+        })
+        const schedule3 = await startSchedule(server, piscina, () => {
+            lock3 = true
+            promises.shift()!.resolve()
+        })
+
         await schedule1.stopSchedule()
 
-        await delay(1500)
+        await promises[0].promise
 
         expect(lock2 || lock3).toBe(true)
 
         if (lock3) {
             await schedule3.stopSchedule()
-            await delay(1000)
+            await promises[0].promise
             expect(lock2).toBe(true)
             await schedule2.stopSchedule()
         } else {
             await schedule2.stopSchedule()
-            await delay(1000)
+            await promises[0].promise
             expect(lock3).toBe(true)
             await schedule3.stopSchedule()
         }
-    })
-
-    test('unobtained redlock does not leave itself hanging', async () => {
-        let lock1 = false
-        let lock2 = false
-
-        const schedule1 = await startSchedule(server, piscina, () => {
-            lock1 = true
-        })
-        const schedule2 = await startSchedule(server, piscina, () => {
-            lock2 = true
-        })
-
-        await delay(1500)
-
-        expect(lock1).toBe(true)
-        expect(lock2).toBe(false)
-
-        await schedule1.stopSchedule()
-        await schedule2.stopSchedule()
     })
 
     describe('loading the schedule', () => {
