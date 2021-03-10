@@ -12,6 +12,7 @@ import { DB } from '../db'
 import { Event as EventProto, IEvent } from '../idl/protos'
 import { status } from '../status'
 import {
+    CohortPeople,
     Element,
     Person,
     PersonDistinctId,
@@ -552,11 +553,7 @@ export class EventsProcessor {
             )
             if (await this.shouldSendHooksTask(team)) {
                 this.pluginsServer.statsd?.increment(`hooks.send_task`)
-                this.celery.sendTask(
-                    'posthog.tasks.calculate_action.calculate_actions_for_event',
-                    [event.id, siteUrl],
-                    {}
-                )
+                this.celery.sendTask('posthog.tasks.webhooks.post_event_to_webhook', [event.id, siteUrl], {})
             }
         }
 
