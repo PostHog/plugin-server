@@ -1,6 +1,6 @@
 import { mocked } from 'ts-jest/utils'
 
-import { processError } from '../../src/error'
+import { clearError, processError } from '../../src/error'
 import { status } from '../../src/status'
 import { createLazyPluginVM } from '../../src/vm/lazy'
 import { createPluginConfigVM } from '../../src/vm/vm'
@@ -37,10 +37,11 @@ describe('createLazyPluginVM()', () => {
             expect(await vm.getTasks()).toEqual(mockVM.tasks)
         })
 
-        it('logs info on success', async () => {
+        it('logs info and clears errors on success', async () => {
             await createVM().promise
 
             expect(status.info).toHaveBeenCalledWith('🔌', 'Loaded some plugin')
+            expect(clearError).toHaveBeenCalledWith('mockServer', 'mockConfig')
         })
     })
 
