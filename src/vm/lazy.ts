@@ -11,14 +11,14 @@ export function createLazyPluginVM(
     logInfo = ''
 ): LazyPluginVM {
     const promise = createPluginConfigVM(server, pluginConfig, indexJs, libJs)
-        .then(async (vm) => {
+        .then((vm) => {
             status.info('🔌', `Loaded ${logInfo}`)
-            await clearError(server, pluginConfig)
+            void clearError(server, pluginConfig)
             return vm
         })
-        .catch(async (error) => {
+        .catch((error) => {
             console.warn(`⚠️ Failed to load ${logInfo}`)
-            await processError(server, pluginConfig, error)
+            void processError(server, pluginConfig, error)
             return null
         })
 
