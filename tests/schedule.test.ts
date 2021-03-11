@@ -129,6 +129,7 @@ describe('startSchedule', () => {
 
     test('redlock', async () => {
         const promises = [createPromise(), createPromise(), createPromise()]
+        let i = 0
 
         let lock1 = false
         let lock2 = false
@@ -136,7 +137,7 @@ describe('startSchedule', () => {
 
         const schedule1 = await startSchedule(server, piscina, () => {
             lock1 = true
-            promises.shift()!.resolve()
+            promises[i++].resolve()
         })
 
         await promises[0].promise
@@ -147,27 +148,27 @@ describe('startSchedule', () => {
 
         const schedule2 = await startSchedule(server, piscina, () => {
             lock2 = true
-            promises.shift()!.resolve()
+            promises[i++].resolve()
         })
         const schedule3 = await startSchedule(server, piscina, () => {
             lock3 = true
-            promises.shift()!.resolve()
+            promises[i++].resolve()
         })
 
         await schedule1.stopSchedule()
 
-        await promises[0].promise
+        await promises[1].promise
 
         expect(lock2 || lock3).toBe(true)
 
         if (lock3) {
             await schedule3.stopSchedule()
-            await promises[0].promise
+            await promises[2].promise
             expect(lock2).toBe(true)
             await schedule2.stopSchedule()
         } else {
             await schedule2.stopSchedule()
-            await promises[0].promise
+            await promises[2].promise
             expect(lock3).toBe(true)
             await schedule3.stopSchedule()
         }

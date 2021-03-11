@@ -5,13 +5,11 @@ interface MockPromise<T> {
 }
 
 export function createPromise<T = void>(): MockPromise<T> {
-    let resolve: (value?: any) => void
-    let reject: (error: any) => void
-
-    const promise = new Promise<T>((_resolve, _reject) => {
-        resolve = _resolve
-        reject = _reject
+    const result: Partial<MockPromise<T>> = {}
+    result.promise = new Promise<T>((_resolve, _reject) => {
+        result.resolve = _resolve
+        result.reject = _reject
     })
 
-    return { promise, resolve, reject }
+    return result as MockPromise<T>
 }
