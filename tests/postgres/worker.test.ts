@@ -117,8 +117,8 @@ test('pause the queue if too many tasks', async () => {
             TASKS_PER_WORKER: 2,
             REDIS_POOL_MIN_SIZE: 3,
             REDIS_POOL_MAX_SIZE: 3,
-            PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
-            CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
+            PLUGINS_CELERY_QUEUE: `test-plugins-celery-queue-${new UUIDT()}`,
+            CELERY_DEFAULT_QUEUE: `test-celery-default-queue-${new UUIDT()}`,
             LOG_LEVEL: LogLevel.Debug,
         },
         makePiscina
@@ -129,7 +129,7 @@ test('pause the queue if too many tasks', async () => {
     await redis.del(pluginsServer.server.PLUGINS_CELERY_QUEUE)
     await redis.del(pluginsServer.server.CELERY_DEFAULT_QUEUE)
 
-    const kwargs = {
+    const args = Object.values({
         distinct_id: 'my-id',
         ip: '127.0.0.1',
         site_url: 'http://localhost',
@@ -141,8 +141,7 @@ test('pause the queue if too many tasks', async () => {
         now: new Date().toISOString(),
         sent_at: new Date().toISOString(),
         uuid: new UUIDT().toString(),
-    }
-    const args = Object.values(kwargs)
+    })
 
     const baseCompleted = pluginsServer.piscina.completed
 
@@ -159,7 +158,7 @@ test('pause the queue if too many tasks', async () => {
     expect(pluginsServer.piscina.completed).toBe(baseCompleted)
     expect(pluginsServer.queue.isPaused()).toBe(false)
 
-    await delay(5000)
+    await delay(2000)
 
     expect(pluginsServer.piscina.queueSize).toBe(0)
     expect(pluginsServer.piscina.completed).toBe(baseCompleted + 4)
@@ -171,47 +170,31 @@ test('pause the queue if too many tasks', async () => {
         client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
     }
 
-    for (let i = 0; i < 50; i++) {
-        if ((await redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)) > 40) {
-            await delay(100)
+    let celerySize = 50,
+        pausedTimes = 0
+    const startTime = pluginsServer.piscina.duration
+    while (celerySize > 0 || pluginsServer.piscina.queueSize > 0) {
+        await delay(50)
+        celerySize = await redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)
+
+        if (pluginsServer.queue.isPaused()) {
+            pausedTimes++
+            expect(pluginsServer.piscina.queueSize).toBeGreaterThan(0)
         }
     }
 
-    expect(await redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(40)
+    await delay(3000)
 
-    await delay(100)
-
-    expect(pluginsServer.queue.isPaused()).toBe(true)
-    expect(pluginsServer.piscina.queueSize).toBe(6)
-    expect(pluginsServer.piscina.completed).toBe(baseCompleted + 4)
-
-    for (let i = 0; i < 50; i++) {
-        if ((await redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)) > 32) {
-            await delay(100)
-        }
-    }
-
-    expect(await redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(32)
-
-    expect(pluginsServer.queue.isPaused()).toBe(true)
-    expect(pluginsServer.piscina.queueSize).toBe(6)
-    expect(pluginsServer.piscina.completed).toBe(baseCompleted + 20)
-
-    await delay(1000)
-
-    expect(await redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(32)
-
-    expect(pluginsServer.queue.isPaused()).toBe(true)
-    expect(pluginsServer.piscina.queueSize).toBe(6)
-    expect(pluginsServer.piscina.completed).toBe(baseCompleted + 24)
-
-    await delay(10000)
-
+    expect(pausedTimes).toBeGreaterThanOrEqual(10)
     expect(pluginsServer.queue.isPaused()).toBe(false)
     expect(pluginsServer.piscina.queueSize).toBe(0)
-    expect(pluginsServer.piscina.completed).toBe(baseCompleted + 104)
+    expect(pluginsServer.piscina.completed).toEqual(baseCompleted + 104)
 
-    expect(await redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)).toBe(0)
+    const duration = pluginsServer.piscina.duration - startTime
+    const expectedTimeMs = (50 / 4) * 1000
+
+    expect(duration).toBeGreaterThanOrEqual(expectedTimeMs)
+    expect(duration).toBeLessThanOrEqual(expectedTimeMs * 1.4)
 
     await pluginsServer.server.redisPool.release(redis)
     await pluginsServer.stop()
