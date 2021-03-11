@@ -16,7 +16,7 @@ import { setupPiscina } from './helpers/worker'
 
 jest.mock('../src/sql')
 jest.mock('../src/status')
-jest.setTimeout(600000) // 600 sec timeout
+jest.setTimeout(60000) // 60 sec timeout
 
 function createEvent(index = 0): PluginEvent {
     return {
