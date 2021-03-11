@@ -1,7 +1,7 @@
 import { ingestEvent } from '../ingestion/ingest-event'
 import { initApp } from '../init'
 import { runPlugins, runPluginsOnBatch, runPluginTask } from '../plugins/run'
-import { setupPlugins } from '../plugins/setup'
+import { loadSchedule, setupPlugins } from '../plugins/setup'
 import { createServer } from '../server'
 import { status } from '../status'
 import { PluginsServerConfig } from '../types'
@@ -50,6 +50,9 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
         }
         if (task === 'reloadPlugins') {
             await setupPlugins(server)
+        }
+        if (task === 'reloadSchedule') {
+            await loadSchedule(server)
         }
         server.statsd?.timing(`piscina_task.${task}`, timer)
         return response

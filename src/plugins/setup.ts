@@ -38,8 +38,7 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         server.pluginConfigsPerTeam.get(teamId)?.sort((a, b) => a.order - b.order)
     }
 
-    // :TODO: Make this truly async. This seems to cause issues during testing.
-    await loadSchedule(server)
+    void loadSchedule(server)
 }
 
 async function loadPluginsFromDB(
