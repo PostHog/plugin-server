@@ -123,6 +123,8 @@ test('pause the queue if too many tasks', async () => {
         },
         makePiscina
     )
+    await loadPluginSchedule(pluginsServer.piscina)
+    await delay(1000)
 
     const redis = await pluginsServer.server.redisPool.acquire()
 
@@ -158,7 +160,7 @@ test('pause the queue if too many tasks', async () => {
     expect(pluginsServer.piscina.completed).toBe(baseCompleted)
     expect(pluginsServer.queue.isPaused()).toBe(false)
 
-    await delay(2000)
+    await delay(5000)
 
     expect(pluginsServer.piscina.queueSize).toBe(0)
     expect(pluginsServer.piscina.completed).toBe(baseCompleted + 4)
