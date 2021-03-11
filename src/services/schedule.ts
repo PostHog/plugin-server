@@ -125,6 +125,9 @@ export async function loadPluginSchedule(
     piscina: Piscina,
     maxIterations = 2000
 ): Promise<PluginsServer['pluginSchedule']> {
+    // :TRICKY: While loadSchedule is called during the worker init process, it sometimes does not finish executing
+    //  due to threading shenanigans. Nudge the plugin server to finish loading!
+    void piscina.broadcastTask({ task: 'reloadSchedule' })
     while (maxIterations--) {
         const schedule = (await piscina.runTask({ task: 'getPluginSchedule' })) as Record<
             string,
