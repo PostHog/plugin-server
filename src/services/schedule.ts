@@ -82,9 +82,7 @@ export async function startSchedule(
         }
     }
 
-    void loadPluginSchedule(piscina).then((schedule) => {
-        server.pluginSchedule = schedule
-    })
+    server.pluginSchedule = await loadPluginSchedule(piscina)
 
     lockTimeout = setTimeout(tryToGetTheLock, 0)
 
