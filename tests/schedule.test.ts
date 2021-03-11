@@ -179,7 +179,6 @@ describe('startSchedule', () => {
 
         beforeEach(async () => {
             schedule = await startSchedule(server, piscina)
-            console.log('Schedule started!')
         })
 
         afterEach(async () => {
