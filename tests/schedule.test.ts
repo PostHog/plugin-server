@@ -16,7 +16,7 @@ import { setupPiscina } from './helpers/worker'
 
 jest.mock('../src/sql')
 jest.mock('../src/status')
-jest.setTimeout(60000) // 60 sec timeout
+jest.setTimeout(600000) // 600 sec timeout
 
 function createEvent(index = 0): PluginEvent {
     return {
@@ -31,7 +31,7 @@ function createEvent(index = 0): PluginEvent {
 }
 
 test('runTasksDebounced', async () => {
-    const workerThreads = 2
+    const workerThreads = 1
     const testCode = `
         const counterKey = 'test_counter_2'
         async function setupPlugin (meta) {

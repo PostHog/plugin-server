@@ -121,8 +121,11 @@ export async function startSchedule(
     return { stopSchedule, reloadSchedule }
 }
 
-export async function loadPluginSchedule(piscina: Piscina): Promise<PluginsServer['pluginSchedule']> {
-    while (true) {
+export async function loadPluginSchedule(
+    piscina: Piscina,
+    maxIterations = 2000
+): Promise<PluginsServer['pluginSchedule']> {
+    while (maxIterations--) {
         const schedule = (await piscina.runTask({ task: 'getPluginSchedule' })) as Record<
             string,
             PluginConfigId[]
@@ -132,6 +135,7 @@ export async function loadPluginSchedule(piscina: Piscina): Promise<PluginsServe
         }
         await delay(200)
     }
+    throw new Error('Could not load plugin schedule in time')
 }
 
 export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskName: string): void {
