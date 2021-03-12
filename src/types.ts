@@ -1,3 +1,4 @@
+import { ReaderModel } from '@maxmind/geoip2-node'
 import ClickHouse from '@posthog/clickhouse'
 import { PluginAttachment, PluginConfigSchema, PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import { Pool as GenericPool } from 'generic-pool'
@@ -64,6 +65,7 @@ export interface PluginsServer extends PluginsServerConfig {
     kafka?: Kafka
     kafkaProducer?: Producer
     statsd?: StatsD
+    geoIp?: ReaderModel
     // currently enabled plugin status
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>
