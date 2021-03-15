@@ -144,7 +144,7 @@ test('archive plugin with broken index.js does not do much', async () => {
     const { pluginConfigs } = mockServer
 
     const pluginConfig = pluginConfigs.get(39)!
-    expect(await pluginConfig.vm!.promise).toEqual(null)
+    expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
 
     const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
     const returnedEvent = await runPlugins(mockServer, { ...event })
@@ -169,7 +169,7 @@ test('local plugin with broken index.js does not do much', async () => {
     const { pluginConfigs } = mockServer
 
     const pluginConfig = pluginConfigs.get(39)!
-    expect(await pluginConfig.vm!.promise).toEqual(null)
+    expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
 
     const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
     const returnedEvent = await runPlugins(mockServer, { ...event })
@@ -204,7 +204,8 @@ test('archive plugin with broken plugin.json does not do much', async () => {
         pluginConfigs.get(39)!,
         'Can not load plugin.json for plugin "test-maxmind-plugin"'
     )
-    expect(pluginConfigs.get(39)!.vm).toEqual(null)
+
+    expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
 })
 
 test('local plugin with broken plugin.json does not do much', async () => {
@@ -228,7 +229,7 @@ test('local plugin with broken plugin.json does not do much', async () => {
         pluginConfigs.get(39)!,
         expect.stringContaining('Could not load posthog config at ')
     )
-    expect(pluginConfigs.get(39)!.vm).toEqual(null)
+    expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
 
     unlink()
 })
@@ -251,7 +252,7 @@ test('plugin with http urls must have an archive', async () => {
         pluginConfigs.get(39)!,
         'Un-downloaded remote plugins not supported! Plugin: "test-maxmind-plugin"'
     )
-    expect(pluginConfigs.get(39)!.vm).toEqual(null)
+    expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
 })
 
 test("plugin with broken archive doesn't load", async () => {
@@ -272,7 +273,7 @@ test("plugin with broken archive doesn't load", async () => {
         pluginConfigs.get(39)!,
         Error('Could not read archive as .zip or .tgz')
     )
-    expect(pluginConfigs.get(39)!.vm).toEqual(null)
+    expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
 })
 
 test('plugin config order', async () => {
@@ -375,12 +376,10 @@ test('reloading plugins after config changes', async () => {
         makeConfig(64, 43, 1),
     ])
 
-    mocked(loadPlugin).mockReset()
-
     await setupPlugins(mockServer)
     await loadSchedule(mockServer)
 
-    expect(loadPlugin).toHaveBeenCalledTimes(3)
+    expect(loadPlugin).toHaveBeenCalledTimes(4 + 3)
     expect(Array.from(mockServer.plugins.keys())).toEqual(expect.arrayContaining([60, 61, 63, 64]))
     expect(Array.from(mockServer.pluginConfigs.keys())).toEqual(expect.arrayContaining([39, 41, 42, 43]))
 

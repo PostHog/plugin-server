@@ -3,6 +3,7 @@ import { PluginAttachment } from '@posthog/plugin-scaffold'
 import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows } from '../sql'
 import { status } from '../status'
 import { Plugin, PluginConfig, PluginConfigId, PluginId, PluginsServer, TeamId } from '../types'
+import { createLazyPluginVM } from '../vm/lazy'
 import { loadPlugin } from './loadPlugin'
 
 export async function setupPlugins(server: PluginsServer): Promise<void> {
@@ -14,16 +15,14 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         const prevConfig = server.pluginConfigs.get(id)
         const prevPlugin = prevConfig ? server.plugins.get(pluginConfig.plugin_id) : null
 
-        // :TRICKY: This forces a reload for plugin VMs which have either been added or changed
         if (
             prevConfig &&
             pluginConfig.updated_at === prevConfig.updated_at &&
             plugin?.updated_at == prevPlugin?.updated_at
         ) {
             pluginConfig.vm = prevConfig.vm
-        }
-
-        if (!pluginConfig.vm) {
+        } else {
+            pluginConfig.vm = createLazyPluginVM()
             pluginVMLoadPromises.push(loadPlugin(server, pluginConfig))
         }
     }
@@ -118,7 +117,9 @@ export async function loadSchedule(server: PluginsServer): Promise<void> {
         }
     }
 
-    status.info('🔌', `Loaded ${count} scheduled tasks`)
+    if (count > 0) {
+        status.info('🔌', `Loaded ${count} scheduled tasks`)
+    }
 
     server.pluginSchedule = pluginSchedule
 }

@@ -2,6 +2,7 @@ import { mocked } from 'ts-jest/utils'
 
 import { clearError, processError } from '../../src/error'
 import { status } from '../../src/status'
+import { LazyPluginVM } from '../../src/types'
 import { createLazyPluginVM } from '../../src/vm/lazy'
 import { createPluginConfigVM } from '../../src/vm/vm'
 
@@ -10,7 +11,9 @@ jest.mock('../../src/error')
 jest.mock('../../src/status')
 
 describe('createLazyPluginVM()', () => {
-    const createVM = () => createLazyPluginVM('mockServer' as any, 'mockConfig' as any, '', 'some plugin')
+    const createVM = () => createLazyPluginVM()
+    const initializeVM = (vm: LazyPluginVM) =>
+        vm.initialize('mockServer' as any, 'mockConfig' as any, '', 'some plugin')
 
     describe('VM creation succeeds', () => {
         const mockVM = {
@@ -29,6 +32,7 @@ describe('createLazyPluginVM()', () => {
 
         it('returns correct values for get methods', async () => {
             const vm = createVM()
+            void initializeVM(vm)
 
             expect(await vm.getProcessEvent()).toEqual('processEvent')
             expect(await vm.getProcessEventBatch()).toEqual(null)
@@ -38,7 +42,9 @@ describe('createLazyPluginVM()', () => {
         })
 
         it('logs info and clears errors on success', async () => {
-            await createVM().promise
+            const vm = createVM()
+            void initializeVM(vm)
+            await vm.promise
 
             expect(status.info).toHaveBeenCalledWith('🔌', 'Loaded some plugin')
             expect(clearError).toHaveBeenCalledWith('mockServer', 'mockConfig')
@@ -56,6 +62,7 @@ describe('createLazyPluginVM()', () => {
 
         it('returns empty values for get methods', async () => {
             const vm = createVM()
+            void initializeVM(vm)
 
             expect(await vm.getProcessEvent()).toEqual(null)
             expect(await vm.getProcessEventBatch()).toEqual(null)
@@ -65,7 +72,9 @@ describe('createLazyPluginVM()', () => {
 
         it('logs failure', async () => {
             try {
-                await createVM().promise
+                const vm = createVM()
+                void initializeVM(vm)
+                await vm.promise
             } catch {}
 
             expect(console.warn).toHaveBeenCalledWith('⚠️ Failed to load some plugin')

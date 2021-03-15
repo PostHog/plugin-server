@@ -174,6 +174,8 @@ export interface LazyPluginVM {
     getProcessEventBatch: () => Promise<PluginConfigVMReponse['methods']['processEventBatch'] | null>
     getTask: (name: string) => Promise<PluginTask | null>
     getTasks: () => Promise<Record<string, PluginTask>>
+    initialize: (server: PluginsServer, pluginConfig: PluginConfig, indexJs: string, logInfo: string) => Promise<void>
+    failInitialization: () => void
 }
 
 export interface EventUsage {

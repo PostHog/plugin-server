@@ -1,15 +1,15 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
-import { clearError, processError } from '../error'
+import { processError } from '../error'
 import { PluginConfig, PluginJsonConfig, PluginsServer } from '../types'
 import { getFileFromArchive } from '../utils'
-import { createLazyPluginVM } from '../vm/lazy'
 
 export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Promise<boolean> {
     const { plugin } = pluginConfig
 
     if (!plugin) {
+        pluginConfig.vm?.failInitialization()
         return false
     }
 
@@ -24,6 +24,7 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
                     const jsonBuffer = fs.readFileSync(configPath)
                     config = JSON.parse(jsonBuffer.toString())
                 } catch (e) {
+                    pluginConfig.vm?.failInitialization()
                     await processError(
                         server,
                         pluginConfig,
@@ -34,6 +35,7 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
             }
 
             if (!config['main'] && !fs.existsSync(path.resolve(pluginPath, 'index.js'))) {
+                pluginConfig.vm?.failInitialization()
                 await processError(
                     server,
                     pluginConfig,
@@ -45,7 +47,7 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
             const jsPath = path.resolve(pluginPath, config['main'] || 'index.js')
             const indexJs = fs.readFileSync(jsPath).toString()
 
-            pluginConfig.vm = createLazyPluginVM(
+            void pluginConfig.vm?.initialize(
                 server,
                 pluginConfig,
                 indexJs,
@@ -60,6 +62,7 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
                 try {
                     config = JSON.parse(json)
                 } catch (error) {
+                    pluginConfig.vm?.failInitialization()
                     await processError(server, pluginConfig, `Can not load plugin.json for plugin "${plugin.name}"`)
                     return false
                 }
@@ -68,15 +71,17 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
             const indexJs = await getFileFromArchive(archive, config['main'] || 'index.js')
 
             if (indexJs) {
-                pluginConfig.vm = createLazyPluginVM(server, pluginConfig, indexJs, `plugin "${plugin.name}"!`)
+                void pluginConfig.vm?.initialize(server, pluginConfig, indexJs, `plugin "${plugin.name}"!`)
                 return true
             } else {
+                pluginConfig.vm?.failInitialization()
                 await processError(server, pluginConfig, `Could not load index.js for plugin "${plugin.name}"!`)
             }
         } else if (plugin.plugin_type === 'source' && plugin.source) {
-            pluginConfig.vm = createLazyPluginVM(server, pluginConfig, plugin.source, `plugin "${plugin.name}"!`)
+            void pluginConfig.vm?.initialize(server, pluginConfig, plugin.source, `plugin "${plugin.name}"!`)
             return true
         } else {
+            pluginConfig.vm?.failInitialization()
             await processError(
                 server,
                 pluginConfig,
@@ -84,6 +89,7 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
             )
         }
     } catch (error) {
+        pluginConfig.vm?.failInitialization()
         await processError(server, pluginConfig, error)
     }
     return false
