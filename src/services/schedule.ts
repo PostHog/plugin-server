@@ -82,18 +82,28 @@ export async function startSchedule(
         }
     }
 
-    server.pluginSchedule = await loadPluginSchedule(piscina)
+    let pluginSchedulePromise = loadPluginSchedule(piscina)
+    server.pluginSchedule = await pluginSchedulePromise
 
     lockTimeout = setTimeout(tryToGetTheLock, 0)
 
-    const runEveryMinuteJob = schedule.scheduleJob('* * * * *', () => {
-        !stopped && weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryMinute')
+    const runEveryMinuteJob = schedule.scheduleJob('* * * * *', async () => {
+        !stopped &&
+            weHaveTheLock &&
+            (await pluginSchedulePromise) &&
+            runTasksDebounced(server!, piscina!, 'runEveryMinute')
     })
-    const runEveryHourJob = schedule.scheduleJob('0 * * * *', () => {
-        !stopped && weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryHour')
+    const runEveryHourJob = schedule.scheduleJob('0 * * * *', async () => {
+        !stopped &&
+            weHaveTheLock &&
+            (await pluginSchedulePromise) &&
+            runTasksDebounced(server!, piscina!, 'runEveryHour')
     })
-    const runEveryDayJob = schedule.scheduleJob('0 0 * * *', () => {
-        !stopped && weHaveTheLock && runTasksDebounced(server!, piscina!, 'runEveryDay')
+    const runEveryDayJob = schedule.scheduleJob('0 0 * * *', async () => {
+        !stopped &&
+            weHaveTheLock &&
+            (await pluginSchedulePromise) &&
+            runTasksDebounced(server!, piscina!, 'runEveryDay')
     })
 
     const stopSchedule = async () => {
@@ -109,13 +119,8 @@ export async function startSchedule(
     }
 
     const reloadSchedule = async () => {
-        lockTimeout && clearTimeout(lockTimeout)
-        weHaveTheLock = false
-        await lock?.unlock().catch(Sentry.captureException)
-
-        server.pluginSchedule = await loadPluginSchedule(piscina)
-
-        lockTimeout = setTimeout(tryToGetTheLock, 0)
+        pluginSchedulePromise = loadPluginSchedule(piscina)
+        server.pluginSchedule = await pluginSchedulePromise
     }
 
     return { stopSchedule, reloadSchedule }
