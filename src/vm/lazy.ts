@@ -1,37 +1,57 @@
 import { clearError, processError } from '../error'
 import { status } from '../status'
-import { LazyPluginVM, PluginConfig, PluginsServer } from '../types'
+import { PluginConfig, PluginConfigVMReponse, PluginsServer, PluginTask } from '../types'
 import { createPluginConfigVM } from './vm'
 
-export function createLazyPluginVM(): LazyPluginVM {
-    const returnValue: Partial<LazyPluginVM> = {
-        getProcessEvent: async () => (await returnValue.promise)?.methods.processEvent || null,
-        getProcessEventBatch: async () => (await returnValue.promise)?.methods.processEventBatch || null,
-        getTask: async (name: string) => (await returnValue.promise)?.tasks[name] || null,
-        getTasks: async () => (await returnValue.promise)?.tasks || {},
-    }
-    returnValue.promise = new Promise((resolve) => {
-        returnValue.initialize = async (
-            server: PluginsServer,
-            pluginConfig: PluginConfig,
-            indexJs: string,
-            logInfo = ''
-        ) => {
-            try {
-                const vm = await createPluginConfigVM(server, pluginConfig, indexJs)
-                status.info('🔌', `Loaded ${logInfo}`)
-                void clearError(server, pluginConfig)
-                resolve(vm)
-            } catch (error) {
-                status.warn('⚠️', `Failed to load ${logInfo}`)
-                void processError(server, pluginConfig, error)
+export class LazyPluginVM {
+    public initialize?: (
+        server: PluginsServer,
+        pluginConfig: PluginConfig,
+        indexJs: string,
+        logInfo: string
+    ) => Promise<void>
+    public failInitialization?: () => void
+
+    private resolveInternalVm: Promise<PluginConfigVMReponse | null>
+
+    constructor() {
+        this.resolveInternalVm = new Promise((resolve) => {
+            this.initialize = async (
+                server: PluginsServer,
+                pluginConfig: PluginConfig,
+                indexJs: string,
+                logInfo = ''
+            ) => {
+                try {
+                    const vm = await createPluginConfigVM(server, pluginConfig, indexJs)
+                    status.info('🔌', `Loaded ${logInfo}`)
+                    void clearError(server, pluginConfig)
+                    resolve(vm)
+                } catch (error) {
+                    status.warn('⚠️', `Failed to load ${logInfo}`)
+                    void processError(server, pluginConfig, error)
+                    resolve(null)
+                }
+            }
+            this.failInitialization = () => {
                 resolve(null)
             }
-        }
-        returnValue.failInitialization = () => {
-            resolve(null)
-        }
-    })
+        })
+    }
 
-    return returnValue as LazyPluginVM
+    async getProcessEvent(): Promise<PluginConfigVMReponse['methods']['processEvent'] | null> {
+        return (await this.resolveInternalVm)?.methods.processEvent || null
+    }
+
+    async getProcessEventBatch(): Promise<PluginConfigVMReponse['methods']['processEventBatch'] | null> {
+        return (await this.resolveInternalVm)?.methods.processEventBatch || null
+    }
+
+    async getTask(name: string): Promise<PluginTask | null> {
+        return (await this.resolveInternalVm)?.tasks[name] || null
+    }
+
+    async getTasks(): Promise<Record<string, PluginTask>> {
+        return (await this.resolveInternalVm)?.tasks || {}
+    }
 }

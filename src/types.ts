@@ -10,6 +10,7 @@ import { Pool } from 'pg'
 import { VM } from 'vm2'
 
 import { DB } from './db'
+import { LazyPluginVM } from './vm/lazy'
 
 export enum LogLevel {
     Debug = 'debug',
@@ -166,16 +167,6 @@ export interface PluginConfigVMReponse {
         processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
     }
     tasks: Record<string, PluginTask>
-}
-
-export interface LazyPluginVM {
-    promise: Promise<PluginConfigVMReponse | null>
-    getProcessEvent: () => Promise<PluginConfigVMReponse['methods']['processEvent'] | null>
-    getProcessEventBatch: () => Promise<PluginConfigVMReponse['methods']['processEventBatch'] | null>
-    getTask: (name: string) => Promise<PluginTask | null>
-    getTasks: () => Promise<Record<string, PluginTask>>
-    initialize: (server: PluginsServer, pluginConfig: PluginConfig, indexJs: string, logInfo: string) => Promise<void>
-    failInitialization: () => void
 }
 
 export interface EventUsage {
