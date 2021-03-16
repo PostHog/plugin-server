@@ -8,6 +8,7 @@ const memoize: Record<string, string> = {}
 
 export function transformCode(rawCode: string, server: PluginsServer): string {
     if (process.env.NODE_ENV === 'test' && memoize[rawCode]) {
+        // Memoizing in tests for speed, not in production though due to reliability concerns
         return memoize[rawCode]
     }
 
