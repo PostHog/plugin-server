@@ -56,8 +56,6 @@ describe('createLazyPluginVM()', () => {
 
         beforeEach(() => {
             mocked(createPluginConfigVM).mockRejectedValue(error)
-
-            jest.spyOn(console, 'warn').mockImplementation(() => null)
         })
 
         it('returns empty values for get methods', async () => {
@@ -77,7 +75,7 @@ describe('createLazyPluginVM()', () => {
                 await vm.promise
             } catch {}
 
-            expect(console.warn).toHaveBeenCalledWith('⚠️ Failed to load some plugin')
+            expect(status.warn).toHaveBeenCalledWith('⚠️', 'Failed to load some plugin')
             expect(processError).toHaveBeenCalledWith('mockServer', 'mockConfig', error)
         })
     })
