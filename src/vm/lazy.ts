@@ -23,7 +23,7 @@ export function createLazyPluginVM(): LazyPluginVM {
                 void clearError(server, pluginConfig)
                 resolve(vm)
             } catch (error) {
-                console.warn(`⚠️ Failed to load ${logInfo}`)
+                status.warn('⚠️', `Failed to load ${logInfo}`)
                 void processError(server, pluginConfig, error)
                 resolve(null)
             }
