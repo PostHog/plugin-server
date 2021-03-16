@@ -4,15 +4,9 @@ import { PluginConfig, PluginConfigVMReponse, PluginsServer, PluginTask } from '
 import { createPluginConfigVM } from './vm'
 
 export class LazyPluginVM {
-    public initialize?: (
-        server: PluginsServer,
-        pluginConfig: PluginConfig,
-        indexJs: string,
-        logInfo: string
-    ) => Promise<void>
-    public failInitialization?: () => void
-
-    private resolveInternalVm: Promise<PluginConfigVMReponse | null>
+    initialize?: (server: PluginsServer, pluginConfig: PluginConfig, indexJs: string, logInfo: string) => Promise<void>
+    failInitialization?: () => void
+    resolveInternalVm: Promise<PluginConfigVMReponse | null>
 
     constructor() {
         this.resolveInternalVm = new Promise((resolve) => {

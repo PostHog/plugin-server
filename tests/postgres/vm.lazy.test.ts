@@ -43,7 +43,7 @@ describe('LazyPluginVM', () => {
         it('logs info and clears errors on success', async () => {
             const vm = createVM()
             void initializeVM(vm)
-            await vm.promise
+            await vm.resolveInternalVm
 
             expect(status.info).toHaveBeenCalledWith('🔌', 'Loaded some plugin')
             expect(clearError).toHaveBeenCalledWith('mockServer', 'mockConfig')
@@ -71,7 +71,7 @@ describe('LazyPluginVM', () => {
             try {
                 const vm = createVM()
                 void initializeVM(vm)
-                await vm.promise
+                await vm.resolveInternalVm
             } catch {}
 
             expect(status.warn).toHaveBeenCalledWith('⚠️', 'Failed to load some plugin')
