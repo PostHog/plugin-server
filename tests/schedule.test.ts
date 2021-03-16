@@ -31,7 +31,7 @@ function createEvent(index = 0): PluginEvent {
 }
 
 test('runTasksDebounced', async () => {
-    const workerThreads = 2
+    const workerThreads = 1
     const testCode = `
         const counterKey = 'test_counter_2'
         async function setupPlugin (meta) {
