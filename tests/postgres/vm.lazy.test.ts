@@ -3,14 +3,13 @@ import { mocked } from 'ts-jest/utils'
 import { clearError, processError } from '../../src/error'
 import { status } from '../../src/status'
 import { LazyPluginVM } from '../../src/types'
-import { createLazyPluginVM } from '../../src/vm/lazy'
 import { createPluginConfigVM } from '../../src/vm/vm'
 
 jest.mock('../../src/vm/vm')
 jest.mock('../../src/error')
 jest.mock('../../src/status')
 
-describe('createLazyPluginVM()', () => {
+describe('LazyPluginVM', () => {
     const createVM = () => new LazyPluginVM()
     const initializeVM = (vm: LazyPluginVM) =>
         vm.initialize('mockServer' as any, 'mockConfig' as any, '', 'some plugin')
