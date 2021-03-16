@@ -11,8 +11,8 @@ jest.mock('../../src/status')
 
 describe('LazyPluginVM', () => {
     const createVM = () => new LazyPluginVM()
-    const initializeVM = (vm: LazyPluginVM) =>
-        vm.initialize('mockServer' as any, 'mockConfig' as any, '', 'some plugin')
+    const initializeVm = (vm: LazyPluginVM) =>
+        vm.initialize!('mockServer' as any, 'mockConfig' as any, '', 'some plugin')
 
     describe('VM creation succeeds', () => {
         const mockVM = {
@@ -31,7 +31,7 @@ describe('LazyPluginVM', () => {
 
         it('returns correct values for get methods', async () => {
             const vm = createVM()
-            void initializeVM(vm)
+            void initializeVm(vm)
 
             expect(await vm.getProcessEvent()).toEqual('processEvent')
             expect(await vm.getProcessEventBatch()).toEqual(null)
@@ -42,7 +42,7 @@ describe('LazyPluginVM', () => {
 
         it('logs info and clears errors on success', async () => {
             const vm = createVM()
-            void initializeVM(vm)
+            void initializeVm(vm)
             await vm.resolveInternalVm
 
             expect(status.info).toHaveBeenCalledWith('🔌', 'Loaded some plugin')
@@ -59,7 +59,7 @@ describe('LazyPluginVM', () => {
 
         it('returns empty values for get methods', async () => {
             const vm = createVM()
-            void initializeVM(vm)
+            void initializeVm(vm)
 
             expect(await vm.getProcessEvent()).toEqual(null)
             expect(await vm.getProcessEventBatch()).toEqual(null)
@@ -70,7 +70,7 @@ describe('LazyPluginVM', () => {
         it('logs failure', async () => {
             try {
                 const vm = createVM()
-                void initializeVM(vm)
+                void initializeVm(vm)
                 await vm.resolveInternalVm
             } catch {}
 
