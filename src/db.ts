@@ -19,6 +19,7 @@ import {
     Event,
     Person,
     PersonDistinctId,
+    PluginsServerConfig,
     PostgresSessionRecordingEvent,
     RawOrganization,
     RawPerson,
@@ -49,29 +50,32 @@ export class DB {
     /** StatsD instance used to do instrumentation */
     statsd: StatsD | undefined
 
-    /** Queued messages for kafka */
+    /** Queued producer for kafka */
     lastFlushTime: Date
     kafkaMessageQueue: Array<ProducerRecord>
     kafkaFlushInterval: NodeJS.Timeout
-
-    KAFKA_FLUSH_FREQUENCY_MS = 1000
-    KAFKA_FLUSH_MAX_QUEUE_SIZE = 1000
+    flushFrequencyMs: number
+    maxQueueSize: number
 
     constructor(
         postgres: Pool,
         redisPool: GenericPool<Redis.Redis>,
-        kafkaProducer?: Producer,
-        clickhouse?: ClickHouse,
-        statsd?: StatsD
+        kafkaProducer: Producer | undefined,
+        clickhouse: ClickHouse | undefined,
+        statsd: StatsD | undefined,
+        serverConfig: PluginsServerConfig
     ) {
         this.postgres = postgres
         this.redisPool = redisPool
         this.kafkaProducer = kafkaProducer
         this.clickhouse = clickhouse
         this.statsd = statsd
+
         this.lastFlushTime = new Date()
         this.kafkaMessageQueue = []
-        this.kafkaFlushInterval = setInterval(() => this.flushKafkaMessages(), this.KAFKA_FLUSH_FREQUENCY_MS)
+        this.flushFrequencyMs = serverConfig?.KAFKA_FLUSH_FREQUENCY_MS
+        this.maxQueueSize = serverConfig?.KAFKA_PRODUCER_MAX_QUEUE_SIZE
+        this.kafkaFlushInterval = setInterval(() => this.flushKafkaMessages(), this.flushFrequencyMs)
     }
 
     // Postgres
@@ -136,11 +140,7 @@ export class DB {
         this.kafkaMessageQueue.push(kafkaMessage)
 
         const timeSinceLastFlush = new Date().getTime() - this.lastFlushTime.getTime()
-        if (
-            timeSinceLastFlush > this.KAFKA_FLUSH_FREQUENCY_MS ||
-            this.kafkaMessageQueue.length >= this.KAFKA_FLUSH_MAX_QUEUE_SIZE ||
-            true
-        ) {
+        if (timeSinceLastFlush > this.flushFrequencyMs || this.kafkaMessageQueue.length >= this.maxQueueSize) {
             await this.flushKafkaMessages()
         }
     }

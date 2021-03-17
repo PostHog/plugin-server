@@ -134,7 +134,7 @@ export async function createServer(
         }
     }
 
-    const db = new DB(postgres, redisPool, kafkaProducer, clickhouse, statsd)
+    const db = new DB(postgres, redisPool, kafkaProducer, clickhouse, statsd, serverConfig)
 
     const server: Omit<PluginsServer, 'eventsProcessor'> = {
         ...serverConfig,
