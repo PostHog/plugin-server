@@ -7,7 +7,6 @@ import { Producer, ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 
-import { defaultConfig } from './config'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './ingestion/utils'
 import {
@@ -61,10 +60,10 @@ export class DB {
     constructor(
         postgres: Pool,
         redisPool: GenericPool<Redis.Redis>,
-        kafkaProducer?: Producer,
-        clickhouse?: ClickHouse,
-        statsd?: StatsD,
-        serverConfig: PluginsServerConfig = defaultConfig
+        kafkaProducer: Producer | undefined,
+        clickhouse: ClickHouse | undefined,
+        statsd: StatsD | undefined,
+        serverConfig: PluginsServerConfig
     ) {
         this.postgres = postgres
         this.redisPool = redisPool
