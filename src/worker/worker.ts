@@ -54,6 +54,9 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
         if (task === 'reloadSchedule') {
             await loadSchedule(server)
         }
+        if (task === 'flushKafkaMessages') {
+            await server.db.flushKafkaMessages()
+        }
         server.statsd?.timing(`piscina_task.${task}`, timer)
         return response
     }
