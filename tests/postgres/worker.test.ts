@@ -143,6 +143,7 @@ test('pause the queue if too many tasks', async () => {
         uuid: new UUIDT().toString(),
     })
 
+    await delay(1000)
     const baseCompleted = pluginsServer.piscina.completed
 
     expect(pluginsServer.piscina.queueSize).toBe(0)
