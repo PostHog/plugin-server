@@ -3,6 +3,7 @@ import AdmZip from 'adm-zip'
 import { randomBytes } from 'crypto'
 import Redis from 'ioredis'
 import { DateTime } from 'luxon'
+import { Pool } from 'pg'
 import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
@@ -393,4 +394,24 @@ export function pluginDigest(plugin: Plugin): string {
         extras.push('GLOBAL')
     }
     return `plugin "${plugin.name}" (${extras.join(' - ')})`
+}
+
+export function createPostgresPool(serverConfig: PluginsServerConfig): Pool {
+    const postgres = new Pool({
+        connectionString: serverConfig.DATABASE_URL,
+        idleTimeoutMillis: 500,
+        max: 10,
+        ssl: process.env.DYNO // Means we are on Heroku
+            ? {
+                  rejectUnauthorized: false,
+              }
+            : undefined,
+    })
+
+    postgres.on('error', (error) => {
+        Sentry.captureException(error)
+        status.error('🔴', 'PostgreSQL error encountered!\n', error)
+    })
+
+    return postgres
 }

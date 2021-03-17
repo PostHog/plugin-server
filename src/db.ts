@@ -1,6 +1,7 @@
 import ClickHouse from '@posthog/clickhouse'
-import { Properties } from '@posthog/plugin-scaffold'
+import { CacheOptions, Properties } from '@posthog/plugin-scaffold'
 import { Pool as GenericPool } from 'generic-pool'
+import { StatsD, Tags } from 'hot-shots'
 import Redis from 'ioredis'
 import { Producer, ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
@@ -45,49 +46,59 @@ export class DB {
     /** ClickHouse used for syncing Postgres and ClickHouse person data. */
     clickhouse?: ClickHouse
 
+    /** StatsD instance used to do instrumentation */
+    statsd: StatsD | undefined
+
     constructor(
         postgres: Pool,
         redisPool: GenericPool<Redis.Redis>,
         kafkaProducer?: Producer,
-        clickhouse?: ClickHouse
+        clickhouse?: ClickHouse,
+        statsd?: StatsD
     ) {
         this.postgres = postgres
+        this.redisPool = redisPool
         this.kafkaProducer = kafkaProducer
         this.clickhouse = clickhouse
-        this.redisPool = redisPool
+        this.statsd = statsd
     }
 
     // Postgres
 
     public async postgresQuery<R extends QueryResultRow = any, I extends any[] = any[]>(
         queryTextOrConfig: string | QueryConfig<I>,
-        values?: I
+        values?: I,
+        tag?: string
     ): Promise<QueryResult<R>> {
-        const timeout = timeoutGuard(`Postgres slow query warning after 30 sec: ${queryTextOrConfig}`)
-        try {
-            return await this.postgres.query(queryTextOrConfig, values)
-        } finally {
-            clearTimeout(timeout)
-        }
+        return this.instrumentQuery('query.postgres', tag, async () => {
+            const timeout = timeoutGuard(`Postgres slow query warning after 30 sec: ${queryTextOrConfig}`)
+            try {
+                return await this.postgres.query(queryTextOrConfig, values)
+            } finally {
+                clearTimeout(timeout)
+            }
+        })
     }
 
     public async postgresTransaction<ReturnType extends any>(
         transaction: (client: PoolClient) => Promise<ReturnType>
     ): Promise<ReturnType> {
-        const timeout = timeoutGuard(`Postgres slow transaction warning after 30 sec!`)
-        const client = await this.postgres.connect()
-        try {
-            await client.query('BEGIN')
-            const response = await transaction(client)
-            await client.query('COMMIT')
-            return response
-        } catch (e) {
-            await client.query('ROLLBACK')
-            throw e
-        } finally {
-            client.release()
-            clearTimeout(timeout)
-        }
+        return this.instrumentQuery('query.postgres_transation', undefined, async () => {
+            const timeout = timeoutGuard(`Postgres slow transaction warning after 30 sec!`)
+            const client = await this.postgres.connect()
+            try {
+                await client.query('BEGIN')
+                const response = await transaction(client)
+                await client.query('COMMIT')
+                return response
+            } catch (e) {
+                await client.query('ROLLBACK')
+                throw e
+            } finally {
+                client.release()
+                clearTimeout(timeout)
+            }
+        })
     }
 
     // ClickHouse
@@ -96,119 +107,143 @@ export class DB {
         query: string,
         options?: ClickHouse.QueryOptions
     ): Promise<ClickHouse.QueryResult<Record<string, any>>> {
-        if (!this.clickhouse) {
-            throw new Error('ClickHouse connection has not been provided to this DB instance!')
-        }
-        const timeout = timeoutGuard(`ClickHouse slow query warning after 30 sec: ${query}`)
-        try {
-            return await this.clickhouse.querying(query, options)
-        } finally {
-            clearTimeout(timeout)
-        }
+        return this.instrumentQuery('query.clickhouse', undefined, async () => {
+            if (!this.clickhouse) {
+                throw new Error('ClickHouse connection has not been provided to this DB instance!')
+            }
+            const timeout = timeoutGuard(`ClickHouse slow query warning after 30 sec: ${query}`)
+            try {
+                return await this.clickhouse.querying(query, options)
+            } finally {
+                clearTimeout(timeout)
+            }
+        })
     }
 
     // Kafka
 
     public async sendKafkaMessage(kafkaMessage: ProducerRecord): Promise<void> {
-        if (!this.kafkaProducer) {
-            throw new Error('Kafka connection has not been provided!')
-        }
-        const timeout = timeoutGuard(
-            `Kafka message sending delayed. Waiting over 30 sec to send to topic: ${kafkaMessage.topic}`
-        )
-        try {
-            await this.kafkaProducer.send(kafkaMessage)
-        } finally {
-            clearTimeout(timeout)
-        }
+        return this.instrumentQuery('query.kafka_send', undefined, async () => {
+            if (!this.kafkaProducer) {
+                throw new Error('Kafka connection has not been provided!')
+            }
+            const timeout = timeoutGuard(
+                `Kafka message sending delayed. Waiting over 30 sec to send to topic: ${kafkaMessage.topic}`
+            )
+            try {
+                await this.kafkaProducer.send(kafkaMessage)
+            } finally {
+                clearTimeout(timeout)
+            }
+        })
     }
 
     // Redis
 
-    public async redisGet(key: string, defaultValue: unknown, parseJSON = true): Promise<unknown> {
-        const client = await this.redisPool.acquire()
-        const timeout = timeoutGuard(`Getting redis key delayed. Waiting over 30 sec to get key: ${key}`)
-        try {
-            const value = await tryTwice(
-                async () => await client.get(key),
-                `Waited 5 sec to get redis key: ${key}, retrying once!`
-            )
-            if (typeof value === 'undefined') {
-                return defaultValue
+    public async redisGet(key: string, defaultValue: unknown, options: CacheOptions = {}): Promise<unknown> {
+        const { jsonSerialize = true } = options
+
+        return this.instrumentQuery('query.regisGet', undefined, async () => {
+            const client = await this.redisPool.acquire()
+            const timeout = timeoutGuard(`Getting redis key delayed. Waiting over 30 sec to get key: ${key}`)
+            try {
+                const value = await tryTwice(
+                    async () => await client.get(key),
+                    `Waited 5 sec to get redis key: ${key}, retrying once!`
+                )
+                if (typeof value === 'undefined') {
+                    return defaultValue
+                }
+                return value ? (jsonSerialize ? JSON.parse(value) : value) : null
+            } catch (error) {
+                if (error instanceof SyntaxError) {
+                    // invalid JSON
+                    return null
+                } else {
+                    throw error
+                }
+            } finally {
+                clearTimeout(timeout)
+                await this.redisPool.release(client)
             }
-            return value ? (parseJSON ? JSON.parse(value) : value) : null
-        } catch (error) {
-            if (error instanceof SyntaxError) {
-                // invalid json
-                return null
-            } else {
-                throw error
-            }
-        } finally {
-            clearTimeout(timeout)
-            await this.redisPool.release(client)
-        }
+        })
     }
 
-    public async redisSet(key: string, value: unknown, ttlSeconds?: number, stringify = true): Promise<void> {
-        const client = await this.redisPool.acquire()
-        const timeout = timeoutGuard(`Setting redis key delayed. Waiting over 30 sec to set key: ${key}`)
-        try {
-            const serializedValue = stringify ? JSON.stringify(value) : (value as string)
-            if (ttlSeconds) {
-                await client.set(key, serializedValue, 'EX', ttlSeconds)
-            } else {
-                await client.set(key, serializedValue)
+    public async redisSet(key: string, value: unknown, ttlSeconds?: number, options: CacheOptions = {}): Promise<void> {
+        const { jsonSerialize = true } = options
+
+        return this.instrumentQuery('query.redisSet', undefined, async () => {
+            const client = await this.redisPool.acquire()
+            const timeout = timeoutGuard(`Setting redis key delayed. Waiting over 30 sec to set key: ${key}`)
+            try {
+                const serializedValue = jsonSerialize ? JSON.stringify(value) : (value as string)
+                if (ttlSeconds) {
+                    await client.set(key, serializedValue, 'EX', ttlSeconds)
+                } else {
+                    await client.set(key, serializedValue)
+                }
+            } finally {
+                clearTimeout(timeout)
+                await this.redisPool.release(client)
             }
-        } finally {
-            clearTimeout(timeout)
-            await this.redisPool.release(client)
-        }
+        })
     }
 
     public async redisIncr(key: string): Promise<number> {
-        const client = await this.redisPool.acquire()
-        const timeout = timeoutGuard(`Incrementing redis key delayed. Waiting over 30 sec to incr key: ${key}`)
-        try {
-            return await client.incr(key)
-        } finally {
-            clearTimeout(timeout)
-            await this.redisPool.release(client)
-        }
+        return this.instrumentQuery('query.redisIncr', undefined, async () => {
+            const client = await this.redisPool.acquire()
+            const timeout = timeoutGuard(`Incrementing redis key delayed. Waiting over 30 sec to incr key: ${key}`)
+            try {
+                return await client.incr(key)
+            } finally {
+                clearTimeout(timeout)
+                await this.redisPool.release(client)
+            }
+        })
     }
 
     public async redisExpire(key: string, ttlSeconds: number): Promise<boolean> {
-        const client = await this.redisPool.acquire()
-        const timeout = timeoutGuard(`Expiring redis key delayed. Waiting over 30 sec to expire key: ${key}`)
-        try {
-            return (await client.expire(key, ttlSeconds)) === 1
-        } finally {
-            clearTimeout(timeout)
-            await this.redisPool.release(client)
-        }
+        return this.instrumentQuery('query.redisExpire', undefined, async () => {
+            const client = await this.redisPool.acquire()
+            const timeout = timeoutGuard(`Expiring redis key delayed. Waiting over 30 sec to expire key: ${key}`)
+            try {
+                return (await client.expire(key, ttlSeconds)) === 1
+            } finally {
+                clearTimeout(timeout)
+                await this.redisPool.release(client)
+            }
+        })
     }
 
-    public async redisLPush(key: string, value: unknown, stringify = true): Promise<number> {
-        const client = await this.redisPool.acquire()
-        const timeout = timeoutGuard(`LPushing redis key delayed. Waiting over 30 sec to lpush key: ${key}`)
-        try {
-            const serializedValue = stringify ? JSON.stringify(value) : (value as string)
-            return await client.lpush(key, serializedValue)
-        } finally {
-            clearTimeout(timeout)
-            await this.redisPool.release(client)
-        }
+    public async redisLPush(key: string, value: unknown, options: CacheOptions = {}): Promise<number> {
+        const { jsonSerialize = true } = options
+
+        return this.instrumentQuery('query.redisLPush', undefined, async () => {
+            const client = await this.redisPool.acquire()
+            const timeout = timeoutGuard(`LPushing redis key delayed. Waiting over 30 sec to lpush key: ${key}`)
+            try {
+                const serializedValue = jsonSerialize ? JSON.stringify(value) : (value as string)
+                return await client.lpush(key, serializedValue)
+            } finally {
+                clearTimeout(timeout)
+                await this.redisPool.release(client)
+            }
+        })
     }
 
     public async redisBRPop(key1: string, key2: string): Promise<[string, string]> {
-        const client = await this.redisPool.acquire()
-        const timeout = timeoutGuard(`BRPoping redis key delayed. Waiting over 30 sec to brpop keys: ${key1}, ${key2}`)
-        try {
-            return await client.brpop(key1, key2)
-        } finally {
-            clearTimeout(timeout)
-            await this.redisPool.release(client)
-        }
+        return this.instrumentQuery('query.redisBRPop', undefined, async () => {
+            const client = await this.redisPool.acquire()
+            const timeout = timeoutGuard(
+                `BRPoping redis key delayed. Waiting over 30 sec to brpop keys: ${key1}, ${key2}`
+            )
+            try {
+                return await client.brpop(key1, key2)
+            } finally {
+                clearTimeout(timeout)
+                await this.redisPool.release(client)
+            }
+        })
     }
 
     // Person
@@ -227,7 +262,8 @@ export class DB {
                 return rest
             }) as ClickHousePerson[]
         } else if (database === Database.Postgres) {
-            return ((await this.postgresQuery('SELECT * FROM posthog_person')).rows as RawPerson[]).map(
+            return ((await this.postgresQuery('SELECT * FROM posthog_person', undefined, 'fetchPersons'))
+                .rows as RawPerson[]).map(
                 (rawPerson: RawPerson) =>
                     ({
                         ...rawPerson,
@@ -252,7 +288,8 @@ export class DB {
                 posthog_person.team_id = $1
                 AND posthog_persondistinctid.team_id = $1
                 AND posthog_persondistinctid.distinct_id = $2`,
-            [teamId, distinctId]
+            [teamId, distinctId],
+            'fetchPerson'
         )
         if (selectResult.rows.length > 0) {
             const rawPerson: RawPerson = selectResult.rows[0]
@@ -327,7 +364,8 @@ export class DB {
             `UPDATE posthog_person SET ${Object.keys(update).map(
                 (field, index) => `"${sanitizeSqlIdentifier(field)}" = $${index + 1}`
             )} WHERE id = $${Object.values(update).length + 1}`,
-            values
+            values,
+            'updatePerson'
         )
 
         if (this.kafkaProducer) {
@@ -387,7 +425,8 @@ export class DB {
         } else if (database === Database.Postgres) {
             const result = await this.postgresQuery(
                 'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 and team_id=$2 ORDER BY id',
-                [person.id, person.team_id]
+                [person.id, person.team_id],
+                'fetchDistinctIds'
             )
             return result.rows as PersonDistinctId[]
         } else {
@@ -449,9 +488,11 @@ export class DB {
     // Organization
 
     public async fetchOrganization(organizationId: string): Promise<RawOrganization | undefined> {
-        const selectResult = await this.postgresQuery(`SELECT * FROM posthog_organization WHERE id $1`, [
-            organizationId,
-        ])
+        const selectResult = await this.postgresQuery(
+            `SELECT * FROM posthog_organization WHERE id $1`,
+            [organizationId],
+            'fetchOrganization'
+        )
         const rawOrganization: RawOrganization = selectResult.rows[0]
         return rawOrganization
     }
@@ -552,5 +593,21 @@ export class DB {
         }
 
         return hash
+    }
+
+    private async instrumentQuery<T>(
+        metricName: string,
+        tag: string | undefined,
+        runQuery: () => Promise<T>
+    ): Promise<T> {
+        const tags: Tags | undefined = tag ? { queryTag: tag } : undefined
+        const timer = new Date()
+
+        this.statsd?.increment(`${metricName}.total`, tags)
+        try {
+            return await runQuery()
+        } finally {
+            this.statsd?.timing(metricName, timer, tags)
+        }
     }
 }

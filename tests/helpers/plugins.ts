@@ -44,6 +44,8 @@ export const plugin60: Plugin = {
     from_json: false,
     from_web: false,
     is_global: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
 }
 
 export const pluginAttachment1: PluginAttachmentDB = {
@@ -65,6 +67,8 @@ export const pluginConfig39: PluginConfig = {
     order: 0,
     config: { localhostIP: '94.224.212.175' },
     error: undefined,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
 }
 
 function createZipBuffer(name: string, { indexJs, pluginJson }: { indexJs?: string; pluginJson?: string }): Buffer {

@@ -10,6 +10,7 @@ import { Pool } from 'pg'
 import { VM } from 'vm2'
 
 import { DB } from './db'
+import { LazyPluginVM } from './vm/lazy'
 
 export enum LogLevel {
     Debug = 'debug',
@@ -68,8 +69,7 @@ export interface PluginsServer extends PluginsServerConfig {
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>
     pluginConfigsPerTeam: Map<TeamId, PluginConfig[]>
-    defaultConfigs: PluginConfig[]
-    pluginSchedule: Record<string, PluginConfigId[]>
+    pluginSchedule: Record<string, PluginConfigId[]> | null
     pluginSchedulePromises: Record<string, Record<PluginConfigId, Promise<any> | null>>
     eventsProcessor: EventsProcessor
 }
@@ -108,6 +108,8 @@ export interface Plugin {
     error?: PluginError
     from_json?: boolean
     from_web?: boolean
+    created_at: string
+    updated_at: string
 }
 
 export interface PluginConfig {
@@ -120,7 +122,9 @@ export interface PluginConfig {
     config: Record<string, unknown>
     error?: PluginError
     attachments?: Record<string, PluginAttachment>
-    vm?: PluginConfigVMReponse | null
+    vm?: LazyPluginVM | null
+    created_at: string
+    updated_at: string
 }
 
 export interface PluginJsonConfig {
@@ -351,4 +355,9 @@ export enum TimestampFormat {
 export enum Database {
     ClickHouse = 'clickhouse',
     Postgres = 'postgres',
+}
+
+export interface ScheduleControl {
+    stopSchedule: () => Promise<void>
+    reloadSchedule: () => Promise<void>
 }

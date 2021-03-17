@@ -1421,10 +1421,10 @@
   resolved "https://registry.yarnpkg.com/@posthog/clickhouse/-/clickhouse-1.7.0.tgz#21fa1e8cfa0637b688f91964e0efeedbf4cf7a3c"
   integrity sha512-B8hZ8Dh2EoJoDb7Gx38ylBQM92oON/X2IxXCb7BfYStk3m17nStcAyaCsc2zbvxC0fFfTMU8lFRiFSEJmijkyg==
 
-"@posthog/plugin-scaffold@0.2.15":
-  version "0.2.15"
-  resolved "https://registry.yarnpkg.com/@posthog/plugin-scaffold/-/plugin-scaffold-0.2.15.tgz#0b2b8478006a70661c507294c196b60c9a62e76f"
-  integrity sha512-AXSKZm4PlG3mdguBFXgyquox6PZ1ohdD/wIk5rX8rJBh3mIoICXAZ7M9TtYf+0X+2aoxFOQsaVLO1D9XEImBVQ==
+"@posthog/plugin-scaffold@0.3.1":
+  version "0.3.1"
+  resolved "https://registry.yarnpkg.com/@posthog/plugin-scaffold/-/plugin-scaffold-0.3.1.tgz#9b18aaba86816ab886eb8f492c32bf0c6b5a75c6"
+  integrity sha512-WHnc1kXwHl2tl/glAPDyVt4He0G8XcOrXkJEw1YqmeQm+bjSE9++pzNKgFzshvJBWtl3D/eGTB87gzkAJlU7yA==
 
 "@protobufjs/aspromise@^1.1.1", "@protobufjs/aspromise@^1.1.2":
   version "1.1.2"
@@ -5902,10 +5902,9 @@ pirates@^4.0.1:
   dependencies:
     node-modules-regexp "^1.0.0"
 
-piscina@^2.1.0:
-  version "2.1.0"
-  resolved "https://registry.yarnpkg.com/piscina/-/piscina-2.1.0.tgz#947d937e0efd0de7a0e8bf10363c2e053c619413"
-  integrity sha512-3FgX36QyZcU4prKuNKl7/lWlOF3HAv9n7JpCjw09Zbql2KkzXXQ7E5xUS+RV5wV24Rn0r6Lr8jLdtU/cNZHAnA==
+"piscina@https://github.com/PostHog/piscina.git#broadcast-release":
+  version "2.2.0"
+  resolved "https://github.com/PostHog/piscina.git#f8584a8e4409057f74b7ae0bf4cf6185e61530b6"
   dependencies:
     eventemitter-asyncresource "^1.0.0"
     hdr-histogram-js "^2.0.1"
