@@ -7,6 +7,7 @@ import { Producer, ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 
+import { defaultConfig } from './config'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './ingestion/utils'
 import {
@@ -60,10 +61,10 @@ export class DB {
     constructor(
         postgres: Pool,
         redisPool: GenericPool<Redis.Redis>,
-        kafkaProducer: Producer | undefined,
-        clickhouse: ClickHouse | undefined,
-        statsd: StatsD | undefined,
-        serverConfig: PluginsServerConfig
+        kafkaProducer?: Producer,
+        clickhouse?: ClickHouse,
+        statsd?: StatsD,
+        serverConfig: PluginsServerConfig = defaultConfig
     ) {
         this.postgres = postgres
         this.redisPool = redisPool
@@ -73,8 +74,8 @@ export class DB {
 
         this.lastFlushTime = new Date()
         this.kafkaMessageQueue = []
-        this.flushFrequencyMs = serverConfig?.KAFKA_FLUSH_FREQUENCY_MS
-        this.maxQueueSize = serverConfig?.KAFKA_PRODUCER_MAX_QUEUE_SIZE
+        this.flushFrequencyMs = serverConfig.KAFKA_FLUSH_FREQUENCY_MS
+        this.maxQueueSize = serverConfig.KAFKA_PRODUCER_MAX_QUEUE_SIZE
         this.kafkaFlushInterval = setInterval(() => this.flushKafkaMessages(), this.flushFrequencyMs)
     }
 
@@ -172,7 +173,7 @@ export class DB {
             const timeout = timeoutGuard(`Kafka message sending delayed. Waiting over 30 sec to send messages.`)
             try {
                 await this.kafkaProducer!.sendBatch({
-                    topicMessages: Array.from(Object.values(batches)),
+                    topicMessages: Object.values(batches),
                 })
             } finally {
                 clearTimeout(timeout)
