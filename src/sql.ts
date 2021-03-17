@@ -1,6 +1,6 @@
 import { Plugin, PluginAttachmentDB, PluginConfig, PluginConfigId, PluginError, PluginsServer } from './types'
 
-function pluginConfigsInForceQuery(specificField?: string): string {
+function pluginConfigsInForceQuery(specificField?: keyof PluginConfig): string {
     return `SELECT posthog_pluginconfig.${specificField || '*'}
        FROM posthog_pluginconfig
        LEFT JOIN posthog_team ON posthog_team.id = posthog_pluginconfig.team_id
