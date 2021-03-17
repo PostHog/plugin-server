@@ -75,6 +75,12 @@ export class EventsProcessor {
         const personUuid = new UUIDT().toString()
 
         const ts = this.handleTimestamp(data, now, sentAt)
+        // Send latency estimate to statsd, but ignore events set in the future.
+        const latencyEstimate = (sentAt || ts).toMillis() - singleSaveTimer.getMilliseconds()
+        if (latencyEstimate > 0) {
+            this.pluginsServer.statsd?.timing('process_event.latency', latencyEstimate)
+        }
+
         const timeout1 = timeoutGuard(
             `Still running "handleIdentifyOrAlias". Timeout warning after 30 sec! ${eventUuid}`
         )
