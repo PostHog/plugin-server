@@ -150,39 +150,30 @@ export class DB {
             return
         }
 
-        if (!this.kafkaProducer) {
-            throw new Error('Kafka connection has not been provided!')
-        }
-
-        const messages: Record<string, ProducerRecord> = {}
-        for (const message of this.kafkaMessageQueue) {
-            if (!messages[message.topic]) {
-                messages[message.topic] = {
-                    ...message,
-                    messages: [],
-                }
-            }
-            messages[message.topic].messages = messages[message.topic].messages.concat(message.messages)
-        }
-
-        this.kafkaMessageQueue = []
-        this.lastFlushTime = new Date()
-
-        for (const kafkaMessage of Object.values(messages)) {
-            await this.sendKafkaMessage(kafkaMessage)
-        }
-    }
-
-    private async sendKafkaMessage(kafkaMessage: ProducerRecord): Promise<void> {
         return this.instrumentQuery('query.kafka_send', undefined, async () => {
             if (!this.kafkaProducer) {
                 throw new Error('Kafka connection has not been provided!')
             }
-            const timeout = timeoutGuard(
-                `Kafka message sending delayed. Waiting over 30 sec to send to topic: ${kafkaMessage.topic}`
-            )
+
+            const batches: Record<string, ProducerRecord> = {}
+            for (const { topic, messages } of this.kafkaMessageQueue) {
+                if (!batches[topic]) {
+                    batches[topic] = {
+                        topic,
+                        messages: [],
+                    }
+                }
+                batches[topic].messages = batches[topic].messages.concat(messages)
+            }
+
+            this.kafkaMessageQueue = []
+            this.lastFlushTime = new Date()
+
+            const timeout = timeoutGuard(`Kafka message sending delayed. Waiting over 30 sec to send messages.`)
             try {
-                await this.kafkaProducer.send(kafkaMessage)
+                await this.kafkaProducer!.sendBatch({
+                    topicMessages: Array.from(Object.values(batches)),
+                })
             } finally {
                 clearTimeout(timeout)
             }
