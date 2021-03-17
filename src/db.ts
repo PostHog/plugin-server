@@ -123,6 +123,7 @@ export class DB {
     // Kafka
 
     public async sendKafkaMessage(kafkaMessage: ProducerRecord): Promise<void> {
+        kafkaMessage.acks = 1 // Only wait for leader broker to ack, instead of all brokers (which is 3 on Heroku)
         return this.instrumentQuery('query.kafka_send', undefined, async () => {
             if (!this.kafkaProducer) {
                 throw new Error('Kafka connection has not been provided!')
