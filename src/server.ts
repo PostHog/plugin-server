@@ -124,6 +124,7 @@ export async function createServer(
             port: serverConfig.STATSD_PORT,
             host: serverConfig.STATSD_HOST,
             prefix: serverConfig.STATSD_PREFIX,
+            telegraf: true,
         })
         // don't repeat the same info in each thread
         if (threadId === null) {
@@ -168,7 +169,7 @@ export async function createServer(
 }
 
 // TODO: refactor this into a class, removing the need for many different Servers
-type ServerInstance = {
+export type ServerInstance = {
     server: PluginsServer
     piscina: Piscina
     queue: Queue
