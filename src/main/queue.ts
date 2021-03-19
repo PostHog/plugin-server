@@ -6,7 +6,7 @@ import Client from '../shared/celery/client'
 import { status } from '../shared/status'
 import { UUIDT } from '../shared/utils'
 import { IngestEventResponse, PluginsServer, Queue } from '../types'
-import Worker from './celery/worker'
+import CeleryQueueWorker from './ingestion/celery-queue-worker'
 import { KafkaQueue } from './ingestion/kafka-queue'
 
 export type WorkerMethods = {
@@ -52,7 +52,7 @@ export async function startQueue(
 }
 
 function startQueueRedis(server: PluginsServer, piscina: Piscina | undefined, workerMethods: WorkerMethods): Queue {
-    const celeryQueue = new Worker(server.db, server.PLUGINS_CELERY_QUEUE)
+    const celeryQueue = new CeleryQueueWorker(server.db, server.PLUGINS_CELERY_QUEUE)
     const client = new Client(server.db, server.CELERY_DEFAULT_QUEUE)
 
     celeryQueue.register(

@@ -5,7 +5,7 @@ import { Queue } from '../../types'
 
 type Handler = (...args: any[]) => Promise<void>
 
-export class Worker extends Base implements Queue {
+export class CeleryQueueWorker extends Base implements Queue {
     handlers: Record<string, Handler> = {}
     activeTasks: Set<Promise<any>> = new Set()
 
@@ -225,4 +225,4 @@ export class Worker extends Base implements Queue {
     }
 }
 
-export default Worker
+export default CeleryQueueWorker
