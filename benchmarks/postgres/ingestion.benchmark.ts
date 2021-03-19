@@ -12,7 +12,7 @@ import { getFirstTeam, resetTestDatabase } from '../../tests/helpers/sql'
 import { endLog, startLog } from './helpers/log'
 import { ingestCountEvents, setupPiscina } from './helpers/piscina'
 
-jest.mock('../../src/sql')
+jest.mock('../../src/shared/sql')
 jest.setTimeout(600000) // 600 sec timeout
 
 describe('ingestion benchmarks', () => {

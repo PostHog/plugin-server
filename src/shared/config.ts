@@ -1,7 +1,7 @@
 import os from 'os'
 
-import { KAFKA_EVENTS_PLUGIN_INGESTION } from './shared/ingestion/topics'
-import { LogLevel, PluginsServerConfig } from './types'
+import { LogLevel, PluginsServerConfig } from '../types'
+import { KAFKA_EVENTS_PLUGIN_INGESTION } from './ingestion/topics'
 
 export const defaultConfig = overrideWithEnv(getDefaultConfig())
 export const configHelp = getConfigHelp()

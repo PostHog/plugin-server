@@ -4,8 +4,8 @@ import { Consumer, EachBatchPayload, Kafka } from 'kafkajs'
 import { PluginsServer, Queue } from 'types'
 
 import { timeoutGuard } from '../../shared/ingestion/utils'
+import { status } from '../../shared/status'
 import { groupIntoBatches, killGracefully } from '../../shared/utils'
-import { status } from '../../status'
 
 export class KafkaQueue implements Queue {
     private pluginsServer: PluginsServer

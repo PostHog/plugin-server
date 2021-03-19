@@ -1,8 +1,8 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import { mocked } from 'ts-jest/utils'
 
-import { clearError, processError } from '../src/error'
 import { createServer } from '../src/server'
+import { clearError, processError } from '../src/shared/error'
 import { LogLevel, PluginsServer } from '../src/types'
 import { loadPlugin } from '../src/worker/plugins/loadPlugin'
 import { runPlugins } from '../src/worker/plugins/run'
@@ -17,9 +17,9 @@ import {
 } from './helpers/plugins'
 import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows, setError } from './helpers/sqlMock'
 
-jest.mock('../src/sql')
-jest.mock('../src/status')
-jest.mock('../src/error')
+jest.mock('../src/shared/sql')
+jest.mock('../src/shared/status')
+jest.mock('../src/shared/error')
 jest.mock('../src/worker/plugins/loadPlugin', () => {
     const { loadPlugin } = jest.requireActual('../src/worker/plugins/loadPlugin')
     return { loadPlugin: jest.fn().mockImplementation(loadPlugin) }

@@ -1,7 +1,7 @@
 import { initApp } from '../init'
 import { createServer } from '../server'
+import { status } from '../shared/status'
 import { cloneObject } from '../shared/utils'
-import { status } from '../status'
 import { PluginsServer, PluginsServerConfig } from '../types'
 import { ingestEvent } from './ingestion/ingest-event'
 import { runPlugins, runPluginsOnBatch, runPluginTask } from './plugins/run'

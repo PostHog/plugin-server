@@ -1,8 +1,8 @@
 import { v4 } from 'uuid'
 
-import { DB } from '../../db'
-import { status } from '../../status'
 import { Pausable } from '../../types'
+import { DB } from '../db'
+import { status } from '../status'
 import { Message } from './message'
 
 type BrokerSubscription = { queue: string; callback: (message: Message) => any }

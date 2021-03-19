@@ -15,8 +15,8 @@ import { createTaskRunner } from '../../src/worker/worker'
 import { resetTestDatabase } from '../helpers/sql'
 import { setupPiscina } from '../helpers/worker'
 
-jest.mock('../../src/sql')
-jest.mock('../../src/status')
+jest.mock('../../src/shared/sql')
+jest.mock('../../src/shared/status')
 jest.mock('../../src/worker/ingestion/ingest-event')
 jest.mock('../../src/worker/plugins/run')
 jest.mock('../../src/worker/plugins/setup')

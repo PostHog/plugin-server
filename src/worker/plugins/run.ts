@@ -1,6 +1,6 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 
-import { processError } from '../../error'
+import { processError } from '../../shared/error'
 import { PluginConfig, PluginsServer } from '../../types'
 
 export async function runPlugins(server: PluginsServer, event: PluginEvent): Promise<PluginEvent | null> {

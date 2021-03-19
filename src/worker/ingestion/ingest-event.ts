@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/node'
 import { DateTime } from 'luxon'
 
 import { timeoutGuard } from '../../shared/ingestion/utils'
-import { status } from '../../status'
+import { status } from '../../shared/status'
 import { IngestEventResponse, PluginsServer } from '../../types'
 
 export async function ingestEvent(server: PluginsServer, event: PluginEvent): Promise<IngestEventResponse> {

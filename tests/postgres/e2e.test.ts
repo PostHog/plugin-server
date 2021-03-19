@@ -10,7 +10,7 @@ import { pluginConfig39 } from '../helpers/plugins'
 import { resetTestDatabase } from '../helpers/sql'
 import { delayUntilEventIngested } from '../shared/process-event'
 
-jest.mock('../../src/status')
+jest.mock('../../src/shared/status')
 jest.setTimeout(60000) // 60 sec timeout
 
 describe('e2e postgres ingestion', () => {

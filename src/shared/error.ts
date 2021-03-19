@@ -1,7 +1,7 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 
+import { PluginConfig, PluginConfigId, PluginError, PluginsServer } from '../types'
 import { setError } from './sql'
-import { PluginConfig, PluginConfigId, PluginError, PluginsServer } from './types'
 
 export async function processError(
     server: PluginsServer,

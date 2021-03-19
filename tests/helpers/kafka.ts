@@ -1,6 +1,6 @@
 import { Kafka, logLevel } from 'kafkajs'
 
-import { defaultConfig, overrideWithEnv } from '../../src/config'
+import { defaultConfig, overrideWithEnv } from '../../src/shared/config'
 import {
     KAFKA_EVENTS,
     KAFKA_EVENTS_PLUGIN_INGESTION,

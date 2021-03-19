@@ -1,5 +1,5 @@
-import { clearError, processError } from '../../error'
-import { status } from '../../status'
+import { clearError, processError } from '../../shared/error'
+import { status } from '../../shared/status'
 import { PluginConfig, PluginConfigVMReponse, PluginsServer, PluginTask } from '../../types'
 import { createPluginConfigVM } from './vm'
 

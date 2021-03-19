@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
-import { processError } from '../../error'
+import { processError } from '../../shared/error'
 import { getFileFromArchive, pluginDigest } from '../../shared/utils'
 import { PluginConfig, PluginJsonConfig, PluginsServer } from '../../types'
 

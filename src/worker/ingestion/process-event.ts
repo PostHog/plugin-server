@@ -7,9 +7,9 @@ import { DateTime, Duration } from 'luxon'
 import * as fetch from 'node-fetch'
 import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
 
-import { DB } from '../../db'
 import { Event as EventProto, IEvent } from '../../idl/protos'
 import Client from '../../shared/celery/client'
+import { DB } from '../../shared/db'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from '../../shared/ingestion/topics'
 import {
     elementsToString,
@@ -17,8 +17,8 @@ import {
     sanitizeEventName,
     timeoutGuard,
 } from '../../shared/ingestion/utils'
+import { status } from '../../shared/status'
 import { castTimestampOrNow, UUID, UUIDT } from '../../shared/utils'
-import { status } from '../../status'
 import {
     CohortPeople,
     Element,

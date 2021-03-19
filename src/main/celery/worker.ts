@@ -1,6 +1,6 @@
 import Base from '../../shared/celery/base'
 import { Message } from '../../shared/celery/message'
-import { status } from '../../status'
+import { status } from '../../shared/status'
 import { Queue } from '../../types'
 
 type Handler = (...args: any[]) => Promise<void>

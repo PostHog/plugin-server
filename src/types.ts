@@ -8,7 +8,7 @@ import { DateTime } from 'luxon'
 import { Pool } from 'pg'
 import { VM } from 'vm2'
 
-import { DB } from './db'
+import { DB } from './shared/db'
 import { EventsProcessor } from './worker/ingestion/process-event'
 import { LazyPluginVM } from './worker/vm/lazy'
 
