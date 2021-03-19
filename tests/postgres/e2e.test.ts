@@ -1,6 +1,6 @@
 import * as IORedis from 'ioredis'
 
-import { startPluginsServer } from '../../src/server'
+import { startPluginsServer } from '../../src/main/pluginsServer'
 import { UUIDT } from '../../src/shared/utils'
 import { LogLevel } from '../../src/types'
 import { PluginsServer } from '../../src/types'

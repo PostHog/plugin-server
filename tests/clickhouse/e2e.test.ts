@@ -1,4 +1,4 @@
-import { startPluginsServer } from '../../src/server'
+import { startPluginsServer } from '../../src/main/pluginsServer'
 import { KAFKA_EVENTS_PLUGIN_INGESTION } from '../../src/shared/ingestion/topics'
 import { delay, UUIDT } from '../../src/shared/utils'
 import { LogLevel, PluginsServerConfig } from '../../src/types'

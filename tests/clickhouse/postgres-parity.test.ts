@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon'
 
-import { startPluginsServer } from '../../src/server'
+import { startPluginsServer } from '../../src/main/pluginsServer'
 import { castTimestampOrNow, UUIDT } from '../../src/shared/utils'
 import { Database, LogLevel, PluginsServer, PluginsServerConfig, Team, TimestampFormat } from '../../src/types'
 import { makePiscina } from '../../src/worker/piscina'

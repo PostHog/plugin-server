@@ -1,7 +1,7 @@
 import * as IORedis from 'ioredis'
 import { performance } from 'perf_hooks'
 
-import { startPluginsServer } from '../../src/server'
+import { startPluginsServer } from '../../src/main/pluginsServer'
 import { delay, UUIDT } from '../../src/shared/utils'
 import { LogLevel, PluginsServerConfig, Queue } from '../../src/types'
 import { PluginsServer } from '../../src/types'

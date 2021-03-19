@@ -1,4 +1,4 @@
-import { startPluginsServer } from '../../src/server'
+import { startPluginsServer } from '../../src/main/pluginsServer'
 import { UUIDT } from '../../src/shared/utils'
 import { LogLevel, PluginsServer } from '../../src/types'
 import { makePiscina } from '../../src/worker/piscina'
