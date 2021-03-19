@@ -2,10 +2,10 @@ import { mocked } from 'ts-jest/utils'
 
 import { clearError, processError } from '../../src/error'
 import { status } from '../../src/status'
-import { LazyPluginVM } from '../../src/vm/lazy'
-import { createPluginConfigVM } from '../../src/vm/vm'
+import { LazyPluginVM } from '../../src/worker/vm/lazy'
+import { createPluginConfigVM } from '../../src/worker/vm/vm'
 
-jest.mock('../../src/vm/vm')
+jest.mock('../../src/worker/vm/vm')
 jest.mock('../../src/error')
 jest.mock('../../src/status')
 

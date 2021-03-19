@@ -1,6 +1,6 @@
 import { transform } from '@babel/standalone'
 
-import { PluginsServer } from '../../types'
+import { PluginsServer } from '../../../types'
 import { loopTimeout } from './loop-timeout'
 import { promiseTimeout } from './promise-timeout'
 

@@ -1,7 +1,7 @@
 import { createServer } from '../src/server'
 import { PluginsServer } from '../src/types'
 import { code } from '../src/utils'
-import { transformCode } from '../src/vm/transforms'
+import { transformCode } from '../src/worker/vm/transforms'
 import { resetTestDatabase } from './helpers/sql'
 
 let server: PluginsServer

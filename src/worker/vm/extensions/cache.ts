@@ -1,6 +1,6 @@
 import { CacheExtension } from '@posthog/plugin-scaffold'
 
-import { PluginsServer } from '../../types'
+import { PluginsServer } from '../../../types'
 
 export function createCache(server: PluginsServer, pluginId: number, teamId: number): CacheExtension {
     const getKey = (key: string) => `@plugin/${pluginId}/${typeof teamId === 'undefined' ? '@all' : teamId}/${key}`

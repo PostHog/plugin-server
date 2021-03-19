@@ -10,7 +10,7 @@ import { Pool } from 'pg'
 import { VM } from 'vm2'
 
 import { DB } from './db'
-import { LazyPluginVM } from './vm/lazy'
+import { LazyPluginVM } from './worker/vm/lazy'
 
 export enum LogLevel {
     Debug = 'debug',

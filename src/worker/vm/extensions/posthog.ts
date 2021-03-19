@@ -2,10 +2,10 @@ import { Properties } from '@posthog/plugin-scaffold'
 import { DateTime } from 'luxon'
 import { PluginConfig, PluginsServer, RawEventMessage } from 'types'
 
-import Client from '../../celery/client'
-import { UUIDT } from '../../utils'
+import Client from '../../../celery/client'
+import { UUIDT } from '../../../utils'
 
-const { version } = require('../../../package.json')
+const { version } = require('../../../../package.json')
 
 interface InternalData {
     distinct_id: string
