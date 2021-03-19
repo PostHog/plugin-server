@@ -1442,10 +1442,10 @@
   optionalDependencies:
     nice-napi "^1.0.2"
 
-"@posthog/plugin-scaffold@0.3.1":
-  version "0.3.1"
-  resolved "https://registry.yarnpkg.com/@posthog/plugin-scaffold/-/plugin-scaffold-0.3.1.tgz#9b18aaba86816ab886eb8f492c32bf0c6b5a75c6"
-  integrity sha512-WHnc1kXwHl2tl/glAPDyVt4He0G8XcOrXkJEw1YqmeQm+bjSE9++pzNKgFzshvJBWtl3D/eGTB87gzkAJlU7yA==
+"@posthog/plugin-scaffold@0.4.0":
+  version "0.4.0"
+  resolved "https://registry.yarnpkg.com/@posthog/plugin-scaffold/-/plugin-scaffold-0.4.0.tgz#eb77f0bdf18784e06d9c89d0755cc2412d0fafc5"
+  integrity sha512-86/NmkRYf5jxjkmobSDOf2M+6p0xn07DJSSqWoFWeld+dTKsS2pJZxz1EyBA+CATYCLErqCbD/9rL3PR6b/N6w==
 
 "@protobufjs/aspromise@^1.1.1", "@protobufjs/aspromise@^1.1.2":
   version "1.1.2"

@@ -1,7 +1,5 @@
-import { Reader, ReaderModel } from '@maxmind/geoip2-node'
 import ClickHouse from '@posthog/clickhouse'
 import Piscina from '@posthog/piscina'
-import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import { FastifyInstance } from 'fastify'
 import * as fs from 'fs'
@@ -10,7 +8,6 @@ import { StatsD } from 'hot-shots'
 import Redis from 'ioredis'
 import { Kafka, logLevel, Producer } from 'kafkajs'
 import { DateTime } from 'luxon'
-import fetch from 'node-fetch'
 import * as schedule from 'node-schedule'
 import * as path from 'path'
 import { Pool, types as pgTypes } from 'pg'
@@ -23,26 +20,11 @@ import { startSchedule } from './services/schedule'
 import { status } from './status'
 import { PluginsServer, PluginsServerConfig, Queue, ScheduleControl } from './types'
 import { createPostgresPool, createRedis, delay, UUIDT } from './utils'
+import { prepareMmdb } from './vm/extensions/geoip'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 import { startQueue } from './worker/queue'
 
 const { version } = require('../package.json')
-
-async function prepareGeoIp(db: DB): Promise<ReaderModel> {
-    const mmdbString = (await db.redisGet('mmdb', null, false)) as string | null
-    let mmdb: Buffer | null = mmdbString === null ? null : Buffer.from(mmdbString, 'binary')
-    if (!mmdb) {
-        console.log('GeoLite2 database not in cache, downloading...')
-        const response = await fetch('http://posthog-mmdb.herokuapp.com/')
-        mmdb = await response.buffer()
-        console.log('Downloaded GeoLite2 database')
-        await db.redisSet('mmdb', mmdb.toString('binary'), 7 * 86_400, false)
-        console.log('Cached GeoLite2 database for a week')
-    } else {
-        console.log('Using GeoLite2 database from cache')
-    }
-    return Reader.openBuffer(mmdb)
-}
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
@@ -155,8 +137,6 @@ export async function createServer(
 
     const db = new DB(postgres, redisPool, kafkaProducer, clickhouse, statsd, serverConfig)
 
-    const geoIp = await prepareGeoIp(db)
-
     const server: Omit<PluginsServer, 'eventsProcessor'> = {
         ...serverConfig,
         db,
@@ -166,7 +146,7 @@ export async function createServer(
         kafka,
         kafkaProducer,
         statsd,
-        geoIp,
+        mmdb: await prepareMmdb(db),
         plugins: new Map(),
         pluginConfigs: new Map(),
         pluginConfigsPerTeam: new Map(),

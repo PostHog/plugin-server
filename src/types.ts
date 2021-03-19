@@ -66,7 +66,7 @@ export interface PluginsServer extends PluginsServerConfig {
     kafka?: Kafka
     kafkaProducer?: Producer
     statsd?: StatsD
-    geoIp?: ReaderModel
+    mmdb: ReaderModel
     // currently enabled plugin status
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>
