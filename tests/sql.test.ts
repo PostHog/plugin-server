@@ -1,4 +1,4 @@
-import { createServer } from '../src/server'
+import { createServer } from '../src/shared/server'
 import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows, setError } from '../src/shared/sql'
 import { PluginConfig, PluginError, PluginsServer } from '../src/types'
 import { commonOrganizationId } from './helpers/plugins'

@@ -7,7 +7,7 @@ import {
     startSchedule,
     waitForTasksToFinish,
 } from '../src/main/services/schedule'
-import { createServer } from '../src/server'
+import { createServer } from '../src/shared/server'
 import { delay } from '../src/shared/utils'
 import { LogLevel, ScheduleControl } from '../src/types'
 import { createPromise } from './helpers/promises'

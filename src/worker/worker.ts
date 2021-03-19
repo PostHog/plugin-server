@@ -1,5 +1,5 @@
 import { initApp } from '../init'
-import { createServer } from '../server'
+import { createServer } from '../shared/server'
 import { status } from '../shared/status'
 import { cloneObject } from '../shared/utils'
 import { PluginsServer, PluginsServerConfig } from '../types'

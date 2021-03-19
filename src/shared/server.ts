@@ -9,14 +9,14 @@ import * as path from 'path'
 import { types as pgTypes } from 'pg'
 import { ConnectionOptions } from 'tls'
 
-import { defaultConfig } from './shared/config'
-import { DB } from './shared/db'
-import { status } from './shared/status'
-import { createPostgresPool, createRedis, UUIDT } from './shared/utils'
-import { PluginsServer, PluginsServerConfig } from './types'
-import { EventsProcessor } from './worker/ingestion/process-event'
+import { PluginsServer, PluginsServerConfig } from '../types'
+import { EventsProcessor } from '../worker/ingestion/process-event'
+import { defaultConfig } from './config'
+import { DB } from './db'
+import { status } from './status'
+import { createPostgresPool, createRedis, UUIDT } from './utils'
 
-const { version } = require('../package.json')
+const { version } = require('../../package.json')
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},

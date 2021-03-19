@@ -1,8 +1,8 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as fetch from 'node-fetch'
 
-import { createServer } from '../../src/server'
 import Client from '../../src/shared/celery/client'
+import { createServer } from '../../src/shared/server'
 import { delay } from '../../src/shared/utils'
 import { PluginsServer } from '../../src/types'
 import { createPluginConfigVM } from '../../src/worker/vm/vm'

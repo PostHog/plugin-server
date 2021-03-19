@@ -1,4 +1,4 @@
-import { createServer } from '../src/server'
+import { createServer } from '../src/shared/server'
 import { code } from '../src/shared/utils'
 import { PluginsServer } from '../src/types'
 import { transformCode } from '../src/worker/vm/transforms'

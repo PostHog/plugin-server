@@ -4,8 +4,8 @@ import { DateTime } from 'luxon'
 import { performance } from 'perf_hooks'
 
 import { IEvent } from '../../src/idl/protos'
-import { createServer } from '../../src/server'
 import { hashElements } from '../../src/shared/ingestion/utils'
+import { createServer } from '../../src/shared/server'
 import { delay, UUIDT } from '../../src/shared/utils'
 import {
     Database,
