@@ -3,10 +3,10 @@ import * as Sentry from '@sentry/node'
 import * as schedule from 'node-schedule'
 import Redlock from 'redlock'
 
-import { processError } from '../error'
-import { status } from '../status'
-import { PluginConfigId, PluginsServer, ScheduleControl } from '../types'
-import { createRedis, delay } from '../utils'
+import { processError } from '../../error'
+import { status } from '../../status'
+import { PluginConfigId, PluginsServer, ScheduleControl } from '../../types'
+import { createRedis, delay } from '../../utils'
 
 export const LOCKED_RESOURCE = 'plugin-server:locks:schedule'
 

@@ -1,13 +1,13 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 
-import { createServer } from '../src/server'
 import {
     loadPluginSchedule,
     LOCKED_RESOURCE,
     runTasksDebounced,
     startSchedule,
     waitForTasksToFinish,
-} from '../src/services/schedule'
+} from '../src/main/services/schedule'
+import { createServer } from '../src/server'
 import { LogLevel, ScheduleControl } from '../src/types'
 import { delay } from '../src/utils'
 import { createPromise } from './helpers/promises'
