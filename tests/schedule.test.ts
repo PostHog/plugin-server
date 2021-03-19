@@ -8,8 +8,8 @@ import {
     waitForTasksToFinish,
 } from '../src/main/services/schedule'
 import { createServer } from '../src/server'
+import { delay } from '../src/shared/utils'
 import { LogLevel, ScheduleControl } from '../src/types'
-import { delay } from '../src/utils'
 import { createPromise } from './helpers/promises'
 import { resetTestDatabase } from './helpers/sql'
 import { setupPiscina } from './helpers/worker'

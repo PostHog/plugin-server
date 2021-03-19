@@ -1,8 +1,8 @@
 import { startQueue } from '../../src/main/queue'
 import { createServer } from '../../src/server'
 import Client from '../../src/shared/celery/client'
+import { delay } from '../../src/shared/utils'
 import { LogLevel, PluginsServer } from '../../src/types'
-import { delay } from '../../src/utils'
 import { runPlugins } from '../../src/worker/plugins/run'
 
 jest.setTimeout(60000) // 60 sec timeout

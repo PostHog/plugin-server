@@ -10,6 +10,14 @@ import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './shared/ingestion/topics'
 import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './shared/ingestion/utils'
 import {
+    castTimestampOrNow,
+    clickHouseTimestampToISO,
+    createRedis,
+    escapeClickHouseString,
+    sanitizeSqlIdentifier,
+    tryTwice,
+} from './shared/utils'
+import {
     ClickHouseEvent,
     ClickHousePerson,
     ClickHousePersonDistinctId,
@@ -26,14 +34,6 @@ import {
     SessionRecordingEvent,
     TimestampFormat,
 } from './types'
-import {
-    castTimestampOrNow,
-    clickHouseTimestampToISO,
-    createRedis,
-    escapeClickHouseString,
-    sanitizeSqlIdentifier,
-    tryTwice,
-} from './utils'
 
 /** The recommended way of accessing the database. */
 export class DB {

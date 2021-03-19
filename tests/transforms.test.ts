@@ -1,6 +1,6 @@
 import { createServer } from '../src/server'
+import { code } from '../src/shared/utils'
 import { PluginsServer } from '../src/types'
-import { code } from '../src/utils'
 import { transformCode } from '../src/worker/vm/transforms'
 import { resetTestDatabase } from './helpers/sql'
 

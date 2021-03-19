@@ -19,9 +19,9 @@ import { DB } from './db'
 import { startQueue } from './main/queue'
 import { startSchedule } from './main/services/schedule'
 import { startFastifyInstance, stopFastifyInstance } from './main/web/server'
+import { createPostgresPool, createRedis, delay, UUIDT } from './shared/utils'
 import { status } from './status'
 import { PluginsServer, PluginsServerConfig, Queue, ScheduleControl } from './types'
-import { createPostgresPool, createRedis, delay, UUIDT } from './utils'
 import { EventsProcessor } from './worker/ingestion/process-event'
 
 const { version } = require('../package.json')

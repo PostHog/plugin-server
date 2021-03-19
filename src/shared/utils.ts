@@ -8,8 +8,8 @@ import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
 
-import { status } from './status'
-import { LogLevel, Plugin, PluginsServerConfig, TimestampFormat } from './types'
+import { status } from '../status'
+import { LogLevel, Plugin, PluginsServerConfig, TimestampFormat } from '../types'
 
 /** Time until autoexit (due to error) gives up on graceful exit and kills the process right away. */
 const GRACEFUL_EXIT_PERIOD_SECONDS = 5

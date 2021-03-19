@@ -17,6 +17,7 @@ import {
     sanitizeEventName,
     timeoutGuard,
 } from '../../shared/ingestion/utils'
+import { castTimestampOrNow, UUID, UUIDT } from '../../shared/utils'
 import { status } from '../../status'
 import {
     CohortPeople,
@@ -29,7 +30,6 @@ import {
     Team,
     TimestampFormat,
 } from '../../types'
-import { castTimestampOrNow, UUID, UUIDT } from '../../utils'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer

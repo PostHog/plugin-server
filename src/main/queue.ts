@@ -3,9 +3,9 @@ import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 
 import Client from '../shared/celery/client'
+import { UUIDT } from '../shared/utils'
 import { status } from '../status'
 import { IngestEventResponse, PluginsServer, Queue } from '../types'
-import { UUIDT } from '../utils'
 import Worker from './celery/worker'
 import { KafkaQueue } from './ingestion/kafka-queue'
 

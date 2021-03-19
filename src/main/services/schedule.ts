@@ -4,9 +4,9 @@ import * as schedule from 'node-schedule'
 import Redlock from 'redlock'
 
 import { processError } from '../../error'
+import { createRedis, delay } from '../../shared/utils'
 import { status } from '../../status'
 import { PluginConfigId, PluginsServer, ScheduleControl } from '../../types'
-import { createRedis, delay } from '../../utils'
 
 export const LOCKED_RESOURCE = 'plugin-server:locks:schedule'
 

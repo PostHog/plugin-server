@@ -3,7 +3,7 @@ import { DateTime } from 'luxon'
 import { PluginConfig, PluginsServer, RawEventMessage } from 'types'
 
 import Client from '../../../shared/celery/client'
-import { UUIDT } from '../../../utils'
+import { UUIDT } from '../../../shared/utils'
 
 const { version } = require('../../../../package.json')
 
