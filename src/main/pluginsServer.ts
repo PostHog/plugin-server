@@ -13,7 +13,7 @@ import { startQueue } from './queue'
 import { startSchedule } from './services/schedule'
 import { startFastifyInstance, stopFastifyInstance } from './web/server'
 
-const { version } = require('../package.json')
+const { version } = require('../../package.json')
 
 // TODO: refactor this into a class, removing the need for many different Servers
 export type ServerInstance = {
