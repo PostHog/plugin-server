@@ -2,7 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import { DateTime } from 'luxon'
 
-import { timeoutGuard } from '../../ingestion/utils'
+import { timeoutGuard } from '../../shared/ingestion/utils'
 import { status } from '../../status'
 import { IngestEventResponse, PluginsServer } from '../../types'
 

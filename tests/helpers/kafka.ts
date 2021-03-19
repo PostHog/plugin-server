@@ -8,7 +8,7 @@ import {
     KAFKA_PERSON,
     KAFKA_PERSON_UNIQUE_ID,
     KAFKA_SESSION_RECORDING_EVENTS,
-} from '../../src/ingestion/topics'
+} from '../../src/shared/ingestion/topics'
 import { PluginsServerConfig } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
 

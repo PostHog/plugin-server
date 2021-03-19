@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/node'
 import { Consumer, EachBatchPayload, Kafka } from 'kafkajs'
 import { PluginsServer, Queue } from 'types'
 
-import { timeoutGuard } from '../../ingestion/utils'
+import { timeoutGuard } from '../../shared/ingestion/utils'
 import { status } from '../../status'
 import { groupIntoBatches, killGracefully } from '../../utils'
 

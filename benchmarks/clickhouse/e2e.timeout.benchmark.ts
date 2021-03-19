@@ -1,7 +1,7 @@
 import { performance } from 'perf_hooks'
 
-import { KAFKA_EVENTS_PLUGIN_INGESTION } from '../../src/ingestion/topics'
 import { startPluginsServer } from '../../src/server'
+import { KAFKA_EVENTS_PLUGIN_INGESTION } from '../../src/shared/ingestion/topics'
 import { ClickHouseEvent, LogLevel, PluginsServerConfig, Queue } from '../../src/types'
 import { PluginsServer } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'

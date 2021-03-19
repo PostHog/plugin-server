@@ -7,8 +7,8 @@ import { Producer, ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 
-import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
-import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './ingestion/utils'
+import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './shared/ingestion/topics'
+import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './shared/ingestion/utils'
 import {
     ClickHouseEvent,
     ClickHousePerson,

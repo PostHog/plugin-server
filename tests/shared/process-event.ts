@@ -4,9 +4,9 @@ import { DateTime } from 'luxon'
 import { performance } from 'perf_hooks'
 
 import { IEvent } from '../../src/idl/protos'
-import { EventsProcessor } from '../../src/ingestion/process-event'
-import { hashElements } from '../../src/ingestion/utils'
 import { createServer } from '../../src/server'
+import { EventsProcessor } from '../../src/shared/ingestion/process-event'
+import { hashElements } from '../../src/shared/ingestion/utils'
 import {
     Database,
     Event,
