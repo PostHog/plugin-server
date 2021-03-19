@@ -5,7 +5,6 @@ import { performance } from 'perf_hooks'
 
 import { IEvent } from '../../src/idl/protos'
 import { createServer } from '../../src/server'
-import { EventsProcessor } from '../../src/shared/ingestion/process-event'
 import { hashElements } from '../../src/shared/ingestion/utils'
 import { delay, UUIDT } from '../../src/shared/utils'
 import {
@@ -18,6 +17,7 @@ import {
     SessionRecordingEvent,
     Team,
 } from '../../src/types'
+import { EventsProcessor } from '../../src/worker/ingestion/process-event'
 import { createUserTeamAndOrganization, getFirstTeam, getTeams, onQuery, resetTestDatabase } from '../helpers/sql'
 
 jest.setTimeout(600000) // 600 sec timeout.

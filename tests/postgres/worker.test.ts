@@ -92,7 +92,7 @@ test('assume that the workerThreads and tasksPerWorker values behave as expected
     await resetTestDatabase(testCode)
     const piscina = setupPiscina(workerThreads, tasksPerWorker)
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
-    const promises = []
+    const promises: Array<Promise<any>> = []
 
     // warmup 2x
     await Promise.all([processEvent(createEvent()), processEvent(createEvent())])
