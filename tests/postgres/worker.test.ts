@@ -4,13 +4,13 @@ import { mocked } from 'ts-jest/utils'
 
 import Client from '../../src/celery/client'
 import { loadPluginSchedule } from '../../src/main/services/schedule'
-import { runPlugins, runPluginsOnBatch, runPluginTask } from '../../src/plugins/run'
-import { loadSchedule, setupPlugins } from '../../src/plugins/setup'
 import { ServerInstance, startPluginsServer } from '../../src/server'
 import { LogLevel } from '../../src/types'
 import { delay, UUIDT } from '../../src/utils'
 import { ingestEvent } from '../../src/worker/ingestion/ingest-event'
 import { makePiscina } from '../../src/worker/piscina'
+import { runPlugins, runPluginsOnBatch, runPluginTask } from '../../src/worker/plugins/run'
+import { loadSchedule, setupPlugins } from '../../src/worker/plugins/setup'
 import { createTaskRunner } from '../../src/worker/worker'
 import { resetTestDatabase } from '../helpers/sql'
 import { setupPiscina } from '../helpers/worker'
@@ -18,8 +18,8 @@ import { setupPiscina } from '../helpers/worker'
 jest.mock('../../src/sql')
 jest.mock('../../src/status')
 jest.mock('../../src/worker/ingestion/ingest-event')
-jest.mock('../../src/plugins/run')
-jest.mock('../../src/plugins/setup')
+jest.mock('../../src/worker/plugins/run')
+jest.mock('../../src/worker/plugins/setup')
 jest.setTimeout(600000) // 600 sec timeout
 
 function createEvent(index = 0): PluginEvent {

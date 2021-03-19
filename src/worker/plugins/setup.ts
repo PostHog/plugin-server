@@ -1,9 +1,9 @@
 import { PluginAttachment } from '@posthog/plugin-scaffold'
 
-import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows } from '../sql'
-import { status } from '../status'
-import { Plugin, PluginConfig, PluginConfigId, PluginId, PluginsServer, TeamId } from '../types'
-import { LazyPluginVM } from '../vm/lazy'
+import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows } from '../../sql'
+import { status } from '../../status'
+import { Plugin, PluginConfig, PluginConfigId, PluginId, PluginsServer, TeamId } from '../../types'
+import { LazyPluginVM } from '../../vm/lazy'
 import { loadPlugin } from './loadPlugin'
 
 export async function setupPlugins(server: PluginsServer): Promise<void> {

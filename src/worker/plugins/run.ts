@@ -1,7 +1,7 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 
-import { processError } from '../error'
-import { PluginConfig, PluginsServer } from '../types'
+import { processError } from '../../error'
+import { PluginConfig, PluginsServer } from '../../types'
 
 export async function runPlugins(server: PluginsServer, event: PluginEvent): Promise<PluginEvent | null> {
     const pluginsToRun = getPluginsForTeam(server, event.team_id)

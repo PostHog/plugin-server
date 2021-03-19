@@ -1,11 +1,11 @@
 import { initApp } from '../init'
-import { runPlugins, runPluginsOnBatch, runPluginTask } from '../plugins/run'
-import { loadSchedule, setupPlugins } from '../plugins/setup'
 import { createServer } from '../server'
 import { status } from '../status'
 import { PluginsServer, PluginsServerConfig } from '../types'
 import { cloneObject } from '../utils'
 import { ingestEvent } from './ingestion/ingest-event'
+import { runPlugins, runPluginsOnBatch, runPluginTask } from './plugins/run'
+import { loadSchedule, setupPlugins } from './plugins/setup'
 
 type TaskWorker = ({ task, args }: { task: string; args: any }) => Promise<any>
 
