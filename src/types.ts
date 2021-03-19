@@ -361,3 +361,5 @@ export interface ScheduleControl {
     stopSchedule: () => Promise<void>
     reloadSchedule: () => Promise<void>
 }
+
+export type IngestEventResponse = { success?: boolean; error?: string }

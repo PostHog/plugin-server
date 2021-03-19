@@ -4,9 +4,8 @@ import * as Sentry from '@sentry/node'
 
 import Client from '../celery/client'
 import Worker from '../celery/worker'
-import { IngestEventResponse } from '../ingestion/ingest-event'
 import { status } from '../status'
-import { PluginsServer, Queue } from '../types'
+import { IngestEventResponse, PluginsServer, Queue } from '../types'
 import { UUIDT } from '../utils'
 import { KafkaQueue } from './ingestion/kafka-queue'
 
