@@ -2,7 +2,7 @@
  * writes here Base Parent class of Celery client and worker
  * @author SunMyeong Lee <actumn814@gmail.com>
  */
-import { DB } from '../db'
+import { DB } from '../../db'
 import { Broker } from './broker'
 import { CeleryConf, defaultConf } from './conf'
 

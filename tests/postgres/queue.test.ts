@@ -1,6 +1,6 @@
-import Client from '../../src/celery/client'
 import { startQueue } from '../../src/main/queue'
 import { createServer } from '../../src/server'
+import Client from '../../src/shared/celery/client'
 import { LogLevel, PluginsServer } from '../../src/types'
 import { delay } from '../../src/utils'
 import { runPlugins } from '../../src/worker/plugins/run'

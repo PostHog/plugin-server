@@ -1,5 +1,5 @@
-import Base from '../../celery/base'
-import { Message } from '../../celery/message'
+import Base from '../../shared/celery/base'
+import { Message } from '../../shared/celery/message'
 import { status } from '../../status'
 import { Queue } from '../../types'
 
