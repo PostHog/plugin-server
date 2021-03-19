@@ -60,9 +60,9 @@ export class EventsProcessor {
             throw new Error(`Not a valid UUID: "${eventUuid}"`)
         }
         const singleSaveTimer = new Date()
-        const timeout = timeoutGuard(
-            `Still inside "EventsProcessor.processEvent". Timeout warning after 30 sec! ${JSON.stringify(data)}`
-        )
+        const timeout = timeoutGuard('Still inside "EventsProcessor.processEvent". Timeout warning after 30 sec!', {
+            event: JSON.stringify(data),
+        })
 
         const properties: Properties = data.properties ?? {}
         if (data['$set']) {
@@ -75,9 +75,9 @@ export class EventsProcessor {
         const personUuid = new UUIDT().toString()
 
         const ts = this.handleTimestamp(data, now, sentAt)
-        const timeout1 = timeoutGuard(
-            `Still running "handleIdentifyOrAlias". Timeout warning after 30 sec! ${eventUuid}`
-        )
+        const timeout1 = timeoutGuard('Still running "handleIdentifyOrAlias". Timeout warning after 30 sec!', {
+            eventUuid,
+        })
         await this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
         clearTimeout(timeout1)
 
@@ -85,7 +85,8 @@ export class EventsProcessor {
 
         if (data['event'] === '$snapshot') {
             const timeout2 = timeoutGuard(
-                `Still running "createSessionRecordingEvent". Timeout warning after 30 sec! ${eventUuid}`
+                'Still running "createSessionRecordingEvent". Timeout warning after 30 sec!',
+                { eventUuid }
             )
             result = await this.createSessionRecordingEvent(
                 eventUuid,
@@ -95,10 +96,12 @@ export class EventsProcessor {
                 ts,
                 properties['$snapshot_data']
             )
-            this.pluginsServer.statsd?.timing('kafka_queue.single_save.snapshot', singleSaveTimer)
+            this.pluginsServer.statsd?.timing('kafka_queue.single_save.snapshot', singleSaveTimer, {
+                team_id: teamId.toString(),
+            })
             clearTimeout(timeout2)
         } else {
-            const timeout3 = timeoutGuard(`Still running "captureEE". Timeout warning after 30 sec! ${eventUuid}`)
+            const timeout3 = timeoutGuard('Still running "captureEE". Timeout warning after 30 sec!', { eventUuid })
             result = await this.captureEE(
                 eventUuid,
                 personUuid,
@@ -111,7 +114,9 @@ export class EventsProcessor {
                 ts,
                 sentAt
             )
-            this.pluginsServer.statsd?.timing('kafka_queue.single_save.standard', singleSaveTimer)
+            this.pluginsServer.statsd?.timing('kafka_queue.single_save.standard', singleSaveTimer, {
+                team_id: teamId.toString(),
+            })
             clearTimeout(timeout3)
         }
         clearTimeout(timeout)
@@ -297,17 +302,19 @@ export class EventsProcessor {
             const otherPersonDistinctIds: PersonDistinctId[] = (
                 await this.db.postgresQuery(
                     'SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2',
-                    [otherPerson.id, mergeInto.team_id]
+                    [otherPerson.id, mergeInto.team_id],
+                    'otherPersonDistinctIds'
                 )
             ).rows
             for (const personDistinctId of otherPersonDistinctIds) {
                 await this.db.moveDistinctId(otherPerson, personDistinctId, mergeInto)
             }
 
-            await this.db.postgresQuery('UPDATE posthog_cohortpeople SET person_id = $1 WHERE person_id = $2', [
-                mergeInto.id,
-                otherPerson.id,
-            ])
+            await this.db.postgresQuery(
+                'UPDATE posthog_cohortpeople SET person_id = $1 WHERE person_id = $2',
+                [mergeInto.id, otherPerson.id],
+                'updateCohortPeople'
+            )
 
             await this.db.deletePerson(otherPerson)
         }
@@ -342,7 +349,11 @@ export class EventsProcessor {
             }))
         }
 
-        const teamQueryResult = await this.db.postgresQuery('SELECT * FROM posthog_team WHERE id = $1', [teamId])
+        const teamQueryResult = await this.db.postgresQuery(
+            'SELECT * FROM posthog_team WHERE id = $1',
+            [teamId],
+            'selectTeam'
+        )
         const team: Team = teamQueryResult.rows[0]
 
         if (!team) {
@@ -357,7 +368,8 @@ export class EventsProcessor {
 
         const pdiSelectResult = await this.db.postgresQuery(
             'SELECT COUNT(*) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
-            [teamId, distinctId]
+            [teamId, distinctId],
+            'pdicount'
         )
         const pdiCount = parseInt(pdiSelectResult.rows[0].pdicount)
 
@@ -385,16 +397,18 @@ export class EventsProcessor {
     }
 
     private async storeNamesAndProperties(team: Team, event: string, properties: Properties): Promise<void> {
-        const timeout = timeoutGuard(
-            `Still running "storeNamesAndProperties". Timeout warning after 30 sec! Event: ${event}. Ingested: ${team.ingested_event}`
-        )
+        const timeout = timeoutGuard('Still running "storeNamesAndProperties". Timeout warning after 30 sec!', {
+            event: event,
+            ingested: team.ingested_event,
+        })
         // In _capture we only prefetch a couple of fields in Team to avoid fetching too much data
         let save = false
         if (!team.ingested_event) {
             // First event for the team captured
             const organizationMembers = await this.db.postgresQuery(
                 'SELECT distinct_id FROM posthog_user JOIN posthog_organizationmembership ON posthog_user.id = posthog_organizationmembership.user_id WHERE organization_id = $1',
-                [team.organization_id]
+                [team.organization_id],
+                'posthog_organizationmembership'
             )
             const distinctIds: { distinct_id: string }[] = organizationMembers.rows
             for (const { distinct_id } of distinctIds) {
@@ -426,7 +440,8 @@ export class EventsProcessor {
         }
         if (save) {
             const timeout2 = timeoutGuard(
-                `Still running "storeNamesAndProperties" save. Timeout warning after 30 sec! Event: ${event}`
+                'Still running "storeNamesAndProperties" save. Timeout warning after 30 sec!',
+                { event }
             )
             await this.db.postgresQuery(
                 `UPDATE posthog_team SET
@@ -441,7 +456,8 @@ export class EventsProcessor {
                     JSON.stringify(team.event_properties_with_usage),
                     JSON.stringify(team.event_properties_numerical),
                     team.id,
-                ]
+                ],
+                'storeNamesAndProperties'
             )
             clearTimeout(timeout2)
         }
@@ -462,7 +478,8 @@ export class EventsProcessor {
         try {
             const hookQueryResult = await this.db.postgresQuery(
                 `SELECT COUNT(*) FROM ee_hook WHERE team_id = $1 AND event = 'action_performed' LIMIT 1`,
-                [team.id]
+                [team.id],
+                'shouldSendHooksTask'
             )
             return parseInt(hookQueryResult.rows[0].count) > 0
         } catch (error) {
@@ -504,7 +521,7 @@ export class EventsProcessor {
         }
 
         if (this.kafkaProducer) {
-            await this.db.sendKafkaMessage({
+            await this.db.queueKafkaMessage({
                 topic: KAFKA_EVENTS,
                 messages: [
                     {
@@ -549,7 +566,8 @@ export class EventsProcessor {
                     data.timestamp,
                     JSON.stringify(elements || []),
                     elementsHash,
-                ]
+                ],
+                'createEventInsert'
             )
             if (await this.shouldSendHooksTask(team)) {
                 this.pluginsServer.statsd?.increment(`hooks.send_task`)
@@ -584,14 +602,15 @@ export class EventsProcessor {
         }
 
         if (this.kafkaProducer) {
-            await this.db.sendKafkaMessage({
+            await this.db.queueKafkaMessage({
                 topic: KAFKA_SESSION_RECORDING_EVENTS,
                 messages: [{ key: uuid, value: Buffer.from(JSON.stringify(data)) }],
             })
         } else {
             const insertResult = await this.db.postgresQuery(
                 'INSERT INTO posthog_sessionrecordingevent (created_at, team_id, distinct_id, session_id, timestamp, snapshot_data) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-                [data.created_at, data.team_id, data.distinct_id, data.session_id, data.timestamp, data.snapshot_data]
+                [data.created_at, data.team_id, data.distinct_id, data.session_id, data.timestamp, data.snapshot_data],
+                'insertSessionRecording'
             )
             const eventCreated = insertResult.rows[0] as PostgresSessionRecordingEvent
             return eventCreated
