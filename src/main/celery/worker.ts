@@ -1,7 +1,7 @@
-import { status } from '../status'
-import { Queue } from '../types'
-import Base from './base'
-import { Message } from './message'
+import Base from '../../celery/base'
+import { Message } from '../../celery/message'
+import { status } from '../../status'
+import { Queue } from '../../types'
 
 type Handler = (...args: any[]) => Promise<void>
 
