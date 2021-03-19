@@ -3,9 +3,9 @@ import * as Sentry from '@sentry/node'
 import { Consumer, EachBatchPayload, Kafka } from 'kafkajs'
 import { PluginsServer, Queue } from 'types'
 
-import { status } from '../status'
-import { groupIntoBatches, killGracefully } from '../utils'
-import { timeoutGuard } from './utils'
+import { timeoutGuard } from '../../ingestion/utils'
+import { status } from '../../status'
+import { groupIntoBatches, killGracefully } from '../../utils'
 
 export class KafkaQueue implements Queue {
     private pluginsServer: PluginsServer

@@ -5,10 +5,10 @@ import * as Sentry from '@sentry/node'
 import Client from '../celery/client'
 import Worker from '../celery/worker'
 import { IngestEventResponse } from '../ingestion/ingest-event'
-import { KafkaQueue } from '../ingestion/kafka-queue'
 import { status } from '../status'
 import { PluginsServer, Queue } from '../types'
 import { UUIDT } from '../utils'
+import { KafkaQueue } from './ingestion/kafka-queue'
 
 export type WorkerMethods = {
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
