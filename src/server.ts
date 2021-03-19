@@ -16,13 +16,13 @@ import { ConnectionOptions } from 'tls'
 
 import { defaultConfig } from './config'
 import { DB } from './db'
-import { EventsProcessor } from './ingestion/process-event'
 import { startQueue } from './main/queue'
 import { startSchedule } from './main/services/schedule'
 import { startFastifyInstance, stopFastifyInstance } from './main/web/server'
 import { status } from './status'
 import { PluginsServer, PluginsServerConfig, Queue, ScheduleControl } from './types'
 import { createPostgresPool, createRedis, delay, UUIDT } from './utils'
+import { EventsProcessor } from './worker/ingestion/process-event'
 
 const { version } = require('../package.json')
 
@@ -154,6 +154,7 @@ export async function createServer(
         pluginSchedulePromises: { runEveryMinute: {}, runEveryHour: {}, runEveryDay: {} },
     }
 
+    // :TODO: This is only used on worker threads, not main
     server.eventsProcessor = new EventsProcessor(server as PluginsServer)
 
     const closeServer = async () => {

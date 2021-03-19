@@ -7,10 +7,12 @@ import { DateTime, Duration } from 'luxon'
 import * as fetch from 'node-fetch'
 import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
 
-import Client from '../celery/client'
-import { DB } from '../db'
-import { Event as EventProto, IEvent } from '../idl/protos'
-import { status } from '../status'
+import Client from '../../celery/client'
+import { DB } from '../../db'
+import { Event as EventProto, IEvent } from '../../idl/protos'
+import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from '../../ingestion/topics'
+import { elementsToString, personInitialAndUTMProperties, sanitizeEventName, timeoutGuard } from '../../ingestion/utils'
+import { status } from '../../status'
 import {
     CohortPeople,
     Element,
@@ -21,10 +23,8 @@ import {
     SessionRecordingEvent,
     Team,
     TimestampFormat,
-} from '../types'
-import { castTimestampOrNow, UUID, UUIDT } from '../utils'
-import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from './topics'
-import { elementsToString, personInitialAndUTMProperties, sanitizeEventName, timeoutGuard } from './utils'
+} from '../../types'
+import { castTimestampOrNow, UUID, UUIDT } from '../../utils'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
