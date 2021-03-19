@@ -25,14 +25,24 @@ export async function prepareMmdb(db: DB): Promise<ReaderModel> {
     return Reader.openBuffer(mmdb)
 }
 
-export function createGeoIp(reader: ReaderModel): GeoIPExtension {
-    return {
-        locate: function (ip) {
-            try {
-                return reader.city(ip)
-            } catch {
-                return null
-            }
-        },
-    }
+function throwMmdbUnavailable(): never {
+    throw new Error(
+        'IP location capabilities are unavailable in this PostHog instance due to the DISABLE_MMDB setting!'
+    )
+}
+
+export function createGeoIp(reader: ReaderModel | null): GeoIPExtension {
+    return reader
+        ? {
+              locate: function (ip) {
+                  try {
+                      return reader.city(ip)
+                  } catch {
+                      return null
+                  }
+              },
+          }
+        : {
+              locate: throwMmdbUnavailable,
+          }
 }

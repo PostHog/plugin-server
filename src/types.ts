@@ -55,6 +55,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     SCHEDULE_LOCK_TTL: number
     REDIS_POOL_MIN_SIZE: number
     REDIS_POOL_MAX_SIZE: number
+    DISABLE_MMDB: boolean
 }
 
 export interface PluginsServer extends PluginsServerConfig {
@@ -66,7 +67,7 @@ export interface PluginsServer extends PluginsServerConfig {
     kafka?: Kafka
     kafkaProducer?: Producer
     statsd?: StatsD
-    mmdb: ReaderModel
+    mmdb: ReaderModel | null
     // currently enabled plugin status
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>

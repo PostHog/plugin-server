@@ -146,7 +146,7 @@ export async function createServer(
         kafka,
         kafkaProducer,
         statsd,
-        mmdb: await prepareMmdb(db),
+        mmdb: !serverConfig.DISABLE_MMDB ? await prepareMmdb(db) : null,
         plugins: new Map(),
         pluginConfigs: new Map(),
         pluginConfigsPerTeam: new Map(),
