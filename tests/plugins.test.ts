@@ -120,6 +120,7 @@ test('plugin meta has what it should have', async () => {
         'config',
         'global',
         'storage',
+        'geoip',
     ])
     expect(returnedEvent!.properties!['attachments']).toEqual({
         maxmindMmdb: { content_type: 'application/octet-stream', contents: Buffer.from('test'), file_name: 'test.txt' },
