@@ -6,17 +6,18 @@ import { threadId } from 'worker_threads'
 import { DB } from '../../../shared/db'
 import { status } from '../../../shared/status'
 
-const REDIS_MMDB_KEY = '@posthog-plugin-server/mmdb'
+const MMDB_REDIS_KEY = '@posthog-plugin-server/mmdb'
+const MMDB_STATIC_ENDPOINT = 'https://mmdb.posthog.net/'
 
 export async function prepareMmdb(db: DB): Promise<ReaderModel> {
-    const mmdbString = (await db.redisGet(REDIS_MMDB_KEY, null, { jsonSerialize: false })) as string | null
+    const mmdbString = (await db.redisGet(MMDB_REDIS_KEY, null, { jsonSerialize: false })) as string | null
     let mmdb: Buffer | null = mmdbString === null ? null : Buffer.from(mmdbString, 'binary')
     if (!mmdb) {
         status.info('⏳', 'GeoLite2 database not in cache, downloading...')
-        const response = await fetch('http://posthog-mmdb.herokuapp.com/')
+        const response = await fetch(MMDB_STATIC_ENDPOINT)
         mmdb = await response.buffer()
         status.info('⌛️', 'Downloaded GeoLite2 database')
-        await db.redisSet(REDIS_MMDB_KEY, mmdb.toString('binary'), 7 * 86_400, { jsonSerialize: false })
+        await db.redisSet(MMDB_REDIS_KEY, mmdb.toString('binary'), 7 * 86_400, { jsonSerialize: false })
         status.info('🌍', 'Cached GeoLite2 database for a week')
     } else if (threadId === 0) {
         // Only logging this in the main thread
