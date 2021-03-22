@@ -1,8 +1,9 @@
 import { Properties } from '@posthog/plugin-scaffold'
 import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
-import { DB } from 'shared/db'
-import { timeoutGuard } from 'shared/ingestion/utils'
-import { Team, TeamId } from 'types'
+
+import { DB } from '../../shared/db'
+import { timeoutGuard } from '../../shared/ingestion/utils'
+import { Team, TeamId } from '../../types'
 
 export class TeamManager {
     db: DB

@@ -6,7 +6,6 @@ import { Producer } from 'kafkajs'
 import { DateTime, Duration } from 'luxon'
 import * as fetch from 'node-fetch'
 import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
-import { TeamManager } from 'worker/ingestion/team-manager'
 
 import { Event as EventProto, IEvent } from '../../idl/protos'
 import Client from '../../shared/celery/client'
@@ -31,6 +30,7 @@ import {
     Team,
     TimestampFormat,
 } from '../../types'
+import { TeamManager } from './team-manager'
 
 export class EventsProcessor {
     pluginsServer: PluginsServer
