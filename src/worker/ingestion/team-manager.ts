@@ -15,7 +15,7 @@ export class TeamManager {
         this.shouldSendWebhooksCache = new Map()
     }
 
-    public async fetchTeam(teamId: number): Promise<Team | null> {
+    public async fetchTeam(teamId: number, eventUuid?: string): Promise<Team | null> {
         const cachedTeam = this.getByAge(this.teamCache, teamId)
         if (cachedTeam) {
             return cachedTeam
@@ -29,6 +29,9 @@ export class TeamManager {
                 'selectTeam'
             )
             const team: Team | null = teamQueryResult.rows[0]
+            if (team) {
+                team.__fetch_event_uuid = eventUuid
+            }
 
             this.teamCache.set(teamId, [team, new Date()])
             return team
@@ -72,10 +75,11 @@ export class TeamManager {
     public async updateEventNamesAndProperties(
         teamId: number,
         event: string,
+        eventUuid: string,
         properties: Properties,
         posthog: ReturnType<typeof nodePostHog>
     ): Promise<void> {
-        const team = await this.fetchTeam(teamId)
+        let team = await this.fetchTeam(teamId)
 
         if (!team) {
             return
@@ -85,55 +89,30 @@ export class TeamManager {
             event: event,
             ingested: team.ingested_event,
         })
-        // In _capture we only prefetch a couple of fields in Team to avoid fetching too much data
-        let save = false
-        if (!team.ingested_event) {
-            // First event for the team captured
-            const organizationMembers = await this.db.postgresQuery(
-                'SELECT distinct_id FROM posthog_user JOIN posthog_organizationmembership ON posthog_user.id = posthog_organizationmembership.user_id WHERE organization_id = $1',
-                [team.organization_id],
-                'posthog_organizationmembership'
-            )
-            const distinctIds: { distinct_id: string }[] = organizationMembers.rows
-            for (const { distinct_id } of distinctIds) {
-                posthog.identify(distinct_id)
-                posthog.capture('first team event ingested', { team: team.uuid })
-            }
-            team.ingested_event = true
-            save = true
+        let shouldUpdate = this.calculateUpdates(team, event, properties)
+        if (shouldUpdate && team.__fetch_event_uuid !== eventUuid) {
+            // :TRICKY: Double-check if we're updating based on cached data, if so, re-validate.
+            // :TODO: Switch all of this to a sane schema that can be updated without races.
+            this.teamCache.delete(teamId)
+            team = await this.fetchTeam(teamId, eventUuid)
+            shouldUpdate = this.calculateUpdates(team, event, properties)
         }
-        if (team.event_names && !team.event_names.includes(event)) {
-            save = true
-            team.event_names.push(event)
-            team.event_names_with_usage.push({ event: event, usage_count: null, volume: null })
-        }
-        for (const [key, value] of Object.entries(properties)) {
-            if (team.event_properties && !team.event_properties.includes(key)) {
-                team.event_properties.push(key)
-                team.event_properties_with_usage.push({ key: key, usage_count: null, volume: null })
-                save = true
-            }
-            if (
-                typeof value === 'number' &&
-                team.event_properties_numerical &&
-                !team.event_properties_numerical.includes(key)
-            ) {
-                team.event_properties_numerical.push(key)
-                save = true
-            }
-        }
-        if (save) {
+        if (team && shouldUpdate) {
             const timeout2 = timeoutGuard(
                 'Still running "updateEventNamesAndProperties" save. Timeout warning after 30 sec!',
                 { event }
             )
             await this.db.postgresQuery(
                 `UPDATE posthog_team SET
-                    ingested_event = $1, event_names = $2, event_names_with_usage = $3, event_properties = $4,
-                    event_properties_with_usage = $5, event_properties_numerical = $6
+                    ingested_event = $1,
+                    event_names = $2,
+                    event_names_with_usage = $3,
+                    event_properties = $4,
+                    event_properties_with_usage = $5,
+                    event_properties_numerical = $6
                 WHERE id = $7`,
                 [
-                    team.ingested_event,
+                    true,
                     JSON.stringify(team.event_names),
                     JSON.stringify(team.event_names_with_usage),
                     JSON.stringify(team.event_properties),
@@ -145,7 +124,53 @@ export class TeamManager {
             )
             clearTimeout(timeout2)
         }
+        if (team && !team.ingested_event) {
+            // First event for the team captured
+            const organizationMembers = await this.db.postgresQuery(
+                'SELECT distinct_id FROM posthog_user JOIN posthog_organizationmembership ON posthog_user.id = posthog_organizationmembership.user_id WHERE organization_id = $1',
+                [team.organization_id],
+                'posthog_organizationmembership'
+            )
+            const distinctIds: { distinct_id: string }[] = organizationMembers.rows
+            for (const { distinct_id } of distinctIds) {
+                posthog.identify(distinct_id)
+                posthog.capture('first team event ingested', { team: team.uuid })
+            }
+        }
         clearTimeout(timeout)
+    }
+
+    calculateUpdates(team: Team | null, event: string, properties: Properties): boolean {
+        if (!team) {
+            return false
+        }
+
+        let shouldUpdate = false
+        if (!team.ingested_event) {
+            shouldUpdate = true
+        }
+
+        if (team.event_names && !team.event_names.includes(event)) {
+            shouldUpdate = true
+            team.event_names.push(event)
+            team.event_names_with_usage.push({ event: event, usage_count: null, volume: null })
+        }
+        for (const [key, value] of Object.entries(properties)) {
+            if (!team.event_properties || !team.event_properties.includes(key)) {
+                team.event_properties.push(key)
+                team.event_properties_with_usage.push({ key: key, usage_count: null, volume: null })
+                shouldUpdate = true
+            }
+            if (
+                typeof value === 'number' &&
+                (!team.event_properties_numerical || !team.event_properties_numerical.includes(key))
+            ) {
+                team.event_properties_numerical.push(key)
+                shouldUpdate = true
+            }
+        }
+
+        return shouldUpdate
     }
 
     private getByAge<K, V>(cache: Map<K, [V, Date]>, key: K, maxAgeMs = 30000): V | undefined {

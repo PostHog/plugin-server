@@ -357,7 +357,7 @@ export class EventsProcessor {
             }))
         }
 
-        const team: Team | null = await this.teamManager.fetchTeam(teamId)
+        const team: Team | null = await this.teamManager.fetchTeam(teamId, eventUuid)
 
         if (!team) {
             throw new Error(`No team found with ID ${teamId}. Can't ingest event.`)
@@ -367,7 +367,7 @@ export class EventsProcessor {
             properties['$ip'] = ip
         }
 
-        await this.teamManager.updateEventNamesAndProperties(teamId, event, properties, this.posthog)
+        await this.teamManager.updateEventNamesAndProperties(teamId, event, eventUuid, properties, this.posthog)
 
         const pdiSelectResult = await this.db.postgresQuery(
             'SELECT COUNT(*) AS pdicount FROM posthog_persondistinctid WHERE team_id = $1 AND distinct_id = $2',
