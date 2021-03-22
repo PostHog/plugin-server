@@ -9,7 +9,7 @@ type TeamWithEventUuid = Team & { __fetch_event_uuid?: string }
 
 export class TeamManager {
     db: DB
-    teamCache: Map<TeamId, [Team | null, number]>
+    teamCache: Map<TeamId, [TeamWithEventUuid | null, number]>
     shouldSendWebhooksCache: Map<TeamId, [boolean, number]>
 
     constructor(db: DB) {
@@ -31,7 +31,7 @@ export class TeamManager {
                 [teamId],
                 'selectTeam'
             )
-            const team: Team | null = teamQueryResult.rows[0] || null
+            const team: TeamWithEventUuid | null = teamQueryResult.rows[0] || null
             if (team) {
                 team.__fetch_event_uuid = eventUuid
             }

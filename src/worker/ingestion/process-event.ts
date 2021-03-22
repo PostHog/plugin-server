@@ -20,7 +20,6 @@ import {
 import { status } from '../../shared/status'
 import { castTimestampOrNow, UUID, UUIDT } from '../../shared/utils'
 import {
-    CohortPeople,
     Element,
     Person,
     PersonDistinctId,
@@ -28,6 +27,7 @@ import {
     PostgresSessionRecordingEvent,
     SessionRecordingEvent,
     Team,
+    TeamId,
     TimestampFormat,
 } from '../../types'
 import { TeamManager } from './team-manager'
@@ -357,7 +357,7 @@ export class EventsProcessor {
             }))
         }
 
-        const team: Team | null = await this.teamManager.fetchTeam(teamId, eventUuid)
+        const team = await this.teamManager.fetchTeam(teamId, eventUuid)
 
         if (!team) {
             throw new Error(`No team found with ID ${teamId}. Can't ingest event.`)
@@ -396,13 +396,22 @@ export class EventsProcessor {
             )
         }
 
-        return await this.createEvent(eventUuid, event, team, distinctId, properties, timestamp, elementsList, siteUrl)
+        return await this.createEvent(
+            eventUuid,
+            event,
+            teamId,
+            distinctId,
+            properties,
+            timestamp,
+            elementsList,
+            siteUrl
+        )
     }
 
     private async createEvent(
         uuid: string,
         event: string,
-        team: Team,
+        teamId: TeamId,
         distinctId: string,
         properties?: Properties,
         timestamp?: DateTime | string,
@@ -420,7 +429,7 @@ export class EventsProcessor {
             event,
             properties: JSON.stringify(properties ?? {}),
             timestamp: timestampString,
-            teamId: team.id,
+            teamId,
             distinctId,
             elementsChain,
             createdAt: timestampString,
@@ -436,7 +445,7 @@ export class EventsProcessor {
                     },
                 ],
             })
-            if (await this.teamManager.shouldSendWebhooks(team.id)) {
+            if (await this.teamManager.shouldSendWebhooks(teamId)) {
                 this.pluginsServer.statsd?.increment(`hooks.send_task`)
                 this.celery.sendTask(
                     'ee.tasks.webhooks_ee.post_event_to_webhook_ee',
@@ -448,7 +457,7 @@ export class EventsProcessor {
                             timestamp,
                             elements_chain: elementsChain,
                         },
-                        team.id,
+                        teamId,
                         siteUrl,
                     ],
                     {}
@@ -457,7 +466,7 @@ export class EventsProcessor {
         } else {
             let elementsHash = ''
             if (elements && elements.length > 0) {
-                elementsHash = await this.db.createElementGroup(elements, team.id)
+                elementsHash = await this.db.createElementGroup(elements, teamId)
             }
             const {
                 rows: [event],
@@ -475,7 +484,7 @@ export class EventsProcessor {
                 ],
                 'createEventInsert'
             )
-            if (await this.teamManager.shouldSendWebhooks(team.id)) {
+            if (await this.teamManager.shouldSendWebhooks(teamId)) {
                 this.pluginsServer.statsd?.increment(`hooks.send_task`)
                 this.celery.sendTask('posthog.tasks.webhooks.post_event_to_webhook', [event.id, siteUrl], {})
             }
