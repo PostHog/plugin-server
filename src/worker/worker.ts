@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/node'
+
 import { ingestEvent } from '../ingestion/ingest-event'
 import { initApp } from '../init'
 import { runPlugins, runPluginsOnBatch, runPluginTask } from '../plugins/run'
@@ -27,6 +29,8 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
 export const createTaskRunner = (server: PluginsServer): TaskWorker => async ({ task, args }) => {
     const timer = new Date()
     let response
+
+    Sentry.setContext('task', { task, args })
 
     if (task === 'hello') {
         response = `hello ${args[0]}!`
