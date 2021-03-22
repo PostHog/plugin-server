@@ -3,8 +3,8 @@ import { GeoIPExtension } from '@posthog/plugin-scaffold'
 import fetch from 'node-fetch'
 import { threadId } from 'worker_threads'
 
-import { DB } from '../../db'
-import { status } from '../../status'
+import { DB } from '../../../shared/db'
+import { status } from '../../../shared/status'
 
 const REDIS_MMDB_KEY = '@posthog-plugin-server/mmdb'
 

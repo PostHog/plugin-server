@@ -12,13 +12,11 @@ import { ConnectionOptions } from 'tls'
 
 import { PluginsServer, PluginsServerConfig } from '../types'
 import { EventsProcessor } from '../worker/ingestion/process-event'
+import { prepareMmdb } from '../worker/vm/extensions/geoip'
 import { defaultConfig } from './config'
 import { DB } from './db'
 import { status } from './status'
-import { PluginsServer, PluginsServerConfig } from './types'
 import { createPostgresPool, createRedis, UUIDT } from './utils'
-import { createPostgresPool, createRedis, UUIDT } from './utils'
-import { prepareMmdb } from './vm/extensions/geoip'
 
 const { version } = require('../../package.json')
 
