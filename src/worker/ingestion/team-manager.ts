@@ -1,3 +1,5 @@
+import { Properties } from '@posthog/plugin-scaffold'
+import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
 import { DB } from 'shared/db'
 import { timeoutGuard } from 'shared/ingestion/utils'
 import { Team, TeamId } from 'types'
@@ -65,6 +67,85 @@ export class TeamManager {
         } finally {
             clearTimeout(timeout)
         }
+    }
+
+    public async updateEventNamesAndProperties(
+        teamId: number,
+        event: string,
+        properties: Properties,
+        posthog: ReturnType<typeof nodePostHog>
+    ): Promise<void> {
+        const team = await this.fetchTeam(teamId)
+
+        if (!team) {
+            return
+        }
+
+        const timeout = timeoutGuard('Still running "updateEventNamesAndProperties". Timeout warning after 30 sec!', {
+            event: event,
+            ingested: team.ingested_event,
+        })
+        // In _capture we only prefetch a couple of fields in Team to avoid fetching too much data
+        let save = false
+        if (!team.ingested_event) {
+            // First event for the team captured
+            const organizationMembers = await this.db.postgresQuery(
+                'SELECT distinct_id FROM posthog_user JOIN posthog_organizationmembership ON posthog_user.id = posthog_organizationmembership.user_id WHERE organization_id = $1',
+                [team.organization_id],
+                'posthog_organizationmembership'
+            )
+            const distinctIds: { distinct_id: string }[] = organizationMembers.rows
+            for (const { distinct_id } of distinctIds) {
+                posthog.identify(distinct_id)
+                posthog.capture('first team event ingested', { team: team.uuid })
+            }
+            team.ingested_event = true
+            save = true
+        }
+        if (team.event_names && !team.event_names.includes(event)) {
+            save = true
+            team.event_names.push(event)
+            team.event_names_with_usage.push({ event: event, usage_count: null, volume: null })
+        }
+        for (const [key, value] of Object.entries(properties)) {
+            if (team.event_properties && !team.event_properties.includes(key)) {
+                team.event_properties.push(key)
+                team.event_properties_with_usage.push({ key: key, usage_count: null, volume: null })
+                save = true
+            }
+            if (
+                typeof value === 'number' &&
+                team.event_properties_numerical &&
+                !team.event_properties_numerical.includes(key)
+            ) {
+                team.event_properties_numerical.push(key)
+                save = true
+            }
+        }
+        if (save) {
+            const timeout2 = timeoutGuard(
+                'Still running "updateEventNamesAndProperties" save. Timeout warning after 30 sec!',
+                { event }
+            )
+            await this.db.postgresQuery(
+                `UPDATE posthog_team SET
+                    ingested_event = $1, event_names = $2, event_names_with_usage = $3, event_properties = $4,
+                    event_properties_with_usage = $5, event_properties_numerical = $6
+                WHERE id = $7`,
+                [
+                    team.ingested_event,
+                    JSON.stringify(team.event_names),
+                    JSON.stringify(team.event_names_with_usage),
+                    JSON.stringify(team.event_properties),
+                    JSON.stringify(team.event_properties_with_usage),
+                    JSON.stringify(team.event_properties_numerical),
+                    team.id,
+                ],
+                'updateEventNamesAndProperties'
+            )
+            clearTimeout(timeout2)
+        }
+        clearTimeout(timeout)
     }
 
     private getByAge<K, V>(cache: Map<K, [V, Date]>, key: K, maxAgeMs = 30000): V | undefined {
