@@ -7,8 +7,8 @@ import { Team, TeamId } from '../../types'
 
 export class TeamManager {
     db: DB
-    teamCache: Map<TeamId, [Team | null, Date]>
-    shouldSendWebhooksCache: Map<TeamId, [boolean, Date]>
+    teamCache: Map<TeamId, [Team | null, number]>
+    shouldSendWebhooksCache: Map<TeamId, [boolean, number]>
 
     constructor(db: DB) {
         this.db = db
@@ -29,12 +29,12 @@ export class TeamManager {
                 [teamId],
                 'selectTeam'
             )
-            const team: Team | null = teamQueryResult.rows[0]
+            const team: Team | null = teamQueryResult.rows[0] || null
             if (team) {
                 team.__fetch_event_uuid = eventUuid
             }
 
-            this.teamCache.set(teamId, [team, new Date()])
+            this.teamCache.set(teamId, [team, Date.now()])
             return team
         } finally {
             clearTimeout(timeout)
@@ -60,7 +60,7 @@ export class TeamManager {
                 'shouldSendHooksTask'
             )
             const hasHooks = parseInt(hookQueryResult.rows[0].count) > 0
-            this.shouldSendWebhooksCache.set(teamId, [hasHooks, new Date()])
+            this.shouldSendWebhooksCache.set(teamId, [hasHooks, Date.now()])
             return hasHooks
         } catch (error) {
             // In FOSS PostHog ee_hook does not exist. If the error is other than that, rethrow it
@@ -141,7 +141,7 @@ export class TeamManager {
         clearTimeout(timeout)
     }
 
-    calculateUpdates(team: Team | null, event: string, properties: Properties): boolean {
+    private calculateUpdates(team: Team | null, event: string, properties: Properties): boolean {
         if (!team) {
             return false
         }
@@ -174,10 +174,10 @@ export class TeamManager {
         return shouldUpdate
     }
 
-    private getByAge<K, V>(cache: Map<K, [V, Date]>, key: K, maxAgeMs = 30000): V | undefined {
+    private getByAge<K, V>(cache: Map<K, [V, number]>, key: K, maxAgeMs = 30000): V | undefined {
         if (cache.has(key)) {
             const [value, age] = cache.get(key)!
-            if (new Date().getTime() - age.getTime() <= maxAgeMs) {
+            if (Date.now() - age <= maxAgeMs) {
                 return value
             }
         }
