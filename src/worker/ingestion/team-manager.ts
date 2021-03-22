@@ -5,6 +5,8 @@ import { DB } from '../../shared/db'
 import { timeoutGuard } from '../../shared/ingestion/utils'
 import { Team, TeamId } from '../../types'
 
+type TeamWithEventUuid = Team & { __fetch_event_uuid?: string }
+
 export class TeamManager {
     db: DB
     teamCache: Map<TeamId, [Team | null, number]>
@@ -80,7 +82,7 @@ export class TeamManager {
         properties: Properties,
         posthog: ReturnType<typeof nodePostHog>
     ): Promise<void> {
-        let team = await this.fetchTeam(teamId)
+        let team: TeamWithEventUuid | null = await this.fetchTeam(teamId)
 
         if (!team) {
             return

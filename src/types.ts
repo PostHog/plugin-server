@@ -238,7 +238,6 @@ export interface Team {
     session_recording_opt_in: boolean
     plugins_opt_in: boolean
     ingested_event: boolean
-    __fetch_event_uuid?: string
 }
 
 /** Usable Element model. */
