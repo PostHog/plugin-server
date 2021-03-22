@@ -6,6 +6,7 @@ import { Producer } from 'kafkajs'
 import { DateTime, Duration } from 'luxon'
 import * as fetch from 'node-fetch'
 import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
+import { TeamManager } from 'worker/ingestion/team-manager'
 
 import { Event as EventProto, IEvent } from '../../idl/protos'
 import Client from '../../shared/celery/client'
@@ -38,6 +39,7 @@ export class EventsProcessor {
     kafkaProducer: Producer
     celery: Client
     posthog: ReturnType<typeof nodePostHog>
+    teamManager: TeamManager
 
     constructor(pluginsServer: PluginsServer) {
         this.pluginsServer = pluginsServer
@@ -45,6 +47,7 @@ export class EventsProcessor {
         this.clickhouse = pluginsServer.clickhouse!
         this.kafkaProducer = pluginsServer.kafkaProducer!
         this.celery = new Client(pluginsServer.db, pluginsServer.CELERY_DEFAULT_QUEUE)
+        this.teamManager = new TeamManager(pluginsServer.db)
         this.posthog = nodePostHog('sTMFPsFhdP1Ssg', { fetch })
         if (process.env.NODE_ENV === 'test') {
             this.posthog.optOut()
@@ -354,12 +357,7 @@ export class EventsProcessor {
             }))
         }
 
-        const teamQueryResult = await this.db.postgresQuery(
-            'SELECT * FROM posthog_team WHERE id = $1',
-            [teamId],
-            'selectTeam'
-        )
-        const team: Team = teamQueryResult.rows[0]
+        const team: Team | null = await this.teamManager.fetchTeam(teamId)
 
         if (!team) {
             throw new Error(`No team found with ID ${teamId}. Can't ingest event.`)
@@ -469,35 +467,6 @@ export class EventsProcessor {
         clearTimeout(timeout)
     }
 
-    private async shouldSendHooksTask(team: Team): Promise<boolean> {
-        // Webhooks
-        if (team.slack_incoming_webhook) {
-            return true
-        }
-        // REST hooks (Zapier)
-        if (!this.pluginsServer.KAFKA_ENABLED) {
-            // REST hooks are EE-only
-            return false
-        }
-        const timeout = timeoutGuard(`Still running "shouldSendHooksTask". Timeout warning after 30 sec!`)
-        try {
-            const hookQueryResult = await this.db.postgresQuery(
-                `SELECT COUNT(*) FROM ee_hook WHERE team_id = $1 AND event = 'action_performed' LIMIT 1`,
-                [team.id],
-                'shouldSendHooksTask'
-            )
-            return parseInt(hookQueryResult.rows[0].count) > 0
-        } catch (error) {
-            // In FOSS PostHog ee_hook does not exist. If the error is other than that, rethrow it
-            if (!String(error).includes('relation "ee_hook" does not exist')) {
-                throw error
-            }
-        } finally {
-            clearTimeout(timeout)
-        }
-        return false
-    }
-
     private async createEvent(
         uuid: string,
         event: string,
@@ -535,7 +504,7 @@ export class EventsProcessor {
                     },
                 ],
             })
-            if (await this.shouldSendHooksTask(team)) {
+            if (await this.teamManager.shouldSendWebhooks(team.id)) {
                 this.pluginsServer.statsd?.increment(`hooks.send_task`)
                 this.celery.sendTask(
                     'ee.tasks.webhooks_ee.post_event_to_webhook_ee',
@@ -574,7 +543,7 @@ export class EventsProcessor {
                 ],
                 'createEventInsert'
             )
-            if (await this.shouldSendHooksTask(team)) {
+            if (await this.teamManager.shouldSendWebhooks(team.id)) {
                 this.pluginsServer.statsd?.increment(`hooks.send_task`)
                 this.celery.sendTask('posthog.tasks.webhooks.post_event_to_webhook', [event.id, siteUrl], {})
             }
