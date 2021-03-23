@@ -1,10 +1,10 @@
 import * as BigQuery from '@google-cloud/bigquery'
 
-type DummyCloud = {
+export interface DummyCloud {
     bigquery: typeof BigQuery
 }
 
-type DummyGoogle = {
+export interface DummyGoogle {
     cloud: DummyCloud
 }
 

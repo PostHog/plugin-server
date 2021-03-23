@@ -3,6 +3,7 @@ import fetch from 'node-fetch'
 import { VM } from 'vm2'
 
 import { PluginConfig, PluginConfigVMReponse, PluginsServer } from '../../types'
+import { createExtensions } from './extensions'
 import { createCache } from './extensions/cache'
 import { createConsole } from './extensions/console'
 import { createGoogle } from './extensions/google'
@@ -23,13 +24,10 @@ export async function createPluginConfigVM(
         sandbox: {},
     })
 
-    // Add PostHog utilities to virtual machine
-    vm.freeze(createConsole(), 'console')
-    vm.freeze(createPosthog(server, pluginConfig), 'posthog')
-
-    // Add non-PostHog utilities to virtual machine
-    vm.freeze(fetch, 'fetch')
-    vm.freeze(createGoogle(), 'google')
+    const extensions = createExtensions(server, pluginConfig)
+    for (const [key, extension] of Object.entries(extensions)) {
+        vm.freeze(extension, key) // Inject extensions as globals
+    }
 
     if (process.env.NODE_ENV === 'test') {
         vm.freeze(setTimeout, '__jestSetTimeout')
@@ -57,10 +55,9 @@ export async function createPluginConfigVM(
 
     vm.freeze(
         {
-            cache: createCache(server, pluginConfig.plugin_id, pluginConfig.team_id),
             config: pluginConfig.config,
             attachments: pluginConfig.attachments,
-            storage: createStorage(server, pluginConfig),
+            ...extensions, // Inject extensions into meta
         },
         '__pluginHostMeta'
     )
