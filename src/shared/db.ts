@@ -6,7 +6,6 @@ import Redis from 'ioredis'
 import { Producer, ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
-import { instrumentQuery } from 'shared/metrics'
 
 import {
     ClickHouseEvent,
@@ -27,6 +26,8 @@ import {
 } from '../types'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
 import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './ingestion/utils'
+import { KafkaProducerWrapper } from './kafka-producer-wrapper'
+import { instrumentQuery } from './metrics'
 import {
     castTimestampOrNow,
     clickHouseTimestampToISO,
@@ -44,39 +45,25 @@ export class DB {
     redisPool: GenericPool<Redis.Redis>
 
     /** Kafka producer used for syncing Postgres and ClickHouse person data. */
-    kafkaProducer?: Producer
+    kafkaProducer?: KafkaProducerWrapper
     /** ClickHouse used for syncing Postgres and ClickHouse person data. */
     clickhouse?: ClickHouse
 
     /** StatsD instance used to do instrumentation */
     statsd: StatsD | undefined
 
-    /** Queued producer for kafka */
-    lastFlushTime: Date
-    kafkaMessageQueue: Array<ProducerRecord>
-    kafkaFlushInterval: NodeJS.Timeout
-    flushFrequencyMs: number
-    maxQueueSize: number
-
     constructor(
         postgres: Pool,
         redisPool: GenericPool<Redis.Redis>,
-        kafkaProducer: Producer | undefined,
+        kafkaProducer: KafkaProducerWrapper | undefined,
         clickhouse: ClickHouse | undefined,
-        statsd: StatsD | undefined,
-        serverConfig: PluginsServerConfig
+        statsd: StatsD | undefined
     ) {
         this.postgres = postgres
         this.redisPool = redisPool
         this.kafkaProducer = kafkaProducer
         this.clickhouse = clickhouse
         this.statsd = statsd
-
-        this.lastFlushTime = new Date()
-        this.kafkaMessageQueue = []
-        this.flushFrequencyMs = serverConfig.KAFKA_FLUSH_FREQUENCY_MS
-        this.maxQueueSize = serverConfig.KAFKA_PRODUCER_MAX_QUEUE_SIZE
-        this.kafkaFlushInterval = setInterval(() => this.flushKafkaMessages(), this.flushFrequencyMs)
     }
 
     // Postgres
@@ -130,41 +117,6 @@ export class DB {
             const timeout = timeoutGuard('ClickHouse slow query warning after 30 sec', { query })
             try {
                 return await this.clickhouse.querying(query, options)
-            } finally {
-                clearTimeout(timeout)
-            }
-        })
-    }
-
-    // Kafka
-    public async queueKafkaMessage(kafkaMessage: ProducerRecord): Promise<void> {
-        this.kafkaMessageQueue.push(kafkaMessage)
-
-        const timeSinceLastFlush = new Date().getTime() - this.lastFlushTime.getTime()
-        if (timeSinceLastFlush > this.flushFrequencyMs || this.kafkaMessageQueue.length >= this.maxQueueSize) {
-            await this.flushKafkaMessages()
-        }
-    }
-
-    public flushKafkaMessages(): Promise<void> {
-        if (this.kafkaMessageQueue.length === 0) {
-            return Promise.resolve()
-        }
-
-        return instrumentQuery(this.statsd, 'query.kafka_send', undefined, async () => {
-            if (!this.kafkaProducer) {
-                throw new Error('Kafka connection has not been provided!')
-            }
-
-            const messages = this.kafkaMessageQueue
-            this.kafkaMessageQueue = []
-            this.lastFlushTime = new Date()
-
-            const timeout = timeoutGuard('Kafka message sending delayed. Waiting over 30 sec to send messages.')
-            try {
-                await this.kafkaProducer!.sendBatch({
-                    topicMessages: messages,
-                })
             } finally {
                 clearTimeout(timeout)
             }
@@ -384,7 +336,7 @@ export class DB {
 
         if (this.kafkaProducer) {
             for (const kafkaMessage of kafkaMessages) {
-                await this.queueKafkaMessage(kafkaMessage)
+                await this.kafkaProducer.queueMessage(kafkaMessage)
             }
         }
 
@@ -403,7 +355,7 @@ export class DB {
         )
 
         if (this.kafkaProducer) {
-            await this.queueKafkaMessage({
+            await this.kafkaProducer.queueMessage({
                 topic: KAFKA_PERSON,
                 messages: [
                     {
@@ -476,7 +428,7 @@ export class DB {
     public async addDistinctId(person: Person, distinctId: string): Promise<void> {
         const kafkaMessage = await this.addDistinctIdPooled(this.postgres, person, distinctId)
         if (this.kafkaProducer && kafkaMessage) {
-            await this.queueKafkaMessage(kafkaMessage)
+            await this.kafkaProducer.queueMessage(kafkaMessage)
         }
     }
 
@@ -512,7 +464,7 @@ export class DB {
         ])
         if (this.kafkaProducer) {
             const clickhouseModel: ClickHousePersonDistinctId = { ...personDistinctId, person_id: moveToPerson.uuid }
-            await this.queueKafkaMessage({
+            await this.kafkaProducer.queueMessage({
                 topic: KAFKA_PERSON_UNIQUE_ID,
                 messages: [{ value: Buffer.from(JSON.stringify(clickhouseModel)) }],
             })

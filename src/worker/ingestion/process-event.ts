@@ -2,7 +2,6 @@ import ClickHouse from '@posthog/clickhouse'
 import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import equal from 'fast-deep-equal'
-import { Producer } from 'kafkajs'
 import { DateTime, Duration } from 'luxon'
 import * as fetch from 'node-fetch'
 import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
@@ -17,6 +16,7 @@ import {
     sanitizeEventName,
     timeoutGuard,
 } from '../../shared/ingestion/utils'
+import { KafkaProducerWrapper } from '../../shared/kafka-producer-wrapper'
 import { status } from '../../shared/status'
 import { castTimestampOrNow, UUID, UUIDT } from '../../shared/utils'
 import {
@@ -35,8 +35,8 @@ import { TeamManager } from './team-manager'
 export class EventsProcessor {
     pluginsServer: PluginsServer
     db: DB
-    clickhouse: ClickHouse
-    kafkaProducer: Producer
+    clickhouse: ClickHouse | undefined
+    kafkaProducer: KafkaProducerWrapper | undefined
     celery: Client
     posthog: ReturnType<typeof nodePostHog>
     teamManager: TeamManager
@@ -44,8 +44,8 @@ export class EventsProcessor {
     constructor(pluginsServer: PluginsServer) {
         this.pluginsServer = pluginsServer
         this.db = pluginsServer.db
-        this.clickhouse = pluginsServer.clickhouse!
-        this.kafkaProducer = pluginsServer.kafkaProducer!
+        this.clickhouse = pluginsServer.clickhouse
+        this.kafkaProducer = pluginsServer.kafkaProducer
         this.celery = new Client(pluginsServer.db, pluginsServer.CELERY_DEFAULT_QUEUE)
         this.teamManager = new TeamManager(pluginsServer.db)
         this.posthog = nodePostHog('sTMFPsFhdP1Ssg', { fetch })
@@ -436,7 +436,7 @@ export class EventsProcessor {
         }
 
         if (this.kafkaProducer) {
-            await this.db.queueKafkaMessage({
+            await this.kafkaProducer.queueMessage({
                 topic: KAFKA_EVENTS,
                 messages: [
                     {
@@ -517,7 +517,7 @@ export class EventsProcessor {
         }
 
         if (this.kafkaProducer) {
-            await this.db.queueKafkaMessage({
+            await this.kafkaProducer.queueMessage({
                 topic: KAFKA_SESSION_RECORDING_EVENTS,
                 messages: [{ key: uuid, value: Buffer.from(JSON.stringify(data)) }],
             })
