@@ -6,6 +6,7 @@ import { StatsD } from 'hot-shots'
 import Redis from 'ioredis'
 import { Kafka, logLevel, Producer } from 'kafkajs'
 import { DateTime } from 'luxon'
+import { scheduleJob } from 'node-schedule'
 import * as path from 'path'
 import { types as pgTypes } from 'pg'
 import { ConnectionOptions } from 'tls'
@@ -147,6 +148,7 @@ export async function createServer(
         kafkaProducer,
         statsd,
         mmdb: null,
+        mmdbUpdateJob: null,
         plugins: new Map(),
         pluginConfigs: new Map(),
         pluginConfigsPerTeam: new Map(),
@@ -157,6 +159,11 @@ export async function createServer(
 
     if (!serverConfig.DISABLE_MMDB) {
         server.mmdb = await prepareMmdb(server as PluginsServer)
+        server.mmdbUpdateJob = scheduleJob('0 * * * * *', async () => {
+            // Check every day at 4 AM
+            status.info('⏲', 'Performing periodic MMDB staleness check...')
+            await prepareMmdb(server as PluginsServer, true)
+        })
     }
 
     // :TODO: This is only used on worker threads, not main
@@ -164,6 +171,7 @@ export async function createServer(
 
     const closeServer = async () => {
         clearInterval(db.kafkaFlushInterval)
+        ;(server as PluginsServer).mmdbUpdateJob?.cancel()
         await db.flushKafkaMessages()
         await kafkaProducer?.disconnect()
         await redisPool.drain()

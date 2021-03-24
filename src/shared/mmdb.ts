@@ -14,9 +14,33 @@ const MMDB_ATTACHMENT_KEY = '@posthog/mmdb'
 const MMDB_STALE_AGE_DAYS = 21
 const MMDB_STATUS_REDIS_KEY = '@posthog-plugin-server/mmdb-being-fetched'
 
+/** Check if MMDB is being currently fetched by any other plugin server worker in the cluster. */
 async function isMmdbBeingFetchedSomewhere(server: PluginsServer): Promise<boolean> {
     const fetchingStatus = await server.db.redisGet(MMDB_STATUS_REDIS_KEY, 'false')
     return fetchingStatus === 'true'
+}
+
+/** Decompress a Brotli-compressed MMDB buffer and open a reader from it. */
+async function decompressAndOpenMmdb(brotliContents: Buffer, filename: string): Promise<ReaderModel> {
+    return await new Promise((resolve, reject) => {
+        brotliDecompress(brotliContents, (error, result) => {
+            if (error) {
+                reject(error)
+            } else {
+                status.info(
+                    '🪗',
+                    `Brotli-decompressed ${filename} from ${prettyBytes(brotliContents.byteLength)} into ${prettyBytes(
+                        result.byteLength
+                    )}`
+                )
+                try {
+                    resolve(Reader.openBuffer(result))
+                } catch (e) {
+                    reject(e)
+                }
+            }
+        })
+    })
 }
 
 /** Download latest MMDB database, save it, and return its reader. */
@@ -27,8 +51,8 @@ async function fetchAndInsertFreshMmdb(server: PluginsServer): Promise<ReaderMod
     const response = await fetch(MMDB_ENDPOINT, { compress: false })
     const contentType = response.headers.get('content-type')
     const filename = response.headers.get('content-disposition')!.match(/filename="(.+)"/)![1]
-    const compressedContents = await response.buffer()
-    status.info('✅', `Downloaded ${filename} of ${prettyBytes(compressedContents.byteLength)}`)
+    const brotliContents = await response.buffer()
+    status.info('✅', `Downloaded ${filename} of ${prettyBytes(brotliContents.byteLength)}`)
 
     // Insert new attachment
     const newAttachmentResults = await db.postgresQuery<PluginAttachmentDB>(
@@ -37,7 +61,7 @@ async function fetchAndInsertFreshMmdb(server: PluginsServer): Promise<ReaderMod
             key, content_type, file_name, file_size, contents, plugin_config_id, team_id
         ) VALUES ($1, $2, $3, $4, $5, NULL, NULL) RETURNING *
     `,
-        [MMDB_ATTACHMENT_KEY, contentType, filename, compressedContents.byteLength, compressedContents]
+        [MMDB_ATTACHMENT_KEY, contentType, filename, brotliContents.byteLength, brotliContents]
     )
     // Ensure that there's no old attachments lingering
     await db.postgresQuery(
@@ -47,16 +71,7 @@ async function fetchAndInsertFreshMmdb(server: PluginsServer): Promise<ReaderMod
         [MMDB_ATTACHMENT_KEY, newAttachmentResults.rows[0].id]
     )
 
-    // Decompress buffer and open a reader with it
-    return new Promise((resolve, reject) => {
-        brotliDecompress(compressedContents, (error, result) => {
-            if (error) {
-                reject(error)
-            } else {
-                resolve(Reader.openBuffer(result))
-            }
-        })
-    })
+    return await decompressAndOpenMmdb(brotliContents, filename)
 }
 
 /** Drop-in replacement for fetchAndInsertFreshMmdb that handles multiple worker concurrency better. */
@@ -80,14 +95,16 @@ async function distributableFetchAndInsertFreshMmdb(server: PluginsServer): Prom
     }
 }
 
-/** Update server MMDB in the background. */
+/** Update server MMDB in the background, with no availability interruptions. */
 async function backgroundInjectFreshMmdb(server: PluginsServer): Promise<void> {
     server.mmdb = await distributableFetchAndInsertFreshMmdb(server)
     status.info('💉', `Injected fresh ${MMDB_ATTACHMENT_KEY} into the plugin server`)
 }
 
 /** Ensure that an MMDB is available and return its reader. If needed, update the MMDB in the background. */
-export async function prepareMmdb(server: PluginsServer): Promise<ReaderModel> {
+export async function prepareMmdb(server: PluginsServer, onlyBackground?: false): Promise<ReaderModel>
+export async function prepareMmdb(server: PluginsServer, onlyBackground: true): Promise<void>
+export async function prepareMmdb(server: PluginsServer, onlyBackground = false): Promise<ReaderModel | void> {
     const { db } = server
 
     const readResults = await db.postgresQuery<PluginAttachmentDB>(
@@ -98,7 +115,7 @@ export async function prepareMmdb(server: PluginsServer): Promise<ReaderModel> {
     `,
         [MMDB_ATTACHMENT_KEY]
     )
-    if (!readResults.rowCount) {
+    if (!readResults.rowCount && !onlyBackground) {
         status.info('⬇️', `Fetching ${MMDB_ATTACHMENT_KEY} for the first time`)
         return await distributableFetchAndInsertFreshMmdb(server)
     }
@@ -124,14 +141,7 @@ export async function prepareMmdb(server: PluginsServer): Promise<ReaderModel> {
         void backgroundInjectFreshMmdb(server)
     }
 
-    // Decompress buffer and open a reader with it
-    return new Promise((resolve, reject) => {
-        brotliDecompress(mmdbRow.contents!, (error, result) => {
-            if (error) {
-                reject(error)
-            } else {
-                resolve(Reader.openBuffer(result))
-            }
-        })
-    })
+    if (!onlyBackground) {
+        return await decompressAndOpenMmdb(mmdbRow.contents, mmdbRow.file_name)
+    }
 }

@@ -6,6 +6,7 @@ import { StatsD } from 'hot-shots'
 import { Redis } from 'ioredis'
 import { Kafka, Producer } from 'kafkajs'
 import { DateTime } from 'luxon'
+import { Job } from 'node-schedule'
 import { Pool } from 'pg'
 import { VM } from 'vm2'
 
@@ -67,6 +68,7 @@ export interface PluginsServer extends PluginsServerConfig {
     kafkaProducer?: Producer
     statsd?: StatsD
     mmdb: ReaderModel | null
+    mmdbUpdateJob: Job | null
     // currently enabled plugin status
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>
