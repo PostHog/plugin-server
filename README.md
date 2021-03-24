@@ -34,8 +34,8 @@ There's a multitude of settings you can use to control the plugin server. Use th
 | BASE_DIR                      | base path for resolving local plugins                      | `'.'`                                 |
 | WORKER_CONCURRENCY            | number of concurrent worker threads                        | `0` – all cores                       |
 | TASKS_PER_WORKER              | number of parallel tasks per worker thread                 | `10`                                  |
-| REDIS_POOL_MIN_SIZE           | minimum number of Redis connections to use per thread      | 1                                     |
-| REDIS_POOL_MAX_SIZE           | maximum number of Redis connections to use per thread      | 3                                     |
+| REDIS_POOL_MIN_SIZE           | minimum number of Redis connections to use per thread      | `1`                                   |
+| REDIS_POOL_MAX_SIZE           | maximum number of Redis connections to use per thread      | `3`                                   |
 | SCHEDULE_LOCK_TTL             | how many seconds to hold the lock for the schedule         | `60`                                  |
 | CELERY_DEFAULT_QUEUE          | Celery outgoing queue                                      | `'celery'`                            |
 | PLUGINS_CELERY_QUEUE          | Celery incoming queue                                      | `'posthog-plugins'`                   |
