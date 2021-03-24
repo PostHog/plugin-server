@@ -8,9 +8,6 @@ import { makePiscina } from './worker/piscina'
 
 type Argv = {
     config: string
-    disableWeb: boolean
-    webPort: number
-    webHostname: string
     concurrency: number
 }
 

@@ -1,6 +1,5 @@
 import Piscina from '@posthog/piscina'
 import * as Sentry from '@sentry/node'
-import { FastifyInstance } from 'fastify'
 import Redis from 'ioredis'
 import * as schedule from 'node-schedule'
 
@@ -11,7 +10,6 @@ import { createRedis, delay } from '../shared/utils'
 import { PluginsServer, PluginsServerConfig, Queue, ScheduleControl } from '../types'
 import { startQueue } from './queue'
 import { startSchedule } from './services/schedule'
-import { startFastifyInstance, stopFastifyInstance } from './web/server'
 
 const { version } = require('../../package.json')
 
@@ -37,7 +35,6 @@ export async function startPluginsServer(
 
     let pubSub: Redis.Redis | undefined
     let server: PluginsServer | undefined
-    let fastifyInstance: FastifyInstance | undefined
     let pingJob: schedule.Job | undefined
     let statsJob: schedule.Job | undefined
     let piscina: Piscina | undefined
@@ -59,9 +56,6 @@ export async function startPluginsServer(
             process.exit()
         }
         status.info('💤', ' Shutting down gracefully...')
-        if (fastifyInstance && !serverConfig?.DISABLE_WEB) {
-            await stopFastifyInstance(fastifyInstance!)
-        }
         await queue?.stop()
         await pubSub?.quit()
         pingJob && schedule.cancelJob(pingJob)
@@ -84,9 +78,6 @@ export async function startPluginsServer(
         ;[server, closeServer] = await createServer(serverConfig, null)
 
         piscina = makePiscina(serverConfig)
-        if (!server.DISABLE_WEB) {
-            fastifyInstance = await startFastifyInstance(server)
-        }
 
         scheduleControl = await startSchedule(server, piscina)
         queue = await startQueue(server, piscina)

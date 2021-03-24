@@ -3,27 +3,27 @@ import { getDefaultConfig, overrideWithEnv } from '../src/shared/config'
 test('overrideWithEnv 1', () => {
     const defaultConfig = getDefaultConfig()
     const env = {
-        DISABLE_WEB: 'false',
-        WEB_PORT: '3008',
-        WEB_HOSTNAME: '0.0.0.0',
+        CLICKHOUSE_SECURE: 'false',
+        TASK_TIMEOUT: '177',
+        KAFKA_HOSTS: 'example.com',
         BASE_DIR: undefined,
     }
     const config = overrideWithEnv(getDefaultConfig(), env)
 
-    expect(config.DISABLE_WEB).toEqual(false)
-    expect(config.WEB_PORT).toEqual(3008)
-    expect(config.WEB_HOSTNAME).toEqual('0.0.0.0')
-    expect(config.BASE_DIR).toEqual(defaultConfig.BASE_DIR)
+    expect(config.CLICKHOUSE_SECURE).toStrictEqual(false)
+    expect(config.TASK_TIMEOUT).toStrictEqual(177)
+    expect(config.KAFKA_HOSTS).toStrictEqual('example.com')
+    expect(config.BASE_DIR).toStrictEqual(defaultConfig.BASE_DIR)
 })
 
 test('overrideWithEnv 2', () => {
     const defaultConfig = getDefaultConfig()
     const env = {
-        DISABLE_WEB: '1',
-        WEB_PORT: '3008.12',
+        CLICKHOUSE_SECURE: '1',
+        TASK_TIMEOUT: '4.5',
     }
     const config = overrideWithEnv(getDefaultConfig(), env)
 
-    expect(config.DISABLE_WEB).toEqual(true)
-    expect(config.WEB_PORT).toEqual(3008.12)
+    expect(config.CLICKHOUSE_SECURE).toStrictEqual(true)
+    expect(config.TASK_TIMEOUT).toStrictEqual(4.5)
 })

@@ -52,9 +52,6 @@ There's a multitude of settings you can use to control the plugin server. Use th
 | KAFKA_TRUSTED_CERT_B64        | Kafka trusted CA in Base64                                 | `null`                                |
 | KAFKA_PRODUCER_MAX_QUEUE_SIZE | Kafka producer queue max size before flushing              | `20`                                  |
 | KAFKA_FLUSH_FREQUENCY_MS      | Kafka producer queue max duration before flushing          | `500`                                 |
-| DISABLE_WEB                   | whether to disable web server                              | `true`                                |
-| WEB_PORT                      | port for web server to listen on                           | `3008`                                |
-| WEB_HOSTNAME                  | hostname for web server to listen on                       | `'0.0.0.0'`                           |
 | LOG_LEVEL                     | minimum log level                                          | `LogLevel.Info`                       |
 | SENTRY_DSN                    | Sentry ingestion URL                                       | `null`                                |
 | STATSD_HOST                   | StatsD host - integration disabled if this is not provided | `null`                                |
