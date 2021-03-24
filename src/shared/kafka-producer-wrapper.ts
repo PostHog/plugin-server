@@ -5,6 +5,16 @@ import { PluginsServerConfig } from '../types'
 import { timeoutGuard } from './ingestion/utils'
 import { instrumentQuery } from './metrics'
 
+/** This class wraps kafkajs producer, adding batching to optimize performance.
+ *
+ * As messages get queued, we flush the queue in the following cases.
+ *
+ * 1. Message size + current batch exceeds max batch message size
+ * 2. Too much time passed
+ * 3. Too many messages queued.
+ *
+ * We also flush the queue regularly to avoid dropping any messages as the program quits.
+ */
 export class KafkaProducerWrapper {
     /** Kafka producer used for syncing Postgres and ClickHouse person data. */
     producer: Producer
@@ -40,6 +50,7 @@ export class KafkaProducerWrapper {
         const messageSize = this.getMessageSize(kafkaMessage)
 
         if (this.currentBatchSize + messageSize > this.maxBatchSize) {
+            // :TRICKY: We want to first flush then immediately add the message to the queue. Awaiting and then pushing would result in a race condition.
             await this.flush(kafkaMessage)
         } else {
             this.currentBatch.push(kafkaMessage)
