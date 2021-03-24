@@ -149,8 +149,8 @@ export interface PluginError {
 
 export interface PluginAttachmentDB {
     id: number
-    team_id: TeamId
-    plugin_config_id: PluginConfigId
+    team_id: TeamId | null
+    plugin_config_id: PluginConfigId | null
     key: string
     content_type: string
     file_size: number | null
