@@ -62,7 +62,7 @@ export async function createPluginConfigVM(
             config: pluginConfig.config,
             attachments: pluginConfig.attachments,
             storage: createStorage(server, pluginConfig),
-            geoip: createGeoIp(server.mmdb),
+            geoip: createGeoIp(server),
         },
         '__pluginHostMeta'
     )

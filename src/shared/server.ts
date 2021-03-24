@@ -12,9 +12,9 @@ import { ConnectionOptions } from 'tls'
 
 import { PluginsServer, PluginsServerConfig } from '../types'
 import { EventsProcessor } from '../worker/ingestion/process-event'
-import { prepareMmdb } from '../worker/vm/extensions/geoip'
 import { defaultConfig } from './config'
 import { DB } from './db'
+import { prepareMmdb } from './mmdb'
 import { status } from './status'
 import { createPostgresPool, createRedis, UUIDT } from './utils'
 
@@ -146,13 +146,17 @@ export async function createServer(
         kafka,
         kafkaProducer,
         statsd,
-        mmdb: !serverConfig.DISABLE_MMDB ? await prepareMmdb(db) : null,
+        mmdb: null,
         plugins: new Map(),
         pluginConfigs: new Map(),
         pluginConfigsPerTeam: new Map(),
 
         pluginSchedule: null,
         pluginSchedulePromises: { runEveryMinute: {}, runEveryHour: {}, runEveryDay: {} },
+    }
+
+    if (!serverConfig.DISABLE_MMDB) {
+        server.mmdb = await prepareMmdb(server as PluginsServer)
     }
 
     // :TODO: This is only used on worker threads, not main
