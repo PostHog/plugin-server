@@ -57,6 +57,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     REDIS_POOL_MIN_SIZE: number
     REDIS_POOL_MAX_SIZE: number
     DISABLE_MMDB: boolean
+    DISTINCT_ID_LRU_SIZE: number
 }
 export interface PluginsServer extends PluginsServerConfig {
     // active connections to Postgres, Redis, ClickHouse, Kafka, StatsD

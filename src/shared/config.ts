@@ -46,6 +46,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         REDIS_POOL_MIN_SIZE: 1,
         REDIS_POOL_MAX_SIZE: 3,
         DISABLE_MMDB: isTestEnv,
+        DISTINCT_ID_LRU_SIZE: 10000,
     }
 }
 
