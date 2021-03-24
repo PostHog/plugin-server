@@ -18,7 +18,7 @@ export class PersonManager {
 
     async isNewPerson(db: DB, teamId: number, distinctId: string): Promise<boolean> {
         const key = `${teamId}::${distinctId}`
-        if (this.personSeen.has(key)) {
+        if (this.personSeen.get(key)) {
             return false
         }
 
