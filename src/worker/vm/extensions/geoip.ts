@@ -60,12 +60,15 @@ export async function prepareMmdb(server: PluginsServer): Promise<ReaderModel> {
         return await fetchAndInsertFreshMmdb(server)
     }
     const [mmdbRow] = readResults.rows
-    if (!mmdbRow.contents) {throw new Error(`${MMDB_ATTACHMENT_KEY} attachment ID ${mmdbRow.id} has no file contents!`)}
+    if (!mmdbRow.contents) {
+        throw new Error(`${MMDB_ATTACHMENT_KEY} attachment ID ${mmdbRow.id} has no file contents!`)
+    }
     const mmdbDateStringMatch = mmdbRow.file_name.match(/\d{4}-\d{2}-\d{2}/)
-    if (!mmdbDateStringMatch)
-        {throw new Error(
+    if (!mmdbDateStringMatch) {
+        throw new Error(
             `${MMDB_ATTACHMENT_KEY} attachment ID ${mmdbRow.id} has an invalid filename! ${MMDB_ATTACHMENT_KEY} filename must include an ISO date`
-        )}
+        )
+    }
     const mmdbAge = DateTime.fromISO(mmdbDateStringMatch[0]).diffNow().days
     status.info('ℹ️', `Fetched MMDB is ${mmdbAge} days old`)
     if (mmdbAge > 21) {
