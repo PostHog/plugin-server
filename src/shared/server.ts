@@ -160,7 +160,7 @@ export async function createServer(
     if (!serverConfig.DISABLE_MMDB) {
         server.mmdb = await prepareMmdb(server as PluginsServer)
         server.mmdbUpdateJob = scheduleJob(
-            '* 4 * * *',
+            '0 4 * * *',
             async () => await performMmdbStalenessCheck(server as PluginsServer)
         )
     }
