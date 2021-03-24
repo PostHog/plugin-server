@@ -118,7 +118,11 @@ test('plugin meta has what it should have', async () => {
         'attachments',
         'cache',
         'config',
+        'console',
+        'fetch',
         'global',
+        'google',
+        'posthog',
         'storage',
     ])
     expect(returnedEvent!.properties!['attachments']).toEqual({

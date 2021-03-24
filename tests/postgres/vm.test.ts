@@ -600,7 +600,7 @@ test('fetch', async () => {
     }
 
     await vm.methods.processEvent(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', undefined)
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
