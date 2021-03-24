@@ -15,7 +15,7 @@ import { PluginsServer, PluginsServerConfig } from '../types'
 import { EventsProcessor } from '../worker/ingestion/process-event'
 import { defaultConfig } from './config'
 import { DB } from './db'
-import { prepareMmdb } from './mmdb'
+import { performMmdbStalenessCheck, prepareMmdb } from './mmdb'
 import { status } from './status'
 import { createPostgresPool, createRedis, UUIDT } from './utils'
 
@@ -159,11 +159,10 @@ export async function createServer(
 
     if (!serverConfig.DISABLE_MMDB) {
         server.mmdb = await prepareMmdb(server as PluginsServer)
-        server.mmdbUpdateJob = scheduleJob('0 * * * * *', async () => {
-            // Check every day at 4 AM
-            status.info('⏲', 'Performing periodic MMDB staleness check...')
-            await prepareMmdb(server as PluginsServer, true)
-        })
+        server.mmdbUpdateJob = scheduleJob(
+            '* 4 * * *',
+            async () => await performMmdbStalenessCheck(server as PluginsServer)
+        )
     }
 
     // :TODO: This is only used on worker threads, not main
@@ -171,7 +170,7 @@ export async function createServer(
 
     const closeServer = async () => {
         clearInterval(db.kafkaFlushInterval)
-        ;(server as PluginsServer).mmdbUpdateJob?.cancel()
+        server.mmdbUpdateJob?.cancel()
         await db.flushKafkaMessages()
         await kafkaProducer?.disconnect()
         await redisPool.drain()

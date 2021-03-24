@@ -103,8 +103,8 @@ async function backgroundInjectFreshMmdb(server: PluginsServer): Promise<void> {
 
 /** Ensure that an MMDB is available and return its reader. If needed, update the MMDB in the background. */
 export async function prepareMmdb(server: PluginsServer, onlyBackground?: false): Promise<ReaderModel>
-export async function prepareMmdb(server: PluginsServer, onlyBackground: true): Promise<void>
-export async function prepareMmdb(server: PluginsServer, onlyBackground = false): Promise<ReaderModel | void> {
+export async function prepareMmdb(server: PluginsServer, onlyBackground: true): Promise<boolean>
+export async function prepareMmdb(server: PluginsServer, onlyBackground = false): Promise<ReaderModel | boolean> {
     const { db } = server
 
     const readResults = await db.postgresQuery<PluginAttachmentDB>(
@@ -115,9 +115,14 @@ export async function prepareMmdb(server: PluginsServer, onlyBackground = false)
     `,
         [MMDB_ATTACHMENT_KEY]
     )
-    if (!readResults.rowCount && !onlyBackground) {
+    if (!readResults.rowCount) {
         status.info('⬇️', `Fetching ${MMDB_ATTACHMENT_KEY} for the first time`)
-        return await distributableFetchAndInsertFreshMmdb(server)
+        if (onlyBackground) {
+            await backgroundInjectFreshMmdb(server)
+            return true
+        } else {
+            return await distributableFetchAndInsertFreshMmdb(server)
+        }
     }
     const [mmdbRow] = readResults.rows
     if (!mmdbRow.contents) {
@@ -138,10 +143,29 @@ export async function prepareMmdb(server: PluginsServer, onlyBackground = false)
                 mmdbAge === 1 ? 'day' : 'days'
             } old, which is more than the staleness threshold of ${MMDB_STALE_AGE_DAYS} days, refreshing in the background...`
         )
-        void backgroundInjectFreshMmdb(server)
+        if (onlyBackground) {
+            await backgroundInjectFreshMmdb(server)
+            return true
+        } else {
+            void backgroundInjectFreshMmdb(server)
+        }
     }
 
-    if (!onlyBackground) {
+    if (onlyBackground) {
+        return false
+    } else {
         return await decompressAndOpenMmdb(mmdbRow.contents, mmdbRow.file_name)
+    }
+}
+
+/** Check for MMDB staleness every day at 4 AM, if needed perform a no-interruption update. */
+export async function performMmdbStalenessCheck(server: PluginsServer): Promise<void> {
+    // Check every day at 4 AM
+    status.info('⏲', 'Performing periodic MMDB staleness check...')
+    const wasUpdatePerformed = await prepareMmdb(server, true)
+    if (wasUpdatePerformed) {
+        status.info('✅', 'MMDB staleness check completed, update performed')
+    } else {
+        status.info('❎', 'MMDB staleness check completed, no update was needed')
     }
 }
