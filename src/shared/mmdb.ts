@@ -11,13 +11,18 @@ import { delay } from './utils'
 
 const MMDB_ENDPOINT = 'https://mmdb.posthog.net/'
 const MMDB_ATTACHMENT_KEY = '@posthog/mmdb'
-const MMDB_STALE_AGE_DAYS = 21
-const MMDB_STATUS_REDIS_KEY = '@posthog-plugin-server/mmdb-being-fetched'
+const MMDB_STALE_AGE_DAYS = 14
+const MMDB_STATUS_REDIS_KEY = '@posthog-plugin-server/mmdb-status'
+
+enum MmdbStatus {
+    Idle = 'idle',
+    Fetching = 'fetching',
+    Unavailable = 'unavailable',
+}
 
 /** Check if MMDB is being currently fetched by any other plugin server worker in the cluster. */
-async function isMmdbBeingFetchedSomewhere(server: PluginsServer): Promise<boolean> {
-    const fetchingStatus = await server.db.redisGet(MMDB_STATUS_REDIS_KEY, 'false')
-    return fetchingStatus === 'true'
+async function getMmdbStatus(server: PluginsServer): Promise<MmdbStatus> {
+    return (await server.db.redisGet(MMDB_STATUS_REDIS_KEY, MmdbStatus.Idle)) as MmdbStatus
 }
 
 /** Decompress a Brotli-compressed MMDB buffer and open a reader from it. */
@@ -29,7 +34,7 @@ async function decompressAndOpenMmdb(brotliContents: Buffer, filename: string): 
             } else {
                 status.info(
                     '🪗',
-                    `Brotli-decompressed ${filename} from ${prettyBytes(brotliContents.byteLength)} into ${prettyBytes(
+                    `Decompressed ${filename} from ${prettyBytes(brotliContents.byteLength)} into ${prettyBytes(
                         result.byteLength
                     )}`
                 )
@@ -70,41 +75,60 @@ async function fetchAndInsertFreshMmdb(server: PluginsServer): Promise<ReaderMod
     `,
         [MMDB_ATTACHMENT_KEY, newAttachmentResults.rows[0].id]
     )
+    status.info('💾', `Saved ${filename} into the database`)
 
     return await decompressAndOpenMmdb(brotliContents, filename)
 }
 
 /** Drop-in replacement for fetchAndInsertFreshMmdb that handles multiple worker concurrency better. */
-async function distributableFetchAndInsertFreshMmdb(server: PluginsServer): Promise<ReaderModel> {
-    let fetchingStatus = await isMmdbBeingFetchedSomewhere(server)
-    if (fetchingStatus) {
-        while (fetchingStatus) {
+async function distributableFetchAndInsertFreshMmdb(server: PluginsServer): Promise<ReaderModel | null> {
+    let fetchingStatus = await getMmdbStatus(server)
+    if (fetchingStatus === MmdbStatus.Unavailable) {
+        status.info(
+            '☹️',
+            'MMDB fetch and insert for GeoIP capabilities is currently unavailable in this PostHog instance - IP location data may be stale or unavailable'
+        )
+        return null
+    }
+    if (fetchingStatus === MmdbStatus.Fetching) {
+        while (fetchingStatus === MmdbStatus.Fetching) {
             // Retrying shortly, when perhaps the MMDB has been fetched somewhere else and the attachment is up to date
             // Only one plugin server thread out of instances*(workers+1) needs to download the file this way
-            await delay(100)
-            fetchingStatus = await isMmdbBeingFetchedSomewhere(server)
+            await delay(200)
+            fetchingStatus = await getMmdbStatus(server)
         }
         return prepareMmdb(server)
     }
     // Allow 120 seconds of download until another worker retries
-    await server.db.redisSet(MMDB_STATUS_REDIS_KEY, 'true', 120)
+    await server.db.redisSet(MMDB_STATUS_REDIS_KEY, MmdbStatus.Fetching, 120)
     try {
-        return await fetchAndInsertFreshMmdb(server)
-    } finally {
-        await server.db.redisSet(MMDB_STATUS_REDIS_KEY, 'false')
+        const mmdb = await fetchAndInsertFreshMmdb(server)
+        await server.db.redisSet(MMDB_STATUS_REDIS_KEY, MmdbStatus.Idle)
+        return mmdb
+    } catch (e) {
+        // In case of an error mark the MMDB feature unavailable for an hour
+        await server.db.redisSet(MMDB_STATUS_REDIS_KEY, MmdbStatus.Unavailable, 120)
+        status.error('❌', 'An error occurred during MMDB fetch and insert:', e)
+        return null
     }
 }
 
 /** Update server MMDB in the background, with no availability interruptions. */
 async function backgroundInjectFreshMmdb(server: PluginsServer): Promise<void> {
-    server.mmdb = await distributableFetchAndInsertFreshMmdb(server)
-    status.info('💉', `Injected fresh ${MMDB_ATTACHMENT_KEY} into the plugin server`)
+    const mmdb = await distributableFetchAndInsertFreshMmdb(server)
+    if (mmdb) {
+        server.mmdb = mmdb
+        status.info('💉', `Injected fresh ${MMDB_ATTACHMENT_KEY} into the plugin server`)
+    }
 }
 
 /** Ensure that an MMDB is available and return its reader. If needed, update the MMDB in the background. */
-export async function prepareMmdb(server: PluginsServer, onlyBackground?: false): Promise<ReaderModel>
+export async function prepareMmdb(server: PluginsServer, onlyBackground?: false): Promise<ReaderModel | null>
 export async function prepareMmdb(server: PluginsServer, onlyBackground: true): Promise<boolean>
-export async function prepareMmdb(server: PluginsServer, onlyBackground = false): Promise<ReaderModel | boolean> {
+export async function prepareMmdb(
+    server: PluginsServer,
+    onlyBackground = false
+): Promise<ReaderModel | null | boolean> {
     const { db } = server
 
     const readResults = await db.postgresQuery<PluginAttachmentDB>(
@@ -121,7 +145,11 @@ export async function prepareMmdb(server: PluginsServer, onlyBackground = false)
             await backgroundInjectFreshMmdb(server)
             return true
         } else {
-            return await distributableFetchAndInsertFreshMmdb(server)
+            const mmdb = await distributableFetchAndInsertFreshMmdb(server)
+            if (!mmdb) {
+                status.warn('🤒', 'Because of MMDB unavailability, GeoIP plugins will fail in this PostHog instance')
+            }
+            return mmdb
         }
     }
     const [mmdbRow] = readResults.rows
@@ -158,9 +186,8 @@ export async function prepareMmdb(server: PluginsServer, onlyBackground = false)
     }
 }
 
-/** Check for MMDB staleness every day at 4 AM, if needed perform a no-interruption update. */
+/** Check for MMDB staleness every 4 hours, if needed perform a no-interruption update. */
 export async function performMmdbStalenessCheck(server: PluginsServer): Promise<void> {
-    // Check every day at 4 AM
     status.info('⏲', 'Performing periodic MMDB staleness check...')
     const wasUpdatePerformed = await prepareMmdb(server, true)
     if (wasUpdatePerformed) {
