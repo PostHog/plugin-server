@@ -149,4 +149,37 @@ describe('transformCode', () => {
             }));
         `)
     })
+
+    it('replaces imports', () => {
+        const rawCode = code`
+            import { bla, bla2, bla3 as bla4 } from 'node-fetch'
+            import fetch1 from 'node-fetch'
+            import * as fetch2 from 'node-fetch'
+            console.log(bla, bla2, bla4, fetch1, fetch2);
+        `
+
+        const transformedCode = transformCode(rawCode, server, { 'node-fetch': { bla: () => true } })
+
+        expect(transformedCode).toStrictEqual(code`
+            "use strict";
+
+            const bla = __pluginHostImports["node-fetch"]["bla"],
+                  bla2 = __pluginHostImports["node-fetch"]["bla2"],
+                  bla4 = __pluginHostImports["node-fetch"]["bla3"];
+            const fetch1 = __pluginHostImports["node-fetch"]["default"];
+            const fetch2 = __pluginHostImports["node-fetch"]["default"];
+            console.log(bla, bla2, bla4, fetch1, fetch2);
+        `)
+    })
+
+    it('only replaces whitelisted imports', () => {
+        const rawCode = code`
+            import { kea } from 'kea'
+            console.log(kea)
+        `
+
+        expect(() => {
+            transformCode(rawCode, server, { 'node-fetch': { default: () => true } })
+        }).toThrow('/index.ts: Can not import from "kea". It\'s not in the whitelisted packages.')
+    })
 })
