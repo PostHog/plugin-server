@@ -15,6 +15,7 @@ import { PluginsServer, PluginsServerConfig } from '../types'
 import { EventsProcessor } from '../worker/ingestion/process-event'
 import { defaultConfig } from './config'
 import { DB } from './db'
+import { KafkaProducerWrapper } from './kafka-producer-wrapper'
 import { performMmdbStalenessCheck, prepareMmdb } from './mmdb'
 import { status } from './status'
 import { createPostgresPool, createRedis, UUIDT } from './utils'
@@ -28,6 +29,29 @@ export async function createServer(
     const serverConfig: PluginsServerConfig = {
         ...defaultConfig,
         ...config,
+    }
+
+    let statsd: StatsD | undefined
+    if (serverConfig.STATSD_HOST) {
+        statsd = new StatsD({
+            port: serverConfig.STATSD_PORT,
+            host: serverConfig.STATSD_HOST,
+            prefix: serverConfig.STATSD_PREFIX,
+            telegraf: true,
+            errorHandler: (error) => {
+                status.warn('⚠️', 'StatsD error', error)
+                Sentry.captureException(error, {
+                    extra: { threadId },
+                })
+            },
+        })
+        // don't repeat the same info in each thread
+        if (threadId === null) {
+            status.info(
+                '🪵',
+                `Sending metrics to StatsD at ${serverConfig.STATSD_HOST}:${serverConfig.STATSD_PORT}, prefix: "${serverConfig.STATSD_PREFIX}"`
+            )
+        }
     }
 
     let kafkaSsl: ConnectionOptions | undefined
@@ -51,7 +75,7 @@ export async function createServer(
 
     let clickhouse: ClickHouse | undefined
     let kafka: Kafka | undefined
-    let kafkaProducer: Producer | undefined
+    let kafkaProducer: KafkaProducerWrapper | undefined
     if (serverConfig.KAFKA_ENABLED) {
         if (!serverConfig.KAFKA_HOSTS) {
             throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
@@ -80,8 +104,10 @@ export async function createServer(
             logLevel: logLevel.WARN,
             ssl: kafkaSsl,
         })
-        kafkaProducer = kafka.producer()
-        await kafkaProducer?.connect()
+        const producer = kafka.producer()
+        await producer?.connect()
+
+        kafkaProducer = new KafkaProducerWrapper(producer, statsd, serverConfig)
     }
 
     // `node-postgres` will return dates as plain JS Date objects, which will use the local timezone.
@@ -113,30 +139,7 @@ export async function createServer(
         }
     )
 
-    let statsd: StatsD | undefined
-    if (serverConfig.STATSD_HOST) {
-        statsd = new StatsD({
-            port: serverConfig.STATSD_PORT,
-            host: serverConfig.STATSD_HOST,
-            prefix: serverConfig.STATSD_PREFIX,
-            telegraf: true,
-            errorHandler: (error) => {
-                status.warn('⚠️', 'StatsD error', error)
-                Sentry.captureException(error, {
-                    extra: { threadId },
-                })
-            },
-        })
-        // don't repeat the same info in each thread
-        if (threadId === null) {
-            status.info(
-                '🪵',
-                `Sending metrics to StatsD at ${serverConfig.STATSD_HOST}:${serverConfig.STATSD_PORT}, prefix: "${serverConfig.STATSD_PREFIX}"`
-            )
-        }
-    }
-
-    const db = new DB(postgres, redisPool, kafkaProducer, clickhouse, statsd, serverConfig)
+    const db = new DB(postgres, redisPool, kafkaProducer, clickhouse, statsd)
 
     const server: Omit<PluginsServer, 'eventsProcessor'> = {
         ...serverConfig,
@@ -169,10 +172,12 @@ export async function createServer(
     server.eventsProcessor = new EventsProcessor(server as PluginsServer)
 
     const closeServer = async () => {
-        clearInterval(db.kafkaFlushInterval)
         server.mmdbUpdateJob?.cancel()
-        await db.flushKafkaMessages()
-        await kafkaProducer?.disconnect()
+        if (kafkaProducer) {
+            clearInterval(kafkaProducer.flushInterval)
+            await kafkaProducer.flush()
+            await kafkaProducer.producer.disconnect()
+        }
         await redisPool.drain()
         await redisPool.clear()
         await server.postgres.end()
