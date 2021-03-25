@@ -172,7 +172,7 @@ describe('transformCode', () => {
         `)
     })
 
-    it('only replaces whitelisted imports', () => {
+    it('only replaces provided imports', () => {
         const rawCode = code`
             import { kea } from 'kea'
             console.log(kea)
@@ -180,6 +180,6 @@ describe('transformCode', () => {
 
         expect(() => {
             transformCode(rawCode, server, { 'node-fetch': { default: () => true } })
-        }).toThrow('/index.ts: Can not import from "kea". It\'s not in the whitelisted packages.')
+        }).toThrow("/index.ts: Cannot import 'kea'! This package is not provided by PostHog in plugins.")
     })
 })

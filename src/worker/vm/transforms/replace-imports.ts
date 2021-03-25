@@ -12,7 +12,9 @@ export const replaceImports: PluginGen = (server: PluginsServer, imports: Record
                 const importedVars = new Map<string, string>()
 
                 if (typeof imports[importSource] === 'undefined') {
-                    throw new Error(`Can not import from "${importSource}". It's not in the whitelisted packages.`)
+                    throw new Error(
+                        `Cannot import '${importSource}'! This package is not provided by PostHog in plugins.`
+                    )
                 }
 
                 for (const specifier of node.specifiers) {
