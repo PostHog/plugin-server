@@ -627,6 +627,27 @@ test('fetch via import', async () => {
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
 
+test('fetch via require', async () => {
+    const indexJs = `
+        async function processEvent (event, meta) {
+            const response = await require('node-fetch')('https://google.com/results.json?query=' + event.event)
+            event.properties = await response.json()
+            return event
+        }
+    `
+    await resetTestDatabase(indexJs)
+    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'fetched',
+    }
+
+    await vm.methods.processEvent(event)
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
+
+    expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
+})
+
 test('attachments', async () => {
     const indexJs = `
         async function processEvent (event, meta) {

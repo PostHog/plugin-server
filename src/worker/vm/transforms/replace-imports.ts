@@ -35,21 +35,31 @@ export const replaceImports: PluginGen = (server: PluginsServer, imports: Record
                     t.variableDeclaration(
                         'const',
                         Array.from(importedVars.entries()).map(([varName, sourceName]) => {
+                            const importExpression = t.memberExpression(
+                                t.identifier('__pluginHostImports'),
+                                t.stringLiteral(importSource),
+                                true
+                            )
                             return t.variableDeclarator(
                                 t.identifier(varName),
-                                t.memberExpression(
-                                    t.memberExpression(
-                                        t.identifier('__pluginHostImports'),
-                                        t.stringLiteral(importSource),
-                                        true
-                                    ),
-                                    t.stringLiteral(sourceName),
-                                    true
-                                )
+                                sourceName === 'default'
+                                    ? importExpression
+                                    : t.memberExpression(importExpression, t.stringLiteral(sourceName), true)
                             )
                         })
                     )
                 )
+            },
+        },
+        CallExpression: {
+            exit(path: any) {
+                const { node } = path
+                if (t.isIdentifier(node.callee) && node.callee.name === 'require' && node.arguments.length === 1) {
+                    const importPath = node.arguments[0].value
+                    path.replaceWith(
+                        t.memberExpression(t.identifier('__pluginHostImports'), t.stringLiteral(importPath), true)
+                    )
+                }
             },
         },
     },

@@ -17,7 +17,7 @@ export async function createPluginConfigVM(
     indexJs: string
 ): Promise<PluginConfigVMReponse> {
     const imports = {
-        'node-fetch': { default: fetch },
+        'node-fetch': fetch,
         '@google-cloud/bigquery': { BigQuery },
     }
     const transformedCode = transformCode(indexJs, server, imports)
