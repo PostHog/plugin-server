@@ -66,7 +66,7 @@ async function fetchAndInsertFreshMmdb(server: PluginsServer): Promise<ReaderMod
             key, content_type, file_name, file_size, contents, plugin_config_id, team_id
         ) VALUES ($1, $2, $3, $4, $5, NULL, NULL) RETURNING *
     `,
-        [MMDB_ATTACHMENT_KEY, contentType, filename, brotliContents.byteLength, brotliContents]
+        [MMDB_ATTACHMENT_KEY, contentType, filename + '.br', brotliContents.byteLength, brotliContents]
     )
     // Ensure that there's no old attachments lingering
     await db.postgresQuery(

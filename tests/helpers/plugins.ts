@@ -103,9 +103,9 @@ export const mockPluginWithArchive = (indexJs: string, pluginJson?: string): Plu
 export const makePluginObjects = (
     indexJs = ''
 ): {
-    pluginRows: Plugin[]
-    pluginConfigRows: PluginConfig[]
-    pluginAttachmentRows: PluginAttachmentDB[]
+    pluginRows: Omit<Plugin, 'id'>[]
+    pluginConfigRows: Omit<PluginConfig, 'id'>[]
+    pluginAttachmentRows: Omit<PluginAttachmentDB, 'id'>[]
 } => ({
     pluginRows: [mockPluginWithArchive(indexJs)],
     pluginConfigRows: [pluginConfig39],
