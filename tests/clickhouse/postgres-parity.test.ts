@@ -97,6 +97,29 @@ describe('postgres parity', () => {
         expect(postgresDistinctIds).toEqual(['distinct1', 'distinct2'])
 
         expect(person).toEqual(postgresPersons[0])
+
+        // insert same person, no properties. Should not actually insert
+        const second_person = await server.db.createPerson(DateTime.utc(), {}, team.id, null, true, uuid, [
+            'distinct1',
+            'distinct2',
+        ])
+        await delayUntilEventIngested(() => server.db.fetchPersons(Database.ClickHouse))
+        await delayUntilEventIngested(() => server.db.fetchDistinctIdValues(person, Database.ClickHouse), 2)
+
+        const secondClickHousePersons = await server.db.fetchPersons(Database.ClickHouse)
+        expect(clickHousePersons).toEqual([
+            {
+                id: uuid,
+                created_at: expect.any(String), // '2021-02-04 00:18:26.472',
+                team_id: team.id,
+                properties: '{"userProp":"propValue"}',
+                is_identified: 1,
+                _timestamp: expect.any(String),
+                _offset: expect.any(Number),
+            },
+        ])
+        const secondClickHouseDistinctIds = await server.db.fetchDistinctIdValues(person, Database.ClickHouse)
+        expect(clickHouseDistinctIds).toEqual(['distinct1', 'distinct2'])
     })
 
     test('updatePerson', async () => {
