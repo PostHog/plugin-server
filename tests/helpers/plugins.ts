@@ -49,7 +49,7 @@ export const plugin60: Plugin = {
 }
 
 export const pluginAttachment1: PluginAttachmentDB = {
-    id: 1,
+    id: 42666,
     key: 'maxmindMmdb',
     content_type: 'application/octet-stream',
     file_name: 'test.txt',
