@@ -55,9 +55,16 @@ export const replaceImports: PluginGen = (server: PluginsServer, imports: Record
             exit(path: any) {
                 const { node } = path
                 if (t.isIdentifier(node.callee) && node.callee.name === 'require' && node.arguments.length === 1) {
-                    const importPath = node.arguments[0].value
+                    const importSource = node.arguments[0].value
+
+                    if (typeof imports[importSource] === 'undefined') {
+                        throw new Error(
+                            `Cannot import '${importSource}'! This package is not provided by PostHog in plugins.`
+                        )
+                    }
+
                     path.replaceWith(
-                        t.memberExpression(t.identifier('__pluginHostImports'), t.stringLiteral(importPath), true)
+                        t.memberExpression(t.identifier('__pluginHostImports'), t.stringLiteral(importSource), true)
                     )
                 }
             },

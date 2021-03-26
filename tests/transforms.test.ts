@@ -182,4 +182,35 @@ describe('transformCode', () => {
             transformCode(rawCode, server, { 'node-fetch': { default: () => true } })
         }).toThrow("/index.ts: Cannot import 'kea'! This package is not provided by PostHog in plugins.")
     })
+
+    it('replaces requires', () => {
+        const rawCode = code`
+            const fetch = require('node-fetch')
+            const { BigQuery } = require('@google-cloud/bigquery')
+            console.log(fetch, BigQuery);
+        `
+
+        const transformedCode = transformCode(rawCode, server, { 'node-fetch': { bla: () => true } })
+
+        expect(transformedCode).toStrictEqual(code`
+            "use strict";
+
+            const fetch = __pluginHostImports["node-fetch"];
+            const {
+              BigQuery
+            } = __pluginHostImports["@google-cloud/bigquery"];
+            console.log(fetch, BigQuery);
+        `)
+    })
+
+    it('only replaces provided requires', () => {
+        const rawCode = code`
+            const { kea } = require('kea')
+            console.log(kea)
+        `
+
+        expect(() => {
+            transformCode(rawCode, server, { 'node-fetch': { default: () => true } })
+        }).toThrow("/index.ts: Cannot import 'kea'! This package is not provided by PostHog in plugins.")
+    })
 })
