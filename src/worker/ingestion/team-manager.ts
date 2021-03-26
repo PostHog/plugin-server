@@ -44,14 +44,19 @@ export class TeamManager {
     }
 
     public async shouldSendWebhooks(teamId: number): Promise<boolean> {
-        const cachedValue = this.getByAge(this.shouldSendWebhooksCache, teamId)
+        const cachedValue = this.getByAge(this.shouldSendWebhooksCache, teamId, 10_000)
         if (cachedValue !== undefined) {
             return cachedValue
         }
 
         const team = await this.fetchTeam(teamId)
-        if (!team || !team.slack_incoming_webhook) {
+        if (!team) {
+            this.shouldSendWebhooksCache.set(teamId, [false, Date.now()])
             return false
+        }
+        if (!!team.slack_incoming_webhook) {
+            this.shouldSendWebhooksCache.set(teamId, [true, Date.now()])
+            return true
         }
 
         const timeout = timeoutGuard(`Still running "shouldSendWebhooks". Timeout warning after 30 sec!`)
@@ -66,10 +71,11 @@ export class TeamManager {
             return hasHooks
         } catch (error) {
             // In FOSS PostHog ee_hook does not exist. If the error is other than that, rethrow it
-            if (!String(error).includes('relation "ee_hook" does not exist')) {
-                throw error
+            if (String(error).includes('relation "ee_hook" does not exist')) {
+                this.shouldSendWebhooksCache.set(teamId, [false, Date.now()])
+                return false
             }
-            return false
+            throw error
         } finally {
             clearTimeout(timeout)
         }
@@ -176,7 +182,7 @@ export class TeamManager {
         return shouldUpdate
     }
 
-    private getByAge<K, V>(cache: Map<K, [V, number]>, key: K, maxAgeMs = 30000): V | undefined {
+    private getByAge<K, V>(cache: Map<K, [V, number]>, key: K, maxAgeMs = 30_000): V | undefined {
         if (cache.has(key)) {
             const [value, age] = cache.get(key)!
             if (Date.now() - age <= maxAgeMs) {
