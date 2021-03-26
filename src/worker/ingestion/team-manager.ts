@@ -18,7 +18,7 @@ export class TeamManager {
         this.shouldSendWebhooksCache = new Map()
     }
 
-    public async fetchTeam(teamId: number, eventUuid?: string): Promise<Team | null> {
+    public async fetchTeam(teamId: number, eventUuid?: string): Promise<TeamWithEventUuid | null> {
         const cachedTeam = this.getByAge(this.teamCache, teamId)
         if (cachedTeam) {
             return cachedTeam
