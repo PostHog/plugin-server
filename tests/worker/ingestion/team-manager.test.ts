@@ -70,7 +70,7 @@ describe('TeamManager()', () => {
             expect(await teamManager.shouldSendWebhooks(2)).toEqual(true)
         })
 
-        it('caches results, webhooks case', async () => {
+        it('caches results, webhooks-only case', async () => {
             jest.spyOn(global.Date, 'now').mockImplementation(() => new Date('2020-02-27 11:00:05').getTime())
             jest.spyOn(server.db, 'postgresQuery')
 

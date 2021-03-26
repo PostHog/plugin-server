@@ -5,12 +5,15 @@ import { DB } from '../../shared/db'
 import { timeoutGuard } from '../../shared/ingestion/utils'
 import { Team, TeamId } from '../../types'
 
-type TeamWithEventUuid = Team & { __fetch_event_uuid?: string }
+interface TeamWithEventUuid extends Team {
+    __fetch_event_uuid?: string
+}
+type TeamCache<T> = Map<TeamId, [T, number]>
 
 export class TeamManager {
     db: DB
-    teamCache: Map<TeamId, [TeamWithEventUuid | null, number]>
-    shouldSendWebhooksCache: Map<TeamId, [boolean, number]>
+    teamCache: TeamCache<TeamWithEventUuid | null>
+    shouldSendWebhooksCache: TeamCache<boolean>
 
     constructor(db: DB) {
         this.db = db
@@ -44,7 +47,7 @@ export class TeamManager {
     }
 
     public async shouldSendWebhooks(teamId: number): Promise<boolean> {
-        const cachedValue = this.getByAge(this.shouldSendWebhooksCache, teamId, 10_000)
+        const cachedValue = this.getByAge(this.shouldSendWebhooksCache, teamId, 15_000)
         if (cachedValue !== undefined) {
             return cachedValue
         }
