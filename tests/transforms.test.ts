@@ -166,8 +166,8 @@ describe('transformCode', () => {
             const bla = __pluginHostImports["node-fetch"]["bla"],
                   bla2 = __pluginHostImports["node-fetch"]["bla2"],
                   bla4 = __pluginHostImports["node-fetch"]["bla3"];
-            const fetch1 = __pluginHostImports["node-fetch"]["default"];
-            const fetch2 = __pluginHostImports["node-fetch"]["default"];
+            const fetch1 = __pluginHostImports["node-fetch"];
+            const fetch2 = __pluginHostImports["node-fetch"];
             console.log(bla, bla2, bla4, fetch1, fetch2);
         `)
     })
@@ -190,7 +190,10 @@ describe('transformCode', () => {
             console.log(fetch, BigQuery);
         `
 
-        const transformedCode = transformCode(rawCode, server, { 'node-fetch': { bla: () => true } })
+        const transformedCode = transformCode(rawCode, server, {
+            'node-fetch': { bla: () => true },
+            '@google-cloud/bigquery': { BigQuery: () => true },
+        })
 
         expect(transformedCode).toStrictEqual(code`
             "use strict";
