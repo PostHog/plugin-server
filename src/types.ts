@@ -30,6 +30,11 @@ export interface PluginsServerConfig extends Record<string, any> {
     TASK_TIMEOUT: number
     CELERY_DEFAULT_QUEUE: string
     DATABASE_URL: string
+    POSTHOG_DB_NAME: string | null
+    POSTHOG_DB_USER: string
+    POSTHOG_DB_PASSWORD: string
+    POSTHOG_POSTGRES_HOST: string
+    POSTHOG_POSTGRES_PORT: number
     CLICKHOUSE_HOST: string
     CLICKHOUSE_DATABASE: string
     CLICKHOUSE_USER: string
