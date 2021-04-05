@@ -2,7 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import AdmZip from 'adm-zip'
 import { randomBytes } from 'crypto'
-import Redis from 'ioredis'
+import Redis, { RedisOptions } from 'ioredis'
 import { DateTime } from 'luxon'
 import { Pool, PoolConfig } from 'pg'
 import { Readable } from 'stream'
@@ -374,7 +374,18 @@ export async function tryTwice<T extends any>(
 }
 
 export async function createRedis(serverConfig: PluginsServerConfig): Promise<Redis.Redis> {
-    const redis = new Redis(serverConfig.REDIS_URL, { maxRetriesPerRequest: -1 })
+    const credentials: Partial<RedisOptions> | undefined =
+        !serverConfig.REDIS_URL && serverConfig.POSTHOG_REDIS_HOST
+            ? {
+                  password: serverConfig.POSTHOG_DB_PASSWORD,
+                  port: serverConfig.POSTHOG_REDIS_PORT,
+              }
+            : undefined
+
+    const redis = new Redis(credentials ? serverConfig.POSTHOG_REDIS_HOST : serverConfig.REDIS_URL, {
+        ...credentials,
+        maxRetriesPerRequest: -1,
+    })
     redis
         .on('error', (error) => {
             Sentry.captureException(error)
