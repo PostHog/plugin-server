@@ -1,8 +1,10 @@
 import { Reader, ReaderModel } from '@maxmind/geoip2-node'
 import { GeoIPExtension } from '@posthog/plugin-scaffold'
 import { DateTime } from 'luxon'
+import mmapObject from 'mmap-object'
 import fetch from 'node-fetch'
 import prettyBytes from 'pretty-bytes'
+import { isMainThread } from 'worker_threads'
 import { brotliDecompress } from 'zlib'
 
 import { PluginAttachmentDB, PluginsServer } from '../types'
@@ -11,6 +13,7 @@ import { delay } from './utils'
 
 const MMDB_ENDPOINT = 'https://mmdb.posthog.net/'
 const MMDB_ATTACHMENT_KEY = '@posthog/mmdb'
+const MMDB_FILE_NAME = 'posthog-mmdb'
 const MMDB_STALE_AGE_DAYS = 14
 const MMDB_STATUS_REDIS_KEY = '@posthog-plugin-server/mmdb-status'
 
@@ -27,25 +30,38 @@ async function getMmdbStatus(server: PluginsServer): Promise<MmdbStatus> {
 
 /** Decompress a Brotli-compressed MMDB buffer and open a reader from it. */
 async function decompressAndOpenMmdb(brotliContents: Buffer, filename: string): Promise<ReaderModel> {
-    return await new Promise((resolve, reject) => {
-        brotliDecompress(brotliContents, (error, result) => {
-            if (error) {
-                reject(error)
-            } else {
-                status.info(
-                    '🪗',
-                    `Decompressed ${filename} from ${prettyBytes(brotliContents.byteLength)} into ${prettyBytes(
-                        result.byteLength
-                    )}`
-                )
-                try {
-                    resolve(Reader.openBuffer(result))
-                } catch (e) {
-                    reject(e)
+    let decompressedContents: Buffer
+    let sharedObject: mmapObject.Open | undefined
+    if (isMainThread) {
+        decompressedContents = await new Promise((resolve, reject) => {
+            brotliDecompress(brotliContents, (error, result) => {
+                if (error) {
+                    reject(error)
+                } else {
+                    resolve(result)
                 }
-            }
+            })
         })
-    })
+        status.info(
+            '🪗',
+            `Decompressed ${filename} from ${prettyBytes(brotliContents.byteLength)} into ${prettyBytes(
+                decompressedContents.byteLength
+            )}`
+        )
+        sharedObject = new mmapObject.Create(MMDB_FILE_NAME, 80 * 1024, 4, 320 * 1024)
+        sharedObject.mmdbContents = decompressedContents
+    } else {
+        while (!sharedObject) {
+            try {
+                sharedObject = new mmapObject.Open(MMDB_FILE_NAME)
+            } catch (e) {
+                status.error('☹️', e)
+                await delay(250)
+            }
+        }
+        decompressedContents = sharedObject.mmdbContents as Buffer
+    }
+    return Reader.openBuffer(decompressedContents)
 }
 
 /** Download latest MMDB database, save it, and return its reader. */
