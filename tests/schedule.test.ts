@@ -125,6 +125,7 @@ describe('startSchedule', () => {
     afterEach(async () => {
         await redis.del(LOCKED_RESOURCE)
         await server.redisPool.release(redis)
+        console.log(piscina)
         await piscina.destroy()
         await closeServer()
     })
