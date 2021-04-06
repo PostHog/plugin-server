@@ -7,7 +7,7 @@ import { PluginsServer } from '../../src/types'
 import { makePiscina } from '../../src/worker/piscina'
 import { createPosthog, DummyPostHog } from '../../src/worker/vm/extensions/posthog'
 import { pluginConfig39 } from '../helpers/plugins'
-import { resetTestDatabase } from '../helpers/sql'
+import { getErrorForPluginConfig, resetTestDatabase } from '../helpers/sql'
 import { delayUntilEventIngested } from '../shared/process-event'
 
 jest.mock('../../src/shared/status')
@@ -27,6 +27,9 @@ describe('e2e postgres ingestion', () => {
                 event.properties.processed = 'hell yes'
                 event.properties.upperUuid = event.properties.uuid?.toUpperCase()
                 return event
+            }
+            async function shutdown() {
+                throw new Error('This Happened In The Shutdown Palace')
             }
         `)
         const startResponse = await startPluginsServer(
@@ -50,8 +53,15 @@ describe('e2e postgres ingestion', () => {
     })
 
     afterEach(async () => {
+        const error1 = await getErrorForPluginConfig(pluginConfig39.id)
+        expect(error1).toBe(null)
+
         await server.redisPool.release(redis)
         await stopServer()
+
+        // verify the shutdown code runs
+        const error2 = await getErrorForPluginConfig(pluginConfig39.id)
+        expect(error2.message).toBe('This Happened In The Shutdown Palace')
     })
 
     test('event captured, processed, ingested', async () => {
