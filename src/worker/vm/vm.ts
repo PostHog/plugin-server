@@ -1,5 +1,4 @@
-import * as crypto from 'crypto'
-import fetch from 'node-fetch'
+import { randomBytes } from 'crypto'
 import { VM } from 'vm2'
 
 import { PluginConfig, PluginConfigVMReponse, PluginsServer } from '../../types'
@@ -30,7 +29,7 @@ export async function createPluginConfigVM(
     vm.freeze(createPosthog(server, pluginConfig), 'posthog')
 
     // Add non-PostHog utilities to virtual machine
-    vm.freeze(fetch, 'fetch')
+    vm.freeze(imports['node-fetch'], 'fetch')
     vm.freeze(createGoogle(), 'google')
 
     vm.freeze(imports, '__pluginHostImports')
@@ -79,7 +78,7 @@ export async function createPluginConfigVM(
         ${transformedCode};
     `)
 
-    const responseVar = `__pluginDetails${crypto.randomBytes(64).toString('hex')}`
+    const responseVar = `__pluginDetails${randomBytes(64).toString('hex')}`
 
     // Explicitly passing __asyncGuard to the returned function from `vm.run` in order
     // to make it harder to override the global `__asyncGuard = noop` inside plugins.
