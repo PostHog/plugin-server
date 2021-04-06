@@ -8,6 +8,7 @@ import { PluginsServer, PluginsServerConfig } from '../types'
 import { ingestEvent } from './ingestion/ingest-event'
 import { runPlugins, runPluginsOnBatch, runPluginTask } from './plugins/run'
 import { loadSchedule, setupPlugins } from './plugins/setup'
+import { shutdownPlugins } from './plugins/shutdown'
 
 type TaskWorker = ({ task, args }: { task: string; args: any }) => Promise<any>
 
@@ -63,6 +64,9 @@ export const createTaskRunner = (server: PluginsServer): TaskWorker => async ({ 
     }
     if (task === 'flushKafkaMessages') {
         await server.kafkaProducer?.flush()
+    }
+    if (task === 'shutdown') {
+        await shutdownPlugins(server)
     }
     server.statsd?.timing(`piscina_task.${task}`, timer)
     return response

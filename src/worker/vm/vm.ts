@@ -133,8 +133,10 @@ export async function createPluginConfigVM(
 
             // export various functions
             const __methods = {
+                setupPlugin: __asyncFunctionGuard(__bindMeta('setupPlugin')),
+                shutdown: __asyncFunctionGuard(__bindMeta('shutdown')),
                 processEvent: __asyncFunctionGuard(__bindMeta('processEvent')),
-                processEventBatch: __asyncFunctionGuard(__bindMeta('processEventBatch'))
+                processEventBatch: __asyncFunctionGuard(__bindMeta('processEventBatch')),
             };
 
             // gather the runEveryX commands and export in __tasks
@@ -151,18 +153,11 @@ export async function createPluginConfigVM(
                 }
             }
 
-            // run the plugin setup script, if present
-            const __setupPlugin = __asyncFunctionGuard(async () => __callWithMeta('setupPlugin'));
-
-            ${responseVar} = {
-                __methods,
-                __tasks,
-                __setupPlugin
-            }
+            ${responseVar} = { __methods, __tasks, }
         })
     `)(asyncGuard)
 
-    await vm.run(`${responseVar}.__setupPlugin()`)
+    await vm.run(`${responseVar}.__methods.setupPlugin?.()`)
 
     return {
         vm,
