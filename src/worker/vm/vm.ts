@@ -1,7 +1,5 @@
-import { BigQuery } from '@google-cloud/bigquery'
 import * as crypto from 'crypto'
 import fetch from 'node-fetch'
-import snowflake from 'snowflake-sdk'
 import { VM } from 'vm2'
 
 import { PluginConfig, PluginConfigVMReponse, PluginsServer } from '../../types'
@@ -11,6 +9,7 @@ import { createGeoIp } from './extensions/geoip'
 import { createGoogle } from './extensions/google'
 import { createPosthog } from './extensions/posthog'
 import { createStorage } from './extensions/storage'
+import { imports } from './imports'
 import { transformCode } from './transforms'
 
 export async function createPluginConfigVM(
@@ -18,12 +17,6 @@ export async function createPluginConfigVM(
     pluginConfig: PluginConfig, // NB! might have team_id = 0
     indexJs: string
 ): Promise<PluginConfigVMReponse> {
-    const imports = {
-        crypto: crypto,
-        'node-fetch': fetch,
-        'snowflake-sdk': snowflake,
-        '@google-cloud/bigquery': { BigQuery },
-    }
     const transformedCode = transformCode(indexJs, server, imports)
 
     // Create virtual machine
