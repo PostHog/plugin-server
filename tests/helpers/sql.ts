@@ -79,6 +79,7 @@ export async function createUserTeamAndOrganization(
 ): Promise<void> {
     await insertRow(db, 'posthog_user', {
         id: userId,
+        uuid: commonUserId,
         password: 'gibberish',
         first_name: 'PluginTest',
         last_name: 'User',
