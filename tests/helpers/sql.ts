@@ -80,9 +80,9 @@ export async function createUserTeamAndOrganization(
     db: Pool,
     teamId: number,
     userId: number = commonUserId,
+    userUuid: string = commonUserUuid,
     organizationId: string = commonOrganizationId,
-    organizationMembershipId: string = commonOrganizationMembershipId,
-    userUuid: string = commonUserUuid
+    organizationMembershipId: string = commonOrganizationMembershipId
 ): Promise<void> {
     await insertRow(db, 'posthog_user', {
         id: userId,
