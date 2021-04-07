@@ -28,8 +28,8 @@ describe('e2e postgres ingestion', () => {
                 event.properties.upperUuid = event.properties.uuid?.toUpperCase()
                 return event
             }
-            async function shutdown() {
-                throw new Error('This Happened In The Shutdown Palace')
+            async function teardownPlugin() {
+                throw new Error('This Happened In The Teardown Palace')
             }
         `)
         const startResponse = await startPluginsServer(
@@ -59,9 +59,9 @@ describe('e2e postgres ingestion', () => {
         await server.redisPool.release(redis)
         await stopServer()
 
-        // verify the shutdown code runs
+        // verify the teardownPlugin code runs
         const error2 = await getErrorForPluginConfig(pluginConfig39.id)
-        expect(error2.message).toBe('This Happened In The Shutdown Palace')
+        expect(error2.message).toBe('This Happened In The Teardown Palace')
     })
 
     test('event captured, processed, ingested', async () => {

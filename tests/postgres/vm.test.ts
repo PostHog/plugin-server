@@ -38,7 +38,12 @@ test('empty plugins', async () => {
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
     expect(Object.keys(vm).sort()).toEqual(['methods', 'tasks', 'vm'])
-    expect(Object.keys(vm.methods).sort()).toEqual(['processEvent', 'processEventBatch', 'setupPlugin', 'shutdown'])
+    expect(Object.keys(vm.methods).sort()).toEqual([
+        'processEvent',
+        'processEventBatch',
+        'setupPlugin',
+        'teardownPlugin',
+    ])
     expect(vm.methods.processEvent).toEqual(undefined)
     expect(vm.methods.processEventBatch).toEqual(undefined)
 })
@@ -76,12 +81,12 @@ test('setupPlugin async', async () => {
     expect(newEvent.event).toEqual('haha')
 })
 
-test('shutdown sync', async () => {
+test('teardownPlugin sync', async () => {
     const indexJs = `
         function setupPlugin (meta) {
             meta.global.data = 'haha'
         }
-        function shutdown (meta) {
+        function teardownPlugin (meta) {
             fetch('https://google.com/results.json?query=' + meta.global.data)
         }
         function processEvent (event, meta) {
@@ -95,16 +100,16 @@ test('shutdown sync', async () => {
         ...defaultEvent,
         properties: { haha: 'hoho' },
     })
-    await vm.methods.shutdown()
+    await vm.methods.teardownPlugin()
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho')
 })
 
-test('shutdown async', async () => {
+test('teardownPlugin async', async () => {
     const indexJs = `
         function setupPlugin (meta) {
             meta.global.data = 'haha'
         }
-        async function shutdown (meta) {
+        async function teardownPlugin (meta) {
             await fetch('https://google.com/results.json?query=' + meta.global.data)
         }
         function processEvent (event, meta) {
@@ -118,7 +123,7 @@ test('shutdown async', async () => {
         ...defaultEvent,
         properties: { haha: 'hoho' },
     })
-    await vm.methods.shutdown()
+    await vm.methods.teardownPlugin()
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho')
 })
 

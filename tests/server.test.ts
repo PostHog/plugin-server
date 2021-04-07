@@ -12,8 +12,8 @@ test('startPluginsServer', async () => {
         async function processEvent (event) {
             return event
         }
-        async function shutdown() {
-            throw new Error('This Happened In The Shutdown Palace')
+        async function teardownPlugin() {
+            throw new Error('This Happened In The Teardown Palace')
         }
     `
     await resetTestDatabase(testCode)
@@ -31,7 +31,7 @@ test('startPluginsServer', async () => {
 
     await pluginsServer.stop()
 
-    // verify the shutdown code runs
+    // verify the teardownPlugin code runs
     const error2 = await getErrorForPluginConfig(pluginConfig39.id)
-    expect(error2.message).toBe('This Happened In The Shutdown Palace')
+    expect(error2.message).toBe('This Happened In The Teardown Palace')
 })

@@ -1,18 +1,18 @@
 import { processError } from '../../shared/error'
 import { PluginsServer } from '../../types'
 
-export async function shutdownPlugins(server: PluginsServer): Promise<void> {
+export async function teardownPlugins(server: PluginsServer): Promise<void> {
     const { pluginConfigs } = server
 
-    const shutdownPromises = []
+    const teardownPromises = []
     for (const [id, pluginConfig] of pluginConfigs) {
         if (pluginConfig.vm) {
-            const shutdown = await pluginConfig.vm.getShutdown()
-            if (shutdown) {
-                shutdownPromises.push(
+            const teardownPlugin = await pluginConfig.vm.getTeardownPlugin()
+            if (teardownPlugin) {
+                teardownPromises.push(
                     (async () => {
                         try {
-                            await shutdown()
+                            await teardownPlugin()
                         } catch (error) {
                             await processError(server, pluginConfig, error)
                         }
@@ -22,5 +22,5 @@ export async function shutdownPlugins(server: PluginsServer): Promise<void> {
         }
     }
 
-    await Promise.all(shutdownPromises)
+    await Promise.all(teardownPromises)
 }
