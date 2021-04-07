@@ -97,6 +97,7 @@ test('runTasksDebounced exception', async () => {
     // and we're not testing it E2E so we can't check the DB either...
 
     try {
+        await delay(1000)
         await piscina.destroy()
         await closeServer()
     } catch {}
