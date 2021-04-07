@@ -77,9 +77,8 @@ test('piscina worker test', async () => {
     const ingestResponse2 = await ingestEvent({ ...createEvent(), uuid: new UUIDT().toString() })
     expect(ingestResponse2).toEqual({ success: true })
 
-    try {
-        await piscina.destroy()
-    } catch {}
+    await delay(2000)
+    await piscina.destroy()
 })
 
 test('assume that the workerThreads and tasksPerWorker values behave as expected', async () => {
