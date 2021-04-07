@@ -72,6 +72,7 @@ test('runTasksDebounced', async () => {
     expect(event3.properties['counter']).toBe(1)
 
     await waitForTasksToFinish(server)
+    await delay(1000)
     await piscina.destroy()
     await closeServer()
 })
@@ -126,6 +127,7 @@ describe('startSchedule', () => {
     afterEach(async () => {
         await redis.del(LOCKED_RESOURCE)
         await server.redisPool.release(redis)
+        await delay(1000)
         await piscina.destroy()
         await closeServer()
     })
