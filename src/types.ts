@@ -42,6 +42,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     CLICKHOUSE_CA: string | null
     CLICKHOUSE_SECURE: boolean
     KAFKA_ENABLED: boolean
+    KAFKA_CONSUMER_CONCURRENY: number
     KAFKA_HOSTS: string | null
     KAFKA_CLIENT_CERT_B64: string | null
     KAFKA_CLIENT_CERT_KEY_B64: string | null

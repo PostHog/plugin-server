@@ -1,31 +1,28 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
-import { Consumer, EachBatchPayload, Kafka } from 'kafkajs'
-import { PluginsServer, Queue } from 'types'
+import { ConsumerRunConfig, EachBatchPayload } from 'kafkajs'
 
 import { timeoutGuard } from '../../shared/ingestion/utils'
 import { status } from '../../shared/status'
-import { groupIntoBatches, killGracefully, sanitizeEvent } from '../../shared/utils'
+import { groupIntoBatches, sanitizeEvent } from '../../shared/utils'
+import { KafkaQueueBase } from './kafka-queue-base'
 
-export class KafkaQueue implements Queue {
-    private pluginsServer: PluginsServer
-    private kafka: Kafka
-    private consumer: Consumer
-    private wasConsumerRan: boolean
-    private processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
-    private saveEvent: (event: PluginEvent) => Promise<void>
-
-    constructor(
-        pluginsServer: PluginsServer,
-        processEventBatch: (batch: PluginEvent[]) => Promise<any>,
-        saveEvent: (event: PluginEvent) => Promise<void>
-    ) {
-        this.pluginsServer = pluginsServer
-        this.kafka = pluginsServer.kafka!
-        this.consumer = KafkaQueue.buildConsumer(this.kafka)
-        this.wasConsumerRan = false
-        this.processEventBatch = processEventBatch
-        this.saveEvent = saveEvent
+export class KafkaQueueBatched extends KafkaQueueBase {
+    protected getConsumerRunPayload(): ConsumerRunConfig {
+        return {
+            eachBatchAutoResolve: false, // we are resolving the last offset of the batch more deliberately
+            autoCommitInterval: 500, // autocommit every 500 ms…
+            autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
+            eachBatch: async (payload) => {
+                try {
+                    await this.eachBatch(payload)
+                } catch (error) {
+                    status.info('💀', `Kafka batch of ${payload.batch.messages.length} events failed!`)
+                    Sentry.captureException(error)
+                    throw error
+                }
+            },
+        }
     }
 
     private async eachBatch({
@@ -139,89 +136,5 @@ export class KafkaQueue implements Queue {
         resolveOffset(batch.lastOffset())
         await commitOffsetsIfNecessary()
         await heartbeat()
-    }
-
-    async start(): Promise<void> {
-        const startPromise = new Promise<void>(async (resolve, reject) => {
-            this.consumer.on(this.consumer.events.GROUP_JOIN, () => resolve())
-            this.consumer.on(this.consumer.events.CRASH, ({ payload: { error } }) => reject(error))
-            status.info('⏬', `Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
-            this.wasConsumerRan = true
-            await this.consumer.subscribe({ topic: this.pluginsServer.KAFKA_CONSUMPTION_TOPIC! })
-            // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
-            await this.consumer.run({
-                eachBatchAutoResolve: false, // we are resolving the last offset of the batch more deliberately
-                autoCommitInterval: 500, // autocommit every 500 ms…
-                autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
-                eachBatch: async (payload) => {
-                    try {
-                        await this.eachBatch(payload)
-                    } catch (error) {
-                        status.info('💀', `Kafka batch of ${payload.batch.messages.length} events failed!`)
-                        Sentry.captureException(error)
-                        throw error
-                    }
-                },
-            })
-        })
-        return await startPromise
-    }
-
-    async pause(): Promise<void> {
-        if (this.wasConsumerRan && !this.isPaused()) {
-            status.info('⏳', 'Pausing Kafka consumer...')
-            this.consumer.pause([{ topic: this.pluginsServer.KAFKA_CONSUMPTION_TOPIC! }])
-            status.info('⏸', 'Kafka consumer paused!')
-        }
-        return Promise.resolve()
-    }
-
-    resume(): void {
-        if (this.wasConsumerRan && this.isPaused()) {
-            status.info('⏳', 'Resuming Kafka consumer...')
-            this.consumer.resume([{ topic: this.pluginsServer.KAFKA_CONSUMPTION_TOPIC! }])
-            status.info('▶️', 'Kafka consumer resumed!')
-        }
-    }
-
-    isPaused(): boolean {
-        return this.consumer.paused().some(({ topic }) => topic === this.pluginsServer.KAFKA_CONSUMPTION_TOPIC)
-    }
-
-    async stop(): Promise<void> {
-        status.info('⏳', 'Stopping Kafka queue...')
-        try {
-            await this.consumer.stop()
-            status.info('⏹', 'Kafka consumer stopped!')
-        } catch (error) {
-            status.error('⚠️', 'An error occurred while stopping Kafka queue:\n', error)
-        }
-        try {
-            await this.consumer.disconnect()
-        } catch {}
-    }
-
-    private static buildConsumer(kafka: Kafka): Consumer {
-        const consumer = kafka.consumer({
-            groupId: 'clickhouse-ingestion',
-            sessionTimeout: 60000,
-            readUncommitted: false,
-        })
-        const { GROUP_JOIN, CRASH, CONNECT, DISCONNECT } = consumer.events
-        consumer.on(GROUP_JOIN, ({ payload: { groupId } }) => {
-            status.info('✅', `Kafka consumer joined group ${groupId}!`)
-        })
-        consumer.on(CRASH, ({ payload: { error, groupId } }) => {
-            status.error('⚠️', `Kafka consumer group ${groupId} crashed:\n`, error)
-            Sentry.captureException(error)
-            killGracefully()
-        })
-        consumer.on(CONNECT, () => {
-            status.info('✅', 'Kafka consumer connected!')
-        })
-        consumer.on(DISCONNECT, () => {
-            status.info('🛑', 'Kafka consumer disconnected!')
-        })
-        return consumer
     }
 }
