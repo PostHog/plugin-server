@@ -17,12 +17,13 @@ export class KafkaQueueBase implements Queue {
 
     constructor(
         pluginsServer: PluginsServer,
+        getKafka: () => Kafka,
         processEvent: (event: PluginEvent) => Promise<any>,
         processEventBatch: (batch: PluginEvent[]) => Promise<any>,
         saveEvent: (event: PluginEvent) => Promise<void>
     ) {
         this.pluginsServer = pluginsServer
-        this.kafka = pluginsServer.kafka!
+        this.kafka = getKafka()
         this.consumer = KafkaQueueBase.buildConsumer(this.kafka)
         this.wasConsumerRan = false
         this.processEvent = processEvent

@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/node'
 
 import Client from '../shared/celery/client'
 import { status } from '../shared/status'
-import { sanitizeEvent, UUIDT } from '../shared/utils'
+import { createKafka, sanitizeEvent, UUIDT } from '../shared/utils'
 import { IngestEventResponse, PluginsServer, Queue } from '../types'
 import CeleryQueueWorker from './ingestion/celery-queue-worker'
 import { KafkaQueueBatched } from './ingestion/kafka-queue-batched'
@@ -110,6 +110,7 @@ async function startQueueKafka(server: PluginsServer, workerMethods: WorkerMetho
 async function startQueueKafkaBatched(server: PluginsServer, workerMethods: WorkerMethods): Promise<Queue> {
     const kafkaQueue: Queue = new KafkaQueueBatched(
         server,
+        () => server.kafka!,
         (event: PluginEvent) => workerMethods.processEvent(event),
         (batch: PluginEvent[]) => workerMethods.processEventBatch(batch),
         async (event: PluginEvent) => void (await workerMethods.ingestEvent(event))
@@ -120,17 +121,17 @@ async function startQueueKafkaBatched(server: PluginsServer, workerMethods: Work
 }
 
 async function startQueuePoolKafkaSequential(server: PluginsServer, workerMethods: WorkerMethods): Promise<Queue> {
-    const queuePool = new QueuePool(server.KAFKA_CONSUMER_CONCURRENY, async () => {
-        const kafkaQueue: Queue = new KafkaQueueSequential(
-            server,
-            (event: PluginEvent) => workerMethods.processEvent(event),
-            (batch: PluginEvent[]) => workerMethods.processEventBatch(batch),
-            async (event: PluginEvent) => void (await workerMethods.ingestEvent(event))
-        )
-        await kafkaQueue.start()
-
-        return kafkaQueue
-    })
+    const queuePool = new QueuePool(
+        server.KAFKA_CONSUMER_CONCURRENY,
+        () =>
+            new KafkaQueueSequential(
+                server,
+                () => createKafka(server),
+                (event: PluginEvent) => workerMethods.processEvent(event),
+                (batch: PluginEvent[]) => workerMethods.processEventBatch(batch),
+                async (event: PluginEvent) => void (await workerMethods.ingestEvent(event))
+            )
+    )
     await queuePool.start()
     return queuePool
 }

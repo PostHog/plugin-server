@@ -2,17 +2,15 @@ import { Queue } from '../../types'
 
 export class QueuePool implements Queue {
     private concurrency: number
-    private queuePromises: Promise<Queue>[]
     private queues: Queue[] | undefined
 
-    constructor(concurrency: number, builder: (queuePool?: Queue) => Promise<Queue>) {
+    constructor(concurrency: number, builder: (queuePool: Queue, index: number) => Queue) {
         this.concurrency = concurrency
-        this.queuePromises = [...Array(concurrency)].map((_, i) => builder(this))
+        this.queues = [...Array(concurrency)].map((_, i) => builder(this, i))
     }
 
     async start(): Promise<void> {
-        this.queues = await Promise.all(this.queuePromises)
-        await Promise.all(this.queues.map((queue) => queue.start()))
+        await Promise.all(this.queues?.map((queue) => queue.start()) || [])
     }
 
     async pause(): Promise<void> {
