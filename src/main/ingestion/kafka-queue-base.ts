@@ -14,6 +14,7 @@ export class KafkaQueueBase implements Queue {
     protected processEvent: (event: PluginEvent) => Promise<PluginEvent>
     protected processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
     protected saveEvent: (event: PluginEvent) => Promise<void>
+    protected started: boolean
 
     constructor(
         pluginsServer: PluginsServer,
@@ -29,6 +30,7 @@ export class KafkaQueueBase implements Queue {
         this.processEvent = processEvent
         this.processEventBatch = processEventBatch
         this.saveEvent = saveEvent
+        this.started = false
     }
 
     protected getConsumerRunPayload(): ConsumerRunConfig {
@@ -36,6 +38,10 @@ export class KafkaQueueBase implements Queue {
     }
 
     async start(): Promise<void> {
+        if (this.started) {
+            return
+        }
+        this.started = true
         const startPromise = new Promise<void>(async (resolve, reject) => {
             this.consumer.on(this.consumer.events.GROUP_JOIN, () => resolve())
             this.consumer.on(this.consumer.events.CRASH, ({ payload: { error } }) => reject(error))
