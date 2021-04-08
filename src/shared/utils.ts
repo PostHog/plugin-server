@@ -3,14 +3,18 @@ import * as Sentry from '@sentry/node'
 import AdmZip from 'adm-zip'
 import { randomBytes } from 'crypto'
 import Redis, { RedisOptions } from 'ioredis'
+import { Kafka, logLevel } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, PoolConfig } from 'pg'
 import { Readable } from 'stream'
 import * as tar from 'tar-stream'
+import { ConnectionOptions } from 'tls'
 import * as zlib from 'zlib'
 
 import { LogLevel, Plugin, PluginsServerConfig, TimestampFormat } from '../types'
 import { status } from './status'
+
+const { version } = require('../../package.json')
 
 /** Time until autoexit (due to error) gives up on graceful exit and kills the process right away. */
 const GRACEFUL_EXIT_PERIOD_SECONDS = 5
@@ -443,4 +447,36 @@ export function createPostgresPool(serverConfig: PluginsServerConfig): Pool {
 export function sanitizeEvent(event: PluginEvent): PluginEvent {
     event.distinct_id = event.distinct_id?.toString()
     return event
+}
+
+export function createKafka(serverConfig: PluginsServerConfig): Kafka {
+    if (!serverConfig.KAFKA_HOSTS) {
+        throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
+    }
+
+    let kafkaSsl: ConnectionOptions | undefined
+    if (
+        serverConfig.KAFKA_CLIENT_CERT_B64 &&
+        serverConfig.KAFKA_CLIENT_CERT_KEY_B64 &&
+        serverConfig.KAFKA_TRUSTED_CERT_B64
+    ) {
+        kafkaSsl = {
+            cert: Buffer.from(serverConfig.KAFKA_CLIENT_CERT_B64, 'base64'),
+            key: Buffer.from(serverConfig.KAFKA_CLIENT_CERT_KEY_B64, 'base64'),
+            ca: Buffer.from(serverConfig.KAFKA_TRUSTED_CERT_B64, 'base64'),
+
+            /* Intentionally disabling hostname checking. The Kafka cluster runs in the cloud and Apache
+            Kafka on Heroku doesn't currently provide stable hostnames. We're pinned to a specific certificate
+            #for this connection even though the certificate doesn't include host information. We rely
+            on the ca trust_cert for this purpose. */
+            rejectUnauthorized: false,
+        }
+    }
+
+    return new Kafka({
+        clientId: `plugin-server-v${version}-${new UUIDT()}`,
+        brokers: serverConfig.KAFKA_HOSTS.split(','),
+        logLevel: logLevel.WARN,
+        ssl: kafkaSsl,
+    })
 }

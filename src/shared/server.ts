@@ -4,12 +4,11 @@ import * as fs from 'fs'
 import { createPool } from 'generic-pool'
 import { StatsD } from 'hot-shots'
 import Redis from 'ioredis'
-import { Kafka, logLevel, Producer } from 'kafkajs'
+import { Kafka } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { scheduleJob } from 'node-schedule'
 import * as path from 'path'
 import { types as pgTypes } from 'pg'
-import { ConnectionOptions } from 'tls'
 
 import { PluginsServer, PluginsServerConfig } from '../types'
 import { EventsProcessor } from '../worker/ingestion/process-event'
@@ -18,9 +17,7 @@ import { DB } from './db'
 import { KafkaProducerWrapper } from './kafka-producer-wrapper'
 import { performMmdbStalenessCheck, prepareMmdb } from './mmdb'
 import { status } from './status'
-import { createPostgresPool, createRedis, UUIDT } from './utils'
-
-const { version } = require('../../package.json')
+import { createKafka, createPostgresPool, createRedis } from './utils'
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
@@ -54,32 +51,10 @@ export async function createServer(
         }
     }
 
-    let kafkaSsl: ConnectionOptions | undefined
-    if (
-        serverConfig.KAFKA_CLIENT_CERT_B64 &&
-        serverConfig.KAFKA_CLIENT_CERT_KEY_B64 &&
-        serverConfig.KAFKA_TRUSTED_CERT_B64
-    ) {
-        kafkaSsl = {
-            cert: Buffer.from(serverConfig.KAFKA_CLIENT_CERT_B64, 'base64'),
-            key: Buffer.from(serverConfig.KAFKA_CLIENT_CERT_KEY_B64, 'base64'),
-            ca: Buffer.from(serverConfig.KAFKA_TRUSTED_CERT_B64, 'base64'),
-
-            /* Intentionally disabling hostname checking. The Kafka cluster runs in the cloud and Apache
-            Kafka on Heroku doesn't currently provide stable hostnames. We're pinned to a specific certificate
-            #for this connection even though the certificate doesn't include host information. We rely
-            on the ca trust_cert for this purpose. */
-            rejectUnauthorized: false,
-        }
-    }
-
     let clickhouse: ClickHouse | undefined
     let kafka: Kafka | undefined
     let kafkaProducer: KafkaProducerWrapper | undefined
     if (serverConfig.KAFKA_ENABLED) {
-        if (!serverConfig.KAFKA_HOSTS) {
-            throw new Error('You must set KAFKA_HOSTS to process events from Kafka!')
-        }
         clickhouse = new ClickHouse({
             host: serverConfig.CLICKHOUSE_HOST,
             port: serverConfig.CLICKHOUSE_SECURE ? 8443 : 8123,
@@ -98,12 +73,7 @@ export async function createServer(
         })
         await clickhouse.querying('SELECT 1') // test that the connection works
 
-        kafka = new Kafka({
-            clientId: `plugin-server-v${version}-${new UUIDT()}`,
-            brokers: serverConfig.KAFKA_HOSTS.split(','),
-            logLevel: logLevel.WARN,
-            ssl: kafkaSsl,
-        })
+        kafka = createKafka(serverConfig)
         const producer = kafka.producer()
         await producer?.connect()
 
