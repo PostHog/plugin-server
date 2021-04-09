@@ -1,11 +1,14 @@
-import { Reader, ReaderModel } from '@maxmind/geoip2-node'
-import { GeoIPExtension } from '@posthog/plugin-scaffold'
+import { City, Reader, ReaderModel } from '@maxmind/geoip2-node'
+import { captureException } from '@sentry/minimal'
 import { DateTime } from 'luxon'
+import net from 'net'
 import fetch from 'node-fetch'
 import prettyBytes from 'pretty-bytes'
+import { deserialize, serialize } from 'v8'
 import { brotliDecompress } from 'zlib'
 
-import { PluginAttachmentDB, PluginsServer } from '../types'
+import { ServerInstance } from '../main/pluginsServer'
+import { PluginAttachmentDB, PluginsServer, PluginsServerConfig } from '../types'
 import { status } from './status'
 import { delay } from './utils'
 
@@ -13,6 +16,7 @@ const MMDB_ENDPOINT = 'https://mmdb.posthog.net/'
 const MMDB_ATTACHMENT_KEY = '@posthog/mmdb'
 const MMDB_STALE_AGE_DAYS = 14
 const MMDB_STATUS_REDIS_KEY = '@posthog-plugin-server/mmdb-status'
+const MMDB_INTERNAL_SERVER_TIMEOUT_SECONDS = 10
 
 enum MmdbStatus {
     Idle = 'idle',
@@ -81,7 +85,8 @@ async function fetchAndInsertFreshMmdb(server: PluginsServer): Promise<ReaderMod
 }
 
 /** Drop-in replacement for fetchAndInsertFreshMmdb that handles multiple worker concurrency better. */
-async function distributableFetchAndInsertFreshMmdb(server: PluginsServer): Promise<ReaderModel | null> {
+async function distributableFetchAndInsertFreshMmdb(serverInstance: ServerInstance): Promise<ReaderModel | null> {
+    const { server } = serverInstance
     let fetchingStatus = await getMmdbStatus(server)
     if (fetchingStatus === MmdbStatus.Unavailable) {
         status.info(
@@ -97,7 +102,7 @@ async function distributableFetchAndInsertFreshMmdb(server: PluginsServer): Prom
             await delay(200)
             fetchingStatus = await getMmdbStatus(server)
         }
-        return prepareMmdb(server)
+        return prepareMmdb(serverInstance)
     }
     // Allow 120 seconds of download until another worker retries
     await server.db.redisSet(MMDB_STATUS_REDIS_KEY, MmdbStatus.Fetching, 120)
@@ -114,21 +119,22 @@ async function distributableFetchAndInsertFreshMmdb(server: PluginsServer): Prom
 }
 
 /** Update server MMDB in the background, with no availability interruptions. */
-async function backgroundInjectFreshMmdb(server: PluginsServer): Promise<void> {
-    const mmdb = await distributableFetchAndInsertFreshMmdb(server)
+async function backgroundInjectFreshMmdb(serverInstance: ServerInstance): Promise<void> {
+    const mmdb = await distributableFetchAndInsertFreshMmdb(serverInstance)
     if (mmdb) {
-        server.mmdb = mmdb
-        status.info('💉', `Injected fresh ${MMDB_ATTACHMENT_KEY} into the plugin server`)
+        serverInstance.mmdb = mmdb
+        status.info('💉', `Injected fresh ${MMDB_ATTACHMENT_KEY}`)
     }
 }
 
 /** Ensure that an MMDB is available and return its reader. If needed, update the MMDB in the background. */
-export async function prepareMmdb(server: PluginsServer, onlyBackground?: false): Promise<ReaderModel | null>
-export async function prepareMmdb(server: PluginsServer, onlyBackground: true): Promise<boolean>
+export async function prepareMmdb(serverInstance: ServerInstance, onlyBackground?: false): Promise<ReaderModel | null>
+export async function prepareMmdb(serverInstance: ServerInstance, onlyBackground: true): Promise<boolean>
 export async function prepareMmdb(
-    server: PluginsServer,
+    serverInstance: ServerInstance,
     onlyBackground = false
 ): Promise<ReaderModel | null | boolean> {
+    const { server } = serverInstance
     const { db } = server
 
     const readResults = await db.postgresQuery<PluginAttachmentDB>(
@@ -142,10 +148,10 @@ export async function prepareMmdb(
     if (!readResults.rowCount) {
         status.info('⬇️', `Fetching ${MMDB_ATTACHMENT_KEY} for the first time`)
         if (onlyBackground) {
-            await backgroundInjectFreshMmdb(server)
+            await backgroundInjectFreshMmdb(serverInstance)
             return true
         } else {
-            const mmdb = await distributableFetchAndInsertFreshMmdb(server)
+            const mmdb = await distributableFetchAndInsertFreshMmdb(serverInstance)
             if (!mmdb) {
                 status.warn('🤒', 'Because of MMDB unavailability, GeoIP plugins will fail in this PostHog instance')
             }
@@ -172,10 +178,10 @@ export async function prepareMmdb(
             } old, which is more than the staleness threshold of ${MMDB_STALE_AGE_DAYS} days, refreshing in the background...`
         )
         if (onlyBackground) {
-            await backgroundInjectFreshMmdb(server)
+            await backgroundInjectFreshMmdb(serverInstance)
             return true
         } else {
-            void backgroundInjectFreshMmdb(server)
+            void backgroundInjectFreshMmdb(serverInstance)
         }
     }
 
@@ -187,12 +193,106 @@ export async function prepareMmdb(
 }
 
 /** Check for MMDB staleness every 4 hours, if needed perform a no-interruption update. */
-export async function performMmdbStalenessCheck(server: PluginsServer): Promise<void> {
+export async function performMmdbStalenessCheck(serverInstance: ServerInstance): Promise<void> {
     status.info('⏲', 'Performing periodic MMDB staleness check...')
-    const wasUpdatePerformed = await prepareMmdb(server, true)
+    const wasUpdatePerformed = await prepareMmdb(serverInstance, true)
     if (wasUpdatePerformed) {
         status.info('✅', 'MMDB staleness check completed, update performed')
     } else {
         status.info('❎', 'MMDB staleness check completed, no update was needed')
     }
+}
+
+export enum MMDBRequestStatus {
+    TimedOut = 'Internal MMDB server connection timed out!',
+    ServiceUnavailable = 'IP location capabilities are not available in this PostHog instance!',
+    OK = 'OK',
+}
+
+export function createMmdbServer(serverInstance: ServerInstance): net.Server {
+    status.info('🗺', 'Starting internal MMDB server...')
+    const mmdbServer = net.createServer((socket) => {
+        socket.setEncoding('utf8')
+        let status: MMDBRequestStatus = MMDBRequestStatus.OK
+        socket.on('data', (partialData) => {
+            // partialData SHOULD be an IP address string
+            let responseData: any
+            if (status === MMDBRequestStatus.OK) {
+                if (serverInstance.mmdb) {
+                    try {
+                        responseData = serverInstance.mmdb.city(partialData.toString().trim())
+                    } catch (e) {
+                        responseData = null
+                    }
+                } else {
+                    captureException(new Error(status))
+                    status = MMDBRequestStatus.ServiceUnavailable
+                }
+            }
+            if (status !== MMDBRequestStatus.OK) {
+                responseData = status
+            }
+            socket.write(serialize(responseData ?? null))
+        })
+        const requestTimeout = setTimeout(() => {
+            captureException(new Error(status))
+            status = MMDBRequestStatus.TimedOut
+            socket.emit('end')
+        }, MMDB_INTERNAL_SERVER_TIMEOUT_SECONDS * 1000)
+        socket.once('end', () => {
+            if (status !== MMDBRequestStatus.OK) {
+                socket.write(serialize(status))
+            }
+            socket.destroy()
+            clearTimeout(requestTimeout)
+        })
+    })
+    mmdbServer.on('error', (error) => {
+        captureException(error)
+    })
+    mmdbServer.listen(serverInstance.server.INTERNAL_MMDB_SERVER_PORT, 'localhost', () => {
+        status.info('👂', `Internal MMDB server listening on port ${serverInstance.server.INTERNAL_MMDB_SERVER_PORT}`)
+    })
+    return mmdbServer
+}
+
+export async function fetchIpLocationInternally(
+    ipAddress: string,
+    serverConfig: PluginsServerConfig
+): Promise<City | null> {
+    if (serverConfig.DISABLE_MMDB) {
+        throw new Error(MMDBRequestStatus.ServiceUnavailable)
+    }
+    const result = await new Promise<City | null>((resolve, reject) => {
+        const client = new net.Socket()
+        client.connect(serverConfig.INTERNAL_MMDB_SERVER_PORT, 'localhost', () => {
+            client.write(ipAddress)
+            client.end()
+        })
+
+        client.on('data', (data) => {
+            const result = deserialize(data)
+            if (typeof result !== 'string') {
+                // String means a RequestStatus error
+                resolve(result as City | null)
+            } else {
+                reject(new Error(result))
+            }
+        })
+
+        client.setTimeout(MMDB_INTERNAL_SERVER_TIMEOUT_SECONDS, () => {
+            client.destroy()
+            reject(new Error(MMDBRequestStatus.TimedOut))
+        })
+
+        client.on('error', (error) => {
+            client.destroy()
+            if (error.message.includes('ECONNREFUSED')) {
+                reject(new Error(MMDBRequestStatus.ServiceUnavailable))
+            } else {
+                reject(error)
+            }
+        })
+    })
+    return result
 }

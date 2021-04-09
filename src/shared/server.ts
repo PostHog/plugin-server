@@ -4,9 +4,8 @@ import * as fs from 'fs'
 import { createPool } from 'generic-pool'
 import { StatsD } from 'hot-shots'
 import Redis from 'ioredis'
-import { Kafka, logLevel, Producer } from 'kafkajs'
+import { Kafka, logLevel } from 'kafkajs'
 import { DateTime } from 'luxon'
-import { scheduleJob } from 'node-schedule'
 import * as path from 'path'
 import { types as pgTypes } from 'pg'
 import { ConnectionOptions } from 'tls'
@@ -16,7 +15,6 @@ import { EventsProcessor } from '../worker/ingestion/process-event'
 import { defaultConfig } from './config'
 import { DB } from './db'
 import { KafkaProducerWrapper } from './kafka-producer-wrapper'
-import { performMmdbStalenessCheck, prepareMmdb } from './mmdb'
 import { status } from './status'
 import { createPostgresPool, createRedis, UUIDT } from './utils'
 
@@ -158,14 +156,6 @@ export async function createServer(
 
         pluginSchedule: null,
         pluginSchedulePromises: { runEveryMinute: {}, runEveryHour: {}, runEveryDay: {} },
-    }
-
-    if (!serverConfig.DISABLE_MMDB) {
-        server.mmdb = await prepareMmdb(server as PluginsServer)
-        server.mmdbUpdateJob = scheduleJob(
-            '0 */4 * * *',
-            async () => await performMmdbStalenessCheck(server as PluginsServer)
-        )
     }
 
     // :TODO: This is only used on worker threads, not main
