@@ -100,6 +100,7 @@ test('teardownPlugin', async () => {
         ...defaultEvent,
         properties: { haha: 'hoho' },
     })
+    expect(fetch).not.toHaveBeenCalled()
     await vm.methods.teardownPlugin()
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho')
 })
