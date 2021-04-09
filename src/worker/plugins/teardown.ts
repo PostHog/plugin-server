@@ -4,7 +4,7 @@ import { PluginsServer } from '../../types'
 export async function teardownPlugins(server: PluginsServer): Promise<void> {
     const { pluginConfigs } = server
 
-    const teardownPromises = []
+    const teardownPromises: Promise<void>[] = []
     for (const [id, pluginConfig] of pluginConfigs) {
         if (pluginConfig.vm) {
             const teardownPlugin = await pluginConfig.vm.getTeardownPlugin()
