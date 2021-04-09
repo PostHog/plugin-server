@@ -81,36 +81,13 @@ test('setupPlugin async', async () => {
     expect(newEvent.event).toEqual('haha')
 })
 
-test('teardownPlugin sync', async () => {
+test('teardownPlugin', async () => {
     const indexJs = `
         function setupPlugin (meta) {
             meta.global.data = 'haha'
         }
         function teardownPlugin (meta) {
             fetch('https://google.com/results.json?query=' + meta.global.data)
-        }
-        function processEvent (event, meta) {
-            meta.global.data = event.properties.haha
-            return event
-        }
-    `
-    await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
-    await vm.methods.processEvent({
-        ...defaultEvent,
-        properties: { haha: 'hoho' },
-    })
-    await vm.methods.teardownPlugin()
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho')
-})
-
-test('teardownPlugin async', async () => {
-    const indexJs = `
-        function setupPlugin (meta) {
-            meta.global.data = 'haha'
-        }
-        async function teardownPlugin (meta) {
-            await fetch('https://google.com/results.json?query=' + meta.global.data)
         }
         function processEvent (event, meta) {
             meta.global.data = event.properties.haha
