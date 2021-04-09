@@ -7,7 +7,7 @@ import { PluginsServer } from '../../src/types'
 import { makePiscina } from '../../src/worker/piscina'
 import { createPosthog, DummyPostHog } from '../../src/worker/vm/extensions/posthog'
 import { pluginConfig39 } from '../helpers/plugins'
-import { getErrorForPluginConfig, resetTestDatabase } from '../helpers/sql'
+import { resetTestDatabase } from '../helpers/sql'
 import { delayUntilEventIngested } from '../shared/process-event'
 
 jest.mock('../../src/shared/status')
