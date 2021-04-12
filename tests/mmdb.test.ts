@@ -4,7 +4,7 @@ import { DateTime } from 'luxon'
 import * as fetch from 'node-fetch'
 import { join } from 'path'
 
-import { startPluginsServer } from '../src/main/pluginsServer'
+import { ServerInstance, startPluginsServer } from '../src/main/pluginsServer'
 import { defaultConfig } from '../src/shared/config'
 import { fetchIpLocationInternally } from '../src/shared/mmdb'
 import { makePiscina } from '../src/worker/piscina'
@@ -28,16 +28,19 @@ async function resetTestDatabaseWithMmdb(): Promise<void> {
     })
 }
 
-jest.setTimeout(20_000)
+let serverInstance: ServerInstance
 
-afterEach(() => {
+jest.setTimeout(30_000)
+
+afterEach(async () => {
+    await serverInstance?.stop()
     jest.clearAllMocks()
 })
 
 test('no MMDB is used or available if MMDB disabled', async () => {
     await resetTestDatabase()
 
-    const serverInstance = await startPluginsServer({ DISABLE_MMDB: true }, makePiscina)
+    serverInstance = await startPluginsServer({ DISABLE_MMDB: true }, makePiscina)
 
     expect(serverInstance.server.DISABLE_MMDB).toBeTruthy()
 
@@ -47,14 +50,12 @@ test('no MMDB is used or available if MMDB disabled', async () => {
     await expect(
         async () => await fetchIpLocationInternally('89.160.20.129', serverInstance.server)
     ).rejects.toThrowError('IP location capabilities are not available in this PostHog instance!')
-
-    await serverInstance.stop()
 })
 
 test('fresh MMDB is downloaded if not cached and works', async () => {
     await resetTestDatabase()
 
-    const serverInstance = await startPluginsServer({ DISABLE_MMDB: false }, makePiscina)
+    serverInstance = await startPluginsServer({ DISABLE_MMDB: false }, makePiscina)
 
     expect(serverInstance.server.DISABLE_MMDB).toBeFalsy()
 
@@ -75,14 +76,12 @@ test('fresh MMDB is downloaded if not cached and works', async () => {
 
     const cityResultTcpInvalid = await fetchIpLocationInternally('asdfgh', serverInstance.server)
     expect(cityResultTcpInvalid).toBeNull()
-
-    await serverInstance.stop()
 })
 
 test('cached MMDB is used and works', async () => {
     await resetTestDatabaseWithMmdb()
 
-    const serverInstance = await startPluginsServer({ DISABLE_MMDB: false }, makePiscina)
+    serverInstance = await startPluginsServer({ DISABLE_MMDB: false }, makePiscina)
 
     expect(serverInstance.server.DISABLE_MMDB).toBeFalsy()
 
@@ -103,6 +102,4 @@ test('cached MMDB is used and works', async () => {
 
     const cityResultTcpInvalid = await fetchIpLocationInternally('asdfgh', serverInstance.server)
     expect(cityResultTcpInvalid).toBeNull()
-
-    await serverInstance.stop()
 })
