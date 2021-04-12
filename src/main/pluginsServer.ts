@@ -116,10 +116,9 @@ export async function startPluginsServer(
                 '0 */4 * * *',
                 async () => await performMmdbStalenessCheck(serverInstance)
             )
-            const [mmdbServerCreated, mmdbPort] = await createMmdbServer(serverInstance)
-            mmdbServer = mmdbServerCreated
-            serverConfig.INTERNAL_MMDB_SERVER_PORT = mmdbPort
-            server.INTERNAL_MMDB_SERVER_PORT = mmdbPort
+            mmdbServer = await createMmdbServer(serverInstance)
+            serverConfig.INTERNAL_MMDB_SERVER_PORT = (mmdbServer.address() as AddressInfo).port
+            server.INTERNAL_MMDB_SERVER_PORT = serverConfig.INTERNAL_MMDB_SERVER_PORT
         }
 
         piscina = makePiscina(serverConfig)
@@ -166,6 +165,7 @@ export async function startPluginsServer(
         serverInstance.stop = closeJobs
 
         status.info('🚀', 'All systems go')
+
         return serverInstance as ServerInstance
     } catch (error) {
         Sentry.captureException(error)

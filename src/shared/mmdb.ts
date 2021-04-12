@@ -217,7 +217,7 @@ export enum MMDBRequestStatus {
     OK = 'OK',
 }
 
-export async function createMmdbServer(serverInstance: MMDBPrepServerInstance): Promise<[net.Server, number]> {
+export async function createMmdbServer(serverInstance: MMDBPrepServerInstance): Promise<net.Server> {
     status.info('🗺', 'Starting internal MMDB server...')
     const mmdbServer = net.createServer((socket) => {
         socket.setEncoding('utf8')
@@ -272,7 +272,7 @@ export async function createMmdbServer(serverInstance: MMDBPrepServerInstance): 
             const port = (mmdbServer.address() as AddressInfo).port
             status.info('👂', `Internal MMDB server listening on port ${port}`)
             clearTimeout(rejectTimeout)
-            resolve([mmdbServer, port])
+            resolve(mmdbServer)
         })
     })
 }
