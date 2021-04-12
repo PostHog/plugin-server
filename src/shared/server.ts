@@ -148,8 +148,7 @@ export async function createServer(
         kafka,
         kafkaProducer,
         statsd,
-        mmdb: null,
-        mmdbUpdateJob: null,
+
         plugins: new Map(),
         pluginConfigs: new Map(),
         pluginConfigsPerTeam: new Map(),
