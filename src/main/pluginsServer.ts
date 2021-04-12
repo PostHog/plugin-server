@@ -98,6 +98,7 @@ export async function startPluginsServer(
     }
 
     process.on('beforeExit', async () => {
+        // This makes async exit possible with the process waiting until jobs are closed
         await closeJobs()
         process.exit(0)
     })
@@ -160,7 +161,7 @@ export async function startPluginsServer(
             mmdbServer = createMmdbServer(serverInstance)
         }
 
-        status.info('🚀', 'All systems go.')
+        status.info('🚀', 'All systems go')
         return serverInstance
     } catch (error) {
         Sentry.captureException(error)
