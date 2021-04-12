@@ -206,6 +206,8 @@ export class KafkaQueue implements Queue {
             groupId: 'clickhouse-ingestion',
             sessionTimeout: 60000,
             readUncommitted: false,
+            minBytes: 16_384,
+            maxWaitTimeInMs: 500,
         })
         const { GROUP_JOIN, CRASH, CONNECT, DISCONNECT } = consumer.events
         consumer.on(GROUP_JOIN, ({ payload: { groupId } }) => {
