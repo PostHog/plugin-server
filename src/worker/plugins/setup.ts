@@ -24,6 +24,8 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
         } else {
             pluginConfig.vm = new LazyPluginVM()
             pluginVMLoadPromises.push(loadPlugin(server, pluginConfig))
+
+            void prevConfig?.vm?.getTeardownPlugin().then((teardown) => teardown?.())
         }
     }
 
