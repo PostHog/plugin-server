@@ -5,6 +5,7 @@ import { status } from '../../shared/status'
 import { Plugin, PluginConfig, PluginConfigId, PluginId, PluginsServer, TeamId } from '../../types'
 import { LazyPluginVM } from '../vm/lazy'
 import { loadPlugin } from './loadPlugin'
+import { teardownPlugins } from './teardown'
 
 export async function setupPlugins(server: PluginsServer): Promise<void> {
     const { plugins, pluginConfigs, pluginConfigsPerTeam } = await loadPluginsFromDB(server)
@@ -25,7 +26,9 @@ export async function setupPlugins(server: PluginsServer): Promise<void> {
             pluginConfig.vm = new LazyPluginVM()
             pluginVMLoadPromises.push(loadPlugin(server, pluginConfig))
 
-            void prevConfig?.vm?.getTeardownPlugin().then((teardown) => teardown?.())
+            if (prevConfig && (await prevConfig?.vm?.getTeardownPlugin())) {
+                void teardownPlugins(server, [prevConfig])
+            }
         }
     }
 

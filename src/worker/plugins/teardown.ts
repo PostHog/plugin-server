@@ -1,11 +1,16 @@
 import { processError } from '../../shared/error'
-import { PluginsServer } from '../../types'
+import { PluginConfig, PluginsServer } from '../../types'
 
-export async function teardownPlugins(server: PluginsServer): Promise<void> {
-    const { pluginConfigs } = server
+export async function teardownPlugins(
+    server: PluginsServer,
+    pluginConfigs: PluginConfig[] | undefined = undefined
+): Promise<void> {
+    if (!pluginConfigs) {
+        pluginConfigs = Array.from(server.pluginConfigs.values())
+    }
 
     const teardownPromises: Promise<void>[] = []
-    for (const [id, pluginConfig] of pluginConfigs) {
+    for (const pluginConfig of pluginConfigs) {
         if (pluginConfig.vm) {
             const teardownPlugin = await pluginConfig.vm.getTeardownPlugin()
             if (teardownPlugin) {
