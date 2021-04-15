@@ -12,6 +12,7 @@ import { VM } from 'vm2'
 
 import { DB } from './shared/db'
 import { KafkaProducerWrapper } from './shared/kafka-producer-wrapper'
+import { UUID } from './shared/utils'
 import { EventsProcessor } from './worker/ingestion/process-event'
 import { LazyPluginVM } from './worker/vm/lazy'
 
@@ -75,6 +76,7 @@ export interface PluginsServerConfig extends Record<string, any> {
 }
 
 export interface PluginsServer extends PluginsServerConfig {
+    instanceId: UUID
     // active connections to Postgres, Redis, ClickHouse, Kafka, StatsD
     db: DB
     postgres: Pool
@@ -171,6 +173,24 @@ export interface PluginAttachmentDB {
     file_size: number | null
     file_name: string
     contents: Buffer | null
+}
+
+export enum PluginLogEntryType {
+    Debug = 'DEBUG',
+    Log = 'LOG',
+    Info = 'INFO',
+    Warn = 'WARN',
+    Error = 'ERROR',
+}
+
+export interface PluginLogEntry {
+    id: string
+    team_id: number
+    plugin_id: number
+    timestamp: string
+    type: PluginLogEntryType
+    message: string
+    instance_id: string
 }
 
 export interface PluginTask {
