@@ -13,7 +13,7 @@ export function createConsole(server: PluginsServer, pluginConfig: PluginConfig)
             plugin_id: pluginConfig.plugin_id,
             timestamp: new Date().toISOString().replace('T', ' ').replace('Z', ''),
             type,
-            message: args.map(String).join(' '),
+            message: args.map((arg) => (typeof arg === 'object' ? JSON.stringify(arg) : arg)).join(' '),
             instance_id: server.instanceId.toString(),
         }
 
