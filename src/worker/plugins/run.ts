@@ -4,7 +4,7 @@ import { processError } from '../../shared/error'
 import { posthog } from '../../shared/posthog'
 import { PluginConfig, PluginsServer } from '../../types'
 
-const EVENTS_TO_IGNORE = new Set(['$snapshot', '$plugin_running_duration'])
+const EVENTS_TO_IGNORE = new Set(['$plugin_running_duration'])
 
 export async function runPlugins(server: PluginsServer, event: PluginEvent): Promise<PluginEvent | null> {
     if (EVENTS_TO_IGNORE.has(event.event)) {

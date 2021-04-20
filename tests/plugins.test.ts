@@ -2,6 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import { mocked } from 'ts-jest/utils'
 
 import { clearError, processError } from '../src/shared/error'
+import { posthog } from '../src/shared/posthog'
 import { createServer } from '../src/shared/server'
 import { LogLevel, PluginsServer } from '../src/types'
 import { loadPlugin } from '../src/worker/plugins/loadPlugin'
@@ -30,6 +31,7 @@ let closeServer: () => Promise<void>
 beforeEach(async () => {
     ;[mockServer, closeServer] = await createServer({ LOG_LEVEL: LogLevel.Log })
     console.warn = jest.fn() as any
+    posthog.capture = jest.fn() as any
 })
 afterEach(async () => {
     await closeServer()
@@ -84,6 +86,14 @@ test('setupPlugins and runPlugins', async () => {
     const returnedEvent = await runPlugins(mockServer, event)
     expect(event.properties!['processed']).toEqual(true)
     expect(returnedEvent!.properties!['processed']).toEqual(true)
+    expect(posthog.capture).toHaveBeenCalledTimes(1)
+    expect(posthog.capture).toHaveBeenCalledWith('$plugin_running_duration', {
+        team: 2,
+        function: 'processEvent',
+        plugin: 'test-maxmind-plugin',
+        time_ms: expect.any(Number),
+        time_seconds: expect.any(Number),
+    })
 })
 
 test('plugin returns null', async () => {

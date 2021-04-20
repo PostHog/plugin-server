@@ -815,7 +815,7 @@ export const createProcessEventTests = (
     test('capture first team event', async () => {
         await server.db.postgresQuery(`UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`, [false, team.id])
 
-        eventsProcessor.posthog = {
+        const posthog = {
             identify: jest.fn((distinctId) => true),
             capture: jest.fn((event, properties) => true),
         } as any
@@ -838,8 +838,8 @@ export const createProcessEventTests = (
             new UUIDT().toString()
         )
 
-        expect(eventsProcessor.posthog.identify).toHaveBeenCalledWith('plugin_test_user_distinct_id_1001')
-        expect(eventsProcessor.posthog.capture).toHaveBeenCalledWith('first team event ingested', {
+        expect(posthog.identify).toHaveBeenCalledWith('plugin_test_user_distinct_id_1001')
+        expect(posthog.capture).toHaveBeenCalledWith('first team event ingested', {
             team: team.uuid,
         })
 
