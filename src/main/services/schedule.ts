@@ -9,7 +9,11 @@ import { startRedlock } from './redlock'
 
 export const LOCKED_RESOURCE = 'plugin-server:locks:schedule'
 
-export async function startSchedule(server: PluginsServer, piscina: Piscina): Promise<ScheduleControl> {
+export async function startSchedule(
+    server: PluginsServer,
+    piscina: Piscina,
+    onLock?: () => void
+): Promise<ScheduleControl> {
     status.info('⏰', 'Starting scheduling service...')
 
     let stopped = false
@@ -41,6 +45,7 @@ export async function startSchedule(server: PluginsServer, piscina: Piscina): Pr
         LOCKED_RESOURCE,
         () => {
             weHaveTheLock = true
+            onLock?.()
         },
         () => {
             weHaveTheLock = false
