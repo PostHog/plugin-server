@@ -119,6 +119,7 @@ export interface RetryQueue {
     resumeConsumer: () => Promise<void> | void
     isConsumerPaused: () => boolean
     enqueue: (retry: EnqueuedRetry) => Promise<void> | void
+    quit: () => Promise<void> | void
 }
 
 export type PluginId = number

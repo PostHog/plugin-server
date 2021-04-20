@@ -164,6 +164,7 @@ export async function createServer(
 
     const closeServer = async () => {
         server.mmdbUpdateJob?.cancel()
+        await server.retryQueueManager?.quit()
         if (kafkaProducer) {
             clearInterval(kafkaProducer.flushInterval)
             await kafkaProducer.flush()

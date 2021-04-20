@@ -2,9 +2,11 @@ import * as Sentry from '@sentry/node'
 
 import { EnqueuedRetry, OnRetryCallback, PluginsServer, RetryQueue } from '../../types'
 import { FsQueue } from './fs-queue'
+import { GraphileQueue } from './graphile-queue'
 
 const queues = {
     fs: () => new FsQueue(),
+    graphile: (pluginsServer: PluginsServer) => new GraphileQueue(pluginsServer),
 }
 
 export class RetryQueueManager implements RetryQueue {
@@ -19,7 +21,7 @@ export class RetryQueueManager implements RetryQueue {
             .map(
                 (queue): RetryQueue => {
                     if (queues[queue as keyof typeof queues]) {
-                        return queues[queue as keyof typeof queues]()
+                        return queues[queue as keyof typeof queues](pluginsServer)
                     } else {
                         throw new Error(`Unknown retry queue "${queue}"`)
                     }
@@ -44,6 +46,10 @@ export class RetryQueueManager implements RetryQueue {
             }
         }
         throw new Error('No RetryQueue available')
+    }
+
+    async quit(): Promise<void> {
+        await Promise.all(this.retryQueues.map((r) => r.quit()))
     }
 
     async startConsumer(onRetry: OnRetryCallback): Promise<void> {

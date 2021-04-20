@@ -26,6 +26,10 @@ export class FsQueue implements RetryQueue {
         fs.appendFileSync(this.filename, `${JSON.stringify(retry)}\n`)
     }
 
+    quit(): void {
+        // nothing to do
+    }
+
     startConsumer(onRetry: OnRetryCallback): void {
         fs.writeFileSync(this.filename, '')
         this.started = true
