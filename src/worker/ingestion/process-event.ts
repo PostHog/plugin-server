@@ -399,7 +399,7 @@ export class EventsProcessor {
 
         if (properties['$set'] || properties['$set_once'] || properties['$increment']) {
             const incrementProperties = properties['$increment'] || {}
-            for (const [key, val] of Object.entries(properties['$increment']) || {}) {
+            for (const [key, val] of Object.entries(incrementProperties)) {
                 if (typeof val !== 'number') {
                     delete incrementProperties[key]
                 }
