@@ -25,6 +25,7 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
                 await processError(server, pluginConfig, error, returnedEvent)
                 server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.process_event.ERROR`)
             }
+
             const timeSpentRunning = new Date().getTime() - timer.getTime()
             server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.process_event`, timer)
             posthog.capture('$plugin_running_duration', {
@@ -74,6 +75,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
                     await processError(server, pluginConfig, error, returnedEvents[0])
                     server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.process_event_batch.ERROR`)
                 }
+
                 const timeSpentRunning = new Date().getTime() - timer.getTime()
                 server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.process_event_batch`, timer)
                 server.statsd?.timing('plugin.process_event_batch', timer, 0.2, {
