@@ -17,6 +17,7 @@ import {
     Event,
     Person,
     PersonDistinctId,
+    PluginLogEntry,
     PluginsServerConfig,
     PostgresSessionRecordingEvent,
     RawOrganization,
@@ -579,5 +580,15 @@ export class DB {
         }
 
         return hash
+    }
+
+    // PluginLogEntry
+
+    public async fetchPluginLogEntries(): Promise<PluginLogEntry[]> {
+        if (this.kafkaProducer) {
+            return (await this.clickhouseQuery(`SELECT * FROM plugin_log_entries`)).data as PluginLogEntry[]
+        } else {
+            return (await this.postgresQuery('SELECT * FROM posthog_pluginlogentry')).rows as PluginLogEntry[]
+        }
     }
 }

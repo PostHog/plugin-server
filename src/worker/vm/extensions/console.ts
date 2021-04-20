@@ -18,7 +18,7 @@ export function createConsole(server: PluginsServer, pluginConfig: PluginConfig)
 
         args = args.map((arg) => {
             const argString = String(arg)
-            return argString === '[object Object]' ? JSON.stringify(arg) : argString
+            return argString === '[object Object]' ? JSON.stringify(arg, null, 4) : argString
         })
 
         const entry: PluginLogEntry = {
