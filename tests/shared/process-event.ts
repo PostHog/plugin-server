@@ -5,6 +5,7 @@ import { performance } from 'perf_hooks'
 
 import { IEvent } from '../../src/idl/protos'
 import { hashElements } from '../../src/shared/ingestion/utils'
+import { posthog } from '../../src/shared/posthog'
 import { createServer } from '../../src/shared/server'
 import { delay, UUIDT } from '../../src/shared/utils'
 import {
@@ -815,10 +816,8 @@ export const createProcessEventTests = (
     test('capture first team event', async () => {
         await server.db.postgresQuery(`UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`, [false, team.id])
 
-        const posthog = {
-            identify: jest.fn((distinctId) => true),
-            capture: jest.fn((event, properties) => true),
-        } as any
+        posthog.capture = jest.fn() as any
+        posthog.identify = jest.fn() as any
 
         await processEvent(
             '2',
