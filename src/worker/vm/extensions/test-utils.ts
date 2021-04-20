@@ -5,7 +5,7 @@ const consoleFile = path.join(process.cwd(), 'tmp', 'test-console.txt')
 
 export const writeToFile = {
     console: {
-        log: (...args: any[]) => {
+        log: (...args: any[]): void => {
             fs.appendFileSync(consoleFile, `${JSON.stringify(args)}\n`)
         },
         reset(): void {

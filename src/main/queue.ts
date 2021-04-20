@@ -18,7 +18,7 @@ export function pauseQueueIfWorkerFull(
     pause: undefined | (() => void | Promise<void>),
     server: PluginsServer,
     piscina?: Piscina
-) {
+): void {
     if (pause && (piscina?.queueSize || 0) > (server.WORKER_CONCURRENCY || 4) * (server.WORKER_CONCURRENCY || 4)) {
         void pause()
     }
