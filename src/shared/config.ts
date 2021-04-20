@@ -2,6 +2,7 @@ import os from 'os'
 
 import { LogLevel, PluginsServerConfig } from '../types'
 import { KAFKA_EVENTS_PLUGIN_INGESTION } from './ingestion/topics'
+import { stringToBoolean } from './utils'
 
 export const defaultConfig = overrideWithEnv(getDefaultConfig())
 export const configHelp = getConfigHelp()
@@ -121,7 +122,7 @@ export function overrideWithEnv(
             if (typeof defaultConfig[key] === 'number') {
                 newConfig[key] = env[key]?.indexOf('.') ? parseFloat(env[key]!) : parseInt(env[key]!)
             } else if (typeof defaultConfig[key] === 'boolean') {
-                newConfig[key] = env[key]?.toLowerCase() === 'true' || env[key] === '1'
+                newConfig[key] = stringToBoolean(env[key])
             } else {
                 newConfig[key] = env[key]
             }
