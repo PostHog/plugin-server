@@ -115,6 +115,8 @@ test('plugin meta has what it should have', async () => {
     const returnedEvent = await runPlugins(mockServer, event)
 
     expect(Object.keys(returnedEvent!.properties!).sort()).toEqual([
+        '$plugins_failed',
+        '$plugins_ran',
         'attachments',
         'cache',
         'config',
@@ -182,6 +184,72 @@ test('local plugin with broken index.js does not do much', async () => {
     expect(error.message).toContain(': Unexpected token, expected ","')
 
     unlink()
+})
+
+test('plugin throwing error does not prevent ingestion and failure is noted in event', async () => {
+    // silence some spam
+    console.log = jest.fn()
+    console.error = jest.fn()
+
+    getPluginRows.mockReturnValueOnce([
+        mockPluginWithArchive(`
+            function processEvent (event) {
+                throw new Error('I always fail!')
+            }
+        `),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(mockServer)
+    const { pluginConfigs } = mockServer
+
+    expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
+
+    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
+    const returnedEvent = await runPlugins(mockServer, { ...event })
+
+    const expectedReturnEvent = {
+        ...event,
+        properties: {
+            $plugins_ran: [],
+            $plugins_failed: ['test-maxmind-plugin'],
+        },
+    }
+    expect(returnedEvent).toEqual(expectedReturnEvent)
+})
+
+test('events have property $plugins_ran set to the plugins that succeeded', async () => {
+    // silence some spam
+    console.log = jest.fn()
+    console.error = jest.fn()
+
+    getPluginRows.mockReturnValueOnce([
+        mockPluginWithArchive(`
+            function processEvent (event) {
+                return event
+            }
+        `),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(mockServer)
+    const { pluginConfigs } = mockServer
+
+    expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
+
+    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
+    const returnedEvent = await runPlugins(mockServer, { ...event })
+
+    const expectedReturnEvent = {
+        ...event,
+        properties: {
+            $plugins_ran: ['test-maxmind-plugin'],
+            $plugins_failed: [],
+        },
+    }
+    expect(returnedEvent).toEqual(expectedReturnEvent)
 })
 
 test('archive plugin with broken plugin.json does not do much', async () => {
