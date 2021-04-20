@@ -1393,6 +1393,63 @@ export const createProcessEventTests = (
         expect(person2.properties).toEqual({ a_prop: 'test-1', b_prop: 'test-2b', c_prop: 'test-1' })
     })
 
+    test('$increment increments numerical user properties or creates a new one', async () => {
+        await createPerson(server, team, ['distinct_id'])
+
+        await processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: 'some_event',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $increment: { a_prop: 100, non_numerical: '1' },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect((await server.db.fetchEvents()).length).toBe(1)
+
+        const [event] = await server.db.fetchEvents()
+        expect(event.properties['$increment']).toEqual({ a_prop: 100, non_numerical: '1' })
+
+        const [person] = await server.db.fetchPersons()
+        expect(await server.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+
+        // creates numerical prop, ignores non-numerical values
+        expect(person.properties).toEqual({ a_prop: 100 })
+
+        await processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: 'some_other_event',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $increment: { a_prop: 247 },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect((await server.db.fetchEvents()).length).toBe(2)
+        const [person2] = await server.db.fetchPersons()
+
+        // adds to the existing prop value
+        expect(person2.properties).toEqual({ a_prop: 347 })
+    })
+
     test('distinct_id wrong type (number)', async () => {
         await createPerson(server, team, ['asdfasdfasdf'])
         await processEvent(

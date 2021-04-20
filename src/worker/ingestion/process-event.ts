@@ -205,7 +205,8 @@ export class EventsProcessor {
         teamId: number,
         distinctId: string,
         properties: Properties,
-        propertiesOnce: Properties
+        propertiesOnce: Properties,
+        incrementProperties: Record<string, number>
     ): Promise<Person> {
         let personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
@@ -230,7 +231,16 @@ export class EventsProcessor {
                 `Could not find person with distinct id "${distinctId}" in team "${teamId}", even after trying to insert them`
             )
         }
+
         const updatedProperties: Properties = { ...propertiesOnce, ...personFound.properties, ...properties }
+
+        for (const [key, val] of Object.entries(incrementProperties)) {
+            if (updatedProperties[key]) {
+                updatedProperties[key] += val
+            } else {
+                updatedProperties[key] = val
+            }
+        }
 
         if (equal(personFound.properties, updatedProperties)) {
             return personFound
@@ -387,12 +397,20 @@ export class EventsProcessor {
 
         properties = personInitialAndUTMProperties(properties)
 
-        if (properties['$set'] || properties['$set_once']) {
+        if (properties['$set'] || properties['$set_once'] || properties['$increment']) {
+            const incrementProperties = properties['$increment'] || {}
+            for (const [key, val] of Object.entries(properties['$increment']) || {}) {
+                if (typeof val !== 'number') {
+                    delete incrementProperties[key]
+                }
+            }
+
             await this.updatePersonProperties(
                 teamId,
                 distinctId,
                 properties['$set'] || {},
-                properties['$set_once'] || {}
+                properties['$set_once'] || {},
+                incrementProperties
             )
         }
 
