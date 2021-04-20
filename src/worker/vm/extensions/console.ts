@@ -12,6 +12,10 @@ export function createConsole(server: PluginsServer, pluginConfig: PluginConfig)
             status.info('👉', `${type} in ${pluginDigest(pluginConfig.plugin!, pluginConfig.team_id)}:`, ...args)
         }
 
+        if (!server.ENABLE_PERSISTENT_CONSOLE) {
+            return
+        }
+
         args = args.map((arg) => {
             const argString = String(arg)
             return argString === '[object Object]' ? JSON.stringify(arg) : argString

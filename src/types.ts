@@ -73,6 +73,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     DISTINCT_ID_LRU_SIZE: number
     INTERNAL_MMDB_SERVER_PORT: number
     PLUGIN_SERVER_IDLE: boolean
+    ENABLE_PERSISTENT_CONSOLE: boolean
 }
 
 export interface PluginsServer extends PluginsServerConfig {

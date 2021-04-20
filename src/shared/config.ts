@@ -59,6 +59,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         DISTINCT_ID_LRU_SIZE: 10000,
         INTERNAL_MMDB_SERVER_PORT: 0,
         PLUGIN_SERVER_IDLE: false,
+        ENABLE_PERSISTENT_CONSOLE: false, // TODO: remove when persistent console ships in main repo
     }
 }
 
