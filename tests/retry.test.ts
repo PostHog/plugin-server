@@ -16,7 +16,7 @@ jest.setTimeout(60000) // 60 sec timeout
 const { console: testConsole } = imports['test-utils/write-to-file']
 
 describe('retry queues', () => {
-    let workerUtils: WorkerUtils
+    let workerUtils: WorkerUtils | null
 
     beforeEach(async () => {
         testConsole.reset()
@@ -26,7 +26,8 @@ describe('retry queues', () => {
     })
 
     afterEach(async () => {
-        await workerUtils.release()
+        await workerUtils?.release()
+        workerUtils = null
     })
 
     test('onRetry gets called', async () => {
