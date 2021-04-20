@@ -1,7 +1,7 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 
 import { processError } from '../../shared/error'
-import { PluginConfig, PluginsServer } from '../../types'
+import { EnqueuedRetry, PluginConfig, PluginsServer } from '../../types'
 
 export async function runPlugins(server: PluginsServer, event: PluginEvent): Promise<PluginEvent | null> {
     const pluginsToRun = getPluginsForTeam(server, event.team_id)
@@ -89,4 +89,19 @@ export async function runPluginTask(server: PluginsServer, taskName: string, plu
 
 function getPluginsForTeam(server: PluginsServer, teamId: number): PluginConfig[] {
     return server.pluginConfigsPerTeam.get(teamId) || []
+}
+
+export async function runOnRetry(server: PluginsServer, retry: EnqueuedRetry): Promise<any> {
+    const timer = new Date()
+    let response
+    try {
+        const pluginConfig = server.pluginConfigs.get(retry.pluginConfigId)
+        const task = await pluginConfig?.vm?.getOnRetry()
+        response = await task?.(retry.type, retry.payload)
+    } catch (error) {
+        await processError(server, retry.pluginConfigId, error)
+        server.statsd?.increment(`plugin.retry.${retry.type}.${retry.pluginConfigId}.ERROR`)
+    }
+    server.statsd?.timing(`plugin.retry.${retry.type}.${retry.pluginConfigId}`, timer)
+    return response
 }
