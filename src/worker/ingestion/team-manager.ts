@@ -1,8 +1,8 @@
 import { Properties } from '@posthog/plugin-scaffold'
-import { posthog } from 'shared/posthog'
 
 import { DB } from '../../shared/db'
 import { timeoutGuard } from '../../shared/ingestion/utils'
+import { posthog } from '../../shared/posthog'
 import { Team, TeamId } from '../../types'
 
 interface TeamWithEventUuid extends Team {

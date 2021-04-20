@@ -3,7 +3,6 @@ import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import equal from 'fast-deep-equal'
 import { DateTime, Duration } from 'luxon'
-import { posthog } from 'shared/posthog'
 
 import { Event as EventProto, IEvent } from '../../idl/protos'
 import Client from '../../shared/celery/client'
@@ -16,6 +15,7 @@ import {
     timeoutGuard,
 } from '../../shared/ingestion/utils'
 import { KafkaProducerWrapper } from '../../shared/kafka-producer-wrapper'
+import { posthog } from '../../shared/posthog'
 import { status } from '../../shared/status'
 import { castTimestampOrNow, UUID, UUIDT } from '../../shared/utils'
 import {
