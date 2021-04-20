@@ -1,6 +1,7 @@
 import { EnqueuedRetry, OnRetryCallback, RetryQueue } from '../../types'
 import Timeout = NodeJS.Timeout
 import * as fs from 'fs'
+import * as path from 'path'
 
 export class FsQueue implements RetryQueue {
     paused: boolean
@@ -8,15 +9,17 @@ export class FsQueue implements RetryQueue {
     interval: Timeout | null
     filename: string
 
-    constructor(filename = '/tmp/fs-queue-file.txt') {
+    constructor(filename?: string) {
         if (process.env.NODE_ENV !== 'test') {
             throw new Error('Can not use FsQueue outside tests')
         }
         this.paused = false
         this.started = false
         this.interval = null
-        this.filename = filename
-        // this.queued = []
+        this.filename = filename || path.join(process.cwd(), 'tmp', 'fs-queue.txt')
+
+        fs.mkdirSync(path.dirname(this.filename), { recursive: true })
+        fs.writeFileSync(this.filename, '')
     }
 
     enqueue(retry: EnqueuedRetry): Promise<void> | void {
@@ -35,14 +38,8 @@ export class FsQueue implements RetryQueue {
                 .readFileSync(this.filename)
                 .toString()
                 .split('\n')
-                .map((s) => {
-                    try {
-                        return JSON.parse(s) as EnqueuedRetry
-                    } catch (e) {
-                        return null
-                    }
-                })
-                .filter((a) => !!a) as EnqueuedRetry[]
+                .filter((a) => a)
+                .map((s) => JSON.parse(s) as EnqueuedRetry)
 
             const newQueue = queue.filter((element) => element.timestamp < timestamp)
             if (newQueue.length > 0) {

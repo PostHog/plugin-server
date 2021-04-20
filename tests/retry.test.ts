@@ -1,29 +1,31 @@
-import * as fetch from 'node-fetch'
-
 import { startPluginsServer } from '../src/main/pluginsServer'
 import { delay } from '../src/shared/utils'
 import { LogLevel } from '../src/types'
 import { makePiscina } from '../src/worker/piscina'
 import { createPosthog } from '../src/worker/vm/extensions/posthog'
+import { imports } from '../src/worker/vm/imports'
 import { pluginConfig39 } from './helpers/plugins'
-import { resetTestDatabase } from './helpers/sql'
+import { getErrorForPluginConfig, resetTestDatabase } from './helpers/sql'
 
 jest.mock('../src/shared/sql')
 jest.setTimeout(60000) // 60 sec timeout
 
+const { console: testConsole } = imports['test-utils/write-to-file']
+
 describe('retry queues', () => {
+    beforeEach(() => {
+        testConsole.reset()
+    })
     test('on retry gets called', async () => {
         const testCode = `
-            import fetch from 'node-fetch'
+            import { console } from 'test-utils/write-to-file'
 
             export async function onRetry (type, payload, meta) {
-                if (type === 'processEvent') {
-                    console.log('retrying event!', type)
-                }
-                void fetch('https://google.com/retry.json?query=' + type)
+                console.log('retrying event!', type)
             }
             export async function processEvent (event, meta) {
                 if (event.properties?.hi === 'ha') {
+                    console.log('processEvent')
                     meta.retry('processEvent', event, 1)
                 }
                 return event
@@ -38,15 +40,13 @@ describe('retry queues', () => {
             },
             makePiscina
         )
+        console.log(await getErrorForPluginConfig(39))
         const posthog = createPosthog(server.server, pluginConfig39)
-
-        expect(fetch).not.toHaveBeenCalled()
 
         posthog.capture('my event', { hi: 'ha' })
         await delay(5000)
 
-        // can't use this as the call is in a different thread
-        // expect(fetch).toHaveBeenCalledWith('https://google.com/retry.json?query=processEvent')
+        expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'processEvent']])
 
         await server.stop()
     })
