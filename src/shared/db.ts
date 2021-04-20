@@ -612,19 +612,22 @@ export class DB {
             instance_id: instanceId.toString(),
         }
 
-        if (this.kafkaProducer) {
-            await this.kafkaProducer
-                .queueMessage({
+        try {
+            if (this.kafkaProducer) {
+                await this.kafkaProducer.queueMessage({
                     topic: KAFKA_PLUGIN_LOG_ENTRIES,
                     messages: [{ key: entry.id, value: Buffer.from(JSON.stringify(entry)) }],
                 })
-                .catch(captureException)
-        } else {
-            await this.postgresQuery(
-                'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, timestamp, type, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                Object.values(entry),
-                'insertPluginLogEntry'
-            ).catch(captureException)
+            } else {
+                await this.postgresQuery(
+                    'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, timestamp, type, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                    Object.values(entry),
+                    'insertPluginLogEntry'
+                )
+            }
+        } catch (e) {
+            captureException(e)
+            console.error(e)
         }
 
         return entry
