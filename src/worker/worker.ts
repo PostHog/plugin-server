@@ -6,7 +6,7 @@ import { status } from '../shared/status'
 import { cloneObject } from '../shared/utils'
 import { PluginsServer, PluginsServerConfig } from '../types'
 import { ingestEvent } from './ingestion/ingest-event'
-import { runOnRetry,runPlugins, runPluginsOnBatch, runPluginTask } from './plugins/run'
+import { runOnRetry, runPlugins, runPluginsOnBatch, runPluginTask } from './plugins/run'
 import { loadSchedule, setupPlugins } from './plugins/setup'
 import { teardownPlugins } from './plugins/teardown'
 

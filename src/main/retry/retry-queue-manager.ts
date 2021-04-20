@@ -18,6 +18,7 @@ export class RetryQueueManager implements RetryQueue {
 
         this.retryQueues = pluginsServer.RETRY_QUEUES.split(',')
             .map((q) => q.trim())
+            .filter((q) => !!q)
             .map(
                 (queue): RetryQueue => {
                     if (queues[queue as keyof typeof queues]) {
