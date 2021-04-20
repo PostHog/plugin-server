@@ -68,6 +68,7 @@ There's a multitude of settings you can use to control the plugin server. Use th
 | DISTINCT_ID_LRU_SIZE          | size of persons distinct ID LRU cache                             | `10000`                               |
 | PLUGIN_SERVER_IDLE            | whether to disengage the plugin server, e.g. for development      | `false`                               |
 | POSTHOG_PROJECT_API_KEY       | PostHog project API key for analytics                             | `sTMFPsFhdP1Ssg`                      |
+| POSTHOG_API_HOST              | address of the PostHog instance used for analytics                | `sTMFPsFhdP1Ssg`                      |
 
 ## Releasing a new version
 

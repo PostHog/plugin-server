@@ -59,6 +59,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         INTERNAL_MMDB_SERVER_PORT: 0,
         PLUGIN_SERVER_IDLE: false,
         POSTHOG_PROJECT_API_KEY: 'sTMFPsFhdP1Ssg',
+        POSTHOG_API_HOST: 'https://app.posthog.com',
     }
 }
 
@@ -101,6 +102,7 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         INTERNAL_MMDB_SERVER_PORT: 'port of the internal server used for IP location (0 means random)',
         PLUGIN_SERVER_IDLE: 'whether to disengage the plugin server, e.g. for development',
         POSTHOG_PROJECT_API_KEY: 'PostHog project API key for analytics',
+        POSTHOG_API_HOST: 'address of the PostHog instance used for analytics',
     }
 }
 
