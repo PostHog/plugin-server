@@ -58,6 +58,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         DISTINCT_ID_LRU_SIZE: 10000,
         INTERNAL_MMDB_SERVER_PORT: 0,
         PLUGIN_SERVER_IDLE: false,
+        POSTHOG_PROJECT_API_KEY: 'sTMFPsFhdP1Ssg',
     }
 }
 
@@ -99,6 +100,7 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         DISTINCT_ID_LRU_SIZE: 'size of persons distinct ID LRU cache',
         INTERNAL_MMDB_SERVER_PORT: 'port of the internal server used for IP location (0 means random)',
         PLUGIN_SERVER_IDLE: 'whether to disengage the plugin server, e.g. for development',
+        POSTHOG_PROJECT_API_KEY: 'PostHog project API key for analytics',
     }
 }
 

@@ -3,8 +3,7 @@ import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import equal from 'fast-deep-equal'
 import { DateTime, Duration } from 'luxon'
-import * as fetch from 'node-fetch'
-import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
+import { posthog } from 'shared/posthog'
 
 import { Event as EventProto, IEvent } from '../../idl/protos'
 import Client from '../../shared/celery/client'
@@ -26,7 +25,6 @@ import {
     PluginsServer,
     PostgresSessionRecordingEvent,
     SessionRecordingEvent,
-    Team,
     TeamId,
     TimestampFormat,
 } from '../../types'
@@ -39,7 +37,6 @@ export class EventsProcessor {
     clickhouse: ClickHouse | undefined
     kafkaProducer: KafkaProducerWrapper | undefined
     celery: Client
-    posthog: ReturnType<typeof nodePostHog>
     teamManager: TeamManager
     personManager: PersonManager
 
@@ -52,9 +49,8 @@ export class EventsProcessor {
         this.teamManager = new TeamManager(pluginsServer.db)
         this.personManager = new PersonManager(pluginsServer)
 
-        this.posthog = nodePostHog('sTMFPsFhdP1Ssg', { fetch })
         if (process.env.NODE_ENV === 'test') {
-            this.posthog.optOut()
+            posthog.optOut()
         }
     }
 
@@ -374,7 +370,7 @@ export class EventsProcessor {
             properties['$ip'] = ip
         }
 
-        await this.teamManager.updateEventNamesAndProperties(teamId, event, eventUuid, properties, this.posthog)
+        await this.teamManager.updateEventNamesAndProperties(teamId, event, eventUuid, properties)
 
         if (await this.personManager.isNewPerson(this.db, teamId, distinctId)) {
             // Catch race condition where in between getting and creating, another request already created this user

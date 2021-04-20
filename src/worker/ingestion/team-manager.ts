@@ -1,5 +1,5 @@
 import { Properties } from '@posthog/plugin-scaffold'
-import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
+import { posthog } from 'shared/posthog'
 
 import { DB } from '../../shared/db'
 import { timeoutGuard } from '../../shared/ingestion/utils'
@@ -88,8 +88,7 @@ export class TeamManager {
         teamId: number,
         event: string,
         eventUuid: string,
-        properties: Properties,
-        posthog: ReturnType<typeof nodePostHog>
+        properties: Properties
     ): Promise<void> {
         let team: TeamWithEventUuid | null = await this.fetchTeam(teamId)
 
