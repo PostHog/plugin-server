@@ -37,6 +37,7 @@ export async function resetTestDatabase(
         DELETE FROM posthog_event;
         DELETE FROM posthog_pluginstorage;
         DELETE FROM posthog_pluginattachment;
+        DELETE FROM posthog_pluginlogentry;
         DELETE FROM posthog_pluginconfig;
         DELETE FROM posthog_plugin;
         DELETE FROM posthog_team;
