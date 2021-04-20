@@ -1,9 +1,10 @@
 import ClickHouse from '@posthog/clickhouse'
 import { CacheOptions, Properties } from '@posthog/plugin-scaffold'
+import { captureException } from '@sentry/node'
 import { Pool as GenericPool } from 'generic-pool'
-import { StatsD, Tags } from 'hot-shots'
+import { StatsD } from 'hot-shots'
 import Redis from 'ioredis'
-import { Producer, ProducerRecord } from 'kafkajs'
+import { ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 
@@ -17,7 +18,9 @@ import {
     Event,
     Person,
     PersonDistinctId,
+    PluginConfig,
     PluginLogEntry,
+    PluginLogEntryType,
     PluginsServerConfig,
     PostgresSessionRecordingEvent,
     RawOrganization,
@@ -25,17 +28,18 @@ import {
     SessionRecordingEvent,
     TimestampFormat,
 } from '../types'
-import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID } from './ingestion/topics'
+import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_PLUGIN_LOG_ENTRIES } from './ingestion/topics'
 import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './ingestion/utils'
 import { KafkaProducerWrapper } from './kafka-producer-wrapper'
 import { instrumentQuery } from './metrics'
 import {
     castTimestampOrNow,
     clickHouseTimestampToISO,
-    createRedis,
     escapeClickHouseString,
     sanitizeSqlIdentifier,
     tryTwice,
+    UUID,
+    UUIDT,
 } from './utils'
 
 /** The recommended way of accessing the database. */
@@ -590,5 +594,39 @@ export class DB {
         } else {
             return (await this.postgresQuery('SELECT * FROM posthog_pluginlogentry')).rows as PluginLogEntry[]
         }
+    }
+
+    public async createPluginLogEntry(
+        pluginConfig: PluginConfig,
+        type: PluginLogEntryType,
+        message: string,
+        instanceId: UUID
+    ): Promise<PluginLogEntry> {
+        const entry: PluginLogEntry = {
+            id: new UUIDT().toString(),
+            team_id: pluginConfig.team_id,
+            plugin_id: pluginConfig.plugin_id,
+            timestamp: new Date().toISOString().replace('T', ' ').replace('Z', ''),
+            type,
+            message,
+            instance_id: instanceId.toString(),
+        }
+
+        if (this.kafkaProducer) {
+            await this.kafkaProducer
+                .queueMessage({
+                    topic: KAFKA_PLUGIN_LOG_ENTRIES,
+                    messages: [{ key: entry.id, value: Buffer.from(JSON.stringify(entry)) }],
+                })
+                .catch(captureException)
+        } else {
+            await this.postgresQuery(
+                'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, timestamp, type, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                Object.values(entry),
+                'insertPluginLogEntry'
+            ).catch(captureException)
+        }
+
+        return entry
     }
 }
