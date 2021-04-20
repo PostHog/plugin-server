@@ -4,10 +4,10 @@ import { processError } from '../../shared/error'
 import { posthog } from '../../shared/posthog'
 import { PluginConfig, PluginsServer } from '../../types'
 
-const EVENTS_TO_IGNORE = new Set(['$plugin_running_duration'])
+const EVENTS_TO_IGNORE = ['$plugin_running_duration']
 
 export async function runPlugins(server: PluginsServer, event: PluginEvent): Promise<PluginEvent | null> {
-    if (EVENTS_TO_IGNORE.has(event.event)) {
+    if (EVENTS_TO_IGNORE.includes(event.event)) {
         return event
     }
     const pluginsToRun = getPluginsForTeam(server, event.team_id)
@@ -48,7 +48,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
     const eventsByTeam = new Map<number, PluginEvent[]>()
 
     for (const event of batch) {
-        if (EVENTS_TO_IGNORE.has(event.event)) {
+        if (EVENTS_TO_IGNORE.includes(event.event)) {
             continue
         }
         if (eventsByTeam.has(event.team_id)) {

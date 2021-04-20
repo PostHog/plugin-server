@@ -22,7 +22,7 @@ jest.mock('../../src/worker/ingestion/ingest-event')
 jest.mock('../../src/worker/plugins/run')
 jest.mock('../../src/worker/plugins/setup')
 jest.mock('../../src/worker/plugins/teardown')
-jest.setTimeout(600000) // 600 sec timeout
+jest.setTimeout(1000000) // 1000 sec timeout
 
 function createEvent(index = 0): PluginEvent {
     return {
