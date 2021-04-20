@@ -398,7 +398,7 @@ export class EventsProcessor {
         properties = personInitialAndUTMProperties(properties)
 
         if (properties['$set'] || properties['$set_once'] || properties['$increment']) {
-            const incrementProperties = properties['$increment'] || {}
+            const incrementProperties = { ...(properties['$increment'] || {}) }
             for (const [key, val] of Object.entries(incrementProperties)) {
                 if (typeof val !== 'number') {
                     delete incrementProperties[key]
