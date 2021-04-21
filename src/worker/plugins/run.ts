@@ -17,11 +17,11 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
 
             try {
                 returnedEvent = (await processEvent(returnedEvent)) || null
-                pluginsRan.push(pluginConfig.plugin?.name)
+                pluginsRan.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
             } catch (error) {
                 await processError(server, pluginConfig, error, returnedEvent)
                 server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.process_event.ERROR`)
-                pluginsFailed.push(pluginConfig.plugin?.name)
+                pluginsFailed.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
             }
             server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.process_event`, timer)
 
@@ -34,8 +34,13 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
     if (!returnedEvent.properties) {
         returnedEvent.properties = {}
     }
-    returnedEvent.properties['$plugins_ran'] = pluginsRan
-    returnedEvent.properties['$plugins_failed'] = pluginsFailed
+    if (pluginsRan.length > 0) {
+        returnedEvent.properties['$plugins_ran_successfully'] = pluginsRan
+    }
+    if (pluginsFailed.length > 0) {
+        returnedEvent.properties['$plugins_failed'] = pluginsFailed
+    }
+
     return returnedEvent
 }
 
@@ -64,11 +69,11 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
             if (processEventBatch && returnedEvents.length > 0) {
                 try {
                     returnedEvents = (await processEventBatch(returnedEvents)) || []
-                    pluginsRan.push(pluginConfig.plugin?.name)
+                    pluginsRan.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
                 } catch (error) {
                     await processError(server, pluginConfig, error, returnedEvents[0])
                     server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.process_event_batch.ERROR`)
-                    pluginsFailed.push(pluginConfig.plugin?.name)
+                    pluginsFailed.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
                 }
                 server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.process_event_batch`, timer)
                 server.statsd?.timing('plugin.process_event_batch', timer, 0.2, {
@@ -83,7 +88,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
                 if (!event.properties) {
                     event.properties = {}
                 }
-                event.properties['$plugins_ran'] = pluginsRan
+                event.properties['$plugins_ran_successfully'] = pluginsRan
                 event.properties['$plugins_failed'] = pluginsFailed
             }
         }
