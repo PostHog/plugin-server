@@ -606,6 +606,7 @@ export class DB {
             id: new UUIDT().toString(),
             team_id: pluginConfig.team_id,
             plugin_id: pluginConfig.plugin_id,
+            plugin_config_id: pluginConfig.id,
             timestamp: new Date().toISOString().replace('T', ' ').replace('Z', ''),
             type,
             message,
@@ -620,7 +621,7 @@ export class DB {
                 })
             } else {
                 await this.postgresQuery(
-                    'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, timestamp, type, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                    'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, plugin_config_id, timestamp, type, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
                     Object.values(entry),
                     'insertPluginLogEntry'
                 )
