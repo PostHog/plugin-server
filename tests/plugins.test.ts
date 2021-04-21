@@ -211,7 +211,7 @@ test('plugin throwing error does not prevent ingestion and failure is noted in e
     const expectedReturnEvent = {
         ...event,
         properties: {
-            $plugins_failed: ['test-maxmind-plugin'],
+            $plugins_failed: ['test-maxmind-plugin (39)'],
         },
     }
     expect(returnedEvent).toEqual(expectedReturnEvent)
@@ -243,7 +243,7 @@ test('events have property $plugins_ran_successfully set to the plugins that suc
     const expectedReturnEvent = {
         ...event,
         properties: {
-            $plugins_ran_successfully: ['test-maxmind-plugin'],
+            $plugins_ran_successfully: ['test-maxmind-plugin (39)'],
         },
     }
     expect(returnedEvent).toEqual(expectedReturnEvent)
