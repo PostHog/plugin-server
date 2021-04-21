@@ -4,6 +4,18 @@ import { status } from '../../../shared/status'
 import { determineNodeEnv, NodeEnv, pluginDigest } from '../../../shared/utils'
 import { PluginConfig, PluginLogEntryType, PluginsServer } from '../../../types'
 
+function consoleFormat(...args: unknown[]): string {
+    return args
+        .map((arg) => {
+            const argString = String(arg)
+            if (argString === '[object Object]' || Array.isArray(arg)) {
+                return JSON.stringify(arg)
+            }
+            return argString
+        })
+        .join(' ')
+}
+
 export function createConsole(server: PluginsServer, pluginConfig: PluginConfig): ConsoleExtension {
     async function consolePersist(type: PluginLogEntryType, ...args: unknown[]): Promise<void> {
         if (determineNodeEnv() == NodeEnv.Development) {
@@ -14,14 +26,7 @@ export function createConsole(server: PluginsServer, pluginConfig: PluginConfig)
             return
         }
 
-        const message = args
-            .map((arg) => {
-                const argString = String(arg)
-                return argString === '[object Object]' ? JSON.stringify(arg, null, 4) : argString
-            })
-            .join(' ')
-
-        await server.db.createPluginLogEntry(pluginConfig, type, message, server.instanceId)
+        await server.db.createPluginLogEntry(pluginConfig, type, consoleFormat(...args), server.instanceId)
     }
 
     return {

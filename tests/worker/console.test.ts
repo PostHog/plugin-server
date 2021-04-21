@@ -82,11 +82,21 @@ describe('console extension', () => {
 
                 expect(pluginLogEntries.length).toBe(1)
                 expect(pluginLogEntries[0].type).toEqual(type)
-                expect(pluginLogEntries[0].message).toEqual(code`
-                    {
-                        "1": "ein",
-                        "2": "zwei"
-                    }`)
+                expect(pluginLogEntries[0].message).toEqual(`{"1":"ein","2":"zwei"}`)
+            })
+
+            it('leaves an object entry in the database', async () => {
+                const pluginConfig = (await getPluginConfigRows(server))[0]
+
+                const console = createConsole(server, pluginConfig)
+
+                await ((console[method]([99, 79]) as unknown) as Promise<void>)
+
+                const pluginLogEntries = await server.db.fetchPluginLogEntries()
+
+                expect(pluginLogEntries.length).toBe(1)
+                expect(pluginLogEntries[0].type).toEqual(type)
+                expect(pluginLogEntries[0].message).toEqual(`[99,79]`)
             })
         })
     })
