@@ -14,7 +14,7 @@ describe('console extension', () => {
     let closeServer: () => Promise<void>
 
     beforeEach(async () => {
-        ;[server, closeServer] = await createServer()
+        ;[server, closeServer] = await createServer({ ENABLE_PERSISTENT_CONSOLE: true })
         await resetTestDatabase()
     })
 
@@ -25,10 +25,6 @@ describe('console extension', () => {
     Object.values(PluginLogEntryType).map((type) => {
         const method = type.toLowerCase() as keyof ConsoleExtension
         describe(`console#${method}`, () => {
-            if (!server.ENABLE_PERSISTENT_CONSOLE) {
-                // TODO: remove this return
-                return
-            }
             it('leaves an empty entry in the database', async () => {
                 const pluginConfig = (await getPluginConfigRows(server))[0]
 

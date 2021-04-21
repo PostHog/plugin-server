@@ -25,7 +25,7 @@ let stopServer: () => Promise<void>
 
 beforeEach(async () => {
     ;(Client as any).mockClear()
-    ;[mockServer, stopServer] = await createServer()
+    ;[mockServer, stopServer] = await createServer({ ENABLE_PERSISTENT_CONSOLE: true })
 })
 
 afterEach(async () => {
@@ -583,10 +583,6 @@ test('meta.cache incr', async () => {
 })
 
 test('console.log', async () => {
-    if (!mockServer.ENABLE_PERSISTENT_CONSOLE) {
-        // TODO: remove this return
-        return
-    }
     jest.spyOn(mockServer.db, 'createPluginLogEntry')
 
     const indexJs = `

@@ -56,6 +56,7 @@ jobs:
               uses: actions/checkout@v2
               with:
                   repository: 'PostHog/posthog'
+                  ref: 'plugin-log-entries'
                   path: 'posthog/'
 
             - name: Check out plugin server
@@ -135,6 +136,7 @@ jobs:
               uses: actions/checkout@v2
               with:
                   repository: 'PostHog/posthog'
+                  ref: 'plugin-log-entries'
                   path: 'posthog/'
 
             - name: Check out plugin server
@@ -226,6 +228,7 @@ jobs:
               uses: actions/checkout@v2
               with:
                   repository: 'PostHog/posthog'
+                  ref: 'plugin-log-entries'
                   path: 'posthog/'
 
             - name: Check out plugin server
@@ -317,6 +320,7 @@ jobs:
               uses: actions/checkout@v2
               with:
                   repository: 'PostHog/posthog'
+                  ref: 'plugin-log-entries'
                   path: 'posthog/'
 
             - name: Check out plugin server
@@ -404,6 +408,7 @@ jobs:
               uses: actions/checkout@v2
               with:
                   repository: 'PostHog/posthog'
+                  ref: 'plugin-log-entries'
                   path: 'posthog/'
 
             - name: Check out plugin server
@@ -479,6 +484,7 @@ jobs:
               uses: actions/checkout@v2
               with:
                   repository: 'PostHog/posthog'
+                  ref: 'plugin-log-entries'
                   path: 'posthog/'
 
             - name: Check out plugin server
@@ -554,6 +560,7 @@ jobs:
               uses: actions/checkout@v2
               with:
                   repository: 'PostHog/posthog'
+                  ref: 'plugin-log-entries'
                   path: 'posthog/'
 
             - name: Check out plugin server

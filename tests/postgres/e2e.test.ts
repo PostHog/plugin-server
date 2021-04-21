@@ -37,6 +37,7 @@ describe('e2e postgres ingestion', () => {
                 CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
                 LOG_LEVEL: LogLevel.Log,
                 KAFKA_ENABLED: false,
+                ENABLE_PERSISTENT_CONSOLE: true,
             },
             makePiscina
         )
@@ -72,10 +73,6 @@ describe('e2e postgres ingestion', () => {
     })
 
     test('console logging is persistent', async () => {
-        if (!server.ENABLE_PERSISTENT_CONSOLE) {
-            // TODO: remove this return
-            return
-        }
         expect((await server.db.fetchEvents()).length).toBe(0)
 
         posthog.capture('custom event', { name: 'hehe', uuid: new UUIDT().toString() })
