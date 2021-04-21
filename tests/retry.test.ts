@@ -1,7 +1,7 @@
 import { makeWorkerUtils, WorkerUtils } from 'graphile-worker'
 
 import { startPluginsServer } from '../src/main/pluginsServer'
-import { getDefaultConfig } from '../src/shared/config'
+import { defaultConfig } from '../src/shared/config'
 import { delay } from '../src/shared/utils'
 import { LogLevel } from '../src/types'
 import { makePiscina } from '../src/worker/piscina'
@@ -16,18 +16,8 @@ jest.setTimeout(60000) // 60 sec timeout
 const { console: testConsole } = imports['test-utils/write-to-file']
 
 describe('retry queues', () => {
-    let workerUtils: WorkerUtils | null
-
-    beforeEach(async () => {
+    beforeEach(() => {
         testConsole.reset()
-        workerUtils = await makeWorkerUtils({
-            connectionString: getDefaultConfig().DATABASE_URL,
-        })
-    })
-
-    afterEach(async () => {
-        await workerUtils?.release()
-        workerUtils = null
     })
 
     test('onRetry gets called', async () => {
