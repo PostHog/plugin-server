@@ -115,6 +115,7 @@ test('plugin meta has what it should have', async () => {
     const returnedEvent = await runPlugins(mockServer, event)
 
     expect(Object.keys(returnedEvent!.properties!).sort()).toEqual([
+        '$plugins_failed',
         '$plugins_ran_successfully',
         'attachments',
         'cache',
@@ -212,6 +213,7 @@ test('plugin throwing error does not prevent ingestion and failure is noted in e
         ...event,
         properties: {
             $plugins_failed: ['test-maxmind-plugin (39)'],
+            $plugins_ran_successfully: [],
         },
     }
     expect(returnedEvent).toEqual(expectedReturnEvent)
@@ -243,6 +245,7 @@ test('events have property $plugins_ran_successfully set to the plugins that suc
     const expectedReturnEvent = {
         ...event,
         properties: {
+            $plugins_failed: [],
             $plugins_ran_successfully: ['test-maxmind-plugin (39)'],
         },
     }
