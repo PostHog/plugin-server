@@ -65,11 +65,13 @@ describe('teardown', () => {
         const error1 = await getErrorForPluginConfig(pluginConfig39.id)
         expect(error1).toBe(null)
 
+        await delay(1000)
         await resetDatabasePlugin()
+        await delay(1000)
         await piscina?.broadcastTask({ task: 'reloadPlugins' })
 
         // this teardown will happen async
-        await delay(5000)
+        await delay(3000)
 
         // verify the teardownPlugin code runs
         const error2 = await getErrorForPluginConfig(pluginConfig39.id)
