@@ -48,10 +48,6 @@ export class EventsProcessor {
         this.celery = new Client(pluginsServer.db, pluginsServer.CELERY_DEFAULT_QUEUE)
         this.teamManager = new TeamManager(pluginsServer.db)
         this.personManager = new PersonManager(pluginsServer)
-
-        if (process.env.NODE_ENV === 'test') {
-            posthog.optOut()
-        }
     }
 
     public async processEvent(

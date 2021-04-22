@@ -1,8 +1,11 @@
 import * as fetch from 'node-fetch'
 import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
 
-import { defaultConfig } from './config'
+export const posthog = nodePostHog('sTMFPsFhdP1Ssg', {
+    fetch,
+    apiHost: 'https://app.posthog.com',
+})
 
-const posthog = nodePostHog(defaultConfig.POSTHOG_PROJECT_API_KEY, { fetch, apiHost: defaultConfig.POSTHOG_API_HOST })
-
-export { posthog }
+if (process.env.NODE_ENV === 'test') {
+    posthog.optOut()
+}

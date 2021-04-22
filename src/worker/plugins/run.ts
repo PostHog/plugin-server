@@ -1,13 +1,13 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 
 import { processError } from '../../shared/error'
-import { posthog } from '../../shared/posthog'
+import { statusReport } from '../../shared/status-report'
 import { PluginConfig, PluginsServer } from '../../types'
 
-const EVENTS_TO_IGNORE = new Set(['$plugin_running_duration'])
+const EVENTS_TO_IGNORE = ['$plugin_running_duration']
 
 export async function runPlugins(server: PluginsServer, event: PluginEvent): Promise<PluginEvent | null> {
-    if (EVENTS_TO_IGNORE.has(event.event)) {
+    if (EVENTS_TO_IGNORE.includes(event.event)) {
         return event
     }
     const pluginsToRun = getPluginsForTeam(server, event.team_id)
@@ -28,13 +28,7 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
 
             const timeSpentRunning = new Date().getTime() - timer.getTime()
             server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.process_event`, timer)
-            posthog.capture('$plugin_running_duration', {
-                team: event.team_id,
-                plugin: pluginConfig.plugin?.name,
-                time_ms: timeSpentRunning,
-                time_seconds: Math.round(timeSpentRunning / 10) / 1000,
-                function: 'processEvent',
-            })
+            statusReport.addToTimeSpentRunningPlugins(event.team_id, timeSpentRunning)
             if (!returnedEvent) {
                 return null
             }
@@ -48,7 +42,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
     const eventsByTeam = new Map<number, PluginEvent[]>()
 
     for (const event of batch) {
-        if (EVENTS_TO_IGNORE.has(event.event)) {
+        if (EVENTS_TO_IGNORE.includes(event.event)) {
             continue
         }
         if (eventsByTeam.has(event.team_id)) {
@@ -82,13 +76,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
                     plugin: pluginConfig.plugin?.name ?? '?',
                     teamId: teamId.toString(),
                 })
-                posthog.capture('$plugin_running_duration', {
-                    team: teamId,
-                    plugin: pluginConfig.plugin?.name,
-                    time_ms: timeSpentRunning,
-                    time_seconds: Math.round(timeSpentRunning / 10) / 1000,
-                    function: 'processEventBatch',
-                })
+                statusReport.addToTimeSpentRunningPlugins(teamId, timeSpentRunning)
             }
         }
 
@@ -111,13 +99,7 @@ export async function runPluginTask(server: PluginsServer, taskName: string, plu
     }
     const timeSpentRunning = new Date().getTime() - timer.getTime()
     server.statsd?.timing(`plugin.task.${taskName}.${pluginConfigId}`, timer)
-    posthog.capture('$plugin_running_duration', {
-        team: pluginConfig?.team_id,
-        plugin: pluginConfig?.plugin?.name,
-        time_ms: timeSpentRunning,
-        time_seconds: Math.round(timeSpentRunning / 10) / 1000,
-        function: taskName,
-    })
+    statusReport.addToTimeSpentRunningPlugins(pluginConfig?.team_id || 0, timeSpentRunning)
     return response
 }
 

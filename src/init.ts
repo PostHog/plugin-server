@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/node'
 
+import { statusReport } from './shared/status-report'
 import { setLogLevel } from './shared/utils'
 import { PluginsServerConfig } from './types'
 
@@ -9,7 +10,7 @@ require('@sentry/tracing')
 // Code that runs on app start, in both the main and worker threads
 export function initApp(config: PluginsServerConfig): void {
     setLogLevel(config.LOG_LEVEL)
-
+    statusReport.startStatusReportSchedule()
     if (config.SENTRY_DSN) {
         Sentry.init({
             dsn: config.SENTRY_DSN,

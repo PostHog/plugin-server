@@ -7,7 +7,7 @@ export default class Task {
     /**
      * Asynchronous Task
      * @constructor Task
-     * @param {Client} clinet celery client instance
+     * @param {Client} client celery client instance
      * @param {string} name celery task name
      */
     constructor(client: Client, name: string) {

@@ -9,6 +9,7 @@ import * as schedule from 'node-schedule'
 import { defaultConfig } from '../shared/config'
 import { createServer } from '../shared/server'
 import { status } from '../shared/status'
+import { statusReport } from '../shared/status-report'
 import { createRedis, delay } from '../shared/utils'
 import { PluginsServer, PluginsServerConfig, Queue, ScheduleControl } from '../types'
 import { createMmdbServer, performMmdbStalenessCheck, prepareMmdb } from './mmdb'
@@ -71,6 +72,7 @@ export async function startPluginsServer(
         await pubSub?.quit()
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
+        statusReport.stopStatusReportSchedule()
         await scheduleControl?.stopSchedule()
         await new Promise<void>((resolve, reject) =>
             !mmdbServer

@@ -72,8 +72,6 @@ export interface PluginsServerConfig extends Record<string, any> {
     DISTINCT_ID_LRU_SIZE: number
     INTERNAL_MMDB_SERVER_PORT: number
     PLUGIN_SERVER_IDLE: boolean
-    POSTHOG_PROJECT_API_KEY: string
-    POSTHOG_API_HOST: string
 }
 
 export interface PluginsServer extends PluginsServerConfig {
