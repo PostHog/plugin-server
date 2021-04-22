@@ -31,14 +31,12 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
         }
     }
 
-    if (!returnedEvent.properties) {
-        returnedEvent.properties = {}
-    }
-    if (pluginsRan.length > 0) {
-        returnedEvent.properties['$plugins_ran_successfully'] = pluginsRan
-    }
-    if (pluginsFailed.length > 0) {
-        returnedEvent.properties['$plugins_failed'] = pluginsFailed
+    if (pluginsRan.length > 0 || pluginsFailed.length > 0) {
+        event.properties = {
+            ...event.properties,
+            $plugins_ran_successfully: pluginsRan,
+            $plugins_failed: pluginsFailed,
+        }
     }
 
     return returnedEvent
@@ -84,12 +82,12 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
         }
 
         for (const event of returnedEvents) {
-            if (event) {
-                if (!event.properties) {
-                    event.properties = {}
+            if ((event && pluginsRan.length > 0) || pluginsFailed.length > 0) {
+                event.properties = {
+                    ...event.properties,
+                    $plugins_ran_successfully: pluginsRan,
+                    $plugins_failed: pluginsFailed,
                 }
-                event.properties['$plugins_ran_successfully'] = pluginsRan
-                event.properties['$plugins_failed'] = pluginsFailed
             }
         }
 
