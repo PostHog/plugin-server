@@ -82,7 +82,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
         }
 
         for (const event of returnedEvents) {
-            if ((event && pluginsRan.length > 0) || pluginsFailed.length > 0) {
+            if (event && (pluginsRan.length > 0 || pluginsFailed.length > 0)) {
                 event.properties = {
                     ...event.properties,
                     $plugins_ran_successfully: pluginsRan,
