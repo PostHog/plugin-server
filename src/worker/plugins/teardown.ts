@@ -1,13 +1,8 @@
 import { processError } from '../../shared/error'
 import { PluginConfig, PluginsServer } from '../../types'
 
-export async function teardownPlugins(
-    server: PluginsServer,
-    pluginConfigs: PluginConfig[] | undefined = undefined
-): Promise<void> {
-    if (!pluginConfigs) {
-        pluginConfigs = Array.from(server.pluginConfigs.values())
-    }
+export async function teardownPlugins(server: PluginsServer, pluginConfig?: PluginConfig): Promise<void> {
+    const pluginConfigs = pluginConfig ? [pluginConfig] : Array.from(server.pluginConfigs.values())
 
     const teardownPromises: Promise<void>[] = []
     for (const pluginConfig of pluginConfigs) {
