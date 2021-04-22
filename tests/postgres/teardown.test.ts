@@ -23,8 +23,6 @@ describe('teardown', () => {
         const { stop } = await startPluginsServer(
             {
                 WORKER_CONCURRENCY: 2,
-                PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
-                CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
                 LOG_LEVEL: LogLevel.Log,
                 KAFKA_ENABLED: false,
             },
@@ -58,8 +56,6 @@ describe('teardown', () => {
         const { piscina, stop } = await startPluginsServer(
             {
                 WORKER_CONCURRENCY: 2,
-                PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue',
-                CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
                 LOG_LEVEL: LogLevel.Log,
                 KAFKA_ENABLED: false,
             },
@@ -73,7 +69,7 @@ describe('teardown', () => {
         await piscina?.broadcastTask({ task: 'reloadPlugins' })
 
         // this teardown will happen async
-        await delay(2000)
+        await delay(5000)
 
         // verify the teardownPlugin code runs
         const error2 = await getErrorForPluginConfig(pluginConfig39.id)
