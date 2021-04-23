@@ -11,11 +11,15 @@ type TeamCache<T> = Map<TeamId, [T, number]>
 export class TeamManager {
     db: DB
     teamCache: TeamCache<Team | null>
+    eventNamesCache: Map<TeamId, Set<string>>
+    eventPropertiesCache: Map<TeamId, Set<string>>
     shouldSendWebhooksCache: TeamCache<boolean>
 
     constructor(db: DB) {
         this.db = db
         this.teamCache = new Map()
+        this.eventNamesCache = new Map()
+        this.eventPropertiesCache = new Map()
         this.shouldSendWebhooksCache = new Map()
     }
 
@@ -97,17 +101,44 @@ export class TeamManager {
             ingested: team.ingested_event,
         })
 
-        await this.db.postgresQuery(
-            `INSERT INTO posthog_eventdefinition (id, name, volume_30_day, query_usage_30_day, team_id) VALUES ($1, $2, NULL, NULL, $3) ON CONFLICT DO NOTHING`,
-            [new UUIDT().toString(), event, team.id],
-            'insertEventDefinition'
-        )
-        for (const [key, value] of Object.entries(properties)) {
-            await this.db.postgresQuery(
-                `INSERT INTO posthog_propertydefinition (id, name, is_numerical, volume_30_day, query_usage_30_day, team_id) VALUES ($1, $2, $3, NULL, NULL, $4) ON CONFLICT DO NOTHING`,
-                [new UUIDT().toString(), key, typeof value === 'number', team.id],
-                'insertPropertyDefinition'
+        let eventNamesCache = this.eventNamesCache.get(team.id)
+        if (!eventNamesCache) {
+            const eventNames = await this.db.postgresQuery(
+                'SELECT name FROM posthog_eventdefinition WHERE team_id = $1',
+                [team.id]
             )
+            eventNamesCache = new Set(eventNames.rows.map((r) => r.name))
+            this.eventNamesCache.set(team.id, eventNamesCache)
+        }
+
+        if (!eventNamesCache.has(event)) {
+            await this.db.postgresQuery(
+                `INSERT INTO posthog_eventdefinition (id, name, volume_30_day, query_usage_30_day, team_id)
+                 VALUES ($1, $2, NULL, NULL, $3) ON CONFLICT DO NOTHING`,
+                [new UUIDT().toString(), event, team.id],
+                'insertEventDefinition'
+            )
+            this.eventNamesCache.get(team.id)?.add(event)
+        }
+
+        let eventPropertiesCache = this.eventPropertiesCache.get(team.id)
+        if (!eventPropertiesCache) {
+            const eventProperties = await this.db.postgresQuery(
+                'SELECT name FROM posthog_propertydefinition WHERE team_id = $1',
+                [team.id]
+            )
+            eventPropertiesCache = new Set(eventProperties.rows.map((r) => r.name))
+            this.eventPropertiesCache.set(team.id, eventPropertiesCache)
+        }
+
+        for (const [key, value] of Object.entries(properties)) {
+            if (!eventPropertiesCache.has(key)) {
+                await this.db.postgresQuery(
+                    `INSERT INTO posthog_propertydefinition (id, name, is_numerical, volume_30_day, query_usage_30_day, team_id) VALUES ($1, $2, $3, NULL, NULL, $4) ON CONFLICT DO NOTHING`,
+                    [new UUIDT().toString(), key, typeof value === 'number', team.id],
+                    'insertPropertyDefinition'
+                )
+            }
         }
 
         if (team && !team.ingested_event) {
