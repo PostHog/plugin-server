@@ -1,6 +1,7 @@
 import { mocked } from 'ts-jest/utils'
 
 import { createServer } from '../../../src/shared/server'
+import { UUIDT } from '../../../src/shared/utils'
 import { PluginsServer } from '../../../src/types'
 import { TeamManager } from '../../../src/worker/ingestion/team-manager'
 import { resetTestDatabase } from '../../helpers/sql'
@@ -24,25 +25,25 @@ describe('TeamManager()', () => {
             jest.spyOn(global.Date, 'now').mockImplementation(() => new Date('2020-02-27 11:00:05').getTime())
             jest.spyOn(server.db, 'postgresQuery')
 
-            let team = await teamManager.fetchTeam(2, 'uuid1')
+            let team = await teamManager.fetchTeam(2)
             expect(team!.name).toEqual('TEST PROJECT')
-            expect(team!.__fetch_event_uuid).toEqual('uuid1')
+            // expect(team!.__fetch_event_uuid).toEqual('uuid1')
 
             jest.spyOn(global.Date, 'now').mockImplementation(() => new Date('2020-02-27 11:00:25').getTime())
             await server.db.postgresQuery("UPDATE posthog_team SET name = 'Updated Name!'")
 
             mocked(server.db.postgresQuery).mockClear()
 
-            team = await teamManager.fetchTeam(2, 'uuid2')
+            team = await teamManager.fetchTeam(2)
             expect(team!.name).toEqual('TEST PROJECT')
-            expect(team!.__fetch_event_uuid).toEqual('uuid1')
+            // expect(team!.__fetch_event_uuid).toEqual('uuid1')
             expect(server.db.postgresQuery).toHaveBeenCalledTimes(0)
 
             jest.spyOn(global.Date, 'now').mockImplementation(() => new Date('2020-02-27 11:00:36').getTime())
 
-            team = await teamManager.fetchTeam(2, 'uuid3')
+            team = await teamManager.fetchTeam(2)
             expect(team!.name).toEqual('Updated Name!')
-            expect(team!.__fetch_event_uuid).toEqual('uuid3')
+            // expect(team!.__fetch_event_uuid).toEqual('uuid3')
 
             expect(server.db.postgresQuery).toHaveBeenCalledTimes(1)
         })
@@ -114,26 +115,20 @@ describe('TeamManager()', () => {
 
         beforeEach(async () => {
             posthog = { capture: jest.fn(), identify: jest.fn() }
+            await server.db.postgresQuery("UPDATE posthog_team SET ingested_event = 't'")
+            await server.db.postgresQuery('DELETE FROM posthog_eventdefinition')
+            await server.db.postgresQuery('DELETE FROM posthog_propertydefinition')
             await server.db.postgresQuery(
-                `
-                UPDATE posthog_team SET
-                    ingested_event = $1,
-                    event_names = $2,
-                    event_names_with_usage = $3,
-                    event_properties = $4,
-                    event_properties_with_usage = $5,
-                    event_properties_numerical = $6`,
-                [
-                    true,
-                    JSON.stringify(['$pageview']),
-                    JSON.stringify([{ event: '$pageview', usage_count: 2, volume: 3 }]),
-                    JSON.stringify(['property_name', 'numeric_prop']),
-                    JSON.stringify([
-                        { key: 'property_name', usage_count: null, volume: null },
-                        { key: 'numeric_prop', usage_count: null, volume: null },
-                    ]),
-                    JSON.stringify(['numeric_prop']),
-                ]
+                `INSERT INTO posthog_eventdefinition (id, name, volume_30_day, query_usage_30_day, team_id) VALUES ($1, $2, $3, $4, $5)`,
+                [new UUIDT().toString(), '$pageview', 3, 2, 2]
+            )
+            await server.db.postgresQuery(
+                `INSERT INTO posthog_propertydefinition (id, name, is_numerical, volume_30_day, query_usage_30_day, team_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+                [new UUIDT().toString(), 'property_name', false, null, null, 2]
+            )
+            await server.db.postgresQuery(
+                `INSERT INTO posthog_propertydefinition (id, name, is_numerical, volume_30_day, query_usage_30_day, team_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+                [new UUIDT().toString(), 'numeric_prop', true, null, null, 2]
             )
         })
 
@@ -148,22 +143,23 @@ describe('TeamManager()', () => {
             teamManager.teamCache.clear()
 
             const team = await teamManager.fetchTeam(2)
-            expect(team?.event_names).toEqual(['$pageview', 'new-event'])
-            expect(team?.event_names_with_usage).toEqual([
-                { event: '$pageview', usage_count: 2, volume: 3 },
-                { event: 'new-event', usage_count: null, volume: null },
-            ])
-            expect(team?.event_properties).toEqual(['property_name', 'numeric_prop', 'number'])
-            expect(team?.event_properties_with_usage).toEqual([
-                { key: 'property_name', usage_count: null, volume: null },
-                { key: 'numeric_prop', usage_count: null, volume: null },
-                { key: 'number', usage_count: null, volume: null },
-            ])
-            expect(team?.event_properties_numerical).toEqual(['numeric_prop', 'number'])
+            // expect(team?.event_names).toEqual(['$pageview', 'new-event'])
+            // expect(team?.event_names_with_usage).toEqual([
+            //     { event: '$pageview', usage_count: 2, volume: 3 },
+            //     { event: 'new-event', usage_count: null, volume: null },
+            // ])
+            // expect(team?.event_properties).toEqual(['property_name', 'numeric_prop', 'number'])
+            // expect(team?.event_properties_with_usage).toEqual([
+            //     { key: 'property_name', usage_count: null, volume: null },
+            //     { key: 'numeric_prop', usage_count: null, volume: null },
+            //     { key: 'number', usage_count: null, volume: null },
+            // ])
+            // expect(team?.event_properties_numerical).toEqual(['numeric_prop', 'number'])
         })
 
         it('does not update anything if nothing changes', async () => {
-            await teamManager.fetchTeam(2, 'uuid1')
+            await teamManager.fetchTeam(2)
+            await teamManager.cacheEventNamesAndProperties(2)
             jest.spyOn(server.db, 'postgresQuery')
 
             await teamManager.updateEventNamesAndProperties(2, '$pageview', '', {}, posthog)
@@ -185,7 +181,8 @@ describe('TeamManager()', () => {
         })
 
         it('handles cache invalidation properly', async () => {
-            await teamManager.fetchTeam(2, 'uuid1')
+            await teamManager.fetchTeam(2)
+            await teamManager.cacheEventNamesAndProperties(2)
             await server.db.postgresQuery('UPDATE posthog_team SET event_names = $1', [
                 JSON.stringify(['$pageview', '$foobar']),
             ])
@@ -215,7 +212,7 @@ describe('TeamManager()', () => {
             it('calls posthog.identify and posthog.capture', async () => {
                 await teamManager.updateEventNamesAndProperties(2, 'new-event', '', {}, posthog)
 
-                const team = await teamManager.fetchTeam(2, 'uuid1')
+                const team = await teamManager.fetchTeam(2)
                 expect(posthog.identify).toHaveBeenCalledWith('plugin_test_user_distinct_id_1001')
                 expect(posthog.capture).toHaveBeenCalledWith('first team event ingested', { team: team!.uuid })
             })
