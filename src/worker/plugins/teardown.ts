@@ -1,5 +1,5 @@
 import { processError } from '../../shared/error'
-import { PluginConfig, PluginLogEntryType, PluginsServer } from '../../types'
+import { PluginConfig, PluginLogEntrySource, PluginLogEntryType, PluginsServer } from '../../types'
 
 export async function teardownPlugins(server: PluginsServer, pluginConfig?: PluginConfig): Promise<void> {
     const pluginConfigs = pluginConfig ? [pluginConfig] : server.pluginConfigs.values()
@@ -17,8 +17,8 @@ export async function teardownPlugins(server: PluginsServer, pluginConfig?: Plug
                             if (server.ENABLE_PERSISTENT_CONSOLE) {
                                 await server.db.createPluginLogEntry(
                                     pluginConfig,
+                                    PluginLogEntrySource.System,
                                     PluginLogEntryType.Info,
-                                    true,
                                     `Plugin unloaded (instance ID ${server.instanceId}).`,
                                     server.instanceId
                                 )
@@ -29,8 +29,8 @@ export async function teardownPlugins(server: PluginsServer, pluginConfig?: Plug
                             if (server.ENABLE_PERSISTENT_CONSOLE) {
                                 await server.db.createPluginLogEntry(
                                     pluginConfig,
+                                    PluginLogEntrySource.System,
                                     PluginLogEntryType.Error,
-                                    true,
                                     `Plugin failed to unload (instance ID ${server.instanceId}).`,
                                     server.instanceId
                                 )
@@ -41,8 +41,8 @@ export async function teardownPlugins(server: PluginsServer, pluginConfig?: Plug
             } else if (server.ENABLE_PERSISTENT_CONSOLE) {
                 await server.db.createPluginLogEntry(
                     pluginConfig,
+                    PluginLogEntrySource.System,
                     PluginLogEntryType.Info,
-                    true,
                     `Plugin unloaded (instance ID ${server.instanceId}).`,
                     server.instanceId
                 )

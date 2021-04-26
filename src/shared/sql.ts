@@ -1,4 +1,12 @@
-import { Plugin, PluginAttachmentDB, PluginConfig, PluginError, PluginLogEntryType, PluginsServer } from '../types'
+import {
+    Plugin,
+    PluginAttachmentDB,
+    PluginConfig,
+    PluginError,
+    PluginLogEntrySource,
+    PluginLogEntryType,
+    PluginsServer,
+} from '../types'
 
 function pluginConfigsInForceQuery(specificField?: keyof PluginConfig): string {
     return `SELECT posthog_pluginconfig.${specificField || '*'}
@@ -45,8 +53,8 @@ export async function setError(
     if (pluginError && server.ENABLE_PERSISTENT_CONSOLE) {
         await server.db.createPluginLogEntry(
             pluginConfig,
+            PluginLogEntrySource.Plugin,
             PluginLogEntryType.Error,
-            true,
             pluginError.message,
             server.instanceId,
             pluginError.time

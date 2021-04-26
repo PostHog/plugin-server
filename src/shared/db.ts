@@ -20,6 +20,7 @@ import {
     PersonDistinctId,
     PluginConfig,
     PluginLogEntry,
+    PluginLogEntrySource,
     PluginLogEntryType,
     PostgresSessionRecordingEvent,
     RawOrganization,
@@ -597,8 +598,8 @@ export class DB {
 
     public async createPluginLogEntry(
         pluginConfig: PluginConfig,
+        source: PluginLogEntrySource,
         type: PluginLogEntryType,
-        isSystem: boolean,
         message: string,
         instanceId: UUID,
         timestamp: string = new Date().toISOString()
@@ -609,8 +610,8 @@ export class DB {
             plugin_id: pluginConfig.plugin_id,
             plugin_config_id: pluginConfig.id,
             timestamp: timestamp.replace('T', ' ').replace('Z', ''),
+            source,
             type,
-            is_system: isSystem,
             message,
             instance_id: instanceId.toString(),
         }
@@ -623,7 +624,7 @@ export class DB {
                 })
             } else {
                 await this.postgresQuery(
-                    'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, plugin_config_id, timestamp, type, is_system, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                    'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, plugin_config_id, timestamp, source,type, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
                     Object.values(entry),
                     'insertPluginLogEntry'
                 )
