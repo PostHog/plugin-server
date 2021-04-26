@@ -1,4 +1,12 @@
-import { Plugin, PluginAttachmentDB, PluginConfig, PluginConfigId, PluginError, PluginsServer } from '../types'
+import {
+    Plugin,
+    PluginAttachmentDB,
+    PluginConfig,
+    PluginConfigId,
+    PluginError,
+    PluginLogEntryType,
+    PluginsServer,
+} from '../types'
 
 function pluginConfigsInForceQuery(specificField?: keyof PluginConfig): string {
     return `SELECT posthog_pluginconfig.${specificField || '*'}
@@ -36,10 +44,20 @@ export async function getPluginConfigRows(server: PluginsServer): Promise<Plugin
 export async function setError(
     server: PluginsServer,
     pluginError: PluginError | null,
-    pluginConfig: PluginConfig | PluginConfigId
+    pluginConfig: PluginConfig
 ): Promise<void> {
     await server.db.postgresQuery('UPDATE posthog_pluginconfig SET error = $1 WHERE id = $2', [
         pluginError,
         typeof pluginConfig === 'object' ? pluginConfig?.id : pluginConfig,
     ])
+    if (pluginError) {
+        await server.db.createPluginLogEntry(
+            pluginConfig,
+            PluginLogEntryType.Error,
+            true,
+            pluginError.message,
+            server.instanceId,
+            pluginError.time
+        )
+    }
 }

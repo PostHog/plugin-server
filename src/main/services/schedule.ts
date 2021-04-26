@@ -163,7 +163,8 @@ export function runTasksDebounced(server: PluginsServer, piscina: Piscina, taskN
                 server.pluginSchedulePromises[taskName][pluginConfigId] = null
             })
             .catch(async (error) => {
-                await processError(server, pluginConfigId, error)
+                const pluginConfig = await server.db.fetchPluginConfig(pluginConfigId)
+                await processError(server, pluginConfig, error)
                 server.pluginSchedulePromises[taskName][pluginConfigId] = null
             })
     }

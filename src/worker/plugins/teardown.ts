@@ -1,5 +1,5 @@
 import { processError } from '../../shared/error'
-import { PluginConfig, PluginsServer } from '../../types'
+import { PluginConfig, PluginLogEntryType, PluginsServer } from '../../types'
 
 export async function teardownPlugins(server: PluginsServer, pluginConfig?: PluginConfig): Promise<void> {
     const pluginConfigs = pluginConfig ? [pluginConfig] : server.pluginConfigs.values()
@@ -13,10 +13,32 @@ export async function teardownPlugins(server: PluginsServer, pluginConfig?: Plug
                     (async () => {
                         try {
                             await teardownPlugin()
+                            await server.db.createPluginLogEntry(
+                                pluginConfig,
+                                PluginLogEntryType.Info,
+                                true,
+                                `Plugin unloaded (instance ID ${server.instanceId}).`,
+                                server.instanceId
+                            )
                         } catch (error) {
                             await processError(server, pluginConfig, error)
+                            await server.db.createPluginLogEntry(
+                                pluginConfig,
+                                PluginLogEntryType.Error,
+                                true,
+                                `Plugin failed to unload (instance ID ${server.instanceId}).`,
+                                server.instanceId
+                            )
                         }
                     })()
+                )
+            } else {
+                await server.db.createPluginLogEntry(
+                    pluginConfig,
+                    PluginLogEntryType.Info,
+                    true,
+                    `Plugin unloaded (instance ID ${server.instanceId}).`,
+                    server.instanceId
                 )
             }
         }

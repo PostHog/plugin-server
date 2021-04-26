@@ -21,7 +21,6 @@ import {
     PluginConfig,
     PluginLogEntry,
     PluginLogEntryType,
-    PluginsServerConfig,
     PostgresSessionRecordingEvent,
     RawOrganization,
     RawPerson,
@@ -601,14 +600,15 @@ export class DB {
         type: PluginLogEntryType,
         isSystem: boolean,
         message: string,
-        instanceId: UUID
+        instanceId: UUID,
+        timestamp?: string
     ): Promise<PluginLogEntry> {
         const entry: PluginLogEntry = {
             id: new UUIDT().toString(),
             team_id: pluginConfig.team_id,
             plugin_id: pluginConfig.plugin_id,
             plugin_config_id: pluginConfig.id,
-            timestamp: new Date().toISOString().replace('T', ' ').replace('Z', ''),
+            timestamp: (timestamp ?? new Date().toISOString()).replace('T', ' ').replace('Z', ''),
             type,
             is_system: isSystem,
             message,
@@ -634,5 +634,11 @@ export class DB {
         }
 
         return entry
+    }
+
+    // PluginConfig
+
+    public async fetchPluginConfig(id: number): Promise<PluginConfig | null> {
+        return (await this.postgresQuery('SELECT * FROM posthog_pluginconfig WHERE id = $1', [id])).rows[0] ?? null
     }
 }
