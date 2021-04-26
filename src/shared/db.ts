@@ -601,14 +601,14 @@ export class DB {
         isSystem: boolean,
         message: string,
         instanceId: UUID,
-        timestamp?: string
+        timestamp: string = new Date().toISOString()
     ): Promise<PluginLogEntry> {
         const entry: PluginLogEntry = {
             id: new UUIDT().toString(),
             team_id: pluginConfig.team_id,
             plugin_id: pluginConfig.plugin_id,
             plugin_config_id: pluginConfig.id,
-            timestamp: (timestamp ?? new Date().toISOString()).replace('T', ' ').replace('Z', ''),
+            timestamp: timestamp.replace('T', ' ').replace('Z', ''),
             type,
             is_system: isSystem,
             message,
