@@ -599,6 +599,7 @@ export class DB {
     public async createPluginLogEntry(
         pluginConfig: PluginConfig,
         type: PluginLogEntryType,
+        isSystem: boolean,
         message: string,
         instanceId: UUID
     ): Promise<PluginLogEntry> {
@@ -609,6 +610,7 @@ export class DB {
             plugin_config_id: pluginConfig.id,
             timestamp: new Date().toISOString().replace('T', ' ').replace('Z', ''),
             type,
+            is_system: isSystem,
             message,
             instance_id: instanceId.toString(),
         }
@@ -621,7 +623,7 @@ export class DB {
                 })
             } else {
                 await this.postgresQuery(
-                    'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, plugin_config_id, timestamp, type, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                    'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, plugin_config_id, timestamp, type, is_system, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
                     Object.values(entry),
                     'insertPluginLogEntry'
                 )

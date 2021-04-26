@@ -26,7 +26,7 @@ export function createConsole(server: PluginsServer, pluginConfig: PluginConfig)
             return
         }
 
-        await server.db.createPluginLogEntry(pluginConfig, type, consoleFormat(...args), server.instanceId)
+        await server.db.createPluginLogEntry(pluginConfig, type, false, consoleFormat(...args), server.instanceId)
     }
 
     return {

@@ -191,6 +191,7 @@ export interface PluginLogEntry {
     plugin_config_id: number
     timestamp: string
     type: PluginLogEntryType
+    is_system: boolean
     message: string
     instance_id: string
 }
