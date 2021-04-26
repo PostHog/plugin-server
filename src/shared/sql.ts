@@ -1,12 +1,4 @@
-import {
-    Plugin,
-    PluginAttachmentDB,
-    PluginConfig,
-    PluginConfigId,
-    PluginError,
-    PluginLogEntryType,
-    PluginsServer,
-} from '../types'
+import { Plugin, PluginAttachmentDB, PluginConfig, PluginError, PluginLogEntryType, PluginsServer } from '../types'
 
 function pluginConfigsInForceQuery(specificField?: keyof PluginConfig): string {
     return `SELECT posthog_pluginconfig.${specificField || '*'}
