@@ -116,7 +116,7 @@ test('plugin meta has what it should have', async () => {
 
     expect(Object.keys(returnedEvent!.properties!).sort()).toEqual([
         '$plugins_failed',
-        '$plugins_ran_successfully',
+        '$plugins_succeeded',
         'attachments',
         'cache',
         'config',
@@ -213,13 +213,13 @@ test('plugin throwing error does not prevent ingestion and failure is noted in e
         ...event,
         properties: {
             $plugins_failed: ['test-maxmind-plugin (39)'],
-            $plugins_ran_successfully: [],
+            $plugins_succeeded: [],
         },
     }
     expect(returnedEvent).toEqual(expectedReturnEvent)
 })
 
-test('events have property $plugins_ran_successfully set to the plugins that succeeded', async () => {
+test('events have property $plugins_succeeded set to the plugins that succeeded', async () => {
     // silence some spam
     console.log = jest.fn()
     console.error = jest.fn()
@@ -246,7 +246,7 @@ test('events have property $plugins_ran_successfully set to the plugins that suc
         ...event,
         properties: {
             $plugins_failed: [],
-            $plugins_ran_successfully: ['test-maxmind-plugin (39)'],
+            $plugins_succeeded: ['test-maxmind-plugin (39)'],
         },
     }
     expect(returnedEvent).toEqual(expectedReturnEvent)

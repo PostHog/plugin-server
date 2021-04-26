@@ -7,7 +7,7 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
     const pluginsToRun = getPluginsForTeam(server, event.team_id)
     let returnedEvent: PluginEvent | null = event
 
-    const pluginsRan = []
+    const pluginsSucceeded = []
     const pluginsFailed = []
     for (const pluginConfig of pluginsToRun) {
         const processEvent = await pluginConfig.vm?.getProcessEvent()
@@ -17,7 +17,7 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
 
             try {
                 returnedEvent = (await processEvent(returnedEvent)) || null
-                pluginsRan.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
+                pluginsSucceeded.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
             } catch (error) {
                 await processError(server, pluginConfig, error, returnedEvent)
                 server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.process_event.ERROR`)
@@ -31,10 +31,10 @@ export async function runPlugins(server: PluginsServer, event: PluginEvent): Pro
         }
     }
 
-    if (pluginsRan.length > 0 || pluginsFailed.length > 0) {
+    if (pluginsSucceeded.length > 0 || pluginsFailed.length > 0) {
         event.properties = {
             ...event.properties,
-            $plugins_ran_successfully: pluginsRan,
+            $plugins_succeeded: pluginsSucceeded,
             $plugins_failed: pluginsFailed,
         }
     }
@@ -59,7 +59,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
         const pluginsToRun = getPluginsForTeam(server, teamId)
 
         let returnedEvents: PluginEvent[] = teamEvents
-        const pluginsRan = []
+        const pluginsSucceeded = []
         const pluginsFailed = []
         for (const pluginConfig of pluginsToRun) {
             const timer = new Date()
@@ -67,7 +67,7 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
             if (processEventBatch && returnedEvents.length > 0) {
                 try {
                     returnedEvents = (await processEventBatch(returnedEvents)) || []
-                    pluginsRan.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
+                    pluginsSucceeded.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
                 } catch (error) {
                     await processError(server, pluginConfig, error, returnedEvents[0])
                     server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.process_event_batch.ERROR`)
@@ -82,10 +82,10 @@ export async function runPluginsOnBatch(server: PluginsServer, batch: PluginEven
         }
 
         for (const event of returnedEvents) {
-            if (event && (pluginsRan.length > 0 || pluginsFailed.length > 0)) {
+            if (event && (pluginsSucceeded.length > 0 || pluginsFailed.length > 0)) {
                 event.properties = {
                     ...event.properties,
-                    $plugins_ran_successfully: pluginsRan,
+                    $plugins_succeeded: pluginsSucceeded,
                     $plugins_failed: pluginsFailed,
                 }
             }
