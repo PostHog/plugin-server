@@ -68,8 +68,13 @@ describe('teardown', () => {
         ])
         await piscina!.broadcastTask({ task: 'reloadPlugins' })
 
-        // this teardown will happen async
-        await delay(10000)
+        // this teardown will happen async. wait up to 30sec for it...
+        for (let i = 0; i < 30; i++) {
+            await delay(1000)
+            if ((await getErrorForPluginConfig(pluginConfig39.id))?.message) {
+                break
+            }
+        }
 
         // verify the teardownPlugin code runs
         const error2 = await getErrorForPluginConfig(pluginConfig39.id)
