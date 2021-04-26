@@ -42,7 +42,7 @@ export async function setError(
         pluginError,
         typeof pluginConfig === 'object' ? pluginConfig?.id : pluginConfig,
     ])
-    if (pluginError) {
+    if (pluginError && server.ENABLE_PERSISTENT_CONSOLE) {
         await server.db.createPluginLogEntry(
             pluginConfig,
             PluginLogEntryType.Error,

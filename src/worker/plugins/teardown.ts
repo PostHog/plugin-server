@@ -13,6 +13,10 @@ export async function teardownPlugins(server: PluginsServer, pluginConfig?: Plug
                     (async () => {
                         try {
                             await teardownPlugin()
+
+                            if (!server.ENABLE_PERSISTENT_CONSOLE) {
+                                return
+                            }
                             await server.db.createPluginLogEntry(
                                 pluginConfig,
                                 PluginLogEntryType.Info,
@@ -22,6 +26,10 @@ export async function teardownPlugins(server: PluginsServer, pluginConfig?: Plug
                             )
                         } catch (error) {
                             await processError(server, pluginConfig, error)
+
+                            if (!server.ENABLE_PERSISTENT_CONSOLE) {
+                                return
+                            }
                             await server.db.createPluginLogEntry(
                                 pluginConfig,
                                 PluginLogEntryType.Error,
@@ -32,7 +40,7 @@ export async function teardownPlugins(server: PluginsServer, pluginConfig?: Plug
                         }
                     })()
                 )
-            } else {
+            } else if (server.ENABLE_PERSISTENT_CONSOLE) {
                 await server.db.createPluginLogEntry(
                     pluginConfig,
                     PluginLogEntryType.Info,

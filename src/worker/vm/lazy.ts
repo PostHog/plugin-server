@@ -18,24 +18,28 @@ export class LazyPluginVM {
             ) => {
                 try {
                     const vm = await createPluginConfigVM(server, pluginConfig, indexJs)
-                    await server.db.createPluginLogEntry(
-                        pluginConfig,
-                        PluginLogEntryType.Info,
-                        true,
-                        `Plugin loaded (instance ID ${server.instanceId}).`,
-                        server.instanceId
-                    )
+                    if (server.ENABLE_PERSISTENT_CONSOLE) {
+                        await server.db.createPluginLogEntry(
+                            pluginConfig,
+                            PluginLogEntryType.Info,
+                            true,
+                            `Plugin loaded (instance ID ${server.instanceId}).`,
+                            server.instanceId
+                        )
+                    }
                     status.info('🔌', `Loaded ${logInfo}`)
                     void clearError(server, pluginConfig)
                     resolve(vm)
                 } catch (error) {
-                    await server.db.createPluginLogEntry(
-                        pluginConfig,
-                        PluginLogEntryType.Error,
-                        true,
-                        `Plugin failed to load (instance ID ${server.instanceId}).`,
-                        server.instanceId
-                    )
+                    if (server.ENABLE_PERSISTENT_CONSOLE) {
+                        await server.db.createPluginLogEntry(
+                            pluginConfig,
+                            PluginLogEntryType.Error,
+                            true,
+                            `Plugin failed to load (instance ID ${server.instanceId}).`,
+                            server.instanceId
+                        )
+                    }
                     status.warn('⚠️', `Failed to load ${logInfo}`)
                     void processError(server, pluginConfig, error)
                     resolve(null)
