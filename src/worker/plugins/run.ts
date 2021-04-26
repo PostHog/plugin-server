@@ -80,7 +80,7 @@ export async function runPluginTask(server: PluginsServer, taskName: string, plu
         const task = await pluginConfig?.vm?.getTask(taskName)
         response = await task?.exec()
     } catch (error) {
-        await processError(server, pluginConfig ?? (await server.db.fetchPluginConfig(pluginConfigId)), error)
+        await processError(server, pluginConfig || null, error)
         server.statsd?.increment(`plugin.task.${taskName}.${pluginConfigId}.ERROR`)
     }
     server.statsd?.timing(`plugin.task.${taskName}.${pluginConfigId}`, timer)

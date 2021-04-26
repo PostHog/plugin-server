@@ -635,10 +635,4 @@ export class DB {
 
         return entry
     }
-
-    // PluginConfig
-
-    public async fetchPluginConfig(id: number): Promise<PluginConfig | null> {
-        return (await this.postgresQuery('SELECT * FROM posthog_pluginconfig WHERE id = $1', [id])).rows[0] ?? null
-    }
 }
