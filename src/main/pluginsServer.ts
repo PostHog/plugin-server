@@ -167,6 +167,16 @@ export async function startPluginsServer(
                 server!.statsd?.gauge(`piscina.waitTime.p90`, piscina?.waitTime.p90)
                 server!.statsd?.gauge(`piscina.waitTime.p75`, piscina?.waitTime.p75)
                 server!.statsd?.gauge(`piscina.waitTime.p50`, piscina?.waitTime.p50)
+                server!.statsd?.gauge(`piscina.runTime.average`, piscina?.runTime.average)
+                server!.statsd?.gauge(`piscina.runTime.mean`, piscina?.runTime.mean)
+                server!.statsd?.gauge(`piscina.runTime.stddev`, piscina?.runTime.stddev)
+                server!.statsd?.gauge(`piscina.runTime.min`, piscina?.runTime.min)
+                server!.statsd?.gauge(`piscina.runTime.p99_99`, piscina?.runTime.p99_99)
+                server!.statsd?.gauge(`piscina.runTime.p99`, piscina?.runTime.p99)
+                server!.statsd?.gauge(`piscina.runTime.p95`, piscina?.runTime.p95)
+                server!.statsd?.gauge(`piscina.runTime.p90`, piscina?.runTime.p90)
+                server!.statsd?.gauge(`piscina.runTime.p75`, piscina?.runTime.p75)
+                server!.statsd?.gauge(`piscina.runTime.p50`, piscina?.runTime.p50)
             }
         })
 
