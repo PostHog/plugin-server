@@ -1,3 +1,4 @@
+import Piscina from '@posthog/piscina'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import { Consumer, EachBatchPayload, Kafka } from 'kafkajs'
@@ -5,10 +6,11 @@ import { PluginsServer, Queue } from 'types'
 
 import { timeoutGuard } from '../../shared/ingestion/utils'
 import { status } from '../../shared/status'
-import { groupIntoBatches, killGracefully, sanitizeEvent } from '../../shared/utils'
+import { getPiscinaStats, groupIntoBatches, killGracefully, sanitizeEvent } from '../../shared/utils'
 
 export class KafkaQueue implements Queue {
     private pluginsServer: PluginsServer
+    private piscina: Piscina
     private kafka: Kafka
     private consumer: Consumer
     private wasConsumerRan: boolean
@@ -17,10 +19,12 @@ export class KafkaQueue implements Queue {
 
     constructor(
         pluginsServer: PluginsServer,
+        piscina: Piscina,
         processEventBatch: (batch: PluginEvent[]) => Promise<any>,
         saveEvent: (event: PluginEvent) => Promise<void>
     ) {
         this.pluginsServer = pluginsServer
+        this.piscina = piscina
         this.kafka = pluginsServer.kafka!
         this.consumer = KafkaQueue.buildConsumer(this.kafka)
         this.wasConsumerRan = false
@@ -64,6 +68,7 @@ export class KafkaQueue implements Queue {
 
         const processingTimeout = timeoutGuard('Still running plugins on events. Timeout warning after 30 sec!', {
             eventCount: pluginEvents.length,
+            piscina: getPiscinaStats(this.piscina),
         })
         const processingBatches = groupIntoBatches(pluginEvents, maxBatchSize)
         const processedEvents = (
@@ -90,11 +95,13 @@ export class KafkaQueue implements Queue {
 
         const ingestionTimeout = timeoutGuard('Still ingesting events. Timeout warning after 30 sec!', {
             eventCount: processedEvents.length,
+            piscina: getPiscinaStats(this.piscina),
         })
 
         const ingestOneEvent = async (event: PluginEvent) => {
             const singleIngestionTimeout = timeoutGuard('After 30 seconds still ingesting event', {
                 event: JSON.stringify(event),
+                piscina: getPiscinaStats(this.piscina),
             })
             const singleIngestionTimer = new Date()
             try {
