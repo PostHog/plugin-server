@@ -68,7 +68,7 @@ export class KafkaQueue implements Queue {
 
         const processingTimeout = timeoutGuard('Still running plugins on events. Timeout warning after 30 sec!', {
             eventCount: pluginEvents.length,
-            piscina: getPiscinaStats(this.piscina),
+            piscina: JSON.stringify(getPiscinaStats(this.piscina)),
         })
         const processingBatches = groupIntoBatches(pluginEvents, maxBatchSize)
         const processedEvents = (
@@ -95,13 +95,13 @@ export class KafkaQueue implements Queue {
 
         const ingestionTimeout = timeoutGuard('Still ingesting events. Timeout warning after 30 sec!', {
             eventCount: processedEvents.length,
-            piscina: getPiscinaStats(this.piscina),
+            piscina: JSON.stringify(getPiscinaStats(this.piscina)),
         })
 
         const ingestOneEvent = async (event: PluginEvent) => {
             const singleIngestionTimeout = timeoutGuard('After 30 seconds still ingesting event', {
                 event: JSON.stringify(event),
-                piscina: getPiscinaStats(this.piscina),
+                piscina: JSON.stringify(getPiscinaStats(this.piscina)),
             })
             const singleIngestionTimer = new Date()
             try {
