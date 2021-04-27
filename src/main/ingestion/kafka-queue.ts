@@ -141,6 +141,12 @@ export class KafkaQueue implements Queue {
                         await this.eachBatch(payload)
                     } catch (error) {
                         status.info('💀', `Kafka batch of ${payload.batch.messages.length} events failed!`)
+                        if (error.type === 'UNKNOWN_MEMBER_ID') {
+                            status.info(
+                                '💀',
+                                "Probably the batch took longer than the session and we couldn't commit the offset"
+                            )
+                        }
                         Sentry.captureException(error)
                         throw error
                     }
