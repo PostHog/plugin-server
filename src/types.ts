@@ -75,6 +75,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     PLUGIN_SERVER_IDLE: boolean
     ENABLE_PERSISTENT_CONSOLE: boolean
     STALENESS_RESTART_SECONDS: number
+    USE_KAFKA_EACH_MESSAGE: boolean
 }
 
 export interface PluginsServer extends PluginsServerConfig {

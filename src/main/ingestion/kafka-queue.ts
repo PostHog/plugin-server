@@ -1,7 +1,7 @@
 import Piscina from '@posthog/piscina'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
-import { Consumer, EachBatchPayload, Kafka } from 'kafkajs'
+import { Consumer, EachBatchPayload, EachMessagePayload, Kafka } from 'kafkajs'
 import { PluginsServer, Queue } from 'types'
 
 import { timeoutGuard } from '../../shared/ingestion/utils'
@@ -14,12 +14,14 @@ export class KafkaQueue implements Queue {
     private kafka: Kafka
     private consumer: Consumer
     private wasConsumerRan: boolean
+    private processEvent: (event: PluginEvent) => Promise<PluginEvent>
     private processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
     private ingestEvent: (event: PluginEvent) => Promise<void>
 
     constructor(
         pluginsServer: PluginsServer,
         piscina: Piscina,
+        processEvent: (event: PluginEvent) => Promise<any>,
         processEventBatch: (batch: PluginEvent[]) => Promise<any>,
         ingestEvent: (event: PluginEvent) => Promise<void>
     ) {
@@ -28,8 +30,62 @@ export class KafkaQueue implements Queue {
         this.kafka = pluginsServer.kafka!
         this.consumer = KafkaQueue.buildConsumer(this.kafka)
         this.wasConsumerRan = false
+        this.processEvent = processEvent
         this.processEventBatch = processEventBatch
         this.ingestEvent = ingestEvent
+    }
+
+    private async eachMessage({ topic, partition, message }: EachMessagePayload): Promise<void> {
+        const eachMessageStartTimer = new Date()
+
+        const { data: dataStr, ...rawEvent } = JSON.parse(message.value!.toString())
+        const combinedEvent = { ...rawEvent, ...JSON.parse(dataStr) }
+        const event = sanitizeEvent({
+            ...combinedEvent,
+            site_url: combinedEvent.site_url || null,
+            ip: combinedEvent.ip || null,
+        })
+
+        const processingTimeout = timeoutGuard('Still running plugins on event. Timeout warning after 30 sec!', {
+            event: JSON.stringify(event),
+            piscina: JSON.stringify(getPiscinaStats(this.piscina)),
+        })
+        const timer = new Date()
+        let processedEvent: PluginEvent
+        try {
+            processedEvent = await this.processEvent(event)
+        } catch (error) {
+            status.info('🔔', error)
+            Sentry.captureException(error)
+            throw error
+        } finally {
+            this.pluginsServer.statsd?.timing('kafka_queue.single_event_batch', timer)
+            this.pluginsServer.statsd?.timing('kafka_queue.each_batch.process_events', timer)
+            clearTimeout(processingTimeout)
+        }
+
+        // ingest event
+
+        if (processedEvent) {
+            const singleIngestionTimeout = timeoutGuard('After 30 seconds still ingesting event', {
+                event: JSON.stringify(processedEvent),
+                piscina: JSON.stringify(getPiscinaStats(this.piscina)),
+            })
+            const singleIngestionTimer = new Date()
+            try {
+                await this.ingestEvent(processedEvent)
+            } catch (error) {
+                status.info('🔔', error)
+                Sentry.captureException(error)
+                throw error
+            } finally {
+                this.pluginsServer.statsd?.timing('kafka_queue.single_ingestion', singleIngestionTimer)
+                this.pluginsServer.statsd?.timing('kafka_queue.each_batch.ingest_events', singleIngestionTimer)
+                clearTimeout(singleIngestionTimeout)
+            }
+        }
+
+        this.pluginsServer.statsd?.timing('kafka_queue.each_batch', eachMessageStartTimer)
     }
 
     private async eachBatch({
@@ -155,21 +211,38 @@ export class KafkaQueue implements Queue {
             status.info('⏬', `Connecting Kafka consumer to ${this.pluginsServer.KAFKA_HOSTS}...`)
             this.wasConsumerRan = true
             await this.consumer.subscribe({ topic: this.pluginsServer.KAFKA_CONSUMPTION_TOPIC! })
-            // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
-            await this.consumer.run({
-                eachBatchAutoResolve: false, // we are resolving the last offset of the batch more deliberately
-                autoCommitInterval: 500, // autocommit every 500 ms…
-                autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
-                eachBatch: async (payload) => {
-                    try {
-                        await this.eachBatch(payload)
-                    } catch (error) {
-                        status.info('💀', `Kafka batch of ${payload.batch.messages.length} events failed!`)
-                        Sentry.captureException(error)
-                        throw error
-                    }
-                },
-            })
+            if (this.pluginsServer.USE_KAFKA_EACH_MESSAGE) {
+                await this.consumer.run({
+                    partitionsConsumedConcurrently:
+                        this.pluginsServer.WORKER_CONCURRENCY * this.pluginsServer.TASKS_PER_WORKER,
+                    eachMessage: async (payload) => {
+                        try {
+                            await this.eachMessage(payload)
+                        } catch (error) {
+                            status.info('💀', `Kafka message failed: ${payload.message.value?.toString()}`)
+                            status.info('🔔', error)
+                            Sentry.captureException(error)
+                            throw error
+                        }
+                    },
+                })
+            } else {
+                // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
+                await this.consumer.run({
+                    eachBatchAutoResolve: false, // we are resolving the last offset of the batch more deliberately
+                    autoCommitInterval: 500, // autocommit every 500 ms…
+                    autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
+                    eachBatch: async (payload) => {
+                        try {
+                            await this.eachBatch(payload)
+                        } catch (error) {
+                            status.info('💀', `Kafka batch of ${payload.batch.messages.length} events failed!`)
+                            Sentry.captureException(error)
+                            throw error
+                        }
+                    },
+                })
+            }
         })
         return await startPromise
     }
