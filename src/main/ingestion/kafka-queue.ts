@@ -18,6 +18,10 @@ export class KafkaQueue implements Queue {
     private processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
     private ingestEvent: (event: PluginEvent) => Promise<void>
 
+    // used for logging aggregate stats to the console
+    private messageLogDate = 0
+    private messageCounter = 0
+
     constructor(
         pluginsServer: PluginsServer,
         piscina: Piscina,
@@ -33,6 +37,7 @@ export class KafkaQueue implements Queue {
         this.processEvent = processEvent
         this.processEventBatch = processEventBatch
         this.ingestEvent = ingestEvent
+        this.messageLogDate = new Date().valueOf()
     }
 
     private async eachMessage({ topic, partition, message }: EachMessagePayload): Promise<void> {
@@ -48,7 +53,6 @@ export class KafkaQueue implements Queue {
 
         const processingTimeout = timeoutGuard('Still running plugins on event. Timeout warning after 30 sec!', {
             event: JSON.stringify(event),
-            piscina: JSON.stringify(getPiscinaStats(this.piscina)),
         })
         const timer = new Date()
         let processedEvent: PluginEvent
@@ -86,6 +90,17 @@ export class KafkaQueue implements Queue {
         }
 
         this.pluginsServer.statsd?.timing('kafka_queue.each_batch', eachMessageStartTimer)
+
+        const now = new Date().valueOf()
+        this.messageCounter++
+        if (now - this.messageLogDate > 10000) {
+            status.info(
+                '🕒',
+                `Processed ${this.messageCounter} events in ${Math.round((now - this.messageLogDate) / 10) / 100}s`
+            )
+            this.messageCounter = 0
+            this.messageLogDate = now
+        }
     }
 
     private async eachBatch({
@@ -286,8 +301,6 @@ export class KafkaQueue implements Queue {
     private static buildConsumer(kafka: Kafka): Consumer {
         const consumer = kafka.consumer({
             groupId: 'clickhouse-ingestion',
-            rebalanceTimeout: 120000, // default: 60000
-            sessionTimeout: 60000, // default: 30000
             readUncommitted: false,
         })
         const { GROUP_JOIN, CRASH, CONNECT, DISCONNECT } = consumer.events
