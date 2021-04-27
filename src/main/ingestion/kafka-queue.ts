@@ -15,13 +15,13 @@ export class KafkaQueue implements Queue {
     private consumer: Consumer
     private wasConsumerRan: boolean
     private processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
-    private saveEvent: (event: PluginEvent) => Promise<void>
+    private ingestEvent: (event: PluginEvent) => Promise<void>
 
     constructor(
         pluginsServer: PluginsServer,
         piscina: Piscina,
         processEventBatch: (batch: PluginEvent[]) => Promise<any>,
-        saveEvent: (event: PluginEvent) => Promise<void>
+        ingestEvent: (event: PluginEvent) => Promise<void>
     ) {
         this.pluginsServer = pluginsServer
         this.piscina = piscina
@@ -29,7 +29,7 @@ export class KafkaQueue implements Queue {
         this.consumer = KafkaQueue.buildConsumer(this.kafka)
         this.wasConsumerRan = false
         this.processEventBatch = processEventBatch
-        this.saveEvent = saveEvent
+        this.ingestEvent = ingestEvent
     }
 
     private async eachBatch({
@@ -105,7 +105,7 @@ export class KafkaQueue implements Queue {
             })
             const singleIngestionTimer = new Date()
             try {
-                await this.saveEvent(event)
+                await this.ingestEvent(event)
             } catch (error) {
                 status.info('🔔', error)
                 Sentry.captureException(error)
