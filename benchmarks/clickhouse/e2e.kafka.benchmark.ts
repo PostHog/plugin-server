@@ -59,7 +59,7 @@ describe('e2e kafka & clickhouse benchmark', () => {
     test('measure performance', async () => {
         console.debug = () => null
 
-        const count = 300
+        const count = 1000
 
         // fill in the queue
         function createEvent() {
