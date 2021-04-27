@@ -117,6 +117,7 @@ export class KafkaQueue implements Queue {
             await Promise.all(messageBatch.map((message) => this.eachMessage(message)))
 
             resolveOffset(messageBatch[messageBatch.length - 1].offset)
+            await commitOffsetsIfNecessary()
             await heartbeat()
         }
 
@@ -133,8 +134,7 @@ export class KafkaQueue implements Queue {
 
             // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
             await this.consumer.run({
-                eachBatchAutoResolve: false, // we are resolving the last offset of the batch more deliberately
-                autoCommitInterval: 1000, // autocommit every 500 ms…
+                autoCommitInterval: 1000, // autocommit every 1000 ms…
                 autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
                 eachBatch: async (payload) => {
                     try {
