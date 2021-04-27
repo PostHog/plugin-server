@@ -215,6 +215,8 @@ export class KafkaQueue implements Queue {
                 await this.consumer.run({
                     partitionsConsumedConcurrently:
                         this.pluginsServer.WORKER_CONCURRENCY * this.pluginsServer.TASKS_PER_WORKER,
+                    autoCommitInterval: 500, // autocommit every 500 ms…
+                    autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
                     eachMessage: async (payload) => {
                         try {
                             await this.eachMessage(payload)
