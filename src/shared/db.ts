@@ -642,4 +642,14 @@ export class DB {
 
         return entry
     }
+
+    public async fetchEventDefinitions(): Promise<any[]> {
+        return (await this.postgresQuery('SELECT * FROM posthog_eventdefinition', undefined, 'fetchAllPluginLogs'))
+            .rows as any[]
+    }
+
+    public async fetchPropertyDefinitions(): Promise<any[]> {
+        return (await this.postgresQuery('SELECT * FROM posthog_propertydefinition', undefined, 'fetchAllPluginLogs'))
+            .rows as any[]
+    }
 }
