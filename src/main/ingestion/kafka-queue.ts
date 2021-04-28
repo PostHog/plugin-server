@@ -63,7 +63,7 @@ export class KafkaQueue implements Queue {
             Sentry.captureException(error)
             throw error
         } finally {
-            this.pluginsServer.statsd?.timing('kafka_queue.single_event_batch', timer)
+            this.pluginsServer.statsd?.timing('kafka_queue.single_event', timer)
             clearTimeout(processingTimeout)
         }
 
