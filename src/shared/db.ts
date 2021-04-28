@@ -646,12 +646,13 @@ export class DB {
     }
 
     public async fetchEventDefinitions(): Promise<EventDefinitionType[]> {
-        return (await this.postgresQuery('SELECT * FROM posthog_eventdefinition', undefined, 'fetchAllPluginLogs'))
+        return (await this.postgresQuery('SELECT * FROM posthog_eventdefinition', undefined, 'fetchEventDefinitions'))
             .rows as EventDefinitionType[]
     }
 
     public async fetchPropertyDefinitions(): Promise<PropertyDefinitionType[]> {
-        return (await this.postgresQuery('SELECT * FROM posthog_propertydefinition', undefined, 'fetchAllPluginLogs'))
-            .rows as PropertyDefinitionType[]
+        return (
+            await this.postgresQuery('SELECT * FROM posthog_propertydefinition', undefined, 'fetchPropertyDefinitions')
+        ).rows as PropertyDefinitionType[]
     }
 }
