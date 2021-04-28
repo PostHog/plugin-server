@@ -121,6 +121,8 @@ test('plugin meta has what it should have', async () => {
     const returnedEvent = await runPlugins(mockServer, event)
 
     expect(Object.keys(returnedEvent!.properties!).sort()).toEqual([
+        '$plugins_failed',
+        '$plugins_succeeded',
         'attachments',
         'cache',
         'config',
@@ -191,6 +193,72 @@ test('local plugin with broken index.js does not do much', async () => {
     unlink()
 })
 
+test('plugin throwing error does not prevent ingestion and failure is noted in event', async () => {
+    // silence some spam
+    console.log = jest.fn()
+    console.error = jest.fn()
+
+    getPluginRows.mockReturnValueOnce([
+        mockPluginWithArchive(`
+            function processEvent (event) {
+                throw new Error('I always fail!')
+            }
+        `),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(mockServer)
+    const { pluginConfigs } = mockServer
+
+    expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
+
+    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
+    const returnedEvent = await runPlugins(mockServer, { ...event })
+
+    const expectedReturnEvent = {
+        ...event,
+        properties: {
+            $plugins_failed: ['test-maxmind-plugin (39)'],
+            $plugins_succeeded: [],
+        },
+    }
+    expect(returnedEvent).toEqual(expectedReturnEvent)
+})
+
+test('events have property $plugins_succeeded set to the plugins that succeeded', async () => {
+    // silence some spam
+    console.log = jest.fn()
+    console.error = jest.fn()
+
+    getPluginRows.mockReturnValueOnce([
+        mockPluginWithArchive(`
+            function processEvent (event) {
+                return event
+            }
+        `),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(mockServer)
+    const { pluginConfigs } = mockServer
+
+    expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
+
+    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
+    const returnedEvent = await runPlugins(mockServer, { ...event })
+
+    const expectedReturnEvent = {
+        ...event,
+        properties: {
+            $plugins_failed: [],
+            $plugins_succeeded: ['test-maxmind-plugin (39)'],
+        },
+    }
+    expect(returnedEvent).toEqual(expectedReturnEvent)
+})
+
 test('archive plugin with broken plugin.json does not do much', async () => {
     // silence some spam
     console.log = jest.fn()
@@ -211,7 +279,7 @@ test('archive plugin with broken plugin.json does not do much', async () => {
     expect(processError).toHaveBeenCalledWith(
         mockServer,
         pluginConfigs.get(39)!,
-        `Can not load plugin.json for plugin "test-maxmind-plugin" (organization ${commonOrganizationId})`
+        `Can not load plugin.json for plugin test-maxmind-plugin ID ${plugin60.id} (organization ID ${commonOrganizationId})`
     )
 
     expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
@@ -248,7 +316,7 @@ test('plugin with http urls must have an archive', async () => {
     console.log = jest.fn()
     console.error = jest.fn()
 
-    getPluginRows.mockReturnValueOnce([{ ...plugin60, archive: null }])
+    getPluginRows.mockReturnValueOnce([{ ...plugin60, archive: null, is_global: true }])
     getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
     getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
 
@@ -259,7 +327,7 @@ test('plugin with http urls must have an archive', async () => {
     expect(processError).toHaveBeenCalledWith(
         mockServer,
         pluginConfigs.get(39)!,
-        `Tried using undownloaded remote plugin "test-maxmind-plugin" (organization ${commonOrganizationId}), which is not supported!`
+        `Tried using undownloaded remote plugin test-maxmind-plugin ID ${plugin60.id} (organization ID ${commonOrganizationId} - global), which is not supported!`
     )
     expect(await pluginConfigs.get(39)!.vm!.getTasks()).toEqual({})
 })

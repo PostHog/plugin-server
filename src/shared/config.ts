@@ -2,6 +2,7 @@ import os from 'os'
 
 import { LogLevel, PluginsServerConfig } from '../types'
 import { KAFKA_EVENTS_PLUGIN_INGESTION } from './ingestion/topics'
+import { stringToBoolean } from './utils'
 
 export const defaultConfig = overrideWithEnv(getDefaultConfig())
 export const configHelp = getConfigHelp()
@@ -59,6 +60,8 @@ export function getDefaultConfig(): PluginsServerConfig {
         INTERNAL_MMDB_SERVER_PORT: 0,
         PLUGIN_SERVER_IDLE: false,
         RETRY_QUEUES: '',
+        ENABLE_PERSISTENT_CONSOLE: false, // TODO: remove when persistent console ships in main repo
+        STALENESS_RESTART_SECONDS: 0,
     }
 }
 
@@ -101,6 +104,7 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         INTERNAL_MMDB_SERVER_PORT: 'port of the internal server used for IP location (0 means random)',
         PLUGIN_SERVER_IDLE: 'whether to disengage the plugin server, e.g. for development',
         RETRY_QUEUES: 'queue system and fallbacks to use for retries',
+        STALENESS_RESTART_SECONDS: 'trigger a restart if no event ingested for this duration',
     }
 }
 
@@ -123,7 +127,7 @@ export function overrideWithEnv(
             if (typeof defaultConfig[key] === 'number') {
                 newConfig[key] = env[key]?.indexOf('.') ? parseFloat(env[key]!) : parseInt(env[key]!)
             } else if (typeof defaultConfig[key] === 'boolean') {
-                newConfig[key] = env[key]?.toLowerCase() === 'true' || env[key] === '1'
+                newConfig[key] = stringToBoolean(env[key])
             } else {
                 newConfig[key] = env[key]
             }

@@ -30,6 +30,8 @@ export async function createServer(
         ...config,
     }
 
+    const instanceId = new UUIDT()
+
     let statsd: StatsD | undefined
     if (serverConfig.STATSD_HOST) {
         statsd = new StatsD({
@@ -98,10 +100,12 @@ export async function createServer(
         await clickhouse.querying('SELECT 1') // test that the connection works
 
         kafka = new Kafka({
-            clientId: `plugin-server-v${version}-${new UUIDT()}`,
+            clientId: `plugin-server-v${version}-${instanceId}`,
             brokers: serverConfig.KAFKA_HOSTS.split(','),
             logLevel: logLevel.WARN,
             ssl: kafkaSsl,
+            connectionTimeout: 3000, // default: 1000
+            authenticationTimeout: 3000, // default: 1000
         })
         const producer = kafka.producer()
         await producer?.connect()
@@ -142,6 +146,7 @@ export async function createServer(
 
     const server: Omit<PluginsServer, 'eventsProcessor'> = {
         ...serverConfig,
+        instanceId,
         db,
         postgres,
         redisPool,

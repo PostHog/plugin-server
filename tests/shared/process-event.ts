@@ -203,7 +203,11 @@ export const createProcessEventTests = (
     })
 
     test('capture new person', async () => {
-        await server.db.postgresQuery(`UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`, [true, team.id])
+        await server.db.postgresQuery(
+            `UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`,
+            [true, team.id],
+            'testTag'
+        )
         team = await getFirstTeam(server)
 
         expect(team.event_names).toEqual([])
@@ -360,6 +364,24 @@ export const createProcessEventTests = (
             },
             { key: '$ip', usage_count: null, volume: null },
         ])
+    })
+
+    test('capture bad team', async () => {
+        await expect(async () => {
+            await processEvent(
+                'asdfasdfasdf',
+                '',
+                '',
+                ({
+                    event: '$pageview',
+                    properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
+                } as any) as PluginEvent,
+                1337,
+                now,
+                now,
+                new UUIDT().toString()
+            )
+        }).rejects.toThrowError("No team found with ID 1337. Can't ingest event.")
     })
 
     test('capture no element', async () => {
@@ -534,7 +556,7 @@ export const createProcessEventTests = (
     })
 
     test('anonymized ip capture', async () => {
-        await server.db.postgresQuery('update posthog_team set anonymize_ips = $1', [true])
+        await server.db.postgresQuery('update posthog_team set anonymize_ips = $1', [true], 'testTag')
         await createPerson(server, team, ['asdfasdfasdf'])
 
         await processEvent(
@@ -813,7 +835,11 @@ export const createProcessEventTests = (
     })
 
     test('capture first team event', async () => {
-        await server.db.postgresQuery(`UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`, [false, team.id])
+        await server.db.postgresQuery(
+            `UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`,
+            [false, team.id],
+            'testTag'
+        )
 
         eventsProcessor.posthog = {
             identify: jest.fn((distinctId) => true),

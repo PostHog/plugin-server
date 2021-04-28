@@ -37,6 +37,7 @@ export async function resetTestDatabase(
         DELETE FROM posthog_event;
         DELETE FROM posthog_pluginstorage;
         DELETE FROM posthog_pluginattachment;
+        ${config.ENABLE_PERSISTENT_CONSOLE ? 'DELETE FROM posthog_pluginlogentry;' : '' /* TODO: remove this if */}
         DELETE FROM posthog_pluginconfig;
         DELETE FROM posthog_plugin;
         DELETE FROM posthog_team;
@@ -141,7 +142,7 @@ export async function createUserTeamAndOrganization(
 }
 
 export async function getTeams(server: PluginsServer): Promise<Team[]> {
-    return (await server.db.postgresQuery('SELECT * FROM posthog_team ORDER BY id')).rows
+    return (await server.db.postgresQuery('SELECT * FROM posthog_team ORDER BY id', undefined, 'fetchAllTeams')).rows
 }
 
 export async function getFirstTeam(server: PluginsServer): Promise<Team> {

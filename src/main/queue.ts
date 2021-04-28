@@ -26,25 +26,31 @@ export function pauseQueueIfWorkerFull(
 
 export async function startQueue(
     server: PluginsServer,
-    piscina?: Piscina,
+    piscina: Piscina,
     workerMethods: Partial<WorkerMethods> = {}
 ): Promise<Queue> {
     const mergedWorkerMethods = {
         processEvent: (event: PluginEvent) => {
-            return piscina!.runTask({ task: 'processEvent', args: { event } })
+            server.lastActivity = new Date().valueOf()
+            server.lastActivityType = 'processEvent'
+            return piscina.runTask({ task: 'processEvent', args: { event } })
         },
         processEventBatch: (batch: PluginEvent[]) => {
-            return piscina!.runTask({ task: 'processEventBatch', args: { batch } })
+            server.lastActivity = new Date().valueOf()
+            server.lastActivityType = 'processEventBatch'
+            return piscina.runTask({ task: 'processEventBatch', args: { batch } })
         },
         ingestEvent: (event: PluginEvent) => {
-            return piscina!.runTask({ task: 'ingestEvent', args: { event } })
+            server.lastActivity = new Date().valueOf()
+            server.lastActivityType = 'ingestEvent'
+            return piscina.runTask({ task: 'ingestEvent', args: { event } })
         },
         ...workerMethods,
     }
 
     try {
         if (server.KAFKA_ENABLED) {
-            return await startQueueKafka(server, mergedWorkerMethods)
+            return await startQueueKafka(server, piscina, mergedWorkerMethods)
         } else {
             return startQueueRedis(server, piscina, mergedWorkerMethods)
         }
@@ -97,10 +103,11 @@ function startQueueRedis(server: PluginsServer, piscina: Piscina | undefined, wo
     return celeryQueue
 }
 
-async function startQueueKafka(server: PluginsServer, workerMethods: WorkerMethods): Promise<Queue> {
+async function startQueueKafka(server: PluginsServer, piscina: Piscina, workerMethods: WorkerMethods): Promise<Queue> {
     const kafkaQueue: Queue = new KafkaQueue(
         server,
-        (batch: PluginEvent[]) => workerMethods.processEventBatch(batch),
+        piscina,
+        (event: PluginEvent) => workerMethods.processEvent(event),
         async (event) => void (await workerMethods.ingestEvent(event))
     )
     await kafkaQueue.start()
