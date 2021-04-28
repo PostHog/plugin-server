@@ -9,7 +9,7 @@ import * as schedule from 'node-schedule'
 import { defaultConfig } from '../shared/config'
 import { createServer } from '../shared/server'
 import { status } from '../shared/status'
-import { createRedis, delay } from '../shared/utils'
+import { createRedis, delay, getPiscinaStats } from '../shared/utils'
 import { PluginsServer, PluginsServerConfig, Queue, ScheduleControl } from '../types'
 import { createMmdbServer, performMmdbStalenessCheck, prepareMmdb } from './mmdb'
 import { startQueue } from './queue'
@@ -49,6 +49,7 @@ export async function startPluginsServer(
     let closeServer: () => Promise<void> | undefined
     let scheduleControl: ScheduleControl | undefined
     let mmdbServer: net.Server | undefined
+    let lastActivityCheck: NodeJS.Timeout | undefined
 
     let shutdownStatus = 0
 
@@ -67,6 +68,7 @@ export async function startPluginsServer(
         if (fastifyInstance && !serverConfig?.DISABLE_WEB) {
             await stopFastifyInstance(fastifyInstance!)
         }
+        lastActivityCheck && clearInterval(lastActivityCheck)
         await queue?.stop()
         await pubSub?.quit()
         pingJob && schedule.cancelJob(pingJob)
@@ -154,17 +156,49 @@ export async function startPluginsServer(
         // every 10 seconds sends stuff to StatsD
         statsJob = schedule.scheduleJob('*/10 * * * * *', () => {
             if (piscina) {
-                server!.statsd?.gauge(`piscina.utilization`, (piscina?.utilization || 0) * 100)
-                server!.statsd?.gauge(`piscina.threads`, piscina?.threads.length)
-                server!.statsd?.gauge(`piscina.queue_size`, piscina?.queueSize)
+                for (const [key, value] of Object.entries(getPiscinaStats(piscina))) {
+                    server!.statsd?.gauge(`piscina.${key}`, value)
+                }
             }
         })
+
+        if (serverConfig.STALENESS_RESTART_SECONDS > 0) {
+            // check every 10 sec how long it has been since the last activity
+            let lastFoundActivity: number
+            lastActivityCheck = setInterval(() => {
+                if (
+                    server?.lastActivity &&
+                    new Date().valueOf() - server?.lastActivity > serverConfig.STALENESS_RESTART_SECONDS * 1000 &&
+                    lastFoundActivity !== server?.lastActivity
+                ) {
+                    lastFoundActivity = server?.lastActivity
+                    const extra = {
+                        instanceId: server.instanceId.toString(),
+                        lastActivity: server.lastActivity ? new Date(server.lastActivity).toISOString() : null,
+                        lastActivityType: server.lastActivityType,
+                    }
+                    Sentry.captureMessage(
+                        `Plugin Server has not ingested events for over ${serverConfig.STALENESS_RESTART_SECONDS} seconds!`,
+                        {
+                            extra,
+                        }
+                    )
+                    console.log(
+                        `Plugin Server has not ingested events for over ${serverConfig.STALENESS_RESTART_SECONDS} seconds!`,
+                        extra
+                    )
+                }
+            }, Math.min(serverConfig.STALENESS_RESTART_SECONDS, 10000))
+        }
 
         serverInstance.piscina = piscina
         serverInstance.queue = queue
         serverInstance.stop = closeJobs
 
         status.info('🚀', 'All systems go')
+
+        server.lastActivity = new Date().valueOf()
+        server.lastActivityType = 'serverStart'
 
         return serverInstance as ServerInstance
     } catch (error) {

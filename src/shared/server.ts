@@ -103,6 +103,8 @@ export async function createServer(
             brokers: serverConfig.KAFKA_HOSTS.split(','),
             logLevel: logLevel.WARN,
             ssl: kafkaSsl,
+            connectionTimeout: 3000, // default: 1000
+            authenticationTimeout: 3000, // default: 1000
         })
         const producer = kafka.producer()
         await producer?.connect()

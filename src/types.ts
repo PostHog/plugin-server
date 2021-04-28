@@ -74,6 +74,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     INTERNAL_MMDB_SERVER_PORT: number
     PLUGIN_SERVER_IDLE: boolean
     ENABLE_PERSISTENT_CONSOLE: boolean
+    STALENESS_RESTART_SECONDS: number
 }
 
 export interface PluginsServer extends PluginsServerConfig {
@@ -93,6 +94,9 @@ export interface PluginsServer extends PluginsServerConfig {
     pluginSchedule: Record<string, PluginConfigId[]> | null
     pluginSchedulePromises: Record<string, Record<PluginConfigId, Promise<any> | null>>
     eventsProcessor: EventsProcessor
+    // diagnostics
+    lastActivity: number
+    lastActivityType: string
 }
 
 export interface Pausable {
@@ -176,6 +180,12 @@ export interface PluginAttachmentDB {
     contents: Buffer | null
 }
 
+export enum PluginLogEntrySource {
+    System = 'SYSTEM',
+    Plugin = 'PLUGIN',
+    Console = 'CONSOLE',
+}
+
 export enum PluginLogEntryType {
     Debug = 'DEBUG',
     Log = 'LOG',
@@ -190,6 +200,7 @@ export interface PluginLogEntry {
     plugin_id: number
     plugin_config_id: number
     timestamp: string
+    source: PluginLogEntrySource
     type: PluginLogEntryType
     message: string
     instance_id: string

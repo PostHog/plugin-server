@@ -30,7 +30,7 @@ test('getPluginAttachmentRows', async () => {
 
     const rows1 = await getPluginAttachmentRows(server)
     expect(rows1).toEqual(rowsExpected)
-    await server.db.postgresQuery("update posthog_team set plugins_opt_in='f'")
+    await server.db.postgresQuery("update posthog_team set plugins_opt_in='f'", undefined, 'testTag')
     const rows2 = await getPluginAttachmentRows(server)
     expect(rows2).toEqual(rowsExpected)
 })
@@ -55,7 +55,7 @@ test('getPluginConfigRows', async () => {
 
     const rows1 = await getPluginConfigRows(server)
     expect(rows1).toEqual(rowsExpected)
-    await server.db.postgresQuery("update posthog_team set plugins_opt_in='f'")
+    await server.db.postgresQuery("update posthog_team set plugins_opt_in='f'", undefined, 'testTag')
     const rows2 = await getPluginConfigRows(server)
     expect(rows2).toEqual(rowsExpected)
 })
@@ -105,7 +105,7 @@ test('getPluginRows', async () => {
 
     const rows1 = await getPluginRows(server)
     expect(rows1).toEqual(rowsExpected)
-    await server.db.postgresQuery("update posthog_team set plugins_opt_in='f'")
+    await server.db.postgresQuery("update posthog_team set plugins_opt_in='f'", undefined, 'testTag')
     const rows2 = await getPluginRows(server)
     expect(rows2).toEqual(rowsExpected)
 })
@@ -125,15 +125,17 @@ test('setError', async () => {
     server.db.postgresQuery = jest.fn() as any
 
     await setError(server, null, pluginConfig39)
-    expect(server.db.postgresQuery).toHaveBeenCalledWith('UPDATE posthog_pluginconfig SET error = $1 WHERE id = $2', [
-        null,
-        pluginConfig39.id,
-    ])
+    expect(server.db.postgresQuery).toHaveBeenCalledWith(
+        'UPDATE posthog_pluginconfig SET error = $1 WHERE id = $2',
+        [null, pluginConfig39.id],
+        'updatePluginConfigError'
+    )
 
     const pluginError: PluginError = { message: 'error happened', time: 'now' }
     await setError(server, pluginError, pluginConfig39)
-    expect(server.db.postgresQuery).toHaveBeenCalledWith('UPDATE posthog_pluginconfig SET error = $1 WHERE id = $2', [
-        pluginError,
-        pluginConfig39.id,
-    ])
+    expect(server.db.postgresQuery).toHaveBeenCalledWith(
+        'UPDATE posthog_pluginconfig SET error = $1 WHERE id = $2',
+        [pluginError, pluginConfig39.id],
+        'updatePluginConfigError'
+    )
 })
