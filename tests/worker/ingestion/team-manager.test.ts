@@ -152,19 +152,48 @@ describe('TeamManager()', () => {
             )
             teamManager.teamCache.clear()
 
-            const team = await teamManager.fetchTeam(2)
-            // expect(team?.event_names).toEqual(['$pageview', 'new-event'])
-            // expect(team?.event_names_with_usage).toEqual([
-            //     { event: '$pageview', usage_count: 2, volume: 3 },
-            //     { event: 'new-event', usage_count: null, volume: null },
-            // ])
-            // expect(team?.event_properties).toEqual(['property_name', 'numeric_prop', 'number'])
-            // expect(team?.event_properties_with_usage).toEqual([
-            //     { key: 'property_name', usage_count: null, volume: null },
-            //     { key: 'numeric_prop', usage_count: null, volume: null },
-            //     { key: 'number', usage_count: null, volume: null },
-            // ])
-            // expect(team?.event_properties_numerical).toEqual(['numeric_prop', 'number'])
+            expect(await server.db.fetchEventDefinitions()).toEqual([
+                {
+                    id: expect.any(String),
+                    name: '$pageview',
+                    query_usage_30_day: 2,
+                    team_id: 2,
+                    volume_30_day: 3,
+                },
+                {
+                    id: expect.any(String),
+                    name: 'new-event',
+                    query_usage_30_day: null,
+                    team_id: 2,
+                    volume_30_day: null,
+                },
+            ])
+            expect(await server.db.fetchPropertyDefinitions()).toEqual([
+                {
+                    id: expect.any(String),
+                    is_numerical: false,
+                    name: 'property_name',
+                    query_usage_30_day: null,
+                    team_id: 2,
+                    volume_30_day: null,
+                },
+                {
+                    id: expect.any(String),
+                    is_numerical: true,
+                    name: 'numeric_prop',
+                    query_usage_30_day: null,
+                    team_id: 2,
+                    volume_30_day: null,
+                },
+                {
+                    id: expect.any(String),
+                    is_numerical: true,
+                    name: 'number',
+                    query_usage_30_day: null,
+                    team_id: 2,
+                    volume_30_day: null,
+                },
+            ])
         })
 
         it('does not update anything if nothing changes', async () => {
