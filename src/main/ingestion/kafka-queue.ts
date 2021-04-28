@@ -103,24 +103,41 @@ export class KafkaQueue implements Queue {
     }: EachBatchPayload): Promise<void> {
         const batchStartTimer = new Date()
 
-        const messageBatches = groupIntoBatches(
-            batch.messages,
-            this.pluginsServer.WORKER_CONCURRENCY * this.pluginsServer.TASKS_PER_WORKER
-        )
+        try {
+            const messageBatches = groupIntoBatches(
+                batch.messages,
+                this.pluginsServer.WORKER_CONCURRENCY * this.pluginsServer.TASKS_PER_WORKER
+            )
 
-        for (const messageBatch of messageBatches) {
-            if (!isRunning() || isStale() || messageBatch.length === 0) {
-                break
+            for (const messageBatch of messageBatches) {
+                if (!isRunning() || isStale()) {
+                    status.info('🔥', `Bailing out of a batch of ${batch.messages.length} events`, {
+                        isRunning: isRunning(),
+                        isStale: isStale(),
+                        msFromBatchStart: new Date().valueOf() - batchStartTimer.valueOf(),
+                    })
+                    return
+                }
+
+                await Promise.all(messageBatch.map((message) => this.eachMessage(message)))
+
+                // this if should never be false, but who can trust computers these days
+                if (messageBatch.length > 0) {
+                    resolveOffset(messageBatch[messageBatch.length - 1].offset)
+                }
+                await commitOffsetsIfNecessary()
+                await heartbeat()
             }
 
-            await Promise.all(messageBatch.map((message) => this.eachMessage(message)))
-
-            resolveOffset(messageBatch[messageBatch.length - 1].offset)
-            await commitOffsetsIfNecessary()
-            await heartbeat()
+            status.info(
+                '🧩',
+                `Kafka batch of ${batch.messages.length} events completed in ${
+                    new Date().valueOf() - batchStartTimer.valueOf()
+                }ms`
+            )
+        } finally {
+            this.pluginsServer.statsd?.timing('kafka_queue.each_batch', batchStartTimer)
         }
-
-        this.pluginsServer.statsd?.timing('kafka_queue.each_batch', batchStartTimer)
     }
 
     async start(): Promise<void> {
@@ -133,6 +150,7 @@ export class KafkaQueue implements Queue {
 
             // KafkaJS batching: https://kafka.js.org/docs/consuming#a-name-each-batch-a-eachbatch
             await this.consumer.run({
+                eachBatchAutoResolve: false,
                 autoCommitInterval: 1000, // autocommit every 1000 ms…
                 autoCommitThreshold: 1000, // …or every 1000 messages, whichever is sooner
                 eachBatch: async (payload) => {
