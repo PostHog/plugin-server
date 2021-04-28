@@ -410,3 +410,20 @@ export interface ScheduleControl {
 }
 
 export type IngestEventResponse = { success?: boolean; error?: string }
+
+export interface EventDefinitionType {
+    id: string
+    name: string
+    volume_30_day: number | null
+    query_usage_30_day: number | null
+    team_id: number
+}
+
+export interface PropertyDefinitionType {
+    id: string
+    name: string
+    is_numerical: boolean
+    volume_30_day: number | null
+    query_usage_30_day: number | null
+    team_id: number
+}
