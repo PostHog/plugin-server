@@ -118,6 +118,7 @@ export class TeamManager {
                     [new UUIDT().toString(), key, typeof value === 'number', team.id],
                     'insertPropertyDefinition'
                 )
+                this.eventPropertiesCache.get(team.id)?.add(key)
             }
         }
 
