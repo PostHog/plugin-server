@@ -86,7 +86,6 @@ export class TeamManager {
     public async updateEventNamesAndProperties(
         teamId: number,
         event: string,
-        eventUuid: string,
         properties: Properties,
         posthog: ReturnType<typeof nodePostHog>
     ): Promise<void> {
