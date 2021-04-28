@@ -49,7 +49,7 @@ export class KafkaQueue implements Queue {
     }
 
     private async eachEvent(event: PluginEvent): Promise<void> {
-        const eachMessageStartTimer = new Date()
+        const eachEventStartTimer = new Date()
 
         const processingTimeout = timeoutGuard('Still running plugins on event. Timeout warning after 30 sec!', {
             event: JSON.stringify(event),
@@ -64,7 +64,6 @@ export class KafkaQueue implements Queue {
             throw error
         } finally {
             this.pluginsServer.statsd?.timing('kafka_queue.single_event_batch', timer)
-            this.pluginsServer.statsd?.timing('kafka_queue.each_batch.process_events', timer)
             clearTimeout(processingTimeout)
         }
 
@@ -83,12 +82,11 @@ export class KafkaQueue implements Queue {
                 throw error
             } finally {
                 this.pluginsServer.statsd?.timing('kafka_queue.single_ingestion', singleIngestionTimer)
-                this.pluginsServer.statsd?.timing('kafka_queue.each_batch.ingest_events', singleIngestionTimer)
                 clearTimeout(singleIngestionTimeout)
             }
         }
 
-        this.pluginsServer.statsd?.timing('kafka_queue.each_message', eachMessageStartTimer)
+        this.pluginsServer.statsd?.timing('kafka_queue.each_event', eachEventStartTimer)
 
         this.countAndLogEvents()
     }
@@ -111,7 +109,7 @@ export class KafkaQueue implements Queue {
 
             for (const messageBatch of messageBatches) {
                 if (!isRunning() || isStale()) {
-                    status.info('🔥', `Bailing out of a batch of ${batch.messages.length} events`, {
+                    status.info('🚪', `Bailing out of a batch of ${batch.messages.length} events`, {
                         isRunning: isRunning(),
                         isStale: isStale(),
                         msFromBatchStart: new Date().valueOf() - batchStartTimer.valueOf(),
