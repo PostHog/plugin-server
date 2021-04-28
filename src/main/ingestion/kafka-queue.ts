@@ -6,7 +6,7 @@ import { PluginsServer, Queue } from 'types'
 
 import { timeoutGuard } from '../../shared/ingestion/utils'
 import { status } from '../../shared/status'
-import { getPiscinaStats, groupIntoBatches, killGracefully, sanitizeEvent } from '../../shared/utils'
+import { groupIntoBatches, killGracefully, sanitizeEvent } from '../../shared/utils'
 
 export class KafkaQueue implements Queue {
     private pluginsServer: PluginsServer
@@ -73,7 +73,6 @@ export class KafkaQueue implements Queue {
         if (processedEvent) {
             const singleIngestionTimeout = timeoutGuard('After 30 seconds still ingesting event', {
                 event: JSON.stringify(processedEvent),
-                piscina: JSON.stringify(getPiscinaStats(this.piscina)),
             })
             const singleIngestionTimer = new Date()
             try {
