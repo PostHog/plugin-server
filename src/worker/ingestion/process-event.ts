@@ -373,7 +373,7 @@ export class EventsProcessor {
             }))
         }
 
-        const team = await this.teamManager.fetchTeam(teamId, eventUuid)
+        const team = await this.teamManager.fetchTeam(teamId)
 
         if (!team) {
             throw new Error(`No team found with ID ${teamId}. Can't ingest event.`)
