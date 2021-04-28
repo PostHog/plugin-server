@@ -195,9 +195,9 @@ describe('TeamManager()', () => {
             await teamManager.fetchTeam(2)
             await teamManager.cacheEventNamesAndProperties(2)
             await server.db.postgresQuery(
-                'UPDATE posthog_team SET event_names = $1',
-                [JSON.stringify(['$pageview', '$foobar'])],
-                'testTag'
+                `INSERT INTO posthog_eventdefinition (id, name, volume_30_day, query_usage_30_day, team_id) VALUES ($1, $2, NULL, NULL, $3) ON CONFLICT DO NOTHING`,
+                [new UUIDT().toString(), '$foobar', 2],
+                'insertEventDefinition'
             )
 
             jest.spyOn(teamManager, 'fetchTeam')
@@ -205,7 +205,7 @@ describe('TeamManager()', () => {
 
             // Scenario: Different request comes in, team gets reloaded in the background with no updates
             await teamManager.updateEventNamesAndProperties(2, '$foobar', 'uuid2', {}, posthog)
-            expect(teamManager.fetchTeam).toHaveBeenCalledTimes(2)
+            expect(teamManager.fetchTeam).toHaveBeenCalledTimes(1)
             expect(server.db.postgresQuery).toHaveBeenCalledTimes(1)
 
             // Scenario: Next request but a real update

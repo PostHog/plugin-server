@@ -124,7 +124,7 @@ export class TeamManager {
 
         if (team && !team.ingested_event) {
             await this.db.postgresQuery(
-                `UPDATE posthog_team SET ingested_event = $1 WHERE id = $7`,
+                `UPDATE posthog_team SET ingested_event = $1 WHERE id = $2`,
                 [true, team.id],
                 'setTeamIngestedEvent'
             )
@@ -154,7 +154,8 @@ export class TeamManager {
         if (!eventNamesCache) {
             const eventNames = await this.db.postgresQuery(
                 'SELECT name FROM posthog_eventdefinition WHERE team_id = $1',
-                [teamId]
+                [teamId],
+                'fetchEventDefinitions'
             )
             eventNamesCache = new Set(eventNames.rows.map((r) => r.name))
             this.eventNamesCache.set(teamId, eventNamesCache)
@@ -164,7 +165,8 @@ export class TeamManager {
         if (!eventPropertiesCache) {
             const eventProperties = await this.db.postgresQuery(
                 'SELECT name FROM posthog_propertydefinition WHERE team_id = $1',
-                [teamId]
+                [teamId],
+                'fetchPropertyDefinitions'
             )
             eventPropertiesCache = new Set(eventProperties.rows.map((r) => r.name))
             this.eventPropertiesCache.set(teamId, eventPropertiesCache)
