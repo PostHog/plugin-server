@@ -1,4 +1,5 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
+import * as Sentry from '@sentry/node'
 
 import { processError } from '../../shared/error'
 import { EnqueuedRetry, PluginConfig, PluginsServer } from '../../types'
@@ -119,13 +120,20 @@ function getPluginsForTeam(server: PluginsServer, teamId: number): PluginConfig[
 export async function runOnRetry(server: PluginsServer, retry: EnqueuedRetry): Promise<any> {
     const timer = new Date()
     let response
-    try {
-        const pluginConfig = server.pluginConfigs.get(retry.pluginConfigId)
-        const task = await pluginConfig?.vm?.getOnRetry()
-        response = await task?.(retry.type, retry.payload)
-    } catch (error) {
-        await processError(server, retry.pluginConfigId, error)
-        server.statsd?.increment(`plugin.retry.${retry.type}.${retry.pluginConfigId}.ERROR`)
+    const pluginConfig = server.pluginConfigs.get(retry.pluginConfigId)
+    if (pluginConfig) {
+        try {
+            const task = await pluginConfig.vm?.getOnRetry()
+            response = await task?.(retry.type, retry.payload)
+        } catch (error) {
+            await processError(server, pluginConfig, error)
+            server.statsd?.increment(`plugin.retry.${retry.type}.${retry.pluginConfigId}.ERROR`)
+        }
+    } else {
+        server.statsd?.increment(`plugin.retry.${retry.type}.${retry.pluginConfigId}.SKIP`)
+        Sentry.captureMessage(`Retrying for plugin config ${retry.pluginConfigId} that does not exist`, {
+            extra: { retry: JSON.stringify(retry) },
+        })
     }
     server.statsd?.timing(`plugin.retry.${retry.type}.${retry.pluginConfigId}`, timer)
     return response
