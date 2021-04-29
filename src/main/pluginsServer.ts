@@ -188,7 +188,7 @@ export async function startPluginsServer(
                         `Plugin Server has not ingested events for over ${serverConfig.STALENESS_RESTART_SECONDS} seconds! Rebooting.`,
                         extra
                     )
-                    setTimeout(() => process.kill(process.pid, 'SIGINT'), 1000)
+                    setTimeout(() => process.kill(process.pid, 'SIGTERM'), 1000)
                     setTimeout(() => process.kill(process.pid, 'SIGTERM'), 60000)
                     setTimeout(() => process.kill(process.pid, 'SIGKILL'), 120000)
                 }
