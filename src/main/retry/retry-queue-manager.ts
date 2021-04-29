@@ -17,12 +17,12 @@ export class RetryQueueManager implements RetryQueue {
         this.pluginsServer = pluginsServer
 
         this.retryQueues = pluginsServer.RETRY_QUEUES.split(',')
-            .map((q) => q.trim())
+            .map((q) => q.trim() as keyof typeof queues)
             .filter((q) => !!q)
             .map(
                 (queue): RetryQueue => {
-                    if (queues[queue as keyof typeof queues]) {
-                        return queues[queue as keyof typeof queues](pluginsServer)
+                    if (queues[queue]) {
+                        return queues[queue](pluginsServer)
                     } else {
                         throw new Error(`Unknown retry queue "${queue}"`)
                     }
