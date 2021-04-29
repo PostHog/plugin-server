@@ -4,7 +4,7 @@ import { Pool } from 'pg'
 import { defaultConfig } from '../../src/shared/config'
 import { status } from '../../src/shared/status'
 
-export async function resetGraphileSchema() {
+export async function resetGraphileSchema(): Promise<void> {
     const db = new Pool({ connectionString: defaultConfig.DATABASE_URL })
 
     try {

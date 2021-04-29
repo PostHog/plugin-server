@@ -103,7 +103,7 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         DISTINCT_ID_LRU_SIZE: 'size of persons distinct ID LRU cache',
         INTERNAL_MMDB_SERVER_PORT: 'port of the internal server used for IP location (0 means random)',
         PLUGIN_SERVER_IDLE: 'whether to disengage the plugin server, e.g. for development',
-        RETRY_QUEUES: 'queue system and fallbacks to use for retries',
+        RETRY_QUEUES: 'retry queue engine and fallback queues',
         STALENESS_RESTART_SECONDS: 'trigger a restart if no event ingested for this duration',
     }
 }

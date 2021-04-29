@@ -29,19 +29,19 @@ describe('retry queues', () => {
     describe('fs queue', () => {
         test('onRetry gets called', async () => {
             const testCode = `
-            import { console } from 'test-utils/write-to-file'
+                import { console } from 'test-utils/write-to-file'
 
-            export async function onRetry (type, payload, meta) {
-                console.log('retrying event!', type)
-            }
-            export async function processEvent (event, meta) {
-                if (event.properties?.hi === 'ha') {
-                    console.log('processEvent')
-                    meta.retry('processEvent', event, 1)
+                export async function onRetry (type, payload, meta) {
+                    console.log('retrying event!', type)
                 }
-                return event
-            }
-        `
+                export async function processEvent (event, meta) {
+                    if (event.properties?.hi === 'ha') {
+                        console.log('processEvent')
+                        meta.retry('processEvent', event, 1)
+                    }
+                    return event
+                }
+            `
             await resetTestDatabase(testCode)
             const server = await startPluginsServer(
                 {
