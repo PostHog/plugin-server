@@ -176,17 +176,21 @@ export async function startPluginsServer(
                         instanceId: server.instanceId.toString(),
                         lastActivity: server.lastActivity ? new Date(server.lastActivity).toISOString() : null,
                         lastActivityType: server.lastActivityType,
+                        piscina: piscina ? JSON.stringify(getPiscinaStats(piscina)) : null,
                     }
                     Sentry.captureMessage(
-                        `Plugin Server has not ingested events for over ${serverConfig.STALENESS_RESTART_SECONDS} seconds!`,
+                        `Plugin Server has not ingested events for over ${serverConfig.STALENESS_RESTART_SECONDS} seconds! Rebooting.`,
                         {
                             extra,
                         }
                     )
                     console.log(
-                        `Plugin Server has not ingested events for over ${serverConfig.STALENESS_RESTART_SECONDS} seconds!`,
+                        `Plugin Server has not ingested events for over ${serverConfig.STALENESS_RESTART_SECONDS} seconds! Rebooting.`,
                         extra
                     )
+                    setTimeout(() => process.kill(process.pid, 'SIGINT'), 1000)
+                    setTimeout(() => process.kill(process.pid, 'SIGTERM'), 60000)
+                    setTimeout(() => process.kill(process.pid, 'SIGKILL'), 120000)
                 }
             }, Math.min(serverConfig.STALENESS_RESTART_SECONDS, 10000))
         }
