@@ -1,4 +1,4 @@
-import { makeWorkerUtils, run, Runner, WorkerUtils } from 'graphile-worker'
+import { makeWorkerUtils, run, Runner, WorkerUtils, WorkerUtilsOptions } from 'graphile-worker'
 
 import { EnqueuedRetry, OnRetryCallback, PluginsServer, RetryQueue } from '../../types'
 
@@ -21,9 +21,15 @@ export class GraphileQueue implements RetryQueue {
 
     async enqueue(retry: EnqueuedRetry): Promise<void> {
         if (!this.workerUtils) {
-            this.workerUtils = await makeWorkerUtils({
-                connectionString: this.pluginsServer.DATABASE_URL,
-            })
+            this.workerUtils = await makeWorkerUtils(
+                this.pluginsServer.RETRY_QUEUE_GRAPHILE_URL
+                    ? {
+                          connectionString: this.pluginsServer.RETRY_QUEUE_GRAPHILE_URL,
+                      }
+                    : ({
+                          pgPool: this.pluginsServer.postgres,
+                      } as WorkerUtilsOptions)
+            )
             await this.workerUtils.migrate()
         }
         await this.workerUtils.addJob('retryTask', retry, { runAt: new Date(retry.timestamp), maxAttempts: 1 })
