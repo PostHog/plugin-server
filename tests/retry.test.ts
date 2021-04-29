@@ -1,4 +1,6 @@
 import { startPluginsServer } from '../src/main/pluginsServer'
+import { LOCKED_RESOURCE } from '../src/main/services/retry-queue-consumer'
+import { createServer } from '../src/shared/server'
 import { delay } from '../src/shared/utils'
 import { LogLevel } from '../src/types'
 import { makePiscina } from '../src/worker/piscina'
@@ -14,8 +16,14 @@ jest.setTimeout(60000) // 60 sec timeout
 const { console: testConsole } = imports['test-utils/write-to-file']
 
 describe('retry queues', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         testConsole.reset()
+
+        const [server, stopServer] = await createServer()
+        const redis = await server.redisPool.acquire()
+        await redis.del(LOCKED_RESOURCE)
+        await server.redisPool.release(redis)
+        await stopServer()
     })
 
     describe('fs queue', () => {
