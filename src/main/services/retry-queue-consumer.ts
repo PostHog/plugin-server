@@ -20,19 +20,19 @@ export async function startRetryQueueConsumer(
         }
     }
 
-    const unlock = await startRedlock(
+    const unlock = await startRedlock({
         server,
-        LOCKED_RESOURCE,
-        async () => {
+        resource: LOCKED_RESOURCE,
+        onLock: async () => {
             status.info('🔄', 'Retry queue consumer lock aquired')
             await server.retryQueueManager.startConsumer(onRetry)
         },
-        async () => {
+        onUnlock: async () => {
             status.info('🔄', 'Stopping retry queue consumer')
             await server.retryQueueManager.stopConsumer()
         },
-        server.SCHEDULE_LOCK_TTL
-    )
+        ttl: server.SCHEDULE_LOCK_TTL,
+    })
 
     return { stop: () => unlock(), resume: () => server.retryQueueManager.resumeConsumer() }
 }

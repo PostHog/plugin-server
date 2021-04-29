@@ -5,13 +5,21 @@ import { status } from '../../shared/status'
 import { createRedis } from '../../shared/utils'
 import { PluginsServer } from '../../types'
 
-export async function startRedlock(
-    server: PluginsServer,
-    resource: string,
-    onLock: () => Promise<void> | void,
-    onUnlock: () => Promise<void> | void,
-    ttl = 60
-): Promise<() => Promise<void>> {
+type RedlockOptions = {
+    server: PluginsServer
+    resource: string
+    onLock: () => Promise<void> | void
+    onUnlock: () => Promise<void> | void
+    ttl: number
+}
+
+export async function startRedlock({
+    server,
+    resource,
+    onLock,
+    onUnlock,
+    ttl,
+}: RedlockOptions): Promise<() => Promise<void>> {
     status.info('⏰', `Starting redlock "${resource}" ...`)
 
     let stopped = false
@@ -19,7 +27,7 @@ export async function startRedlock(
     let lock: Redlock.Lock
     let lockTimeout: NodeJS.Timeout
 
-    const lockTTL = ttl * 1000 // 60 sec
+    const lockTTL = ttl * 1000 // 60 sec if default passed in
     const retryDelay = lockTTL / 10 // 6 sec
     const extendDelay = lockTTL / 2 // 30 sec
 

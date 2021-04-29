@@ -40,18 +40,18 @@ export async function startSchedule(
             runTasksDebounced(server!, piscina!, 'runEveryDay')
     })
 
-    const unlock = await startRedlock(
+    const unlock = await startRedlock({
         server,
-        LOCKED_RESOURCE,
-        () => {
+        resource: LOCKED_RESOURCE,
+        onLock: () => {
             weHaveTheLock = true
             onLock?.()
         },
-        () => {
+        onUnlock: () => {
             weHaveTheLock = false
         },
-        server.SCHEDULE_LOCK_TTL
-    )
+        ttl: server.SCHEDULE_LOCK_TTL,
+    })
 
     const stopSchedule = async () => {
         stopped = true
