@@ -4,7 +4,12 @@ import { EnqueuedRetry, OnRetryCallback, PluginsServer, RetryQueue } from '../..
 import { FsQueue } from './fs-queue'
 import { GraphileQueue } from './graphile-queue'
 
-const queues = {
+enum QueueType {
+    FS = 'fs',
+    Graphile = 'graphile',
+}
+
+const queues: Record<QueueType, (server: PluginsServer) => RetryQueue> = {
     fs: () => new FsQueue(),
     graphile: (pluginsServer: PluginsServer) => new GraphileQueue(pluginsServer),
 }
@@ -17,7 +22,7 @@ export class RetryQueueManager implements RetryQueue {
         this.pluginsServer = pluginsServer
 
         this.retryQueues = pluginsServer.RETRY_QUEUES.split(',')
-            .map((q) => q.trim() as keyof typeof queues)
+            .map((q) => q.trim() as QueueType)
             .filter((q) => !!q)
             .map(
                 (queue): RetryQueue => {
