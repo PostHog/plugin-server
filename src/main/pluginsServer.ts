@@ -189,9 +189,14 @@ export async function startPluginsServer(
                         extra
                     )
                     server.statsd?.increment(`alerts.stale_plugin_server_restarted`)
-                    setTimeout(() => process.kill(process.pid, 'SIGTERM'), 1000)
-                    setTimeout(() => process.kill(process.pid, 'SIGTERM'), 60000)
-                    setTimeout(() => process.kill(process.pid, 'SIGKILL'), 120000)
+
+                    // In tests, only call SIGTERM once to avoid leaky tests.
+                    // In production, kill two more times if the first one fails.
+                    setTimeout(() => process.kill(process.pid, 'SIGTERM'), 100)
+                    if (process.env.NODE_ENV !== 'test') {
+                        setTimeout(() => process.kill(process.pid, 'SIGTERM'), 60000)
+                        setTimeout(() => process.kill(process.pid, 'SIGKILL'), 120000)
+                    }
                 }
             }, Math.min(serverConfig.STALENESS_RESTART_SECONDS, 10000))
         }
