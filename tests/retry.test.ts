@@ -1,12 +1,10 @@
-import { makeWorkerUtils, WorkerUtils } from 'graphile-worker'
-
 import { startPluginsServer } from '../src/main/pluginsServer'
-import { defaultConfig } from '../src/shared/config'
 import { delay } from '../src/shared/utils'
 import { LogLevel } from '../src/types'
 import { makePiscina } from '../src/worker/piscina'
 import { createPosthog } from '../src/worker/vm/extensions/posthog'
 import { imports } from '../src/worker/vm/imports'
+import { resetGraphileSchema } from './helpers/graphile'
 import { pluginConfig39 } from './helpers/plugins'
 import { resetTestDatabase } from './helpers/sql'
 
@@ -20,8 +18,9 @@ describe('retry queues', () => {
         testConsole.reset()
     })
 
-    test('onRetry gets called', async () => {
-        const testCode = `
+    describe('fs queue', () => {
+        test('onRetry gets called', async () => {
+            const testCode = `
             import { console } from 'test-utils/write-to-file'
 
             export async function onRetry (type, payload, meta) {
@@ -35,56 +34,63 @@ describe('retry queues', () => {
                 return event
             }
         `
-        await resetTestDatabase(testCode)
-        const server = await startPluginsServer(
-            {
-                WORKER_CONCURRENCY: 2,
-                LOG_LEVEL: LogLevel.Debug,
-                RETRY_QUEUES: 'fs',
-            },
-            makePiscina
-        )
-        const posthog = createPosthog(server.server, pluginConfig39)
+            await resetTestDatabase(testCode)
+            const server = await startPluginsServer(
+                {
+                    WORKER_CONCURRENCY: 2,
+                    LOG_LEVEL: LogLevel.Debug,
+                    RETRY_QUEUES: 'fs',
+                },
+                makePiscina
+            )
+            const posthog = createPosthog(server.server, pluginConfig39)
 
-        posthog.capture('my event', { hi: 'ha' })
-        await delay(5000)
+            posthog.capture('my event', { hi: 'ha' })
+            await delay(10000)
 
-        expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'processEvent']])
+            expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'processEvent']])
 
-        await server.stop()
+            await server.stop()
+        })
     })
 
-    test('graphile retry queue', async () => {
-        const testCode = `
-            import { console } from 'test-utils/write-to-file'
+    describe('graphile', () => {
+        beforeEach(async () => {
+            await resetGraphileSchema()
+        })
 
-            export async function onRetry (type, payload, meta) {
-                console.log('retrying event!', type)
-            }
-            export async function processEvent (event, meta) {
-                if (event.properties?.hi === 'ha') {
-                    console.log('processEvent')
-                    meta.retry('processEvent', event, 1)
+        test('graphile retry queue', async () => {
+            const testCode = `
+                import { console } from 'test-utils/write-to-file'
+
+                export async function onRetry (type, payload, meta) {
+                    console.log('retrying event!', type)
                 }
-                return event
-            }
-        `
-        await resetTestDatabase(testCode)
-        const server = await startPluginsServer(
-            {
-                WORKER_CONCURRENCY: 2,
-                LOG_LEVEL: LogLevel.Debug,
-                RETRY_QUEUES: 'graphile',
-            },
-            makePiscina
-        )
-        const posthog = createPosthog(server.server, pluginConfig39)
+                export async function processEvent (event, meta) {
+                    if (event.properties?.hi === 'ha') {
+                        console.log('processEvent')
+                        meta.retry('processEvent', event, 1)
+                    }
+                    return event
+                }
+            `
+            await resetTestDatabase(testCode)
+            const server = await startPluginsServer(
+                {
+                    WORKER_CONCURRENCY: 2,
+                    LOG_LEVEL: LogLevel.Debug,
+                    RETRY_QUEUES: 'graphile',
+                },
+                makePiscina
+            )
+            const posthog = createPosthog(server.server, pluginConfig39)
 
-        posthog.capture('my event', { hi: 'ha' })
-        await delay(5000)
+            posthog.capture('my event', { hi: 'ha' })
+            await delay(5000)
 
-        expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'processEvent']])
+            expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'processEvent']])
 
-        await server.stop()
+            await server.stop()
+        })
     })
 })
