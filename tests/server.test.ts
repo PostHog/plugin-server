@@ -1,8 +1,8 @@
 import * as Sentry from '@sentry/node'
 
 import { startPluginsServer } from '../src/main/pluginsServer'
-import { delay } from '../src/shared/utils'
 import { LogLevel } from '../src/types'
+import { delay } from '../src/utils/utils'
 import { makePiscina } from '../src/worker/piscina'
 import { resetTestDatabase } from './helpers/sql'
 

@@ -2,7 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import * as os from 'os'
 import { performance } from 'perf_hooks'
 
-import { defaultConfig } from '../../src/shared/config'
+import { defaultConfig } from '../../src/config/config'
 import { LogLevel } from '../../src/types'
 import { makePiscina } from '../../src/worker/piscina'
 import { resetTestDatabase } from '../../tests/helpers/sql'

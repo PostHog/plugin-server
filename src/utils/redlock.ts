@@ -1,9 +1,9 @@
 import * as Sentry from '@sentry/node'
 import Redlock from 'redlock'
 
-import { status } from '../../shared/status'
-import { createRedis } from '../../shared/utils'
-import { PluginsServer } from '../../types'
+import { PluginsServer } from '../types'
+import { status } from './status'
+import { createRedis } from './utils'
 
 type RedlockOptions = {
     server: PluginsServer

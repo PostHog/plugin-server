@@ -1,10 +1,10 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as fetch from 'node-fetch'
 
-import Client from '../../src/shared/celery/client'
-import { createServer } from '../../src/shared/server'
-import { delay } from '../../src/shared/utils'
 import { PluginsServer } from '../../src/types'
+import { Client } from '../../src/utils/celery/client'
+import { createServer } from '../../src/utils/db/server'
+import { delay } from '../../src/utils/utils'
 import { createPluginConfigVM } from '../../src/worker/vm/vm'
 import { pluginConfig39 } from '../helpers/plugins'
 import { resetTestDatabase } from '../helpers/sql'

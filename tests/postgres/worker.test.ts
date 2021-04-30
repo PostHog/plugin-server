@@ -3,10 +3,10 @@ import IORedis from 'ioredis'
 import { mocked } from 'ts-jest/utils'
 
 import { ServerInstance, startPluginsServer } from '../../src/main/pluginsServer'
-import { loadPluginSchedule } from '../../src/main/services/schedule'
-import Client from '../../src/shared/celery/client'
-import { delay, UUIDT } from '../../src/shared/utils'
+import { loadPluginSchedule } from '../../src/main/scheduler/schedule'
 import { LogLevel } from '../../src/types'
+import { Client } from '../../src/utils/celery/client'
+import { delay, UUIDT } from '../../src/utils/utils'
 import { ingestEvent } from '../../src/worker/ingestion/ingest-event'
 import { makePiscina } from '../../src/worker/piscina'
 import { runPlugins, runPluginsOnBatch, runPluginTask } from '../../src/worker/plugins/run'
@@ -17,7 +17,7 @@ import { resetTestDatabase } from '../helpers/sql'
 import { setupPiscina } from '../helpers/worker'
 
 jest.mock('../../src/shared/sql')
-jest.mock('../../src/shared/status')
+jest.mock('../../src/utils/status')
 jest.mock('../../src/worker/ingestion/ingest-event')
 jest.mock('../../src/worker/plugins/run')
 jest.mock('../../src/worker/plugins/setup')
