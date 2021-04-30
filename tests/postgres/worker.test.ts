@@ -3,7 +3,7 @@ import IORedis from 'ioredis'
 import { mocked } from 'ts-jest/utils'
 
 import { ServerInstance, startPluginsServer } from '../../src/main/pluginsServer'
-import { loadPluginSchedule } from '../../src/main/scheduler/schedule'
+import { loadPluginSchedule } from '../../src/main/services/schedule'
 import { LogLevel } from '../../src/types'
 import { Client } from '../../src/utils/celery/client'
 import { delay, UUIDT } from '../../src/utils/utils'

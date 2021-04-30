@@ -15,11 +15,11 @@ import {
     MMDB_STALE_AGE_DAYS,
     MMDB_STATUS_REDIS_KEY,
     MMDBRequestStatus,
-} from '../config/mmdb-constants'
-import { PluginAttachmentDB, PluginsServer } from '../types'
-import { status } from '../utils/status'
-import { delay } from '../utils/utils'
-import { ServerInstance } from './pluginsServer'
+} from '../../config/mmdb-constants'
+import { PluginAttachmentDB, PluginsServer } from '../../types'
+import { status } from '../../utils/status'
+import { delay } from '../../utils/utils'
+import { ServerInstance } from '../pluginsServer'
 
 type MMDBPrepServerInstance = Pick<ServerInstance, 'server' | 'mmdb'>
 

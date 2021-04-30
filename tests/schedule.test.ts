@@ -6,7 +6,7 @@ import {
     runTasksDebounced,
     startSchedule,
     waitForTasksToFinish,
-} from '../src/main/scheduler/schedule'
+} from '../src/main/services/schedule'
 import { LogLevel, ScheduleControl } from '../src/types'
 import { createServer } from '../src/utils/db/server'
 import { delay } from '../src/utils/utils'

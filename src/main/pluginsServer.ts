@@ -13,9 +13,9 @@ import { status } from '../utils/status'
 import { createRedis, delay, getPiscinaStats } from '../utils/utils'
 import { startQueue } from './ingestion-queues/queue'
 import { startJobQueueConsumer } from './job-queues/job-queue-consumer'
-import { createMmdbServer, performMmdbStalenessCheck, prepareMmdb } from './mmdb'
-import { startSchedule } from './scheduler/schedule'
-import { startFastifyInstance, stopFastifyInstance } from './web/server'
+import { createMmdbServer, performMmdbStalenessCheck, prepareMmdb } from './services/mmdb'
+import { startSchedule } from './services/schedule'
+import { startFastifyInstance, stopFastifyInstance } from './services/web'
 
 const { version } = require('../../package.json')
 
