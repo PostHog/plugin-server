@@ -35,7 +35,7 @@ export async function startRedlock({
     const redis = await createRedis(server)
 
     const redlock = new Redlock([redis], {
-        // we handle retires ourselves to have a way to cancel the promises on quit
+        // we handle retries ourselves to have a way to cancel the promises on quit
         // without this, the `await redlock.lock()` code will remain inflight and cause issues
         retryCount: 0,
     })
