@@ -1,6 +1,6 @@
 import { makeWorkerUtils, run, Runner, WorkerUtils, WorkerUtilsOptions } from 'graphile-worker'
 
-import { EnqueuedRetry, JobQueue,OnRetryCallback, PluginsServer } from '../../types'
+import { EnqueuedRetry, JobQueue, OnRetryCallback, PluginsServer } from '../../types'
 
 export class GraphileQueue implements JobQueue {
     pluginsServer: PluginsServer

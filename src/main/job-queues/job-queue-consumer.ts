@@ -1,6 +1,6 @@
 import Piscina from '@posthog/piscina'
 
-import { JobQueueConsumerControl,OnRetryCallback, PluginsServer } from '../../types'
+import { JobQueueConsumerControl, OnRetryCallback, PluginsServer } from '../../types'
 import { startRedlock } from '../../utils/redlock'
 import { status } from '../../utils/status'
 import { pauseQueueIfWorkerFull } from '../ingestion-queues/queue'
