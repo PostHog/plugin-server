@@ -7,7 +7,7 @@ import { makePiscina } from '../src/worker/piscina'
 import { resetTestDatabase } from './helpers/sql'
 
 jest.mock('@sentry/node')
-jest.mock('../src/shared/sql')
+jest.mock('../src/utils/db/sql')
 jest.setTimeout(60000) // 60 sec timeout
 
 test('startPluginsServer', async () => {

@@ -10,7 +10,7 @@ import { resetGraphileSchema } from './helpers/graphile'
 import { pluginConfig39 } from './helpers/plugins'
 import { resetTestDatabase } from './helpers/sql'
 
-jest.mock('../src/shared/sql')
+jest.mock('../src/utils/db/sql')
 jest.setTimeout(60000) // 60 sec timeout
 
 const { console: testConsole } = imports['test-utils/write-to-file']

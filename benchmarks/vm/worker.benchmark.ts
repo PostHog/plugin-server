@@ -7,7 +7,7 @@ import { LogLevel } from '../../src/types'
 import { makePiscina } from '../../src/worker/piscina'
 import { resetTestDatabase } from '../../tests/helpers/sql'
 
-jest.mock('../../src/shared/sql')
+jest.mock('../../src/utils/db/sql')
 jest.setTimeout(600000) // 600 sec timeout
 
 function processOneEvent(

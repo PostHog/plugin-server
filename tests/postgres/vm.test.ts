@@ -9,7 +9,7 @@ import { createPluginConfigVM } from '../../src/worker/vm/vm'
 import { pluginConfig39 } from '../helpers/plugins'
 import { resetTestDatabase } from '../helpers/sql'
 
-jest.mock('../../src/shared/celery/client')
+jest.mock('../../src/utils/celery/client')
 
 const defaultEvent = {
     distinct_id: 'my_id',
