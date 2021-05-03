@@ -1,11 +1,11 @@
 import { startPluginsServer } from '../../src/main/pluginsServer'
-import { delay } from '../../src/shared/utils'
 import { LogLevel } from '../../src/types'
+import { delay } from '../../src/utils/utils'
 import { makePiscina } from '../../src/worker/piscina'
 import { pluginConfig39 } from '../helpers/plugins'
 import { getErrorForPluginConfig, resetTestDatabase } from '../helpers/sql'
 
-jest.mock('../../src/shared/status')
+jest.mock('../../src/utils/status')
 jest.setTimeout(60000) // 60 sec timeout
 
 const defaultEvent = {
@@ -73,9 +73,11 @@ describe('teardown', () => {
 
         await delay(100)
 
-        await server.db.postgresQuery('update posthog_pluginconfig set updated_at = now() where id = $1', [
-            pluginConfig39.id,
-        ])
+        await server.db.postgresQuery(
+            'update posthog_pluginconfig set updated_at = now() where id = $1',
+            [pluginConfig39.id],
+            'testTag'
+        )
         const event1 = await piscina!.runTask({ task: 'processEvent', args: { event: { ...defaultEvent } } })
         expect(event1.properties.storage).toBe('nope')
 

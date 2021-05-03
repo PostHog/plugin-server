@@ -1,8 +1,8 @@
 import os from 'os'
 
 import { LogLevel, PluginsServerConfig } from '../types'
-import { KAFKA_EVENTS_PLUGIN_INGESTION } from './ingestion/topics'
-import { stringToBoolean } from './utils'
+import { stringToBoolean } from '../utils/utils'
+import { KAFKA_EVENTS_PLUGIN_INGESTION } from './kafka-topics'
 
 export const defaultConfig = overrideWithEnv(getDefaultConfig())
 export const configHelp = getConfigHelp()
@@ -59,7 +59,10 @@ export function getDefaultConfig(): PluginsServerConfig {
         DISTINCT_ID_LRU_SIZE: 10000,
         INTERNAL_MMDB_SERVER_PORT: 0,
         PLUGIN_SERVER_IDLE: false,
+        RETRY_QUEUES: '',
+        RETRY_QUEUE_GRAPHILE_URL: '',
         ENABLE_PERSISTENT_CONSOLE: false, // TODO: remove when persistent console ships in main repo
+        STALENESS_RESTART_SECONDS: 0,
     }
 }
 
@@ -101,6 +104,9 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         DISTINCT_ID_LRU_SIZE: 'size of persons distinct ID LRU cache',
         INTERNAL_MMDB_SERVER_PORT: 'port of the internal server used for IP location (0 means random)',
         PLUGIN_SERVER_IDLE: 'whether to disengage the plugin server, e.g. for development',
+        RETRY_QUEUES: 'retry queue engine and fallback queues',
+        RETRY_QUEUE_GRAPHILE_URL: 'use a different postgres connection in the graphile retry queue',
+        STALENESS_RESTART_SECONDS: 'trigger a restart if no event ingested for this duration',
     }
 }
 

@@ -2,9 +2,9 @@ import * as IORedis from 'ioredis'
 import { performance } from 'perf_hooks'
 
 import { startPluginsServer } from '../../src/main/pluginsServer'
-import { delay, UUIDT } from '../../src/shared/utils'
 import { LogLevel, PluginsServerConfig, Queue } from '../../src/types'
 import { PluginsServer } from '../../src/types'
+import { delay, UUIDT } from '../../src/utils/utils'
 import { makePiscina } from '../../src/worker/piscina'
 import { createPosthog, DummyPostHog } from '../../src/worker/vm/extensions/posthog'
 import { pluginConfig39 } from '../../tests/helpers/plugins'
@@ -73,7 +73,7 @@ describe('e2e celery & postgres benchmark', () => {
         }
         await delay(3000)
         expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toEqual(count)
-        queue.resume()
+        await queue.resume()
 
         console.log('Starting timer')
         const startTime = performance.now()

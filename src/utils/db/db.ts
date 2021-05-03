@@ -8,6 +8,7 @@ import { ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 
+import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_PLUGIN_LOG_ENTRIES } from '../../config/kafka-topics'
 import {
     ClickHouseEvent,
     ClickHousePerson,
@@ -16,22 +17,21 @@ import {
     Element,
     ElementGroup,
     Event,
+    EventDefinitionType,
     Person,
     PersonDistinctId,
     PluginConfig,
     PluginLogEntry,
+    PluginLogEntrySource,
     PluginLogEntryType,
-    PluginsServerConfig,
     PostgresSessionRecordingEvent,
+    PropertyDefinitionType,
     RawOrganization,
     RawPerson,
     SessionRecordingEvent,
     TimestampFormat,
-} from '../types'
-import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_PLUGIN_LOG_ENTRIES } from './ingestion/topics'
-import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './ingestion/utils'
-import { KafkaProducerWrapper } from './kafka-producer-wrapper'
-import { instrumentQuery } from './metrics'
+} from '../../types'
+import { instrumentQuery } from '../metrics'
 import {
     castTimestampOrNow,
     clickHouseTimestampToISO,
@@ -40,7 +40,9 @@ import {
     tryTwice,
     UUID,
     UUIDT,
-} from './utils'
+} from '../utils'
+import { KafkaProducerWrapper } from './kafka-producer-wrapper'
+import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './utils'
 
 /** The recommended way of accessing the database. */
 export class DB {
@@ -75,8 +77,8 @@ export class DB {
 
     public postgresQuery<R extends QueryResultRow = any, I extends any[] = any[]>(
         queryTextOrConfig: string | QueryConfig<I>,
-        values?: I,
-        tag?: string
+        values: I | undefined,
+        tag: string
     ): Promise<QueryResult<R>> {
         return instrumentQuery(this.statsd, 'query.postgres', tag, async () => {
             const timeout = timeoutGuard('Postgres slow query warning after 30 sec', { queryTextOrConfig, values })
@@ -244,7 +246,7 @@ export class DB {
     public async fetchPersons(database: Database = Database.Postgres): Promise<Person[] | ClickHousePerson[]> {
         if (database === Database.ClickHouse) {
             const query = `
-                SELECT * FROM person JOIN (
+                SELECT * FROM person FINAL JOIN (
                     SELECT id, max(_timestamp) as _timestamp FROM person GROUP BY team_id, id
                 ) as person_max ON person.id = person_max.id AND person._timestamp = person_max._timestamp
             `
@@ -463,10 +465,11 @@ export class DB {
         personDistinctId: PersonDistinctId,
         moveToPerson: Person
     ): Promise<void> {
-        await this.postgresQuery(`UPDATE posthog_persondistinctid SET person_id = $1 WHERE id = $2`, [
-            moveToPerson.id,
-            personDistinctId.id,
-        ])
+        await this.postgresQuery(
+            `UPDATE posthog_persondistinctid SET person_id = $1 WHERE id = $2`,
+            [moveToPerson.id, personDistinctId.id],
+            'updateDistinctIdPerson'
+        )
         if (this.kafkaProducer) {
             const clickhouseModel: ClickHousePersonDistinctId = { ...personDistinctId, person_id: moveToPerson.uuid }
             await this.kafkaProducer.queueMessage({
@@ -506,7 +509,7 @@ export class DB {
                 ) || []
             )
         } else {
-            const result = await this.postgresQuery('SELECT * FROM posthog_event')
+            const result = await this.postgresQuery('SELECT * FROM posthog_event', undefined, 'fetchAllEvents')
             return result.rows as Event[]
         }
     }
@@ -524,7 +527,11 @@ export class DB {
             })
             return events
         } else {
-            const result = await this.postgresQuery('SELECT * FROM posthog_sessionrecordingevent')
+            const result = await this.postgresQuery(
+                'SELECT * FROM posthog_sessionrecordingevent',
+                undefined,
+                'fetchAllSessionRecordingEvents'
+            )
             return result.rows as PostgresSessionRecordingEvent[]
         }
     }
@@ -541,7 +548,7 @@ export class DB {
             const chain = events?.[0]?.elements_chain
             return chainToElements(chain)
         } else {
-            return (await this.postgresQuery('SELECT * FROM posthog_element')).rows
+            return (await this.postgresQuery('SELECT * FROM posthog_element', undefined, 'fetchAllElements')).rows
         }
     }
 
@@ -592,22 +599,26 @@ export class DB {
         if (this.kafkaProducer) {
             return (await this.clickhouseQuery(`SELECT * FROM plugin_log_entries`)).data as PluginLogEntry[]
         } else {
-            return (await this.postgresQuery('SELECT * FROM posthog_pluginlogentry')).rows as PluginLogEntry[]
+            return (await this.postgresQuery('SELECT * FROM posthog_pluginlogentry', undefined, 'fetchAllPluginLogs'))
+                .rows as PluginLogEntry[]
         }
     }
 
     public async createPluginLogEntry(
         pluginConfig: PluginConfig,
+        source: PluginLogEntrySource,
         type: PluginLogEntryType,
         message: string,
-        instanceId: UUID
+        instanceId: UUID,
+        timestamp: string = new Date().toISOString()
     ): Promise<PluginLogEntry> {
         const entry: PluginLogEntry = {
             id: new UUIDT().toString(),
             team_id: pluginConfig.team_id,
             plugin_id: pluginConfig.plugin_id,
             plugin_config_id: pluginConfig.id,
-            timestamp: new Date().toISOString().replace('T', ' ').replace('Z', ''),
+            timestamp: timestamp.replace('T', ' ').replace('Z', ''),
+            source,
             type,
             message,
             instance_id: instanceId.toString(),
@@ -621,7 +632,7 @@ export class DB {
                 })
             } else {
                 await this.postgresQuery(
-                    'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, plugin_config_id, timestamp, type, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                    'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, plugin_config_id, timestamp, source,type, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
                     Object.values(entry),
                     'insertPluginLogEntry'
                 )
@@ -632,5 +643,16 @@ export class DB {
         }
 
         return entry
+    }
+
+    public async fetchEventDefinitions(): Promise<EventDefinitionType[]> {
+        return (await this.postgresQuery('SELECT * FROM posthog_eventdefinition', undefined, 'fetchEventDefinitions'))
+            .rows as EventDefinitionType[]
+    }
+
+    public async fetchPropertyDefinitions(): Promise<PropertyDefinitionType[]> {
+        return (
+            await this.postgresQuery('SELECT * FROM posthog_propertydefinition', undefined, 'fetchPropertyDefinitions')
+        ).rows as PropertyDefinitionType[]
     }
 }

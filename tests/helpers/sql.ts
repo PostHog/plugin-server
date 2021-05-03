@@ -1,8 +1,8 @@
 import { Pool, PoolClient } from 'pg'
 
-import { defaultConfig } from '../../src/shared/config'
-import { delay, UUIDT } from '../../src/shared/utils'
+import { defaultConfig } from '../../src/config/config'
 import { Plugin, PluginAttachmentDB, PluginConfig, PluginsServer, PluginsServerConfig, Team } from '../../src/types'
+import { UUIDT } from '../../src/utils/utils'
 import {
     commonOrganizationId,
     commonOrganizationMembershipId,
@@ -40,6 +40,8 @@ export async function resetTestDatabase(
         ${config.ENABLE_PERSISTENT_CONSOLE ? 'DELETE FROM posthog_pluginlogentry;' : '' /* TODO: remove this if */}
         DELETE FROM posthog_pluginconfig;
         DELETE FROM posthog_plugin;
+        DELETE FROM posthog_eventdefinition;
+        DELETE FROM posthog_propertydefinition;
         DELETE FROM posthog_team;
         DELETE FROM posthog_organizationmembership;
         DELETE FROM posthog_organization;
@@ -142,7 +144,7 @@ export async function createUserTeamAndOrganization(
 }
 
 export async function getTeams(server: PluginsServer): Promise<Team[]> {
-    return (await server.db.postgresQuery('SELECT * FROM posthog_team ORDER BY id')).rows
+    return (await server.db.postgresQuery('SELECT * FROM posthog_team ORDER BY id', undefined, 'fetchAllTeams')).rows
 }
 
 export async function getFirstTeam(server: PluginsServer): Promise<Team> {

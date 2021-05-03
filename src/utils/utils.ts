@@ -1,3 +1,4 @@
+import Piscina from '@posthog/piscina'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import AdmZip from 'adm-zip'
@@ -9,7 +10,7 @@ import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
 
-import { LogLevel, Plugin, PluginsServerConfig, TimestampFormat } from '../types'
+import { LogLevel, Plugin, PluginConfigId, PluginsServerConfig, TimestampFormat } from '../types'
 import { status } from './status'
 
 /** Time until autoexit (due to error) gives up on graceful exit and kills the process right away. */
@@ -454,12 +455,11 @@ export enum NodeEnv {
     Test = 'test',
 }
 
-export function stringToBoolean(value: any): boolean {
+export function stringToBoolean(value: unknown): boolean {
     if (!value) {
         return false
     }
-    value = String(value)
-    return ['y', 'yes', 't', 'true', 'on', '1'].includes(value.toLowerCase())
+    return ['y', 'yes', 't', 'true', 'on', '1'].includes(String(value).toLowerCase())
 }
 
 export function determineNodeEnv(): NodeEnv {
@@ -477,4 +477,54 @@ export function determineNodeEnv(): NodeEnv {
         return NodeEnv.Development
     }
     return NodeEnv.Production
+}
+
+export function getPiscinaStats(piscina: Piscina): Record<string, number> {
+    return {
+        utilization: (piscina.utilization || 0) * 100,
+        threads: piscina.threads.length,
+        queue_size: piscina.queueSize,
+        'waitTime.average': piscina.waitTime.average,
+        'waitTime.mean': piscina.waitTime.mean,
+        'waitTime.stddev': piscina.waitTime.stddev,
+        'waitTime.min': piscina.waitTime.min,
+        'waitTime.p99_99': piscina.waitTime.p99_99,
+        'waitTime.p99': piscina.waitTime.p99,
+        'waitTime.p95': piscina.waitTime.p95,
+        'waitTime.p90': piscina.waitTime.p90,
+        'waitTime.p75': piscina.waitTime.p75,
+        'waitTime.p50': piscina.waitTime.p50,
+        'runTime.average': piscina.runTime.average,
+        'runTime.mean': piscina.runTime.mean,
+        'runTime.stddev': piscina.runTime.stddev,
+        'runTime.min': piscina.runTime.min,
+        'runTime.p99_99': piscina.runTime.p99_99,
+        'runTime.p99': piscina.runTime.p99,
+        'runTime.p95': piscina.runTime.p95,
+        'runTime.p90': piscina.runTime.p90,
+        'runTime.p75': piscina.runTime.p75,
+        'runTime.p50': piscina.runTime.p50,
+    }
+}
+
+export function pluginConfigIdFromStack(
+    stack: string,
+    pluginConfigSecretLookup: Map<string, PluginConfigId>
+): PluginConfigId | void {
+    // This matches `pluginConfigIdentifier` from worker/vm/vm.ts
+    // For example: "at __asyncGuard__PluginConfig_39_3af03d... (vm.js:11..."
+    const regexp = /at __[a-zA-Z0-9]+__PluginConfig_([0-9]+)_([0-9a-f]+) \(vm\.js\:/
+    const [_, id, hash] =
+        stack
+            .split('\n')
+            .map((l) => l.match(regexp))
+            .filter((a) => a)
+            .pop() || [] // using pop() to get the lowest matching stack entry, avoiding higher user-defined functions
+
+    if (id && hash) {
+        const secretId = pluginConfigSecretLookup.get(hash)
+        if (secretId === parseInt(id)) {
+            return secretId
+        }
+    }
 }

@@ -10,15 +10,16 @@ import * as path from 'path'
 import { types as pgTypes } from 'pg'
 import { ConnectionOptions } from 'tls'
 
-import { PluginsServer, PluginsServerConfig } from '../types'
-import { EventsProcessor } from '../worker/ingestion/process-event'
-import { defaultConfig } from './config'
+import { defaultConfig } from '../../config/config'
+import { JobQueueManager } from '../../main/job-queues/job-queue-manager'
+import { PluginsServer, PluginsServerConfig } from '../../types'
+import { EventsProcessor } from '../../worker/ingestion/process-event'
+import { status } from '../status'
+import { createPostgresPool, createRedis, UUIDT } from '../utils'
 import { DB } from './db'
 import { KafkaProducerWrapper } from './kafka-producer-wrapper'
-import { status } from './status'
-import { createPostgresPool, createRedis, UUIDT } from './utils'
 
-const { version } = require('../../package.json')
+const { version } = require('../../../package.json')
 
 export async function createServer(
     config: Partial<PluginsServerConfig> = {},
@@ -103,8 +104,10 @@ export async function createServer(
             brokers: serverConfig.KAFKA_HOSTS.split(','),
             logLevel: logLevel.WARN,
             ssl: kafkaSsl,
+            connectionTimeout: 3000, // default: 1000
+            authenticationTimeout: 3000, // default: 1000
         })
-        const producer = kafka.producer()
+        const producer = kafka.producer({ retry: { retries: 10, initialRetryTime: 1000, maxRetryTime: 30 } })
         await producer?.connect()
 
         kafkaProducer = new KafkaProducerWrapper(producer, statsd, serverConfig)
@@ -155,6 +158,8 @@ export async function createServer(
         plugins: new Map(),
         pluginConfigs: new Map(),
         pluginConfigsPerTeam: new Map(),
+        pluginConfigSecrets: new Map(),
+        pluginConfigSecretLookup: new Map(),
 
         pluginSchedule: null,
         pluginSchedulePromises: { runEveryMinute: {}, runEveryHour: {}, runEveryDay: {} },
@@ -162,9 +167,11 @@ export async function createServer(
 
     // :TODO: This is only used on worker threads, not main
     server.eventsProcessor = new EventsProcessor(server as PluginsServer)
+    server.retryQueueManager = new JobQueueManager(server as PluginsServer)
 
     const closeServer = async () => {
         server.mmdbUpdateJob?.cancel()
+        await server.retryQueueManager?.quit()
         if (kafkaProducer) {
             clearInterval(kafkaProducer.flushInterval)
             await kafkaProducer.flush()

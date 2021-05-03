@@ -2,11 +2,11 @@ import Piscina from '@posthog/piscina'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 
-import { status } from '../shared/status'
-import { sanitizeEvent, UUIDT } from '../shared/utils'
-import { IngestEventResponse, PluginsServer, Queue } from '../types'
-import CeleryQueueWorker from './ingestion/celery-queue-worker'
-import { KafkaQueue } from './ingestion/kafka-queue'
+import { IngestEventResponse, PluginsServer, Queue } from '../../types'
+import { status } from '../../utils/status'
+import { sanitizeEvent, UUIDT } from '../../utils/utils'
+import { CeleryQueue } from './celery-queue'
+import { KafkaQueue } from './kafka-queue'
 
 export type WorkerMethods = {
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
@@ -14,33 +14,43 @@ export type WorkerMethods = {
     ingestEvent: (event: PluginEvent) => Promise<IngestEventResponse>
 }
 
-function pauseQueueIfWorkerFull(queue: Queue | undefined, server: PluginsServer, piscina?: Piscina) {
-    if (queue && (piscina?.queueSize || 0) > (server.WORKER_CONCURRENCY || 4) * (server.WORKER_CONCURRENCY || 4)) {
-        void queue.pause()
+export function pauseQueueIfWorkerFull(
+    pause: undefined | (() => void | Promise<void>),
+    server: PluginsServer,
+    piscina?: Piscina
+): void {
+    if (pause && (piscina?.queueSize || 0) > (server.WORKER_CONCURRENCY || 4) * (server.WORKER_CONCURRENCY || 4)) {
+        void pause()
     }
 }
 
 export async function startQueue(
     server: PluginsServer,
-    piscina?: Piscina,
+    piscina: Piscina,
     workerMethods: Partial<WorkerMethods> = {}
 ): Promise<Queue> {
     const mergedWorkerMethods = {
         processEvent: (event: PluginEvent) => {
-            return piscina!.runTask({ task: 'processEvent', args: { event } })
+            server.lastActivity = new Date().valueOf()
+            server.lastActivityType = 'processEvent'
+            return piscina.runTask({ task: 'processEvent', args: { event } })
         },
         processEventBatch: (batch: PluginEvent[]) => {
-            return piscina!.runTask({ task: 'processEventBatch', args: { batch } })
+            server.lastActivity = new Date().valueOf()
+            server.lastActivityType = 'processEventBatch'
+            return piscina.runTask({ task: 'processEventBatch', args: { batch } })
         },
         ingestEvent: (event: PluginEvent) => {
-            return piscina!.runTask({ task: 'ingestEvent', args: { event } })
+            server.lastActivity = new Date().valueOf()
+            server.lastActivityType = 'ingestEvent'
+            return piscina.runTask({ task: 'ingestEvent', args: { event } })
         },
         ...workerMethods,
     }
 
     try {
         if (server.KAFKA_ENABLED) {
-            return await startQueueKafka(server, mergedWorkerMethods)
+            return await startQueueKafka(server, piscina, mergedWorkerMethods)
         } else {
             return startQueueRedis(server, piscina, mergedWorkerMethods)
         }
@@ -51,7 +61,7 @@ export async function startQueue(
 }
 
 function startQueueRedis(server: PluginsServer, piscina: Piscina | undefined, workerMethods: WorkerMethods): Queue {
-    const celeryQueue = new CeleryQueueWorker(server.db, server.PLUGINS_CELERY_QUEUE)
+    const celeryQueue = new CeleryQueue(server.db, server.PLUGINS_CELERY_QUEUE)
 
     celeryQueue.register(
         'posthog.tasks.process_event.process_event_with_plugins',
@@ -75,10 +85,10 @@ function startQueueRedis(server: PluginsServer, piscina: Piscina | undefined, wo
                 ...data,
             } as PluginEvent)
             try {
-                pauseQueueIfWorkerFull(celeryQueue, server, piscina)
+                pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
                 const processedEvent = await workerMethods.processEvent(event)
                 if (processedEvent) {
-                    pauseQueueIfWorkerFull(celeryQueue, server, piscina)
+                    pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
                     await workerMethods.ingestEvent(processedEvent)
                 }
             } catch (e) {
@@ -93,10 +103,11 @@ function startQueueRedis(server: PluginsServer, piscina: Piscina | undefined, wo
     return celeryQueue
 }
 
-async function startQueueKafka(server: PluginsServer, workerMethods: WorkerMethods): Promise<Queue> {
+async function startQueueKafka(server: PluginsServer, piscina: Piscina, workerMethods: WorkerMethods): Promise<Queue> {
     const kafkaQueue: Queue = new KafkaQueue(
         server,
-        (batch: PluginEvent[]) => workerMethods.processEventBatch(batch),
+        piscina,
+        (event: PluginEvent) => workerMethods.processEvent(event),
         async (event) => void (await workerMethods.ingestEvent(event))
     )
     await kafkaQueue.start()

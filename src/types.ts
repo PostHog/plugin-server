@@ -1,4 +1,3 @@
-import { ReaderModel } from '@maxmind/geoip2-node'
 import ClickHouse from '@posthog/clickhouse'
 import { PluginAttachment, PluginConfigSchema, PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import { Pool as GenericPool } from 'generic-pool'
@@ -6,13 +5,12 @@ import { StatsD } from 'hot-shots'
 import { Redis } from 'ioredis'
 import { Kafka } from 'kafkajs'
 import { DateTime } from 'luxon'
-import { Job } from 'node-schedule'
 import { Pool } from 'pg'
 import { VM } from 'vm2'
 
-import { DB } from './shared/db'
-import { KafkaProducerWrapper } from './shared/kafka-producer-wrapper'
-import { UUID } from './shared/utils'
+import { DB } from './utils/db/db'
+import { KafkaProducerWrapper } from './utils/db/kafka-producer-wrapper'
+import { UUID } from './utils/utils'
 import { EventsProcessor } from './worker/ingestion/process-event'
 import { LazyPluginVM } from './worker/vm/lazy'
 
@@ -73,7 +71,10 @@ export interface PluginsServerConfig extends Record<string, any> {
     DISTINCT_ID_LRU_SIZE: number
     INTERNAL_MMDB_SERVER_PORT: number
     PLUGIN_SERVER_IDLE: boolean
+    RETRY_QUEUES: string
+    RETRY_QUEUE_GRAPHILE_URL: string
     ENABLE_PERSISTENT_CONSOLE: boolean
+    STALENESS_RESTART_SECONDS: number
 }
 
 export interface PluginsServer extends PluginsServerConfig {
@@ -92,22 +93,45 @@ export interface PluginsServer extends PluginsServerConfig {
     pluginConfigsPerTeam: Map<TeamId, PluginConfig[]>
     pluginSchedule: Record<string, PluginConfigId[]> | null
     pluginSchedulePromises: Record<string, Record<PluginConfigId, Promise<any> | null>>
+    // unique hash for each plugin config; used to verify IDs caught on stack traces for unhandled promise rejections
+    pluginConfigSecrets: Map<PluginConfigId, string>
+    pluginConfigSecretLookup: Map<string, PluginConfigId>
+    // tools
     eventsProcessor: EventsProcessor
+    jobQueueManager: JobQueue
+    // diagnostics
+    lastActivity: number
+    lastActivityType: string
 }
 
 export interface Pausable {
-    pause: () => Promise<void>
-    resume: () => void
+    pause: () => Promise<void> | void
+    resume: () => Promise<void> | void
     isPaused: () => boolean
 }
 
 export interface Queue extends Pausable {
-    start: () => Promise<void>
-    stop: () => Promise<void>
+    start: () => Promise<void> | void
+    stop: () => Promise<void> | void
 }
 
-export interface Queue {
-    stop: () => Promise<void>
+export type OnRetryCallback = (queue: EnqueuedRetry[]) => Promise<void> | void
+export interface EnqueuedRetry {
+    type: string
+    payload: Record<string, any>
+    timestamp: number
+    pluginConfigId: number
+    pluginConfigTeam: number
+}
+
+export interface JobQueue {
+    startConsumer: (onRetry: OnRetryCallback) => Promise<void> | void
+    stopConsumer: () => Promise<void> | void
+    pauseConsumer: () => Promise<void> | void
+    resumeConsumer: () => Promise<void> | void
+    isConsumerPaused: () => boolean
+    enqueue: (retry: EnqueuedRetry) => Promise<void> | void
+    quit: () => Promise<void> | void
 }
 
 export type PluginId = number
@@ -176,6 +200,12 @@ export interface PluginAttachmentDB {
     contents: Buffer | null
 }
 
+export enum PluginLogEntrySource {
+    System = 'SYSTEM',
+    Plugin = 'PLUGIN',
+    Console = 'CONSOLE',
+}
+
 export enum PluginLogEntryType {
     Debug = 'DEBUG',
     Log = 'LOG',
@@ -190,6 +220,7 @@ export interface PluginLogEntry {
     plugin_id: number
     plugin_config_id: number
     timestamp: string
+    source: PluginLogEntrySource
     type: PluginLogEntryType
     message: string
     instance_id: string
@@ -208,6 +239,7 @@ export interface PluginConfigVMReponse {
         teardownPlugin: () => Promise<void>
         processEvent: (event: PluginEvent) => Promise<PluginEvent>
         processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
+        onRetry: (task: string, payload: Record<string, any>) => Promise<void>
     }
     tasks: Record<string, PluginTask>
 }
@@ -270,11 +302,6 @@ export interface Team {
     api_token: string
     app_urls: string[]
     completed_snippet_onboarding: boolean
-    event_names: string[]
-    event_properties: string[]
-    event_properties_numerical: string[]
-    event_names_with_usage: EventUsage[]
-    event_properties_with_usage: PropertyUsage[]
     opt_out_capture: boolean
     slack_incoming_webhook: string
     session_recording_opt_in: boolean
@@ -403,4 +430,26 @@ export interface ScheduleControl {
     reloadSchedule: () => Promise<void>
 }
 
+export interface JobQueueConsumerControl {
+    stop: () => Promise<void>
+    resume: () => Promise<void> | void
+}
+
 export type IngestEventResponse = { success?: boolean; error?: string }
+
+export interface EventDefinitionType {
+    id: string
+    name: string
+    volume_30_day: number | null
+    query_usage_30_day: number | null
+    team_id: number
+}
+
+export interface PropertyDefinitionType {
+    id: string
+    name: string
+    is_numerical: boolean
+    volume_30_day: number | null
+    query_usage_30_day: number | null
+    team_id: number
+}

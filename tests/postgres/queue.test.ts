@@ -1,8 +1,9 @@
-import { startQueue } from '../../src/main/queue'
-import Client from '../../src/shared/celery/client'
-import { createServer } from '../../src/shared/server'
-import { delay } from '../../src/shared/utils'
+import { setupPiscina } from '../../benchmarks/postgres/helpers/piscina'
+import { startQueue } from '../../src/main/ingestion-queues/queue'
 import { LogLevel, PluginsServer } from '../../src/types'
+import { Client } from '../../src/utils/celery/client'
+import { createServer } from '../../src/utils/db/server'
+import { delay } from '../../src/utils/utils'
 import { runPlugins } from '../../src/worker/plugins/run'
 
 jest.setTimeout(60000) // 60 sec timeout
@@ -59,8 +60,8 @@ test('pause and resume queue', async () => {
 
     // There'll be a "tick lag" with the events moving from one queue to the next. :this_is_fine:
     expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(6)
-
-    const queue = await startQueue(server, undefined, {
+    const piscina = setupPiscina(2, 2)
+    const queue = await startQueue(server, piscina, {
         processEvent: (event) => runPlugins(server, event),
         processEventBatch: (events) => Promise.all(events.map((event) => runPlugins(server, event))),
         ingestEvent: () => Promise.resolve({ success: true }),
@@ -83,7 +84,7 @@ test('pause and resume queue', async () => {
 
     expect(await redis.llen(server.PLUGINS_CELERY_QUEUE)).toBe(pluginQueue)
 
-    queue.resume()
+    await queue.resume()
 
     await delay(500)
 
@@ -92,4 +93,5 @@ test('pause and resume queue', async () => {
     await queue.stop()
     await server.redisPool.release(redis)
     await stopServer()
+    await piscina.destroy()
 })

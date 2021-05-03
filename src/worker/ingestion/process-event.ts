@@ -6,19 +6,8 @@ import { DateTime, Duration } from 'luxon'
 import * as fetch from 'node-fetch'
 import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
 
-import { Event as EventProto, IEvent } from '../../idl/protos'
-import Client from '../../shared/celery/client'
-import { DB } from '../../shared/db'
-import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from '../../shared/ingestion/topics'
-import {
-    elementsToString,
-    personInitialAndUTMProperties,
-    sanitizeEventName,
-    timeoutGuard,
-} from '../../shared/ingestion/utils'
-import { KafkaProducerWrapper } from '../../shared/kafka-producer-wrapper'
-import { status } from '../../shared/status'
-import { castTimestampOrNow, UUID, UUIDT } from '../../shared/utils'
+import { Event as EventProto, IEvent } from '../../config/idl/protos'
+import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from '../../config/kafka-topics'
 import {
     Element,
     Person,
@@ -30,6 +19,12 @@ import {
     TeamId,
     TimestampFormat,
 } from '../../types'
+import { Client } from '../../utils/celery/client'
+import { DB } from '../../utils/db/db'
+import { KafkaProducerWrapper } from '../../utils/db/kafka-producer-wrapper'
+import { elementsToString, personInitialAndUTMProperties, sanitizeEventName, timeoutGuard } from '../../utils/db/utils'
+import { status } from '../../utils/status'
+import { castTimestampOrNow, UUID, UUIDT } from '../../utils/utils'
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
@@ -76,67 +71,79 @@ export class EventsProcessor {
             event: JSON.stringify(data),
         })
 
-        // sanitize values, even though `sanitizeEvent` should have gotten to them
-        distinctId = distinctId?.toString()
+        try {
+            // sanitize values, even though `sanitizeEvent` should have gotten to them
+            distinctId = distinctId?.toString()
 
-        const properties: Properties = data.properties ?? {}
-        if (data['$set']) {
-            properties['$set'] = data['$set']
-        }
-        if (data['$set_once']) {
-            properties['$set_once'] = data['$set_once']
-        }
+            const properties: Properties = data.properties ?? {}
+            if (data['$set']) {
+                properties['$set'] = data['$set']
+            }
+            if (data['$set_once']) {
+                properties['$set_once'] = data['$set_once']
+            }
 
-        const personUuid = new UUIDT().toString()
+            const personUuid = new UUIDT().toString()
 
-        const ts = this.handleTimestamp(data, now, sentAt)
-        const timeout1 = timeoutGuard('Still running "handleIdentifyOrAlias". Timeout warning after 30 sec!', {
-            eventUuid,
-        })
-        await this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
-        clearTimeout(timeout1)
-
-        let result: IEvent | SessionRecordingEvent
-
-        if (data['event'] === '$snapshot') {
-            const timeout2 = timeoutGuard(
-                'Still running "createSessionRecordingEvent". Timeout warning after 30 sec!',
-                { eventUuid }
-            )
-            result = await this.createSessionRecordingEvent(
+            const ts = this.handleTimestamp(data, now, sentAt)
+            const timeout1 = timeoutGuard('Still running "handleIdentifyOrAlias". Timeout warning after 30 sec!', {
                 eventUuid,
-                teamId,
-                distinctId,
-                properties['$session_id'],
-                ts,
-                properties['$snapshot_data']
-            )
-            this.pluginsServer.statsd?.timing('kafka_queue.single_save.snapshot', singleSaveTimer, {
-                team_id: teamId.toString(),
             })
-            clearTimeout(timeout2)
-        } else {
-            const timeout3 = timeoutGuard('Still running "capture". Timeout warning after 30 sec!', { eventUuid })
-            result = await this.capture(
-                eventUuid,
-                personUuid,
-                ip,
-                siteUrl,
-                teamId,
-                data['event'],
-                distinctId,
-                properties,
-                ts,
-                sentAt
-            )
-            this.pluginsServer.statsd?.timing('kafka_queue.single_save.standard', singleSaveTimer, {
-                team_id: teamId.toString(),
-            })
-            clearTimeout(timeout3)
-        }
-        clearTimeout(timeout)
+            try {
+                await this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
+            } finally {
+                clearTimeout(timeout1)
+            }
 
-        return result
+            let result: IEvent | SessionRecordingEvent
+
+            if (data['event'] === '$snapshot') {
+                const timeout2 = timeoutGuard(
+                    'Still running "createSessionRecordingEvent". Timeout warning after 30 sec!',
+                    { eventUuid }
+                )
+                try {
+                    result = await this.createSessionRecordingEvent(
+                        eventUuid,
+                        teamId,
+                        distinctId,
+                        properties['$session_id'],
+                        ts,
+                        properties['$snapshot_data']
+                    )
+                    this.pluginsServer.statsd?.timing('kafka_queue.single_save.snapshot', singleSaveTimer, {
+                        team_id: teamId.toString(),
+                    })
+                } finally {
+                    clearTimeout(timeout2)
+                }
+            } else {
+                const timeout3 = timeoutGuard('Still running "capture". Timeout warning after 30 sec!', { eventUuid })
+                try {
+                    result = await this.capture(
+                        eventUuid,
+                        personUuid,
+                        ip,
+                        siteUrl,
+                        teamId,
+                        data['event'],
+                        distinctId,
+                        properties,
+                        ts,
+                        sentAt
+                    )
+                    this.pluginsServer.statsd?.timing('kafka_queue.single_save.standard', singleSaveTimer, {
+                        team_id: teamId.toString(),
+                    })
+                } finally {
+                    clearTimeout(timeout3)
+                }
+            }
+
+            return result
+        } finally {
+            clearTimeout(timeout)
+        }
     }
 
     private handleTimestamp(data: PluginEvent, now: DateTime, sentAt: DateTime | null): DateTime {
@@ -374,7 +381,7 @@ export class EventsProcessor {
             }))
         }
 
-        const team = await this.teamManager.fetchTeam(teamId, eventUuid)
+        const team = await this.teamManager.fetchTeam(teamId)
 
         if (!team) {
             throw new Error(`No team found with ID ${teamId}. Can't ingest event.`)
@@ -384,7 +391,7 @@ export class EventsProcessor {
             properties['$ip'] = ip
         }
 
-        await this.teamManager.updateEventNamesAndProperties(teamId, event, eventUuid, properties, this.posthog)
+        await this.teamManager.updateEventNamesAndProperties(teamId, event, properties, this.posthog)
 
         if (await this.personManager.isNewPerson(this.db, teamId, distinctId)) {
             // Catch race condition where in between getting and creating, another request already created this user
