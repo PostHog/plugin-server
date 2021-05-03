@@ -1,6 +1,7 @@
 import { PluginConfig, PluginsServer } from '../../../types'
 
 type JobRunner = {
+    runAt: (date: Date) => Promise<void>
     runIn: (duration: number, unit: string) => Promise<void>
     runNow: () => Promise<void>
 }
@@ -53,6 +54,9 @@ export function createJobs(server: PluginsServer, pluginConfig: PluginConfig): J
             get(target, key) {
                 return function createTaskRunner(payload: Record<string, any>): JobRunner {
                     return {
+                        runAt: async function runAt(date: Date) {
+                            await runJob(key.toString(), payload, date.valueOf())
+                        },
                         runIn: async function runIn(duration, unit) {
                             const timestamp = new Date().valueOf() + durationToMs(duration, unit)
                             await runJob(key.toString(), payload, timestamp)
