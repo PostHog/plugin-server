@@ -1,4 +1,4 @@
-import { getDefaultConfig } from '../src/config/config'
+import { defaultConfig } from '../src/config/config'
 import { LOCKED_RESOURCE } from '../src/main/job-queues/job-queue-consumer'
 import { ServerInstance, startPluginsServer } from '../src/main/pluginsServer'
 import { LogLevel, PluginsServerConfig } from '../src/types'
@@ -38,7 +38,7 @@ const testCode = `
 `
 
 const createConfig = (jobQueues: string): PluginsServerConfig => ({
-    ...getDefaultConfig(),
+    ...defaultConfig,
     WORKER_CONCURRENCY: 2,
     LOG_LEVEL: LogLevel.Debug,
     JOB_QUEUES: jobQueues,
