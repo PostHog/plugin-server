@@ -42,6 +42,17 @@ const createConfig = (jobQueues: string) => ({
     JOB_QUEUES: jobQueues,
 })
 
+async function waitForLogEntries(number: number) {
+    const timeout = 20000
+    const start = new Date().valueOf()
+    while (testConsole.read().length < number) {
+        await delay(200)
+        if (new Date().valueOf() - start > timeout) {
+            throw new Error(`Did not get ${number} console logs within ${timeout / 1000} seconds`)
+        }
+    }
+}
+
 describe('job queues', () => {
     let server: ServerInstance
     let posthog: DummyPostHog
@@ -72,19 +83,19 @@ describe('job queues', () => {
 
         test('jobs get scheduled with runIn', async () => {
             posthog.capture('my event', { type: 'runIn' })
-            await delay(3000)
+            await waitForLogEntries(2)
             expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runIn']])
         })
 
         test('jobs get scheduled with runAt', async () => {
             posthog.capture('my event', { type: 'runAt' })
-            await delay(3000)
+            await waitForLogEntries(2)
             expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runAt']])
         })
 
         test('jobs get scheduled with runNow', async () => {
             posthog.capture('my event', { type: 'runNow' })
-            await delay(3000)
+            await waitForLogEntries(2)
             expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runNow']])
         })
     })
@@ -98,7 +109,7 @@ describe('job queues', () => {
 
         test('graphile job queue', async () => {
             posthog.capture('my event', { type: 'runIn' })
-            await delay(5000)
+            await waitForLogEntries(2)
             expect(testConsole.read()).toEqual([['processEvent'], ['runIn', 'runIn']])
         })
     })
