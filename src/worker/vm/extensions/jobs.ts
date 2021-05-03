@@ -1,11 +1,11 @@
 import { PluginConfig, PluginsServer } from '../../../types'
 
-type Job = (payload?: any) => Promise<void>
-type Jobs = Record<string, Job>
 type JobRunner = {
-    runIn: (duration: number, unit: string) => Jobs
-    runNow: () => Jobs
+    runIn: (duration: number, unit: string) => Promise<void>
+    runNow: () => Promise<void>
 }
+type Job = (payload?: any) => JobRunner
+type Jobs = Record<string, Job>
 
 const milliseconds = 1
 const seconds = 1000 * milliseconds
@@ -36,7 +36,7 @@ export function durationToMs(duration: number, unit: string): number {
     return durations[unit] * duration
 }
 
-export function createJobs(server: PluginsServer, pluginConfig: PluginConfig): JobRunner {
+export function createJobs(server: PluginsServer, pluginConfig: PluginConfig): Jobs {
     const runJob = async (type: string, payload: Record<string, any>, timestamp: number) => {
         await server.jobQueueManager.enqueue({
             type,
@@ -47,27 +47,22 @@ export function createJobs(server: PluginsServer, pluginConfig: PluginConfig): J
         })
     }
 
-    return {
-        runIn: (duration, unit) => {
-            return new Proxy(
-                {},
-                {
-                    get: (target, key) => async (payload: Record<string, any>) => {
-                        const timestamp = new Date().valueOf() + durationToMs(duration, unit)
-                        await runJob(key.toString(), payload, timestamp)
-                    },
+    return new Proxy(
+        {},
+        {
+            get(target, key) {
+                return function createTaskRunner(payload: Record<string, any>): JobRunner {
+                    return {
+                        runIn: async function runIn(duration, unit) {
+                            const timestamp = new Date().valueOf() + durationToMs(duration, unit)
+                            await runJob(key.toString(), payload, timestamp)
+                        },
+                        runNow: async function runNow() {
+                            await runJob(key.toString(), payload, new Date().valueOf())
+                        },
+                    }
                 }
-            )
-        },
-        runNow: () => {
-            return new Proxy(
-                {},
-                {
-                    get: (target, key) => async (payload: Record<string, any>) => {
-                        await runJob(key.toString(), payload, new Date().valueOf())
-                    },
-                }
-            )
-        },
-    }
+            },
+        }
+    )
 }

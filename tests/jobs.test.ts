@@ -26,7 +26,7 @@ const testCode = `
     export async function processEvent (event, meta) {
         if (event.properties?.hi === 'ha') {
             console.log('processEvent')
-            meta.jobs.runIn(1, 'second').retryProcessEvent(event)
+            meta.jobs.retryProcessEvent(event).runIn(1, 'second')
         }
         return event
     }
