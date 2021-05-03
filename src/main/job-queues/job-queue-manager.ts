@@ -39,9 +39,6 @@ export class JobQueueManager implements JobQueue {
     }
 
     async connectProducer(): Promise<void> {
-        if (!this.pluginsServer.JOB_QUEUES) {
-            status.info('🩸', `Warning! No job queues configured!`)
-        }
         await Promise.all(
             this.jobQueues.map(async (jobQueue, index) => {
                 try {
