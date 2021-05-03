@@ -17,6 +17,7 @@ export async function createWorker(config: PluginsServerConfig, threadId: number
     status.info('🧵', `Starting Piscina worker thread ${threadId}…`)
 
     const [server, closeServer] = await createServer(config, threadId)
+    await server.jobQueueManager.connectProducer()
     await setupPlugins(server)
 
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {

@@ -5,10 +5,10 @@ import { startRedlock } from '../../utils/redlock'
 import { status } from '../../utils/status'
 import { pauseQueueIfWorkerFull } from '../ingestion-queues/queue'
 
-export const LOCKED_RESOURCE = 'plugin-server:locks:retry-queue-consumer'
+export const LOCKED_RESOURCE = 'plugin-server:locks:job-queue-consumer'
 
 export async function startJobQueueConsumer(server: PluginsServer, piscina: Piscina): Promise<JobQueueConsumerControl> {
-    status.info('🔄', 'Starting retry queue consumer, trying to get lock...')
+    status.info('🔄', 'Starting job queue consumer, trying to get lock...')
 
     const onJob: OnJobCallback = async (jobs) => {
         pauseQueueIfWorkerFull(server.jobQueueManager.pauseConsumer, server, piscina)
@@ -25,7 +25,7 @@ export async function startJobQueueConsumer(server: PluginsServer, piscina: Pisc
             await server.jobQueueManager.startConsumer(onJob)
         },
         onUnlock: async () => {
-            status.info('🔄', 'Stopping retry queue consumer')
+            status.info('🔄', 'Stopping job queue consumer')
             await server.jobQueueManager.stopConsumer()
         },
         ttl: server.SCHEDULE_LOCK_TTL,

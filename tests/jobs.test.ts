@@ -1,6 +1,7 @@
+import { getDefaultConfig } from '../src/config/config'
 import { LOCKED_RESOURCE } from '../src/main/job-queues/job-queue-consumer'
 import { ServerInstance, startPluginsServer } from '../src/main/pluginsServer'
-import { LogLevel } from '../src/types'
+import { LogLevel, PluginsServerConfig } from '../src/types'
 import { createServer } from '../src/utils/db/server'
 import { delay } from '../src/utils/utils'
 import { makePiscina } from '../src/worker/piscina'
@@ -36,7 +37,8 @@ const testCode = `
     }
 `
 
-const createConfig = (jobQueues: string) => ({
+const createConfig = (jobQueues: string): PluginsServerConfig => ({
+    ...getDefaultConfig(),
     WORKER_CONCURRENCY: 2,
     LOG_LEVEL: LogLevel.Debug,
     JOB_QUEUES: jobQueues,
@@ -103,8 +105,9 @@ describe('job queues', () => {
 
     describe('graphile', () => {
         beforeEach(async () => {
-            await resetGraphileSchema()
-            server = await startPluginsServer(createConfig('graphile'), makePiscina)
+            const config = createConfig('graphile')
+            await resetGraphileSchema(config)
+            server = await startPluginsServer(config, makePiscina)
             posthog = createPosthog(server.server, pluginConfig39)
         })
 

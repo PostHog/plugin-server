@@ -130,8 +130,10 @@ export interface JobQueue {
     pauseConsumer: () => Promise<void> | void
     resumeConsumer: () => Promise<void> | void
     isConsumerPaused: () => boolean
+
+    connectProducer: () => Promise<void> | void
     enqueue: (job: EnqueuedJob) => Promise<void> | void
-    quit: () => Promise<void> | void
+    disconnectProducer: () => Promise<void> | void
 }
 
 export type PluginId = number

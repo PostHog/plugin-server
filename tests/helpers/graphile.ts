@@ -1,11 +1,11 @@
 import { makeWorkerUtils } from 'graphile-worker'
 import { Pool } from 'pg'
 
-import { defaultConfig } from '../../src/config/config'
-import { status } from '../../src/utils/status'
+import { PluginsServerConfig } from '../../src/types'
 
-export async function resetGraphileSchema(): Promise<void> {
-    const db = new Pool({ connectionString: defaultConfig.DATABASE_URL })
+export async function resetGraphileSchema(server: PluginsServerConfig): Promise<void> {
+    const graphileUrl = server.JOB_QUEUE_GRAPHILE_URL || server.DATABASE_URL
+    const db = new Pool({ connectionString: graphileUrl })
 
     try {
         await db.query('DROP SCHEMA graphile_worker CASCADE')
@@ -18,7 +18,7 @@ export async function resetGraphileSchema(): Promise<void> {
     }
 
     const workerUtils = await makeWorkerUtils({
-        connectionString: defaultConfig.DATABASE_URL,
+        connectionString: graphileUrl,
     })
     await workerUtils.migrate()
     await workerUtils.release()

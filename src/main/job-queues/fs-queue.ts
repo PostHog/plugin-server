@@ -17,7 +17,9 @@ export class FsQueue implements JobQueue {
         this.started = false
         this.interval = null
         this.filename = filename || path.join(process.cwd(), 'tmp', 'fs-queue.txt')
+    }
 
+    connectProducer(): void {
         fs.mkdirSync(path.dirname(this.filename), { recursive: true })
         fs.writeFileSync(this.filename, '')
     }
@@ -26,7 +28,7 @@ export class FsQueue implements JobQueue {
         fs.appendFileSync(this.filename, `${JSON.stringify(job)}\n`)
     }
 
-    quit(): void {
+    disconnectProducer(): void {
         // nothing to do
     }
 
