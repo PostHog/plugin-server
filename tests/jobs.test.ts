@@ -19,14 +19,18 @@ const testCode = `
     import { console } from 'test-utils/write-to-file'
 
     export const jobs = {
-        retryProcessEvent: (event, meta) => {
-            console.log('retrying event!', event.event)
+        logReply: (text, meta) => {
+            console.log('reply', text)
         }
     }
-    export async function processEvent (event, meta) {
-        if (event.properties?.hi === 'ha') {
-            console.log('processEvent')
-            meta.jobs.retryProcessEvent(event).runIn(1, 'second')
+    export async function processEvent (event, { jobs }) {
+        console.log('processEvent')
+        if (event.properties?.type === 'runIn') {
+            jobs.logReply('runIn').runIn(1, 'second')
+        } else if (event.properties?.type === 'runAt') {
+            jobs.logReply('runAt').runAt(new Date())
+        } else if (event.properties?.type === 'runNow') {
+            jobs.logReply('runNow').runNow()
         }
         return event
     }
@@ -66,10 +70,22 @@ describe('job queues', () => {
             posthog = createPosthog(server.server, pluginConfig39)
         })
 
-        test('jobs get called', async () => {
-            posthog.capture('my event', { hi: 'ha' })
-            await delay(10000)
-            expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'my event']])
+        test('jobs get scheduled with runIn', async () => {
+            posthog.capture('my event', { type: 'runIn' })
+            await delay(3000)
+            expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runIn']])
+        })
+
+        test('jobs get scheduled with runAt', async () => {
+            posthog.capture('my event', { type: 'runAt' })
+            await delay(3000)
+            expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runAt']])
+        })
+
+        test('jobs get scheduled with runNow', async () => {
+            posthog.capture('my event', { type: 'runNow' })
+            await delay(3000)
+            expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runNow']])
         })
     })
 
@@ -81,9 +97,9 @@ describe('job queues', () => {
         })
 
         test('graphile job queue', async () => {
-            posthog.capture('my event', { hi: 'ha' })
+            posthog.capture('my event', { type: 'runIn' })
             await delay(5000)
-            expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'my event']])
+            expect(testConsole.read()).toEqual([['processEvent'], ['runIn', 'runIn']])
         })
     })
 })
