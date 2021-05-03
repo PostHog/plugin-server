@@ -48,6 +48,7 @@ async function waitForLogEntries(number: number) {
     while (testConsole.read().length < number) {
         await delay(200)
         if (new Date().valueOf() - start > timeout) {
+            console.error(`Did not find ${number} console logs:`, testConsole.read())
             throw new Error(`Did not get ${number} console logs within ${timeout / 1000} seconds`)
         }
     }
