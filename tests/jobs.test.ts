@@ -27,17 +27,19 @@ describe('job queues', () => {
     })
 
     describe('fs queue', () => {
-        test('onRetry gets called', async () => {
+        test('jobs get called', async () => {
             const testCode = `
                 import { console } from 'test-utils/write-to-file'
 
-                export async function onRetry (type, payload, meta) {
-                    console.log('retrying event!', type)
+                export const jobs = {
+                    retryProcessEvent: (event, meta) => {
+                        console.log('retrying event!', event.event)
+                    }
                 }
                 export async function processEvent (event, meta) {
                     if (event.properties?.hi === 'ha') {
                         console.log('processEvent')
-                        meta.retry('processEvent', event, 1)
+                        meta.jobs.runIn(1, 'second').retryProcessEvent(event)
                     }
                     return event
                 }
@@ -47,7 +49,7 @@ describe('job queues', () => {
                 {
                     WORKER_CONCURRENCY: 2,
                     LOG_LEVEL: LogLevel.Debug,
-                    RETRY_QUEUES: 'fs',
+                    JOB_QUEUES: 'fs',
                 },
                 makePiscina
             )
@@ -56,7 +58,7 @@ describe('job queues', () => {
             posthog.capture('my event', { hi: 'ha' })
             await delay(10000)
 
-            expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'processEvent']])
+            expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'my event']])
 
             await server.stop()
         })
@@ -67,17 +69,19 @@ describe('job queues', () => {
             await resetGraphileSchema()
         })
 
-        test('graphile retry queue', async () => {
+        test('graphile job queue', async () => {
             const testCode = `
                 import { console } from 'test-utils/write-to-file'
 
-                export async function onRetry (type, payload, meta) {
-                    console.log('retrying event!', type)
+                export const jobs = {
+                    retryProcessEvent: (event, meta) => {
+                        console.log('retrying event!', event.event)
+                    }
                 }
                 export async function processEvent (event, meta) {
                     if (event.properties?.hi === 'ha') {
                         console.log('processEvent')
-                        meta.retry('processEvent', event, 1)
+                        meta.jobs.runIn(1, 'second').retryProcessEvent(event)
                     }
                     return event
                 }
@@ -87,7 +91,7 @@ describe('job queues', () => {
                 {
                     WORKER_CONCURRENCY: 2,
                     LOG_LEVEL: LogLevel.Debug,
-                    RETRY_QUEUES: 'graphile',
+                    JOB_QUEUES: 'graphile',
                 },
                 makePiscina
             )
@@ -96,7 +100,7 @@ describe('job queues', () => {
             posthog.capture('my event', { hi: 'ha' })
             await delay(5000)
 
-            expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'processEvent']])
+            expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'my event']])
 
             await server.stop()
         })

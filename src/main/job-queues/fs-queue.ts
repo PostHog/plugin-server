@@ -1,4 +1,4 @@
-import { EnqueuedRetry, JobQueue, OnRetryCallback } from '../../types'
+import { EnqueuedJob, JobQueue, OnJobCallback } from '../../types'
 import Timeout = NodeJS.Timeout
 import * as fs from 'fs'
 import * as path from 'path'
@@ -22,15 +22,15 @@ export class FsQueue implements JobQueue {
         fs.writeFileSync(this.filename, '')
     }
 
-    enqueue(retry: EnqueuedRetry): Promise<void> | void {
-        fs.appendFileSync(this.filename, `${JSON.stringify(retry)}\n`)
+    enqueue(job: EnqueuedJob): Promise<void> | void {
+        fs.appendFileSync(this.filename, `${JSON.stringify(job)}\n`)
     }
 
     quit(): void {
         // nothing to do
     }
 
-    startConsumer(onRetry: OnRetryCallback): void {
+    startConsumer(onJob: OnJobCallback): void {
         fs.writeFileSync(this.filename, '')
         this.started = true
         this.interval = setInterval(() => {
@@ -43,14 +43,14 @@ export class FsQueue implements JobQueue {
                 .toString()
                 .split('\n')
                 .filter((a) => a)
-                .map((s) => JSON.parse(s) as EnqueuedRetry)
+                .map((s) => JSON.parse(s) as EnqueuedJob)
 
             const newQueue = queue.filter((element) => element.timestamp < timestamp)
             if (newQueue.length > 0) {
                 const oldQueue = queue.filter((element) => element.timestamp >= timestamp)
                 fs.writeFileSync(this.filename, `${oldQueue.map((q) => JSON.stringify(q)).join('\n')}\n`)
 
-                void onRetry(newQueue)
+                void onJob(newQueue)
             }
         }, 1000)
     }

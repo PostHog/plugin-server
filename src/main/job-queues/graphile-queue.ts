@@ -1,12 +1,12 @@
 import { makeWorkerUtils, run, Runner, WorkerUtils, WorkerUtilsOptions } from 'graphile-worker'
 
-import { EnqueuedRetry, JobQueue, OnRetryCallback, PluginsServer } from '../../types'
+import { EnqueuedJob, JobQueue, OnJobCallback, PluginsServer } from '../../types'
 
 export class GraphileQueue implements JobQueue {
     pluginsServer: PluginsServer
     started: boolean
     paused: boolean
-    onRetry: OnRetryCallback | null
+    onJob: OnJobCallback | null
     runner: Runner | null
     workerUtils: WorkerUtils | null
 
@@ -14,17 +14,17 @@ export class GraphileQueue implements JobQueue {
         this.pluginsServer = pluginsServer
         this.started = false
         this.paused = false
-        this.onRetry = null
+        this.onJob = null
         this.runner = null
         this.workerUtils = null
     }
 
-    async enqueue(retry: EnqueuedRetry): Promise<void> {
+    async enqueue(retry: EnqueuedJob): Promise<void> {
         if (!this.workerUtils) {
             this.workerUtils = await makeWorkerUtils(
-                this.pluginsServer.RETRY_QUEUE_GRAPHILE_URL
+                this.pluginsServer.JOB_QUEUE_GRAPHILE_URL
                     ? {
-                          connectionString: this.pluginsServer.RETRY_QUEUE_GRAPHILE_URL,
+                          connectionString: this.pluginsServer.JOB_QUEUE_GRAPHILE_URL,
                       }
                     : ({
                           pgPool: this.pluginsServer.postgres,
@@ -32,7 +32,7 @@ export class GraphileQueue implements JobQueue {
             )
             await this.workerUtils.migrate()
         }
-        await this.workerUtils.addJob('retryTask', retry, { runAt: new Date(retry.timestamp), maxAttempts: 1 })
+        await this.workerUtils.addJob('pluginJob', retry, { runAt: new Date(retry.timestamp), maxAttempts: 1 })
     }
 
     async quit(): Promise<void> {
@@ -41,9 +41,9 @@ export class GraphileQueue implements JobQueue {
         await oldWorkerUtils?.release()
     }
 
-    async startConsumer(onRetry: OnRetryCallback): Promise<void> {
+    async startConsumer(onJob: OnJobCallback): Promise<void> {
         this.started = true
-        this.onRetry = onRetry
+        this.onJob = onJob
         await this.syncState()
     }
 
@@ -77,8 +77,8 @@ export class GraphileQueue implements JobQueue {
                     pollInterval: 100,
                     // you can set the taskList or taskDirectory but not both
                     taskList: {
-                        retryTask: (payload) => {
-                            void this.onRetry?.([payload as EnqueuedRetry])
+                        pluginJob: (payload) => {
+                            void this.onJob?.([payload as EnqueuedJob])
                         },
                     },
                 })

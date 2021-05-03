@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/node'
 
-import { EnqueuedRetry, JobQueue, OnRetryCallback, PluginsServer } from '../../types'
+import { EnqueuedJob, JobQueue, OnJobCallback, PluginsServer } from '../../types'
 import { FsQueue } from './fs-queue'
 import { GraphileQueue } from './graphile-queue'
 
@@ -21,7 +21,7 @@ export class JobQueueManager implements JobQueue {
     constructor(pluginsServer: PluginsServer) {
         this.pluginsServer = pluginsServer
 
-        this.jobQueues = pluginsServer.RETRY_QUEUES.split(',')
+        this.jobQueues = pluginsServer.JOB_QUEUES.split(',')
             .map((q) => q.trim() as JobQueueType)
             .filter((q) => !!q)
             .map(
@@ -29,23 +29,23 @@ export class JobQueueManager implements JobQueue {
                     if (queues[queue]) {
                         return queues[queue](pluginsServer)
                     } else {
-                        throw new Error(`Unknown retry queue "${queue}"`)
+                        throw new Error(`Unknown job queue "${queue}"`)
                     }
                 }
             )
     }
 
-    async enqueue(retry: EnqueuedRetry): Promise<void> {
-        for (const retryQueue of this.jobQueues) {
+    async enqueue(job: EnqueuedJob): Promise<void> {
+        for (const jobQueue of this.jobQueues) {
             try {
-                await retryQueue.enqueue(retry)
+                await jobQueue.enqueue(job)
                 return
             } catch (error) {
                 // if one fails, take the next queue
                 Sentry.captureException(error, {
                     extra: {
-                        retry: JSON.stringify(retry),
-                        queue: retryQueue.toString(),
+                        job: JSON.stringify(job),
+                        queue: jobQueue.toString(),
                         queues: this.jobQueues.map((q) => q.toString()),
                     },
                 })
@@ -58,8 +58,8 @@ export class JobQueueManager implements JobQueue {
         await Promise.all(this.jobQueues.map((r) => r.quit()))
     }
 
-    async startConsumer(onRetry: OnRetryCallback): Promise<void> {
-        await Promise.all(this.jobQueues.map((r) => r.startConsumer(onRetry)))
+    async startConsumer(onJob: OnJobCallback): Promise<void> {
+        await Promise.all(this.jobQueues.map((r) => r.startConsumer(onJob)))
     }
 
     async stopConsumer(): Promise<void> {

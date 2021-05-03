@@ -9,8 +9,10 @@ export async function resetGraphileSchema(): Promise<void> {
 
     try {
         await db.query('DROP SCHEMA graphile_worker CASCADE')
-    } catch (e) {
-        status.error('😱', `Could not dump graphile_worker schema: ${e.message}`)
+    } catch (error) {
+        if (error.message !== 'schema "graphile_worker" does not exist') {
+            throw error
+        }
     } finally {
         await db.end()
     }
