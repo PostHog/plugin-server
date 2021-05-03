@@ -1,10 +1,10 @@
 import { LOCKED_RESOURCE } from '../src/main/job-queues/job-queue-consumer'
-import { startPluginsServer } from '../src/main/pluginsServer'
+import { ServerInstance, startPluginsServer } from '../src/main/pluginsServer'
 import { LogLevel } from '../src/types'
 import { createServer } from '../src/utils/db/server'
 import { delay } from '../src/utils/utils'
 import { makePiscina } from '../src/worker/piscina'
-import { createPosthog } from '../src/worker/vm/extensions/posthog'
+import { createPosthog, DummyPostHog } from '../src/worker/vm/extensions/posthog'
 import { imports } from '../src/worker/vm/imports'
 import { resetGraphileSchema } from './helpers/graphile'
 import { pluginConfig39 } from './helpers/plugins'
@@ -15,94 +15,75 @@ jest.setTimeout(60000) // 60 sec timeout
 
 const { console: testConsole } = imports['test-utils/write-to-file']
 
+const testCode = `
+    import { console } from 'test-utils/write-to-file'
+
+    export const jobs = {
+        retryProcessEvent: (event, meta) => {
+            console.log('retrying event!', event.event)
+        }
+    }
+    export async function processEvent (event, meta) {
+        if (event.properties?.hi === 'ha') {
+            console.log('processEvent')
+            meta.jobs.runIn(1, 'second').retryProcessEvent(event)
+        }
+        return event
+    }
+`
+
+const createConfig = (jobQueues: string) => ({
+    WORKER_CONCURRENCY: 2,
+    LOG_LEVEL: LogLevel.Debug,
+    JOB_QUEUES: jobQueues,
+})
+
 describe('job queues', () => {
+    let server: ServerInstance
+    let posthog: DummyPostHog
+
     beforeEach(async () => {
         testConsole.reset()
 
-        const [server, stopServer] = await createServer()
-        const redis = await server.redisPool.acquire()
+        // reset lock in redis
+        const [tempServer, stopTempServer] = await createServer()
+        const redis = await tempServer.redisPool.acquire()
         await redis.del(LOCKED_RESOURCE)
-        await server.redisPool.release(redis)
-        await stopServer()
+        await tempServer.redisPool.release(redis)
+        await stopTempServer()
+
+        // reset test code
+        await resetTestDatabase(testCode)
+    })
+
+    afterEach(async () => {
+        await server.stop()
     })
 
     describe('fs queue', () => {
+        beforeEach(async () => {
+            server = await startPluginsServer(createConfig('fs'), makePiscina)
+            posthog = createPosthog(server.server, pluginConfig39)
+        })
+
         test('jobs get called', async () => {
-            const testCode = `
-                import { console } from 'test-utils/write-to-file'
-
-                export const jobs = {
-                    retryProcessEvent: (event, meta) => {
-                        console.log('retrying event!', event.event)
-                    }
-                }
-                export async function processEvent (event, meta) {
-                    if (event.properties?.hi === 'ha') {
-                        console.log('processEvent')
-                        meta.jobs.runIn(1, 'second').retryProcessEvent(event)
-                    }
-                    return event
-                }
-            `
-            await resetTestDatabase(testCode)
-            const server = await startPluginsServer(
-                {
-                    WORKER_CONCURRENCY: 2,
-                    LOG_LEVEL: LogLevel.Debug,
-                    JOB_QUEUES: 'fs',
-                },
-                makePiscina
-            )
-            const posthog = createPosthog(server.server, pluginConfig39)
-
             posthog.capture('my event', { hi: 'ha' })
             await delay(10000)
-
             expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'my event']])
-
-            await server.stop()
         })
     })
 
     describe('graphile', () => {
         beforeEach(async () => {
             await resetGraphileSchema()
+            server = await startPluginsServer(createConfig('graphile'), makePiscina)
+            posthog = createPosthog(server.server, pluginConfig39)
         })
 
         test('graphile job queue', async () => {
-            const testCode = `
-                import { console } from 'test-utils/write-to-file'
-
-                export const jobs = {
-                    retryProcessEvent: (event, meta) => {
-                        console.log('retrying event!', event.event)
-                    }
-                }
-                export async function processEvent (event, meta) {
-                    if (event.properties?.hi === 'ha') {
-                        console.log('processEvent')
-                        meta.jobs.runIn(1, 'second').retryProcessEvent(event)
-                    }
-                    return event
-                }
-            `
-            await resetTestDatabase(testCode)
-            const server = await startPluginsServer(
-                {
-                    WORKER_CONCURRENCY: 2,
-                    LOG_LEVEL: LogLevel.Debug,
-                    JOB_QUEUES: 'graphile',
-                },
-                makePiscina
-            )
-            const posthog = createPosthog(server.server, pluginConfig39)
-
             posthog.capture('my event', { hi: 'ha' })
             await delay(5000)
-
             expect(testConsole.read()).toEqual([['processEvent'], ['retrying event!', 'my event']])
-
-            await server.stop()
         })
     })
 })
