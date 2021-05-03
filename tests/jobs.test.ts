@@ -110,7 +110,7 @@ describe('job queues', () => {
         test('graphile job queue', async () => {
             posthog.capture('my event', { type: 'runIn' })
             await waitForLogEntries(2)
-            expect(testConsole.read()).toEqual([['processEvent'], ['runIn', 'runIn']])
+            expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runIn']])
         })
     })
 })
