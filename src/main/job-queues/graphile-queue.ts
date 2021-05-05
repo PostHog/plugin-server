@@ -101,22 +101,6 @@ export class GraphileQueue implements JobQueue {
                         },
                     },
                 })
-                // const events = [
-                //     'pool:create',
-                //     'pool:listen:connecting',
-                //     'pool:listen:success',
-                //     'pool:listen:error',
-                //     'worker:create',
-                //     'worker:fatalError',
-                //     'job:error',
-                //     'gracefulShutdown',
-                //     'stop',
-                // ]
-                // for (const event of events) {
-                //     this.runner.events.on(event as any, (payload) => {
-                //         status.info(':O', { event, payload })
-                //     })
-                // }
             }
         } else {
             if (this.runner) {
