@@ -5,7 +5,7 @@ import AdmZip from 'adm-zip'
 import { randomBytes } from 'crypto'
 import Redis, { RedisOptions } from 'ioredis'
 import { DateTime } from 'luxon'
-import { Pool, PoolConfig } from 'pg'
+import { Pool, PoolClient, PoolConfig } from 'pg'
 import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
@@ -433,7 +433,7 @@ export function createPostgresPool(
                   connectionString: configOrDatabaseUrl.DATABASE_URL,
               }
 
-    const postgres = new Pool({
+    const pgPool = new Pool({
         ...credentials,
         idleTimeoutMillis: 500,
         max: 10,
@@ -444,16 +444,20 @@ export function createPostgresPool(
             : undefined,
     })
 
-    postgres.on(
-        'error',
+    const handleError =
         onError ||
-            ((error) => {
-                Sentry.captureException(error)
-                status.error('🔴', 'PostgreSQL error encountered!\n', error)
-            })
-    )
+        ((error) => {
+            Sentry.captureException(error)
+            status.error('🔴', 'PostgreSQL error encountered!\n', error)
+        })
 
-    return postgres
+    pgPool.on('error', handleError)
+    const handlePoolConnect = (client: PoolClient) => {
+        client.on('error', handleError)
+    }
+    pgPool.on('connect', handlePoolConnect)
+
+    return pgPool
 }
 
 export function sanitizeEvent(event: PluginEvent): PluginEvent {
