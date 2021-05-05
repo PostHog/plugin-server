@@ -412,18 +412,26 @@ export function pluginDigest(plugin: Plugin, teamId?: number): string {
     return `plugin ${plugin.name} ID ${plugin.id} (${extras.join(' - ')})`
 }
 
-export function createPostgresPool(serverConfig: PluginsServerConfig): Pool {
-    const credentials: Partial<PoolConfig> = serverConfig.POSTHOG_DB_NAME
-        ? {
-              database: serverConfig.POSTHOG_DB_NAME,
-              user: serverConfig.POSTHOG_DB_USER,
-              password: serverConfig.POSTHOG_DB_PASSWORD,
-              host: serverConfig.POSTHOG_POSTGRES_HOST,
-              port: serverConfig.POSTHOG_POSTGRES_PORT,
-          }
-        : {
-              connectionString: serverConfig.DATABASE_URL,
-          }
+export function createPostgresPool(
+    configOrDatabaseUrl: PluginsServerConfig | string,
+    onError?: (error: Error) => any
+): Pool {
+    const credentials: Partial<PoolConfig> =
+        typeof configOrDatabaseUrl === 'string'
+            ? {
+                  connectionString: configOrDatabaseUrl,
+              }
+            : configOrDatabaseUrl.POSTHOG_DB_NAME
+            ? {
+                  database: configOrDatabaseUrl.POSTHOG_DB_NAME,
+                  user: configOrDatabaseUrl.POSTHOG_DB_USER,
+                  password: configOrDatabaseUrl.POSTHOG_DB_PASSWORD,
+                  host: configOrDatabaseUrl.POSTHOG_POSTGRES_HOST,
+                  port: configOrDatabaseUrl.POSTHOG_POSTGRES_PORT,
+              }
+            : {
+                  connectionString: configOrDatabaseUrl.DATABASE_URL,
+              }
 
     const postgres = new Pool({
         ...credentials,
@@ -436,10 +444,14 @@ export function createPostgresPool(serverConfig: PluginsServerConfig): Pool {
             : undefined,
     })
 
-    postgres.on('error', (error) => {
-        Sentry.captureException(error)
-        status.error('🔴', 'PostgreSQL error encountered!\n', error)
-    })
+    postgres.on(
+        'error',
+        onError ||
+            ((error) => {
+                Sentry.captureException(error)
+                status.error('🔴', 'PostgreSQL error encountered!\n', error)
+            })
+    )
 
     return postgres
 }
