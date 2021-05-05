@@ -152,7 +152,7 @@ describe('job queues', () => {
                         },
                         false
                     )
-                    await startPluginsServer(config, makePiscina)
+                    server = await startPluginsServer(config, makePiscina)
                     await delay(5000)
                     expect(killMock).toHaveBeenCalledWith(process.pid, 'SIGTERM')
                 })
