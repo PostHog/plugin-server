@@ -37,11 +37,11 @@ const testCode = `
     }
 `
 
-const createConfig = (jobQueues: string): PluginsServerConfig => ({
+const createConfig = (config: Partial<PluginsServerConfig>): PluginsServerConfig => ({
     ...defaultConfig,
     WORKER_CONCURRENCY: 2,
     LOG_LEVEL: LogLevel.Debug,
-    JOB_QUEUES: jobQueues,
+    ...config,
 })
 
 async function waitForLogEntries(number: number) {
@@ -80,7 +80,7 @@ describe('job queues', () => {
 
     describe('fs queue', () => {
         beforeEach(async () => {
-            server = await startPluginsServer(createConfig('fs'), makePiscina)
+            server = await startPluginsServer(createConfig({ JOB_QUEUES: 'fs' }), makePiscina)
             posthog = createPosthog(server.server, pluginConfig39)
         })
 
@@ -104,17 +104,61 @@ describe('job queues', () => {
     })
 
     describe('graphile', () => {
-        beforeEach(async () => {
-            const config = createConfig('graphile')
-            await resetGraphileSchema(config)
-            server = await startPluginsServer(config, makePiscina)
-            posthog = createPosthog(server.server, pluginConfig39)
+        async function initTest(config: Partial<PluginsServerConfig>): Promise<PluginsServerConfig> {
+            const createdConfig = createConfig(config)
+            await resetGraphileSchema(createdConfig)
+            return createdConfig
+        }
+
+        describe('jobs', () => {
+            beforeEach(async () => {
+                const config = initTest({ JOB_QUEUES: 'graphile' })
+                server = await startPluginsServer(config, makePiscina)
+                posthog = createPosthog(server.server, pluginConfig39)
+            })
+
+            test('graphile job queue', async () => {
+                posthog.capture('my event', { type: 'runIn' })
+                await waitForLogEntries(2)
+                expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runIn']])
+            })
         })
 
-        test('graphile job queue', async () => {
-            posthog.capture('my event', { type: 'runIn' })
-            await waitForLogEntries(2)
-            expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runIn']])
+        describe('connection', () => {
+            test('default connection', async () => {
+                const config = initTest({ JOB_QUEUES: 'graphile', JOB_QUEUE_GRAPHILE_URL: '' })
+                server = await startPluginsServer(config, makePiscina)
+                posthog = createPosthog(server.server, pluginConfig39)
+                posthog.capture('my event', { type: 'runIn' })
+                await waitForLogEntries(2)
+                expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runIn']])
+            })
+
+            describe('invalid host/domain', () => {
+                test('crash', async () => {
+                    const config = initTest({
+                        JOB_QUEUES: 'graphile',
+                        JOB_QUEUE_GRAPHILE_URL: 'postgres://0.0.0.0:9212/database',
+                        CRASH_IF_NO_PERSISTENT_JOB_QUEUE: false,
+                    })
+                    await expect(async () => {
+                        server = await startPluginsServer(config, makePiscina)
+                    }).rejects.toThrow()
+                })
+
+                test('no crash', async () => {
+                    const config = initTest({
+                        JOB_QUEUES: 'graphile',
+                        JOB_QUEUE_GRAPHILE_URL: 'postgres://0.0.0.0:9212/database',
+                        CRASH_IF_NO_PERSISTENT_JOB_QUEUE: false,
+                    })
+                    server = await startPluginsServer(config, makePiscina)
+                    posthog = createPosthog(server.server, pluginConfig39)
+                    posthog.capture('my event', { type: 'runIn' })
+                    await waitForLogEntries(1)
+                    expect(testConsole.read()).toEqual([['processEvent']])
+                })
+            })
         })
     })
 })
