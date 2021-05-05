@@ -4,6 +4,7 @@ import { startPluginsServer } from '../src/main/pluginsServer'
 import { LogLevel } from '../src/types'
 import { delay } from '../src/utils/utils'
 import { makePiscina } from '../src/worker/piscina'
+import { mockKill } from './helpers/process'
 import { resetTestDatabase } from './helpers/sql'
 
 jest.mock('@sentry/node')
@@ -29,23 +30,7 @@ test('startPluginsServer', async () => {
 })
 
 describe('plugin server staleness check', () => {
-    const realProcess = process
-    const killMock = jest.fn()
-
-    beforeAll(() => {
-        global.process = new Proxy(process, {
-            get(target, property: keyof typeof process) {
-                if (property === 'kill') {
-                    return killMock
-                }
-                return realProcess[property]
-            },
-        })
-    })
-
-    afterAll(() => {
-        global.process = realProcess
-    })
+    const killMock = mockKill()
 
     test('test if the server terminates', async () => {
         const testCode = `

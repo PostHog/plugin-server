@@ -9,6 +9,7 @@ import { createPosthog, DummyPostHog } from '../src/worker/vm/extensions/posthog
 import { imports } from '../src/worker/vm/imports'
 import { resetGraphileSchema } from './helpers/graphile'
 import { pluginConfig39 } from './helpers/plugins'
+import { mockKill } from './helpers/process'
 import { resetTestDatabase } from './helpers/sql'
 
 jest.mock('../src/utils/db/sql')
@@ -57,6 +58,8 @@ async function waitForLogEntries(number: number) {
 }
 
 describe('job queues', () => {
+    const killMock = mockKill()
+
     let server: ServerInstance
     let posthog: DummyPostHog
 
@@ -75,7 +78,7 @@ describe('job queues', () => {
     })
 
     afterEach(async () => {
-        await server.stop()
+        await server?.stop()
     })
 
     describe('fs queue', () => {
@@ -145,13 +148,13 @@ describe('job queues', () => {
                         {
                             JOB_QUEUES: 'graphile',
                             JOB_QUEUE_GRAPHILE_URL: 'postgres://0.0.0.0:9212/database',
-                            CRASH_IF_NO_PERSISTENT_JOB_QUEUE: false,
+                            CRASH_IF_NO_PERSISTENT_JOB_QUEUE: true,
                         },
                         false
                     )
-                    await expect(async () => {
-                        server = await startPluginsServer(config, makePiscina)
-                    }).rejects.toThrow()
+                    await startPluginsServer(config, makePiscina)
+                    await delay(5000)
+                    expect(killMock).toHaveBeenCalledWith(process.pid, 'SIGTERM')
                 })
 
                 test('no crash', async () => {
