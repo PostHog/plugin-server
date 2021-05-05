@@ -27,16 +27,26 @@ export class GraphileQueue implements JobQueue {
         this.workerUtilsPromise = null
     }
 
+    // producer
+
     async connectProducer(): Promise<void> {
         this.producerPool = await this.createPool()
         await (await this.getWorkerUtils()).migrate()
     }
 
     async enqueue(retry: EnqueuedJob): Promise<void> {
-        await (await this.getWorkerUtils()).addJob('pluginJob', retry, {
+        const workerUtils = await this.getWorkerUtils()
+        await workerUtils.addJob('pluginJob', retry, {
             runAt: new Date(retry.timestamp),
             maxAttempts: 1,
         })
+    }
+
+    private async getWorkerUtils(): Promise<WorkerUtils> {
+        if (!this.workerUtilsPromise) {
+            this.workerUtilsPromise = makeWorkerUtils({ pgPool: this.producerPool as any })
+        }
+        return await this.workerUtilsPromise
     }
 
     async disconnectProducer(): Promise<void> {
@@ -45,6 +55,8 @@ export class GraphileQueue implements JobQueue {
         await oldWorkerUtils?.release()
         await this.producerPool?.end()
     }
+
+    // consumer
 
     async startConsumer(onJob: OnJobCallback): Promise<void> {
         this.started = true
@@ -114,13 +126,6 @@ export class GraphileQueue implements JobQueue {
                 await this.consumerPool?.end()
             }
         }
-    }
-
-    private async getWorkerUtils(): Promise<WorkerUtils> {
-        if (!this.workerUtilsPromise) {
-            this.workerUtilsPromise = makeWorkerUtils({ pgPool: this.producerPool as any })
-        }
-        return await this.workerUtilsPromise
     }
 
     private onConnectionError(error: Error) {
