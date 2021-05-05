@@ -112,7 +112,7 @@ describe('job queues', () => {
 
         describe('jobs', () => {
             beforeEach(async () => {
-                const config = initTest({ JOB_QUEUES: 'graphile' })
+                const config = await initTest({ JOB_QUEUES: 'graphile' })
                 server = await startPluginsServer(config, makePiscina)
                 posthog = createPosthog(server.server, pluginConfig39)
             })
@@ -126,7 +126,7 @@ describe('job queues', () => {
 
         describe('connection', () => {
             test('default connection', async () => {
-                const config = initTest({ JOB_QUEUES: 'graphile', JOB_QUEUE_GRAPHILE_URL: '' })
+                const config = await initTest({ JOB_QUEUES: 'graphile', JOB_QUEUE_GRAPHILE_URL: '' })
                 server = await startPluginsServer(config, makePiscina)
                 posthog = createPosthog(server.server, pluginConfig39)
                 posthog.capture('my event', { type: 'runIn' })
@@ -136,7 +136,7 @@ describe('job queues', () => {
 
             describe('invalid host/domain', () => {
                 test('crash', async () => {
-                    const config = initTest({
+                    const config = await initTest({
                         JOB_QUEUES: 'graphile',
                         JOB_QUEUE_GRAPHILE_URL: 'postgres://0.0.0.0:9212/database',
                         CRASH_IF_NO_PERSISTENT_JOB_QUEUE: false,
@@ -147,7 +147,7 @@ describe('job queues', () => {
                 })
 
                 test('no crash', async () => {
-                    const config = initTest({
+                    const config = await initTest({
                         JOB_QUEUES: 'graphile',
                         JOB_QUEUE_GRAPHILE_URL: 'postgres://0.0.0.0:9212/database',
                         CRASH_IF_NO_PERSISTENT_JOB_QUEUE: false,
