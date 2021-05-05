@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/node'
 import { JobQueueConsumerControl, OnJobCallback, PluginsServer } from '../../types'
 import { startRedlock } from '../../utils/redlock'
 import { status } from '../../utils/status'
-import { killProcess } from '../../utils/utils'
+import { killProcess, logOrThrowJobQueueError } from '../../utils/utils'
 import { pauseQueueIfWorkerFull } from '../ingestion-queues/queue'
 
 export const LOCKED_RESOURCE = 'plugin-server:locks:job-queue-consumer'
@@ -27,9 +27,9 @@ export async function startJobQueueConsumer(server: PluginsServer, piscina: Pisc
             try {
                 await server.jobQueueManager.startConsumer(onJob)
             } catch (error) {
-                status.error('🔴', `Can not start job queue consumer!`)
-                Sentry.captureException(error)
-                if (server.CRASH_IF_NO_PERSISTENT_JOB_QUEUE) {
+                try {
+                    logOrThrowJobQueueError(server, error, `Can not start job queue consumer!`)
+                } catch {
                     killProcess()
                 }
             }

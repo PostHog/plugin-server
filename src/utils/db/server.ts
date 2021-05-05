@@ -15,7 +15,7 @@ import { JobQueueManager } from '../../main/job-queues/job-queue-manager'
 import { PluginsServer, PluginsServerConfig } from '../../types'
 import { EventsProcessor } from '../../worker/ingestion/process-event'
 import { status } from '../status'
-import { createPostgresPool, createRedis, killProcess, UUIDT } from '../utils'
+import { createPostgresPool, createRedis, killProcess, logOrThrowJobQueueError, UUIDT } from '../utils'
 import { DB } from './db'
 import { KafkaProducerWrapper } from './kafka-producer-wrapper'
 
@@ -172,9 +172,9 @@ export async function createServer(
     try {
         await server.jobQueueManager.connectProducer()
     } catch (error) {
-        status.error('🔴', `Can not start job queue producer!`)
-        Sentry.captureException(error)
-        if (server.CRASH_IF_NO_PERSISTENT_JOB_QUEUE) {
+        try {
+            logOrThrowJobQueueError(server as PluginsServer, error, `Can not start job queue producer!`)
+        } catch {
             killProcess()
         }
     }

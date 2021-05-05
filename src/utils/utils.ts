@@ -550,3 +550,13 @@ export function killProcess(): void {
         setTimeout(() => process.kill(process.pid, 'SIGKILL'), 120000)
     }
 }
+
+export function logOrThrowJobQueueError(server: PluginsServerConfig, error: Error, message: string): void {
+    Sentry.captureException(error)
+    if (server.CRASH_IF_NO_PERSISTENT_JOB_QUEUE) {
+        status.error('🔴', message)
+        throw error
+    } else {
+        status.info('🟡', message)
+    }
+}
