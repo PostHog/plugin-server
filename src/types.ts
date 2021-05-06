@@ -244,7 +244,10 @@ export interface PluginConfigVMReponse {
     methods: {
         setupPlugin: () => Promise<void>
         teardownPlugin: () => Promise<void>
+        onEvent: (event: PluginEvent) => Promise<void>
+        onSnapshot: (event: PluginEvent) => Promise<void>
         processEvent: (event: PluginEvent) => Promise<PluginEvent>
+        // DEPRECATED
         processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
     }
     tasks: Record<PluginTaskType, Record<string, PluginTask>>
