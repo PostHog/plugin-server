@@ -118,12 +118,14 @@ describe('e2e postgres ingestion', () => {
         posthog.capture('custom event', { name: 'hehe', uuid: new UUIDT().toString() })
 
         await server.kafkaProducer?.flush()
-        await delayUntilEventIngested(() => server.db.fetchPluginLogEntries())
+        await delayUntilEventIngested(() => server.db.fetchPluginLogEntries(), 3)
 
         const pluginLogEntries = await server.db.fetchPluginLogEntries()
 
-        expect(pluginLogEntries.length).toBe(1)
-        expect(pluginLogEntries[0].type).toEqual('INFO')
-        expect(pluginLogEntries[0].message).toEqual('amogus')
+        expect(pluginLogEntries.length).toBe(3)
+        expect(pluginLogEntries[0].message).toContain('Plugin loaded')
+        expect(pluginLogEntries[1].message).toContain('Plugin loaded')
+        expect(pluginLogEntries[2].type).toEqual('INFO')
+        expect(pluginLogEntries[2].message).toEqual('amogus')
     })
 })
