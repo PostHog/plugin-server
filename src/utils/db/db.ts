@@ -395,9 +395,12 @@ export class DB {
         const propertyUpdates = Object.keys(propertiesToIncrement)
             .map((propName, index) => {
                 const sanitizedPropName = sanitizeSqlIdentifier(propName)
-                return ` || jsonb_set(jsonb_build_object('${sanitizedPropName}', properties->>'${sanitizedPropName}'), '{${sanitizedPropName}}', (COALESCE(properties->>'${sanitizedPropName}','0')::int + $${
+                return `|| CASE WHEN (COALESCE(properties->>'${sanitizedPropName}', '0')~E'^\\\\d+$')
+                    THEN jsonb_set(jsonb_build_object('${sanitizedPropName}', properties->>'${sanitizedPropName}'), '{${sanitizedPropName}}', (COALESCE(properties->>'${sanitizedPropName}','0')::int + $${
                     index + 1
-                })::text::jsonb)`
+                })::text::jsonb)
+                    ELSE '{}'
+                END `
             })
             .join('')
 
@@ -405,8 +408,7 @@ export class DB {
             `UPDATE posthog_person
             SET properties = properties ${propertyUpdates}
             WHERE id = $${values.length}
-            RETURNING properties;
-            `,
+            RETURNING properties;`,
             values,
             'incrementPersonProperties'
         )
