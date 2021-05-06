@@ -113,19 +113,18 @@ describe('e2e postgres ingestion', () => {
     })
 
     test('console logging is persistent', async () => {
-        expect((await server.db.fetchPluginLogEntries()).length).toBe(0)
+        const logCount = (await server.db.fetchPluginLogEntries()).length
+        const getLogsSinceStart = async () => (await server.db.fetchPluginLogEntries()).slice(logCount)
 
         posthog.capture('custom event', { name: 'hehe', uuid: new UUIDT().toString() })
 
-        await server.kafkaProducer?.flush()
-        await delayUntilEventIngested(() => server.db.fetchPluginLogEntries(), 3)
+        await delayUntilEventIngested(async () =>
+            (await getLogsSinceStart()).filter(({ message }) => message.includes('amogus'))
+        )
 
-        const pluginLogEntries = await server.db.fetchPluginLogEntries()
-
-        expect(pluginLogEntries.length).toBe(3)
-        expect(pluginLogEntries.find(({ message, type }) => message.includes('Plugin loaded'))).toBeDefined()
+        const pluginLogEntries = await getLogsSinceStart()
         expect(
-            pluginLogEntries.find(({ message, type }) => message.includes('amogus') && type === 'INFO')
-        ).toBeDefined()
+            pluginLogEntries.filter(({ message, type }) => message.includes('amogus') && type === 'INFO').length
+        ).toEqual(1)
     })
 })
