@@ -71,9 +71,8 @@ export interface PluginsServerConfig extends Record<string, any> {
     DISTINCT_ID_LRU_SIZE: number
     INTERNAL_MMDB_SERVER_PORT: number
     PLUGIN_SERVER_IDLE: boolean
-    RETRY_QUEUES: string
-    RETRY_QUEUE_GRAPHILE_URL: string
-    ENABLE_PERSISTENT_CONSOLE: boolean
+    JOB_QUEUES: string
+    JOB_QUEUE_GRAPHILE_URL: string
     STALENESS_RESTART_SECONDS: number
 }
 

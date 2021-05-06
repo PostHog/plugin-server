@@ -59,9 +59,8 @@ export function getDefaultConfig(): PluginsServerConfig {
         DISTINCT_ID_LRU_SIZE: 10000,
         INTERNAL_MMDB_SERVER_PORT: 0,
         PLUGIN_SERVER_IDLE: false,
-        RETRY_QUEUES: '',
-        RETRY_QUEUE_GRAPHILE_URL: '',
-        ENABLE_PERSISTENT_CONSOLE: false, // TODO: remove when persistent console ships in main repo
+        JOB_QUEUES: '',
+        JOB_QUEUE_GRAPHILE_URL: '',
         STALENESS_RESTART_SECONDS: 0,
     }
 }

@@ -68,10 +68,6 @@ describe('e2e clickhouse ingestion', () => {
     })
 
     test('console logging is persistent', async () => {
-        if (!server.ENABLE_PERSISTENT_CONSOLE) {
-            // TODO: remove this return
-            return
-        }
         expect((await server.db.fetchEvents()).length).toBe(0)
 
         posthog.capture('custom event', { name: 'hehe', uuid: new UUIDT().toString() })
