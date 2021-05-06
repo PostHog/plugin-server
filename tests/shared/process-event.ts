@@ -1554,9 +1554,33 @@ export const createProcessEventTests = (
 
         // adds to the existing prop value
         expect(person2.properties).toEqual({ a_prop: 347 })
+
+        await processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: 'some_other_event',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $increment: { a_prop: 2 ** 63 - 2, b_prop: 25 },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect((await server.db.fetchEvents()).length).toBe(2)
+        const [person3] = await server.db.fetchPersons()
+
+        // Property that would overflow remains the same, others still update
+        expect(person2.properties).toEqual({ a_prop: 347, b_prop: 25 })
     })
 
-    test('$increment increments numerical user properties or creates a new one', async () => {
+    test('$increment does not increment non-numerical props', async () => {
         await createPerson(server, team, ['distinct_id'])
 
         await processEvent(
