@@ -559,7 +559,7 @@ export function filterIncrementProperties(incrementProperties: unknown): Record<
     const filteredIncrementProperties: Record<string, number> = {}
 
     for (const [key, val] of Object.entries(incrementProperties || {})) {
-        if (typeof val === 'number' && Number.isInteger(val) && val < 2 ** 31 - 1) {
+        if (typeof val === 'number' && Number.isInteger(val) && val < 2 ** 63 - 1) {
             filteredIncrementProperties[key] = val
         }
     }
