@@ -39,7 +39,6 @@ test('empty plugins', async () => {
 
     expect(Object.keys(vm).sort()).toEqual(['methods', 'tasks', 'vm'])
     expect(Object.keys(vm.methods).sort()).toEqual([
-        'onRetry',
         'processEvent',
         'processEventBatch',
         'setupPlugin',
@@ -721,10 +720,15 @@ test('runEvery', async () => {
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
-    expect(Object.keys(vm.tasks)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
-    expect(Object.values(vm.tasks).map((v) => v?.name)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
-    expect(Object.values(vm.tasks).map((v) => v?.type)).toEqual(['runEvery', 'runEvery', 'runEvery'])
-    expect(Object.values(vm.tasks).map((v) => typeof v?.exec)).toEqual(['function', 'function', 'function'])
+    expect(Object.keys(vm.tasks).sort()).toEqual(['job', 'schedule'])
+    expect(Object.keys(vm.tasks.schedule)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
+    expect(Object.values(vm.tasks.schedule).map((v) => v?.name)).toEqual([
+        'runEveryMinute',
+        'runEveryHour',
+        'runEveryDay',
+    ])
+    expect(Object.values(vm.tasks.schedule).map((v) => v?.type)).toEqual(['schedule', 'schedule', 'schedule'])
+    expect(Object.values(vm.tasks.schedule).map((v) => typeof v?.exec)).toEqual(['function', 'function', 'function'])
 })
 
 test('runEvery must be a function', async () => {
@@ -738,10 +742,10 @@ test('runEvery must be a function', async () => {
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
 
-    expect(Object.keys(vm.tasks)).toEqual(['runEveryMinute'])
-    expect(Object.values(vm.tasks).map((v) => v?.name)).toEqual(['runEveryMinute'])
-    expect(Object.values(vm.tasks).map((v) => v?.type)).toEqual(['runEvery'])
-    expect(Object.values(vm.tasks).map((v) => typeof v?.exec)).toEqual(['function'])
+    expect(Object.keys(vm.tasks.schedule)).toEqual(['runEveryMinute'])
+    expect(Object.values(vm.tasks.schedule).map((v) => v?.name)).toEqual(['runEveryMinute'])
+    expect(Object.values(vm.tasks.schedule).map((v) => v?.type)).toEqual(['schedule'])
+    expect(Object.values(vm.tasks.schedule).map((v) => typeof v?.exec)).toEqual(['function'])
 })
 
 test('posthog in runEvery', async () => {
@@ -756,7 +760,7 @@ test('posthog in runEvery', async () => {
 
     expect(Client).not.toHaveBeenCalled
 
-    const response = await vm.tasks.runEveryMinute.exec()
+    const response = await vm.tasks.schedule.runEveryMinute.exec()
     expect(response).toBe('haha')
 
     expect(Client).toHaveBeenCalledTimes(2)
@@ -799,7 +803,7 @@ test('posthog in runEvery with timestamp', async () => {
 
     expect(Client).not.toHaveBeenCalled
 
-    const response = await vm.tasks.runEveryMinute.exec()
+    const response = await vm.tasks.schedule.runEveryMinute.exec()
     expect(response).toBe('haha')
 
     expect(Client).toHaveBeenCalledTimes(2)
@@ -839,7 +843,7 @@ test('posthog.capture accepts user-defined distinct id', async () => {
 
     expect(Client).not.toHaveBeenCalled
 
-    const response = await vm.tasks.runEveryMinute.exec()
+    const response = await vm.tasks.schedule.runEveryMinute.exec()
     expect(response).toBe('haha')
 
     const mockClientInstance = (Client as any).mock.instances[1]

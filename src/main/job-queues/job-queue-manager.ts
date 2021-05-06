@@ -1,6 +1,8 @@
 import * as Sentry from '@sentry/node'
 
-import { EnqueuedRetry, JobQueue, OnRetryCallback, PluginsServer } from '../../types'
+import { EnqueuedJob, JobQueue, OnJobCallback, PluginsServer } from '../../types'
+import { status } from '../../utils/status'
+import { logOrThrowJobQueueError } from '../../utils/utils'
 import { FsQueue } from './fs-queue'
 import { GraphileQueue } from './graphile-queue'
 
@@ -17,35 +19,60 @@ const queues: Record<JobQueueType, (server: PluginsServer) => JobQueue> = {
 export class JobQueueManager implements JobQueue {
     pluginsServer: PluginsServer
     jobQueues: JobQueue[]
+    jobQueueTypes: JobQueueType[]
 
     constructor(pluginsServer: PluginsServer) {
         this.pluginsServer = pluginsServer
 
-        this.jobQueues = pluginsServer.RETRY_QUEUES.split(',')
+        this.jobQueueTypes = pluginsServer.JOB_QUEUES.split(',')
             .map((q) => q.trim() as JobQueueType)
             .filter((q) => !!q)
-            .map(
-                (queue): JobQueue => {
-                    if (queues[queue]) {
-                        return queues[queue](pluginsServer)
-                    } else {
-                        throw new Error(`Unknown retry queue "${queue}"`)
-                    }
+
+        this.jobQueues = this.jobQueueTypes.map(
+            (queue): JobQueue => {
+                if (queues[queue]) {
+                    return queues[queue](pluginsServer)
+                } else {
+                    throw new Error(`Unknown job queue "${queue}"`)
                 }
-            )
+            }
+        )
     }
 
-    async enqueue(retry: EnqueuedRetry): Promise<void> {
-        for (const retryQueue of this.jobQueues) {
+    async connectProducer(): Promise<void> {
+        const toRemove = new Set<JobQueue>()
+        await Promise.all(
+            this.jobQueues.map(async (jobQueue, index) => {
+                const jobQueueType = this.jobQueueTypes[index]
+                try {
+                    await jobQueue.connectProducer()
+                    status.info('🚶', `Connected to job queue producer "${jobQueueType}"`)
+                } catch (error) {
+                    toRemove.add(jobQueue)
+                    logOrThrowJobQueueError(
+                        this.pluginsServer,
+                        error,
+                        `Can not start job queue producer "${jobQueueType}": ${error.message}`
+                    )
+                }
+            })
+        )
+        if (toRemove.size > 0) {
+            this.jobQueues = this.jobQueues.filter((jobQueue) => !toRemove.has(jobQueue))
+        }
+    }
+
+    async enqueue(job: EnqueuedJob): Promise<void> {
+        for (const jobQueue of this.jobQueues) {
             try {
-                await retryQueue.enqueue(retry)
+                await jobQueue.enqueue(job)
                 return
             } catch (error) {
                 // if one fails, take the next queue
                 Sentry.captureException(error, {
                     extra: {
-                        retry: JSON.stringify(retry),
-                        queue: retryQueue.toString(),
+                        job: JSON.stringify(job),
+                        queue: jobQueue.toString(),
                         queues: this.jobQueues.map((q) => q.toString()),
                     },
                 })
@@ -54,12 +81,12 @@ export class JobQueueManager implements JobQueue {
         throw new Error('No JobQueue available')
     }
 
-    async quit(): Promise<void> {
-        await Promise.all(this.jobQueues.map((r) => r.quit()))
+    async disconnectProducer(): Promise<void> {
+        await Promise.all(this.jobQueues.map((r) => r.disconnectProducer()))
     }
 
-    async startConsumer(onRetry: OnRetryCallback): Promise<void> {
-        await Promise.all(this.jobQueues.map((r) => r.startConsumer(onRetry)))
+    async startConsumer(onJob: OnJobCallback): Promise<void> {
+        await Promise.all(this.jobQueues.map((r) => r.startConsumer(onJob)))
     }
 
     async stopConsumer(): Promise<void> {
