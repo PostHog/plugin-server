@@ -116,9 +116,7 @@ describe('e2e clickhouse ingestion', () => {
         posthog.capture('custom event', { name: 'hehe', uuid: new UUIDT().toString() })
 
         await server.kafkaProducer?.flush()
-        await delayUntilEventIngested(async () =>
-            (await getLogsSinceStart()).filter(({ message }) => message.includes('amogus'))
-        )
+        await delayUntilEventIngested(() => server.db.fetchEvents())
 
         const pluginLogEntries = await getLogsSinceStart()
         expect(
