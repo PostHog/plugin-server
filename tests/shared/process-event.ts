@@ -1573,11 +1573,11 @@ export const createProcessEventTests = (
             new UUIDT().toString()
         )
 
-        expect((await server.db.fetchEvents()).length).toBe(2)
+        expect((await server.db.fetchEvents()).length).toBe(3)
         const [person3] = await server.db.fetchPersons()
 
         // Property that would overflow remains the same, others still update
-        expect(person2.properties).toEqual({ a_prop: 347, b_prop: 25 })
+        expect(person3.properties).toEqual({ a_prop: 347, b_prop: 25 })
     })
 
     test('$increment does not increment non-numerical props', async () => {
