@@ -28,7 +28,7 @@ export async function runOnSnapshot(server: PluginsServer, event: PluginEvent): 
 
     await Promise.all(
         pluginsToRun.map(async (pluginConfig) => {
-            const onSnapshot = await pluginConfig.vm?.getOnEvent()
+            const onSnapshot = await pluginConfig.vm?.getOnSnapshot()
             if (onSnapshot) {
                 const timer = new Date()
                 try {
