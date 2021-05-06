@@ -396,9 +396,9 @@ export class DB {
             .map((propName, index) => {
                 const sanitizedPropName = sanitizeSqlIdentifier(propName)
                 return `|| CASE WHEN (COALESCE(properties->>'${sanitizedPropName}', '0')~E'^\\\\d+$')
-                    THEN jsonb_set(jsonb_build_object('${sanitizedPropName}', properties->>'${sanitizedPropName}'), '{${sanitizedPropName}}', (COALESCE(properties->>'${sanitizedPropName}','0')::int + $${
+                    THEN jsonb_build_object('${sanitizedPropName}', (COALESCE(properties->>'${sanitizedPropName}','0')::int + $${
                     index + 1
-                })::text::jsonb)
+                })) 
                     ELSE '{}'
                 END `
             })
