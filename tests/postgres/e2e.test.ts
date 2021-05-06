@@ -113,7 +113,7 @@ describe('e2e postgres ingestion', () => {
     })
 
     test('console logging is persistent', async () => {
-        expect((await server.db.fetchEvents()).length).toBe(0)
+        expect((await server.db.fetchPluginLogEntries()).length).toBe(0)
 
         posthog.capture('custom event', { name: 'hehe', uuid: new UUIDT().toString() })
 
@@ -123,9 +123,9 @@ describe('e2e postgres ingestion', () => {
         const pluginLogEntries = await server.db.fetchPluginLogEntries()
 
         expect(pluginLogEntries.length).toBe(3)
-        expect(pluginLogEntries[0].message).toContain('Plugin loaded')
-        expect(pluginLogEntries[1].message).toContain('Plugin loaded')
-        expect(pluginLogEntries[2].type).toEqual('INFO')
-        expect(pluginLogEntries[2].message).toEqual('amogus')
+        expect(pluginLogEntries.find(({ message, type }) => message.includes('Plugin loaded'))).toBeDefined()
+        expect(
+            pluginLogEntries.find(({ message, type }) => message.includes('amogus') && type === 'INFO')
+        ).toBeDefined()
     })
 })
