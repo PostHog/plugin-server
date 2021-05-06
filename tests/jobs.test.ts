@@ -157,7 +157,7 @@ describe('job queues', () => {
                     expect(killMock).toHaveBeenCalledWith(process.pid, 'SIGTERM')
                 })
 
-                test('no crash', async () => {
+                test.skip('no crash', async () => {
                     const config = await initTest(
                         {
                             JOB_QUEUES: 'graphile',
