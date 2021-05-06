@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/node'
 import equal from 'fast-deep-equal'
 import { DateTime, Duration } from 'luxon'
 import * as fetch from 'node-fetch'
+import { QueryResult } from 'pg'
 import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
 
 import { Event as EventProto, IEvent } from '../../config/idl/protos'
@@ -241,16 +242,25 @@ export class EventsProcessor {
 
         const updatedProperties: Properties = { ...propertiesOnce, ...personFound.properties, ...properties }
 
-        for (const [key, val] of Object.entries(incrementProperties)) {
-            if (updatedProperties[key]) {
-                updatedProperties[key] += val
-            } else {
-                updatedProperties[key] = val
-            }
+        let incrementedPropertiesQueryResult: QueryResult | null = null
+
+        const areTherePropsToIncrement = !!Object.keys(incrementProperties).length
+
+        if (areTherePropsToIncrement) {
+            incrementedPropertiesQueryResult = await this.db.incrementPersonProperties(personFound, incrementProperties)
         }
 
-        if (equal(personFound.properties, updatedProperties)) {
+        const arePersonsEqualExcludingIncrement = equal(personFound.properties, updatedProperties)
+
+        // CH still needs to update if there are $increment props but Postgres has already done so
+        if (arePersonsEqualExcludingIncrement && (!this.db.kafkaProducer || !areTherePropsToIncrement)) {
             return personFound
+        }
+
+        if (incrementedPropertiesQueryResult && incrementedPropertiesQueryResult.rows.length > 0) {
+            for (const [key, val] of Object.entries(incrementedPropertiesQueryResult.rows[0].properties)) {
+                updatedProperties[key] = val
+            }
         }
 
         return await this.db.updatePerson(personFound, { properties: updatedProperties })

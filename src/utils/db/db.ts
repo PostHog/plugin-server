@@ -386,6 +386,34 @@ export class DB {
         return updatedPerson
     }
 
+    // Using Postgres only as a source of truth
+    public async incrementPersonProperties(
+        person: Person,
+        propertiesToIncrement: Record<string, number>
+    ): Promise<QueryResult> {
+        const values = [...Object.values(propertiesToIncrement), person.id]
+        const propertyUpdates = Object.keys(propertiesToIncrement)
+            .map((propName, index) => {
+                const sanitizedPropName = sanitizeSqlIdentifier(propName)
+                return ` || jsonb_set(jsonb_build_object('${sanitizedPropName}', properties->>'${sanitizedPropName}'), '{${sanitizedPropName}}', (COALESCE(properties->>'${sanitizedPropName}','0')::int + $${
+                    index + 1
+                })::text::jsonb)`
+            })
+            .join('')
+
+        const newProperties = await this.postgresQuery(
+            `UPDATE posthog_person
+            SET properties = properties ${propertyUpdates}
+            WHERE id = $${values.length}
+            RETURNING properties;
+            `,
+            values,
+            'incrementPersonProperties'
+        )
+
+        return newProperties
+    }
+
     public async deletePerson(person: Person): Promise<void> {
         await this.postgresTransaction(async (client) => {
             await client.query('DELETE FROM posthog_persondistinctid WHERE person_id = $1', [person.id])
