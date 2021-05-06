@@ -239,6 +239,14 @@ export interface PluginTask {
     exec: (payload?: Record<string, any>) => Promise<any>
 }
 
+export type WorkerMethods = {
+    onEvent: (event: PluginEvent) => Promise<void>
+    onSnapshot: (event: PluginEvent) => Promise<void>
+    processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
+    processEventBatch: (batch: PluginEvent[]) => Promise<(PluginEvent | null)[]>
+    ingestEvent: (event: PluginEvent) => Promise<IngestEventResponse>
+}
+
 export interface PluginConfigVMReponse {
     vm: VM
     methods: {

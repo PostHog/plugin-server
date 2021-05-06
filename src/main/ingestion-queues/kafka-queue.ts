@@ -2,7 +2,7 @@ import Piscina from '@posthog/piscina'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import { Consumer, EachBatchPayload, EachMessagePayload, Kafka, KafkaMessage } from 'kafkajs'
-import { PluginsServer, Queue } from 'types'
+import { PluginsServer, Queue, WorkerMethods } from 'types'
 
 import { timeoutGuard } from '../../utils/db/utils'
 import { status } from '../../utils/status'
@@ -14,26 +14,19 @@ export class KafkaQueue implements Queue {
     private kafka: Kafka
     private consumer: Consumer
     private wasConsumerRan: boolean
-    private processEvent: (event: PluginEvent) => Promise<PluginEvent>
-    private ingestEvent: (event: PluginEvent) => Promise<void>
+    private workerMethods: WorkerMethods
 
     // used for logging aggregate stats to the console
     private messageLogDate = 0
     private messageCounter = 0
 
-    constructor(
-        pluginsServer: PluginsServer,
-        piscina: Piscina,
-        processEvent: (event: PluginEvent) => Promise<any>,
-        ingestEvent: (event: PluginEvent) => Promise<void>
-    ) {
+    constructor(pluginsServer: PluginsServer, piscina: Piscina, workerMethods: WorkerMethods) {
         this.pluginsServer = pluginsServer
         this.piscina = piscina
         this.kafka = pluginsServer.kafka!
         this.consumer = KafkaQueue.buildConsumer(this.kafka)
         this.wasConsumerRan = false
-        this.processEvent = processEvent
-        this.ingestEvent = ingestEvent
+        this.workerMethods = workerMethods
         this.messageLogDate = new Date().valueOf()
     }
 
@@ -51,39 +44,40 @@ export class KafkaQueue implements Queue {
     private async eachEvent(event: PluginEvent): Promise<void> {
         const eachEventStartTimer = new Date()
 
-        const processingTimeout = timeoutGuard('Still running plugins on event. Timeout warning after 30 sec!', {
-            event: JSON.stringify(event),
-        })
-        const timer = new Date()
-        let processedEvent: PluginEvent
-        try {
-            processedEvent = await this.processEvent(event)
-        } catch (error) {
-            status.info('🔔', error)
-            Sentry.captureException(error)
-            throw error
-        } finally {
-            this.pluginsServer.statsd?.timing('kafka_queue.single_event', timer)
-            clearTimeout(processingTimeout)
+        let processedEvent: PluginEvent | null = event
+
+        if (processedEvent.event !== '$snapshot') {
+            processedEvent = await this.runInstrumentedFunction({
+                event,
+                func: (event) => this.workerMethods.processEvent(event),
+                statsKey: 'kafka_queue.single_event',
+                timeoutMessage: 'Still running plugins on event. Timeout warning after 30 sec!',
+            })
         }
 
         // ingest event
-
         if (processedEvent) {
-            const singleIngestionTimeout = timeoutGuard('After 30 seconds still ingesting event', {
-                event: JSON.stringify(processedEvent),
-            })
-            const singleIngestionTimer = new Date()
-            try {
-                await this.ingestEvent(processedEvent)
-            } catch (error) {
-                status.info('🔔', error)
-                Sentry.captureException(error)
-                throw error
-            } finally {
-                this.pluginsServer.statsd?.timing('kafka_queue.single_ingestion', singleIngestionTimer)
-                clearTimeout(singleIngestionTimeout)
-            }
+            await Promise.all([
+                this.runInstrumentedFunction({
+                    event,
+                    func: (event) => this.workerMethods.ingestEvent(event),
+                    statsKey: 'kafka_queue.single_ingestion',
+                    timeoutMessage: 'After 30 seconds still ingesting event',
+                }),
+                processedEvent.event === '$snapshot'
+                    ? this.runInstrumentedFunction({
+                          event,
+                          func: (event) => this.workerMethods.onSnapshot(event),
+                          statsKey: 'kafka_queue.single_on_snapshot',
+                          timeoutMessage: 'After 30 seconds still running onSnapshot',
+                      })
+                    : this.runInstrumentedFunction({
+                          event,
+                          func: (event) => this.workerMethods.onEvent(event),
+                          statsKey: 'kafka_queue.single_on_event',
+                          timeoutMessage: 'After 30 seconds still running onEvent',
+                      }),
+            ])
         }
 
         this.pluginsServer.statsd?.timing('kafka_queue.each_event', eachEventStartTimer)
@@ -135,6 +129,33 @@ export class KafkaQueue implements Queue {
             )
         } finally {
             this.pluginsServer.statsd?.timing('kafka_queue.each_batch', batchStartTimer)
+        }
+    }
+
+    private async runInstrumentedFunction({
+        timeoutMessage,
+        event,
+        func,
+        statsKey,
+    }: {
+        event: PluginEvent
+        timeoutMessage: string
+        statsKey: string
+        func: (event: PluginEvent) => Promise<any>
+    }): Promise<any> {
+        const timeout = timeoutGuard(timeoutMessage, {
+            event: JSON.stringify(event),
+        })
+        const timer = new Date()
+        try {
+            return await func(event)
+        } catch (error) {
+            status.info('🔔', error)
+            Sentry.captureException(error)
+            throw error
+        } finally {
+            this.pluginsServer.statsd?.timing(statsKey, timer)
+            clearTimeout(timeout)
         }
     }
 
