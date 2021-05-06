@@ -25,7 +25,7 @@ import { DB } from '../../utils/db/db'
 import { KafkaProducerWrapper } from '../../utils/db/kafka-producer-wrapper'
 import { elementsToString, personInitialAndUTMProperties, sanitizeEventName, timeoutGuard } from '../../utils/db/utils'
 import { status } from '../../utils/status'
-import { castTimestampOrNow, UUID, UUIDT } from '../../utils/utils'
+import { castTimestampOrNow, filterIncrementProperties, UUID, UUIDT } from '../../utils/utils'
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
@@ -415,19 +415,14 @@ export class EventsProcessor {
         properties = personInitialAndUTMProperties(properties)
 
         if (properties['$set'] || properties['$set_once'] || properties['$increment']) {
-            const incrementProperties: Record<string, number> = {}
-            for (const [key, val] of Object.entries(properties['$increment'] || {})) {
-                if (typeof val === 'number') {
-                    incrementProperties[key] = val
-                }
-            }
+            const filteredIncrementProperties = filterIncrementProperties(properties['$increment'])
 
             await this.updatePersonProperties(
                 teamId,
                 distinctId,
                 properties['$set'] || {},
                 properties['$set_once'] || {},
-                incrementProperties
+                filteredIncrementProperties
             )
         }
 

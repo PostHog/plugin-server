@@ -1556,6 +1556,52 @@ export const createProcessEventTests = (
         expect(person2.properties).toEqual({ a_prop: 347 })
     })
 
+    test('$increment increments numerical user properties or creates a new one', async () => {
+        await createPerson(server, team, ['distinct_id'])
+
+        await processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: 'some_event',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $set: { hello: 'world' },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        await processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: 'some_other_event',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $increment: { hello: 10000 }, // try to increment a string
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const [person] = await server.db.fetchPersons()
+        expect(await server.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+
+        // $increment doesn't update a prop that is not an integer
+        expect(person.properties).toEqual({ hello: 'world' })
+    })
+
     test('distinct_id wrong type (number)', async () => {
         await createPerson(server, team, ['asdfasdfasdf'])
         await processEvent(

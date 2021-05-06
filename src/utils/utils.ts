@@ -528,3 +528,19 @@ export function pluginConfigIdFromStack(
         }
     }
 }
+
+export function filterIncrementProperties(incrementProperties: unknown): Record<string, number> {
+    if (typeof incrementProperties !== 'object') {
+        return {} as Record<string, number>
+    }
+
+    const filteredIncrementProperties: Record<string, number> = {}
+
+    for (const [key, val] of Object.entries(incrementProperties || {})) {
+        if (typeof val === 'number' && Number.isInteger(val) && val < 2 ** 31 - 1) {
+            filteredIncrementProperties[key] = val
+        }
+    }
+
+    return filteredIncrementProperties
+}
