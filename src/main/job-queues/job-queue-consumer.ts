@@ -2,9 +2,10 @@ import Piscina from '@posthog/piscina'
 import * as Sentry from '@sentry/node'
 
 import { JobQueueConsumerControl, OnJobCallback, PluginsServer } from '../../types'
+import { killProcess } from '../../utils/kill'
 import { startRedlock } from '../../utils/redlock'
 import { status } from '../../utils/status'
-import { killProcess, logOrThrowJobQueueError } from '../../utils/utils'
+import { logOrThrowJobQueueError } from '../../utils/utils'
 import { pauseQueueIfWorkerFull } from '../ingestion-queues/queue'
 
 export const LOCKED_RESOURCE = 'plugin-server:locks:job-queue-consumer'
