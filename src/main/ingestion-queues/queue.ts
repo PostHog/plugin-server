@@ -6,6 +6,7 @@ import { PluginsServer, Queue, WorkerMethods } from '../../types'
 import { status } from '../../utils/status'
 import { sanitizeEvent, UUIDT } from '../../utils/utils'
 import { CeleryQueue } from './celery-queue'
+import { ingestEvent } from './ingest-event'
 import { KafkaQueue } from './kafka-queue'
 
 export function pauseQueueIfWorkerFull(
@@ -89,21 +90,8 @@ function startQueueRedis(server: PluginsServer, piscina: Piscina | undefined, wo
                 ...data,
             } as PluginEvent)
             try {
-                pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
-
-                // do not run processEvent on snapshots
-                const processedEvent = event.event === '$snapshot' ? event : await workerMethods.processEvent(event)
-
-                if (processedEvent) {
-                    pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
-
-                    await Promise.all([
-                        workerMethods.ingestEvent(processedEvent),
-                        processedEvent.event === '$snapshot'
-                            ? workerMethods.onSnapshot(processedEvent)
-                            : workerMethods.onEvent(processedEvent),
-                    ])
-                }
+                const checkAndPause = () => pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
+                await ingestEvent(server, workerMethods, event, checkAndPause)
             } catch (e) {
                 Sentry.captureException(e)
             }
