@@ -16,6 +16,7 @@ const { console: testConsole } = imports['test-utils/write-to-file']
 jest.mock('../../src/utils/status')
 jest.setTimeout(60000) // 60 sec timeout
 
+// TODO: merge these tests with clickhouse/e2e.test.ts
 describe('e2e postgres ingestion', () => {
     let server: PluginsServer
     let stopServer: () => Promise<void>
