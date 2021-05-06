@@ -59,20 +59,20 @@ export class KafkaQueue implements Queue {
         if (processedEvent) {
             await Promise.all([
                 this.runInstrumentedFunction({
-                    event,
+                    event: processedEvent,
                     func: (event) => this.workerMethods.ingestEvent(event),
                     statsKey: 'kafka_queue.single_ingestion',
                     timeoutMessage: 'After 30 seconds still ingesting event',
                 }),
                 processedEvent.event === '$snapshot'
                     ? this.runInstrumentedFunction({
-                          event,
+                          event: processedEvent,
                           func: (event) => this.workerMethods.onSnapshot(event),
                           statsKey: 'kafka_queue.single_on_snapshot',
                           timeoutMessage: 'After 30 seconds still running onSnapshot',
                       })
                     : this.runInstrumentedFunction({
-                          event,
+                          event: processedEvent,
                           func: (event) => this.workerMethods.onEvent(event),
                           statsKey: 'kafka_queue.single_on_event',
                           timeoutMessage: 'After 30 seconds still running onEvent',

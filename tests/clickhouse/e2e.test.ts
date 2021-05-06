@@ -35,6 +35,7 @@ describe('e2e clickhouse ingestion', () => {
     })
 
     beforeEach(async () => {
+        testConsole.reset()
         await resetTestDatabase(`
             import { console as testConsole } from 'test-utils/write-to-file'
             export async function processEvent (event) {
