@@ -9,7 +9,7 @@ import { Client } from '../../src/utils/celery/client'
 import { delay, UUIDT } from '../../src/utils/utils'
 import { ingestEvent } from '../../src/worker/ingestion/ingest-event'
 import { makePiscina } from '../../src/worker/piscina'
-import { runPlugins, runPluginsOnBatch, runPluginTask } from '../../src/worker/plugins/run'
+import { runPluginTask, runProcessEvent, runProcessEventBatch } from '../../src/worker/plugins/run'
 import { loadSchedule, setupPlugins } from '../../src/worker/plugins/setup'
 import { teardownPlugins } from '../../src/worker/plugins/teardown'
 import { createTaskRunner } from '../../src/worker/worker'
@@ -241,21 +241,23 @@ describe('createTaskRunner()', () => {
     })
 
     it('handles `processEvent` task', async () => {
-        mocked(runPlugins).mockReturnValue('runPlugins response' as any)
+        mocked(runProcessEvent).mockReturnValue('runProcessEvent response' as any)
 
-        expect(await taskRunner({ task: 'processEvent', args: { event: 'someEvent' } })).toEqual('runPlugins response')
+        expect(await taskRunner({ task: 'processEvent', args: { event: 'someEvent' } })).toEqual(
+            'runProcessEvent response'
+        )
 
-        expect(runPlugins).toHaveBeenCalledWith(server, 'someEvent')
+        expect(runProcessEvent).toHaveBeenCalledWith(server, 'someEvent')
     })
 
     it('handles `processEventBatch` task', async () => {
-        mocked(runPluginsOnBatch).mockReturnValue(['runPluginsOnBatch response'] as any)
+        mocked(runProcessEventBatch).mockReturnValue(['runProcessEventBatch response'] as any)
 
         expect(await taskRunner({ task: 'processEventBatch', args: { batch: 'someBatch' } })).toEqual([
-            'runPluginsOnBatch response',
+            'runProcessEventBatch response',
         ])
 
-        expect(runPluginsOnBatch).toHaveBeenCalledWith(server, 'someBatch')
+        expect(runProcessEventBatch).toHaveBeenCalledWith(server, 'someBatch')
     })
 
     it('handles `getPluginSchedule` task', async () => {
