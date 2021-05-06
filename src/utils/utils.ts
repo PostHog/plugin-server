@@ -452,10 +452,6 @@ export function createPostgresPool(
         })
 
     pgPool.on('error', handleError)
-    const handlePoolConnect = (client: PoolClient) => {
-        client.on('error', handleError)
-    }
-    pgPool.on('connect', handlePoolConnect)
 
     return pgPool
 }
