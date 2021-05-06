@@ -190,7 +190,7 @@ describe('queue logic', () => {
         await delay(5000)
 
         expect(pluginsServer.piscina.queueSize).toBe(0)
-        expect(pluginsServer.piscina.completed).toBe(baseCompleted + 4)
+        expect(pluginsServer.piscina.completed).toBe(baseCompleted + 2 * 3) // 2 x (process + on + ingest)
         expect(pluginsServer.queue.isPaused()).toBe(false)
 
         // 2 tasks * 2 threads = 4 active
@@ -217,7 +217,7 @@ describe('queue logic', () => {
         expect(pausedTimes).toBeGreaterThanOrEqual(10)
         expect(pluginsServer.queue.isPaused()).toBe(false)
         expect(pluginsServer.piscina.queueSize).toBe(0)
-        expect(pluginsServer.piscina.completed).toEqual(baseCompleted + 104)
+        expect(pluginsServer.piscina.completed).toEqual(baseCompleted + 156)
 
         const duration = pluginsServer.piscina.duration - startTime
         const expectedTimeMs = (50 / 4) * 1000
