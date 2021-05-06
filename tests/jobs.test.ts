@@ -143,7 +143,7 @@ describe('job queues', () => {
             })
 
             describe('invalid host/domain', () => {
-                test('crash', async () => {
+                test.skip('crash', async () => {
                     const config = await initTest(
                         {
                             JOB_QUEUES: 'graphile',
@@ -157,7 +157,7 @@ describe('job queues', () => {
                     expect(killMock).toHaveBeenCalledWith(process.pid, 'SIGTERM')
                 })
 
-                test.skip('no crash', async () => {
+                test('no crash', async () => {
                     const config = await initTest(
                         {
                             JOB_QUEUES: 'graphile',
