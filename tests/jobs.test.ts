@@ -3,16 +3,17 @@ import { LOCKED_RESOURCE } from '../src/main/job-queues/job-queue-consumer'
 import { ServerInstance, startPluginsServer } from '../src/main/pluginsServer'
 import { LogLevel, PluginsServerConfig } from '../src/types'
 import { createServer } from '../src/utils/db/server'
+import { killProcess } from '../src/utils/kill'
 import { delay } from '../src/utils/utils'
 import { makePiscina } from '../src/worker/piscina'
 import { createPosthog, DummyPostHog } from '../src/worker/vm/extensions/posthog'
 import { imports } from '../src/worker/vm/imports'
 import { resetGraphileSchema } from './helpers/graphile'
 import { pluginConfig39 } from './helpers/plugins'
-import { mockKill } from './helpers/process'
 import { resetTestDatabase } from './helpers/sql'
 
 jest.mock('../src/utils/db/sql')
+jest.mock('../src/utils/kill')
 jest.setTimeout(60000) // 60 sec timeout
 
 const { console: testConsole } = imports['test-utils/write-to-file']
@@ -58,8 +59,6 @@ async function waitForLogEntries(number: number) {
 }
 
 describe('job queues', () => {
-    const killMock = mockKill()
-
     let server: ServerInstance
     let posthog: DummyPostHog
 
@@ -143,7 +142,7 @@ describe('job queues', () => {
             })
 
             describe('invalid host/domain', () => {
-                test.skip('crash', async () => {
+                test('crash', async () => {
                     const config = await initTest(
                         {
                             JOB_QUEUES: 'graphile',
@@ -154,7 +153,7 @@ describe('job queues', () => {
                     )
                     server = await startPluginsServer(config, makePiscina)
                     await delay(5000)
-                    expect(killMock).toHaveBeenCalledWith(process.pid, 'SIGTERM')
+                    expect(killProcess).toHaveBeenCalled()
                 })
 
                 test('no crash', async () => {

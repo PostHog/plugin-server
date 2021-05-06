@@ -2,13 +2,14 @@ import * as Sentry from '@sentry/node'
 
 import { startPluginsServer } from '../src/main/pluginsServer'
 import { LogLevel } from '../src/types'
+import { killProcess } from '../src/utils/kill'
 import { delay } from '../src/utils/utils'
 import { makePiscina } from '../src/worker/piscina'
-import { mockKill } from './helpers/process'
 import { resetTestDatabase } from './helpers/sql'
 
 jest.mock('@sentry/node')
 jest.mock('../src/utils/db/sql')
+jest.mock('../src/utils/kill')
 jest.setTimeout(60000) // 60 sec timeout
 
 test('startPluginsServer', async () => {
@@ -30,8 +31,6 @@ test('startPluginsServer', async () => {
 })
 
 describe('plugin server staleness check', () => {
-    const killMock = mockKill()
-
     test('test if the server terminates', async () => {
         const testCode = `
             async function processEvent (event) {
@@ -51,7 +50,7 @@ describe('plugin server staleness check', () => {
 
         await delay(10000)
 
-        expect(killMock).toHaveBeenCalledWith(process.pid, 'SIGTERM')
+        expect(killProcess).toHaveBeenCalled()
 
         expect(Sentry.captureMessage).toHaveBeenCalledWith(
             `Plugin Server has not ingested events for over 5 seconds! Rebooting.`,
