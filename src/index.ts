@@ -1,5 +1,6 @@
 import { defaultConfig, formatConfigHelp } from './config/config'
 import { initApp } from './init'
+import { GraphileQueue } from './main/job-queues/graphile-queue'
 import { startPluginsServer } from './main/pluginsServer'
 import { Status } from './utils/status'
 import { makePiscina } from './worker/piscina'
@@ -11,6 +12,7 @@ enum AlternativeMode {
     Help = 'HELP',
     Version = 'VRSN',
     Idle = 'IDLE',
+    Migrate = 'MIGRATE',
 }
 
 let alternativeMode: AlternativeMode | undefined
@@ -18,6 +20,8 @@ if (argv.includes('--help') || argv.includes('-h')) {
     alternativeMode = AlternativeMode.Help
 } else if (argv.includes('--version') || argv.includes('-v')) {
     alternativeMode = AlternativeMode.Version
+} else if (argv.includes('--migrate')) {
+    alternativeMode = AlternativeMode.Migrate
 } else if (defaultConfig.PLUGIN_SERVER_IDLE) {
     alternativeMode = AlternativeMode.Idle
 }
@@ -38,6 +42,23 @@ switch (alternativeMode) {
             status.info('💤', 'Plugin server still disengaged with PLUGIN_SERVER_IDLE...')
         }, 30_000)
         break
+    case AlternativeMode.Migrate:
+        initApp(defaultConfig)
+        status.info(`🔨`, `Attemting to connect to graphile worker to run migrations`)
+        void (async function () {
+            try {
+                const graphile = new GraphileQueue(defaultConfig)
+                await graphile.migrate()
+                status.info(`🔨`, `Graphile migrations are now up to date!`)
+                await graphile.disconnectProducer()
+                process.exit(0)
+            } catch (error) {
+                status.error('🔴', 'Error running migrations for Graphile Worker!\n', error)
+                process.exit(1)
+            }
+        })()
+        break
+
     default:
         initApp(defaultConfig)
         void startPluginsServer(defaultConfig, makePiscina) // void the returned promise
