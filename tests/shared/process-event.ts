@@ -16,6 +16,7 @@ import {
 } from '../../src/types'
 import { createServer } from '../../src/utils/db/server'
 import { hashElements } from '../../src/utils/db/utils'
+import { posthog } from '../../src/utils/posthog'
 import { delay, UUIDT } from '../../src/utils/utils'
 import { EventsProcessor } from '../../src/worker/ingestion/process-event'
 import { createUserTeamAndOrganization, getFirstTeam, getTeams, onQuery, resetTestDatabase } from '../helpers/sql'
@@ -886,10 +887,8 @@ export const createProcessEventTests = (
             'testTag'
         )
 
-        eventsProcessor.posthog = {
-            identify: jest.fn((distinctId) => true),
-            capture: jest.fn((event, properties) => true),
-        } as any
+        posthog.capture = jest.fn() as any
+        posthog.identify = jest.fn() as any
 
         await processEvent(
             '2',
@@ -909,8 +908,8 @@ export const createProcessEventTests = (
             new UUIDT().toString()
         )
 
-        expect(eventsProcessor.posthog.identify).toHaveBeenCalledWith('plugin_test_user_distinct_id_1001')
-        expect(eventsProcessor.posthog.capture).toHaveBeenCalledWith('first team event ingested', {
+        expect(posthog.identify).toHaveBeenCalledWith('plugin_test_user_distinct_id_1001')
+        expect(posthog.capture).toHaveBeenCalledWith('first team event ingested', {
             team: team.uuid,
         })
 
