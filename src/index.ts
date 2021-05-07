@@ -43,13 +43,23 @@ switch (alternativeMode) {
         }, 30_000)
         break
     case AlternativeMode.Migrate:
+        const isGraphileEnabled = defaultConfig.JOB_QUEUES.split(',')
+            .map((s) => s.trim())
+            .includes('graphile')
+
+        if (!isGraphileEnabled) {
+            status.info('😔', 'Graphile job queues not enabled. Nothing to migrate.')
+            process.exit(0)
+        }
+
         initApp(defaultConfig)
-        status.info(`🔨`, `Attemting to connect to graphile worker to run migrations`)
+
+        status.info(`🔗`, `Attempting to connect to Graphile job queue to run migrations`)
         void (async function () {
             try {
                 const graphile = new GraphileQueue(defaultConfig)
                 await graphile.migrate()
-                status.info(`🔨`, `Graphile migrations are now up to date!`)
+                status.info(`✅`, `Graphile migrations are now up to date!`)
                 await graphile.disconnectProducer()
                 process.exit(0)
             } catch (error) {
