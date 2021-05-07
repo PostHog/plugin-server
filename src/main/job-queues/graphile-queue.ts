@@ -52,7 +52,7 @@ export class GraphileQueue implements JobQueue {
         if (!this.workerUtilsPromise) {
             this.workerUtilsPromise = makeWorkerUtils({
                 pgPool: this.producerPool as any,
-                schema: this.pluginsServer.JOB_QUEUE_GRAPHILE_SCHEMA,
+                schema: this.serverConfig.JOB_QUEUE_GRAPHILE_SCHEMA,
             })
         }
         return await this.workerUtilsPromise
@@ -99,7 +99,7 @@ export class GraphileQueue implements JobQueue {
                 this.runner = await run({
                     // graphile's types refer to a local node_modules version of Pool
                     pgPool: (this.consumerPool as Pool) as any,
-                    schema: this.pluginsServer.JOB_QUEUE_GRAPHILE_SCHEMA,
+                    schema: this.serverConfig.JOB_QUEUE_GRAPHILE_SCHEMA,
                     concurrency: 1,
                     // Install signal handlers for graceful shutdown on SIGINT, SIGTERM, etc
                     noHandleSignals: false,
