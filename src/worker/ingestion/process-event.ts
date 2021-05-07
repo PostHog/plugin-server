@@ -3,8 +3,6 @@ import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import equal from 'fast-deep-equal'
 import { DateTime, Duration } from 'luxon'
-import * as fetch from 'node-fetch'
-import { nodePostHog } from 'posthog-js-lite/dist/src/targets/node'
 
 import { Event as EventProto, IEvent } from '../../config/idl/protos'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from '../../config/kafka-topics'
@@ -15,7 +13,6 @@ import {
     PluginsServer,
     PostgresSessionRecordingEvent,
     SessionRecordingEvent,
-    Team,
     TeamId,
     TimestampFormat,
 } from '../../types'
@@ -23,6 +20,7 @@ import { Client } from '../../utils/celery/client'
 import { DB } from '../../utils/db/db'
 import { KafkaProducerWrapper } from '../../utils/db/kafka-producer-wrapper'
 import { elementsToString, personInitialAndUTMProperties, sanitizeEventName, timeoutGuard } from '../../utils/db/utils'
+import { posthog } from '../../utils/posthog'
 import { status } from '../../utils/status'
 import { castTimestampOrNow, UUID, UUIDT } from '../../utils/utils'
 import { PersonManager } from './person-manager'
@@ -34,7 +32,6 @@ export class EventsProcessor {
     clickhouse: ClickHouse | undefined
     kafkaProducer: KafkaProducerWrapper | undefined
     celery: Client
-    posthog: ReturnType<typeof nodePostHog>
     teamManager: TeamManager
     personManager: PersonManager
 
@@ -46,11 +43,6 @@ export class EventsProcessor {
         this.celery = new Client(pluginsServer.db, pluginsServer.CELERY_DEFAULT_QUEUE)
         this.teamManager = new TeamManager(pluginsServer.db)
         this.personManager = new PersonManager(pluginsServer)
-
-        this.posthog = nodePostHog('sTMFPsFhdP1Ssg', { fetch })
-        if (process.env.NODE_ENV === 'test') {
-            this.posthog.optOut()
-        }
     }
 
     public async processEvent(
@@ -381,7 +373,7 @@ export class EventsProcessor {
             properties['$ip'] = ip
         }
 
-        await this.teamManager.updateEventNamesAndProperties(teamId, event, properties, this.posthog)
+        await this.teamManager.updateEventNamesAndProperties(teamId, event, properties)
 
         if (await this.personManager.isNewPerson(this.db, teamId, distinctId)) {
             // Catch race condition where in between getting and creating, another request already created this user

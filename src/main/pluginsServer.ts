@@ -11,6 +11,7 @@ import { JobQueueConsumerControl, PluginsServer, PluginsServerConfig, Queue, Sch
 import { createServer } from '../utils/db/server'
 import { killProcess } from '../utils/kill'
 import { status } from '../utils/status'
+import { statusReport } from '../utils/status-report'
 import { createRedis, delay, getPiscinaStats } from '../utils/utils'
 import { startQueue } from './ingestion-queues/queue'
 import { startJobQueueConsumer } from './job-queues/job-queue-consumer'
@@ -76,6 +77,7 @@ export async function startPluginsServer(
         await pubSub?.quit()
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
+        statusReport.stopStatusReportSchedule()
         await jobQueueConsumer?.stop()
         await scheduleControl?.stopSchedule()
         await new Promise<void>((resolve, reject) =>
