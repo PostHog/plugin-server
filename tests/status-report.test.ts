@@ -26,24 +26,24 @@ describe('status report', () => {
             pluginTask_time_ms: 0,
             pluginTask_time_seconds: 0,
             processEvent_time_ms: 2000,
-            processEvent_time_seconds: 0.2,
+            processEvent_time_seconds: 2,
             team: 1,
             total_time_ms: 2000,
-            total_time_seconds: 0.2,
+            total_time_seconds: 2,
         })
 
         expect(posthog.capture).toHaveBeenNthCalledWith(2, '$plugin_running_duration', {
             onEvent_time_ms: 3000,
-            onEvent_time_seconds: 0.3,
+            onEvent_time_seconds: 3,
             onSnapshot_time_ms: 3000,
-            onSnapshot_time_seconds: 0.3,
+            onSnapshot_time_seconds: 3,
             pluginTask_time_ms: 0,
             pluginTask_time_seconds: 0,
             processEvent_time_ms: 0,
             processEvent_time_seconds: 0,
             team: 2,
             total_time_ms: 6000,
-            total_time_seconds: 0.6,
+            total_time_seconds: 6,
         })
     })
 })

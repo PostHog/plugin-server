@@ -24,7 +24,7 @@ class PluginDurationStats {
 
         for (const [entry, ms] of Object.entries(this)) {
             formattedStats[`${entry}_time_ms`] = ms
-            formattedStats[`${entry}_time_seconds`] = Math.round(ms / 10) / 1000
+            formattedStats[`${entry}_time_seconds`] = Math.round(ms / 10) / 100
         }
 
         return formattedStats
