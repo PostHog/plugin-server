@@ -473,4 +473,4 @@ export interface PropertyDefinitionType {
     team_id: number
 }
 
-export type PluginFunction = 'onEvent' | 'processEvent' | 'processEventBatch' | 'onSnapshot' | 'pluginTask'
+export type PluginFunction = 'onEvent' | 'processEvent' | 'onSnapshot' | 'pluginTask'

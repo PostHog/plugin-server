@@ -8,7 +8,6 @@ class PluginDurationStats {
     total: number
     onEvent: number
     processEvent: number
-    processEventBatch: number
     onSnapshot: number
     pluginTask: number
 
@@ -16,7 +15,6 @@ class PluginDurationStats {
         this.total = 0
         this.onEvent = 0
         this.processEvent = 0
-        this.processEventBatch = 0
         this.onSnapshot = 0
         this.pluginTask = 0
     }
