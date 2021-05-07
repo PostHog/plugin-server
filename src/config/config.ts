@@ -59,7 +59,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         DISTINCT_ID_LRU_SIZE: 10000,
         INTERNAL_MMDB_SERVER_PORT: 0,
         PLUGIN_SERVER_IDLE: false,
-        JOB_QUEUES: '',
+        JOB_QUEUES: 'graphile',
         JOB_QUEUE_GRAPHILE_URL: '',
         CRASH_IF_NO_PERSISTENT_JOB_QUEUE: false,
         STALENESS_RESTART_SECONDS: 0,
