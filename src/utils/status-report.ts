@@ -49,7 +49,7 @@ class StatusReport {
     private captureStatusReport(): void {
         for (const [teamId, pluginStats] of Object.entries(this.pluginDurationStatsPerTeam)) {
             posthog.capture('$plugin_running_duration', {
-                team: teamId,
+                team: Number(teamId),
                 ...pluginStats.formatStatsForReport(),
             })
         }
