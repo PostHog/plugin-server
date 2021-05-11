@@ -1644,7 +1644,6 @@ export const createProcessEventTests = (
         const [person] = await server.db.fetchPersons()
         expect(await server.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
 
-        // $increment doesn't update a prop that is not an integer
         expect(person.properties).toEqual({ a: 1, b: 2, c: 3, d: 4, e: 5 })
     })
 
