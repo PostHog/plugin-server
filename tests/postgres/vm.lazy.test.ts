@@ -12,6 +12,11 @@ jest.mock('../../src/utils/db/error')
 jest.mock('../../src/utils/status')
 jest.mock('../../src/utils/db/sql')
 
+const mockConfig = {
+    plugin_id: 60,
+    team_id: 2,
+}
+
 describe('LazyPluginVM', () => {
     const createVM = () => new LazyPluginVM()
     const mockServer: any = {
@@ -19,7 +24,7 @@ describe('LazyPluginVM', () => {
             createPluginLogEntry: jest.fn(),
         },
     }
-    const initializeVm = (vm: LazyPluginVM) => vm.initialize!(mockServer, { plugin_id: 60 } as any, '', 'some plugin')
+    const initializeVm = (vm: LazyPluginVM) => vm.initialize!(mockServer, mockConfig as any, '', 'some plugin')
 
     describe('VM creation succeeds', () => {
         const mockVM = {
@@ -55,9 +60,9 @@ describe('LazyPluginVM', () => {
             await vm.resolveInternalVm
 
             expect(status.info).toHaveBeenCalledWith('🔌', 'Loaded some plugin')
-            expect(clearError).toHaveBeenCalledWith(mockServer, { plugin_id: 60 })
+            expect(clearError).toHaveBeenCalledWith(mockServer, mockConfig)
             expect(mockServer.db.createPluginLogEntry).toHaveBeenCalledWith(
-                { plugin_id: 60 },
+                mockConfig,
                 PluginLogEntrySource.System,
                 PluginLogEntryType.Info,
                 expect.stringContaining('Plugin loaded'),
@@ -91,10 +96,10 @@ describe('LazyPluginVM', () => {
             } catch {}
 
             expect(status.warn).toHaveBeenCalledWith('⚠️', 'Failed to load some plugin')
-            expect(processError).toHaveBeenCalledWith(mockServer, { plugin_id: 60 }, error)
-            expect(disablePlugin).toHaveBeenCalledWith(mockServer, 39)
+            expect(processError).toHaveBeenCalledWith(mockServer, mockConfig, error)
+            expect(disablePlugin).toHaveBeenCalledWith(mockServer, 2, 60)
             expect(mockServer.db.createPluginLogEntry).toHaveBeenCalledWith(
-                { plugin_id: 60 },
+                mockConfig,
                 PluginLogEntrySource.System,
                 PluginLogEntryType.Error,
                 expect.stringContaining('Plugin failed to load'),
