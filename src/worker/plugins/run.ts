@@ -1,6 +1,6 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 
-import { PluginConfig, PluginFunction,PluginsServer, PluginTaskType, TeamId } from '../../types'
+import { PluginConfig, PluginFunction, PluginsServer, PluginTaskType, TeamId } from '../../types'
 import { processError } from '../../utils/db/error'
 import { statusReport } from '../../utils/status-report'
 
