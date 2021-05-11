@@ -395,10 +395,8 @@ export class DB {
         const propertyUpdates = Object.keys(propertiesToIncrement)
             .map((propName, index) => {
                 const sanitizedPropName = sanitizeSqlIdentifier(propName)
-                return `|| CASE WHEN (COALESCE(properties->>'${sanitizedPropName}', '0')~E'^\\\\d+$' AND (COALESCE(properties->>'${sanitizedPropName}','0')::float/(2^63-1) + $${
-                    index + 1
-                }::float/(2^63-1)) < 1)
-                    THEN jsonb_build_object('${sanitizedPropName}', (COALESCE(properties->>'${sanitizedPropName}','0')::bigint + $${
+                return `|| CASE WHEN (COALESCE(properties->>'${sanitizedPropName}', '0')~E'^\\\\d+$')
+                    THEN jsonb_build_object('${sanitizedPropName}', (COALESCE(properties->>'${sanitizedPropName}','0')::numeric + $${
                     index + 1
                 })) 
                     ELSE '{}'

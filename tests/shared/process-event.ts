@@ -1540,7 +1540,7 @@ export const createProcessEventTests = (
                 properties: {
                     token: team.api_token,
                     distinct_id: 'distinct_id',
-                    $increment: { a_prop: 247 },
+                    $increment: { a_prop: 247, b_prop: 2 ** 64 },
                 },
             } as any) as PluginEvent,
             team.id,
@@ -1553,31 +1553,7 @@ export const createProcessEventTests = (
         const [person2] = await server.db.fetchPersons()
 
         // adds to the existing prop value
-        expect(person2.properties).toEqual({ a_prop: 347 })
-
-        await processEvent(
-            'distinct_id',
-            '',
-            '',
-            ({
-                event: 'some_other_event',
-                properties: {
-                    token: team.api_token,
-                    distinct_id: 'distinct_id',
-                    $increment: { a_prop: 2 ** 63 - 2, b_prop: 25 },
-                },
-            } as any) as PluginEvent,
-            team.id,
-            now,
-            now,
-            new UUIDT().toString()
-        )
-
-        expect((await server.db.fetchEvents()).length).toBe(3)
-        const [person3] = await server.db.fetchPersons()
-
-        // Property that would overflow remains the same, others still update
-        expect(person3.properties).toEqual({ a_prop: 347, b_prop: 25 })
+        expect(person2.properties).toEqual({ a_prop: 347, b_prop: 2 ** 64 })
     })
 
     test('$increment does not increment non-numerical props', async () => {
@@ -1624,6 +1600,52 @@ export const createProcessEventTests = (
 
         // $increment doesn't update a prop that is not an integer
         expect(person.properties).toEqual({ hello: 'world' })
+    })
+
+    test('$increment does not increment non-integer numeric values', async () => {
+        await createPerson(server, team, ['distinct_id'])
+
+        await processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: 'some_other_event',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $increment: { a: 1, b: 2, c: 3, d: 4 },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        await processEvent(
+            'distinct_id',
+            '',
+            '',
+            ({
+                event: 'some_other_event',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $increment: { a: 1.2, b: NaN, c: Infinity, d: -1, e: 5 },
+                },
+            } as any) as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const [person] = await server.db.fetchPersons()
+        expect(await server.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+
+        // $increment doesn't update a prop that is not an integer
+        expect(person.properties).toEqual({ a: 1, b: 2, c: 3, d: 4, e: 5 })
     })
 
     test('distinct_id wrong type (number)', async () => {

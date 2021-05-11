@@ -240,7 +240,7 @@ export class EventsProcessor {
             )
         }
 
-        const updatedProperties: Properties = { ...propertiesOnce, ...personFound.properties, ...properties }
+        let updatedProperties: Properties = { ...propertiesOnce, ...personFound.properties, ...properties }
 
         let incrementedPropertiesQueryResult: QueryResult | null = null
 
@@ -258,9 +258,7 @@ export class EventsProcessor {
         }
 
         if (incrementedPropertiesQueryResult && incrementedPropertiesQueryResult.rows.length > 0) {
-            for (const [key, val] of Object.entries(incrementedPropertiesQueryResult.rows[0].properties)) {
-                updatedProperties[key] = val
-            }
+            updatedProperties = { ...updatedProperties, ...incrementedPropertiesQueryResult.rows[0].properties }
         }
 
         return await this.db.updatePerson(personFound, { properties: updatedProperties })
