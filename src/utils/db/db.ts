@@ -395,7 +395,7 @@ export class DB {
         const propertyUpdates = Object.keys(propertiesToIncrement)
             .map((propName, index) => {
                 const sanitizedPropName = sanitizeSqlIdentifier(propName)
-                return `|| CASE WHEN (COALESCE(properties->>'${sanitizedPropName}', '0')~E'^\\\\d+$')
+                return `|| CASE WHEN (COALESCE(properties->>'${sanitizedPropName}', '0')~E'^([-+])?[0-9\.]+$')
                     THEN jsonb_build_object('${sanitizedPropName}', (COALESCE(properties->>'${sanitizedPropName}','0')::numeric + $${
                     index + 1
                 })) 

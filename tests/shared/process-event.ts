@@ -1511,7 +1511,7 @@ export const createProcessEventTests = (
                 properties: {
                     token: team.api_token,
                     distinct_id: 'distinct_id',
-                    $increment: { a_prop: 100, non_numerical: '1' },
+                    $increment: { a: 100, b: 200, c: -100, d: 2 ** 64, non_numerical: '1' },
                 },
             } as any) as PluginEvent,
             team.id,
@@ -1523,13 +1523,13 @@ export const createProcessEventTests = (
         expect((await server.db.fetchEvents()).length).toBe(1)
 
         const [event] = await server.db.fetchEvents()
-        expect(event.properties['$increment']).toEqual({ a_prop: 100, non_numerical: '1' })
+        expect(event.properties['$increment']).toEqual({ a: 100, b: 200, c: -100, d: 2 ** 64, non_numerical: '1' })
 
         const [person] = await server.db.fetchPersons()
         expect(await server.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
 
         // creates numerical prop, ignores non-numerical values
-        expect(person.properties).toEqual({ a_prop: 100 })
+        expect(person.properties).toEqual({ a: 100, b: 200, c: -100, d: 2 ** 64 })
 
         await processEvent(
             'distinct_id',
@@ -1540,7 +1540,7 @@ export const createProcessEventTests = (
                 properties: {
                     token: team.api_token,
                     distinct_id: 'distinct_id',
-                    $increment: { a_prop: 247, b_prop: 2 ** 64 },
+                    $increment: { a: 247, b: -100, c: -568 },
                 },
             } as any) as PluginEvent,
             team.id,
@@ -1553,7 +1553,7 @@ export const createProcessEventTests = (
         const [person2] = await server.db.fetchPersons()
 
         // adds to the existing prop value
-        expect(person2.properties).toEqual({ a_prop: 347, b_prop: 2 ** 64 })
+        expect(person2.properties).toEqual({ a: 347, b: 100, c: -668, d: 2 ** 64 })
     })
 
     test('$increment does not increment non-numerical props', async () => {
@@ -1614,7 +1614,7 @@ export const createProcessEventTests = (
                 properties: {
                     token: team.api_token,
                     distinct_id: 'distinct_id',
-                    $increment: { a: 1, b: 2, c: 3, d: 4 },
+                    $increment: { a: 1, b: 2, c: 3 },
                 },
             } as any) as PluginEvent,
             team.id,
@@ -1632,7 +1632,7 @@ export const createProcessEventTests = (
                 properties: {
                     token: team.api_token,
                     distinct_id: 'distinct_id',
-                    $increment: { a: 1.2, b: NaN, c: Infinity, d: -1, e: 5 },
+                    $increment: { a: 1.2, b: NaN, c: Infinity, d: 4 },
                 },
             } as any) as PluginEvent,
             team.id,
@@ -1644,7 +1644,7 @@ export const createProcessEventTests = (
         const [person] = await server.db.fetchPersons()
         expect(await server.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
 
-        expect(person.properties).toEqual({ a: 1, b: 2, c: 3, d: 4, e: 5 })
+        expect(person.properties).toEqual({ a: 1, b: 2, c: 3, d: 4 })
     })
 
     test('distinct_id wrong type (number)', async () => {
