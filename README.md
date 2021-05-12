@@ -78,7 +78,7 @@ Courtesy of GitHub Actions.
 
 The story begins with `pluginServer.ts -> startPluginServer`, which is the main thread of the plugin server.
 
-This main thread spawns 4 worker threads, managed using Piscina. Each worker thread runs 10 tasks (Q: what are tasks? - TASKS_PER_WORKER - a Piscina setting)
+This main thread spawns 4 worker threads, managed using Piscina. Each worker thread runs 10 tasks.<sup>[1](#f1)</sup>
 
 ### The main thread
 
@@ -93,9 +93,8 @@ Let's talk about the main thread first. This has:
 4. `piscina`: this is the thread manager. `makePiscina` creates the manager, while `createWorker` creates the worker threads.
 
 5. `scheduleControl`: The scheduled job controller. Responsible for adding piscina tasks for scheduled jobs, when the time comes.
-   Q: the schedule information somehow makes it into `server.pluginSchedule`. Unsure how, yet.
-   Comes in `vm.ts -> createPluginConfigVM -> __tasks`.  
-   which is used here: `src/workers/plugins/setup.ts -> loadSchedule`. More about the vm internals in a bit.
+   The schedule information makes it into `server.pluginSchedule` via `vm.ts -> createPluginConfigVM -> __tasks`, which parses for `runEvery*` tasks, and
+   then used in `src/workers/plugins/setup.ts -> loadSchedule`. More about the vm internals in a bit.
 
 6. `jobQueueConsumer`: The internal job queue consumer. This enables retries, scheduling jobs in the future (once) (Note: this is the difference between `scheduleControl` and this internal `jobQueue`). While `scheduleControl` is triggered via `runEveryMinute`, `runEveryHour` tasks, the `jobQueueConsumer` deals with `meta.jobs.doX(event).runAt(new Date())`.
 
@@ -119,16 +118,9 @@ That's all for the main thread. Onto the workers now: It all begins with `worker
 
 What's new here is `setupPlugins` and `createTaskRunner`.
 
-1. `setupPlugins`: Does `loadPluginsFromDB` and then `loadPlugins` (which creates VMs lazily for each plugin)
+1. `setupPlugins`: Does `loadPluginsFromDB` and then `loadPlugins` (which creates VMs lazily for each plugin+team). TeamID represents a company using plugins, and each team can have it's own set of plugins enabled. The PluginConfig shows which team the config belongs to, the plugin to run, and the VM to run it in.
 
-Q: Why does the pluginConfig have a vm? How exactly does this orchestration work? Are VMs created on the fly? What's the meaning of a "plugin installation step"?
-Are these VMs persistent over lifetime of a thread? Do different threads have different VM setup (I hope not? doesn't make sense: I'd imagine every worker thread to have all plugins installed, so each VM on every thread is exactly the same, so every event can be processed on every worker).
-
-... Looks like every plugin gets its own VM, which persists till the worker is running.
-
-.. Hmm, also, there's multiple teams, each with their own configuration + set of enabled plugins. In that sense, it's probably a good idea to begin with a clean slate for each plugin+team id.
-
-2. `createTaskRunner`: There's some excellent wizardry happening here. `makePiscina`, runTask takes the arguments, which sets up the file to be run as `piscina.js` itself, using the `__filename` setup, returning `createWorker`, which is a function returning `createTaskRunner`, which is a [curried function](link), which given `{task, args}`, returns `workerTasks[task](server, args)`. These worker tasks are available in `src/worker/tasks.ts`.
+2. `createTaskRunner`: There's some excellent wizardry happening here. `makePiscina` of `piscina.js` sets up the workers to run the existing file itself (using `__filename` in the setup config, returning `createWorker()`. This `createWorker()` is a function returning `createTaskRunner`, which is a [curried function](https://javascript.info/currying-partials), which given `{task, args}`, returns `workerTasks[task](server, args)`. These worker tasks are available in `src/worker/tasks.ts`.
 
 ### Worker Lifecycle
 
@@ -139,6 +131,10 @@ Q: Where is teamID populated? At event creation time? (in posthog/posthog? row.p
 ### VM Internals
 
 TODO
+
+### End Notes
+
+<a name="f1">1</a>: What are tasks? - TASKS_PER_WORKER - a Piscina setting (https://github.com/piscinajs/piscina#constructor-new-piscinaoptions) -> concurrentTasksPerWorker
 
 ## Questions?
 
