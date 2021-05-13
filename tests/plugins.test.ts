@@ -219,7 +219,7 @@ test('plugin changing teamID throws error', async () => {
     expect(processError).toHaveBeenCalledWith(
         mockServer,
         pluginConfigs.get(39)!,
-        Error('Changing team IDs is an illegal operation'),
+        Error('Illegal Operation: Plugin tried to change teamID'),
         null
     )
 })
