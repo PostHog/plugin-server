@@ -9,6 +9,7 @@ import { runProcessEvent } from '../src/worker/plugins/run'
 import { loadSchedule, setupPlugins } from '../src/worker/plugins/setup'
 import {
     commonOrganizationId,
+    mockPluginSourceCode,
     mockPluginTempFolder,
     mockPluginWithArchive,
     plugin60,
@@ -16,7 +17,7 @@ import {
     pluginConfig39,
 } from './helpers/plugins'
 import { resetTestDatabase } from './helpers/sql'
-import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows } from './helpers/sqlMock'
+import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows, setPluginCapabilities } from './helpers/sqlMock'
 
 jest.mock('../src/utils/db/sql')
 jest.mock('../src/utils/status')
@@ -48,8 +49,11 @@ test('setupPlugins and runProcessEvent', async () => {
     expect(getPluginRows).toHaveBeenCalled()
     expect(getPluginAttachmentRows).toHaveBeenCalled()
     expect(getPluginConfigRows).toHaveBeenCalled()
+    expect(setPluginCapabilities).toHaveBeenCalled()
 
-    expect(Array.from(plugins.entries())).toEqual([[60, plugin60]])
+    expect(Array.from(plugins.entries())).toEqual([
+        [60, { ...plugin60, capabilities: ['processEvent', 'processEventBatch'] }],
+    ])
     expect(Array.from(pluginConfigs.keys())).toEqual([39])
 
     const pluginConfig = pluginConfigs.get(39)!
@@ -443,6 +447,92 @@ test('plugin config order', async () => {
 
     const returnedEvent2 = await runProcessEvent(mockServer, { ...event, properties: { ...event.properties } })
     expect(returnedEvent2!.properties!.plugins).toEqual([61, 60, 62])
+})
+
+test('plugin with archive loads capabilities', async () => {
+    getPluginRows.mockReturnValueOnce([
+        mockPluginWithArchive(`
+            function setupPlugin (meta) { meta.global.key = 'value' }
+            function processEvent (event, meta) { event.properties={"x": 1}; return event }
+        `),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(mockServer)
+    const { pluginConfigs } = mockServer
+
+    const pluginConfig = pluginConfigs.get(39)!
+    expect(pluginConfig.plugin!.capabilities!.sort()).toEqual(['processEvent', 'processEventBatch', 'setupPlugin'])
+})
+
+test('plugin with archive loads all capabilities, no random caps', async () => {
+    getPluginRows.mockReturnValueOnce([
+        mockPluginWithArchive(`
+            function processEvent (event, meta) { event.properties={"x": 1}; return event }
+            function randomFunction (event, meta) { return event}
+            function onEvent (event, meta) { return event }
+
+            function runEveryHour(meta) {console.log('1')}
+
+            export const jobs = {
+                x: (event, meta) => console.log(event)
+            }
+        `),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(mockServer)
+    const { pluginConfigs } = mockServer
+
+    const pluginConfig = pluginConfigs.get(39)!
+    expect(pluginConfig.plugin!.capabilities!.sort()).toEqual([
+        'onEvent',
+        'processEvent',
+        'processEventBatch',
+        'runEveryHour',
+        'jobs',
+    ])
+})
+
+test('plugin with source file loads capabilities', async () => {
+    const [plugin, unlink] = mockPluginTempFolder(`
+        function processEvent (event, meta) { event.properties={"x": 1}; return event }
+        function randomFunction (event, meta) { return event}
+        function onEvent (event, meta) { return event }
+    `)
+
+    getPluginRows.mockReturnValueOnce([plugin])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(mockServer)
+    const { pluginConfigs } = mockServer
+
+    const pluginConfig = pluginConfigs.get(39)!
+    expect(pluginConfig.plugin!.capabilities!.sort()).toEqual(['onEvent', 'processEvent', 'processEventBatch'])
+
+    unlink()
+})
+
+test('plugin with source code loads capabilities', async () => {
+    const source_code = `
+        function processEvent (event, meta) { event.properties={"x": 1}; return event }
+        function randomFunction (event, meta) { return event}
+        function onSnapshot (event, meta) { return event }
+    `
+    getPluginRows.mockReturnValueOnce([mockPluginSourceCode(source_code)])
+
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(mockServer)
+    const { pluginConfigs } = mockServer
+
+    const pluginConfig = pluginConfigs.get(39)!
+    console.log(pluginConfig.plugin!.capabilities!.sort())
+    expect(pluginConfig.plugin!.capabilities!.sort()).toEqual(['onSnapshot', 'processEvent', 'processEventBatch'])
 })
 
 test('reloading plugins after config changes', async () => {

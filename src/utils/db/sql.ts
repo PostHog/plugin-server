@@ -56,6 +56,7 @@ export async function setPluginCapabilities(
     pluginConfig: PluginConfig,
     capabilities: string[]
 ): Promise<void> {
+    console.log('Setting capabilities', capabilities, pluginConfig)
     // see https://github.com/brianc/node-postgres/issues/442 for why stringify
     await server.db.postgresQuery(
         'UPDATE posthog_plugin SET capabilities = ($1) WHERE id = $2',

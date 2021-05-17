@@ -161,6 +161,7 @@ export interface Plugin {
     from_web?: boolean
     created_at: string
     updated_at: string
+    capabilities?: string[]
 }
 
 export interface PluginConfig {

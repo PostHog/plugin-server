@@ -124,15 +124,11 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
         }
     }
 
-    // TODO: this probably shouldn't be here, and a catch-all "jobs" capability
-    // instead
-    if (tasks?.job) {
-        for (const [key, value] of Object.entries(tasks.job)) {
-            if (value) {
-                capabilities.push(key)
-            }
-        }
+    // TODO: Is a job a valid capability?
+    if (tasks?.job && Object.keys(tasks.job).length > 0) {
+        capabilities.push('jobs')
     }
 
     await setPluginCapabilities(server, pluginConfig, capabilities)
+    pluginConfig.plugin!.capabilities = capabilities
 }
