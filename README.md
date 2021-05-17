@@ -132,6 +132,10 @@ Q: Where is teamID populated? At event creation time? (in posthog/posthog? row.p
 
 TODO
 
+#### How VM Extensions Work
+
+TODO
+
 ### End Notes
 
 <a name="f1">1</a>: What are tasks? - TASKS_PER_WORKER - a Piscina setting (https://github.com/piscinajs/piscina#constructor-new-piscinaoptions) -> concurrentTasksPerWorker

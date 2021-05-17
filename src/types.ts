@@ -253,13 +253,13 @@ export type WorkerMethods = {
 export interface PluginConfigVMReponse {
     vm: VM
     methods: {
-        setupPlugin: () => Promise<void>
-        teardownPlugin: () => Promise<void>
-        onEvent: (event: PluginEvent) => Promise<void>
-        onSnapshot: (event: PluginEvent) => Promise<void>
-        processEvent: (event: PluginEvent) => Promise<PluginEvent>
+        setupPlugin: () => Promise<void> | undefined
+        teardownPlugin: () => Promise<void> | undefined
+        onEvent: (event: PluginEvent) => Promise<void> | undefined
+        onSnapshot: (event: PluginEvent) => Promise<void> | undefined
+        processEvent: (event: PluginEvent) => Promise<PluginEvent> | undefined
         // DEPRECATED
-        processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
+        processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]> | undefined
     }
     tasks: Record<PluginTaskType, Record<string, PluginTask>>
 }

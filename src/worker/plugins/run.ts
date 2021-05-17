@@ -58,7 +58,7 @@ export async function runProcessEvent(server: PluginsServer, event: PluginEvent)
 
             try {
                 returnedEvent = (await processEvent(returnedEvent)) || null
-                if (returnedEvent.team_id != teamId) {
+                if (returnedEvent?.team_id != teamId) {
                     returnedEvent = null // don't try to ingest events with modified teamIDs
                     throw new Error('Illegal Operation: Plugin tried to change teamID')
                 }

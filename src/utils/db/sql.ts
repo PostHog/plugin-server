@@ -51,6 +51,26 @@ export async function getPluginConfigRows(server: PluginsServer): Promise<Plugin
     return rows
 }
 
+export async function setPluginCapabilities(
+    server: PluginsServer,
+    pluginConfig: PluginConfig,
+    capabilities: string[]
+): Promise<void> {
+    // see https://github.com/brianc/node-postgres/issues/442 for why stringify
+    await server.db.postgresQuery(
+        'UPDATE posthog_plugin SET capabilities = ($1) WHERE id = $2',
+        [JSON.stringify(capabilities), pluginConfig.plugin_id],
+        'setPluginCapabilities'
+    )
+    await server.db.createPluginLogEntry(
+        pluginConfig,
+        PluginLogEntrySource.System,
+        PluginLogEntryType.Info,
+        `Set plugin capabilities (instance ID ${server.instanceId}).`,
+        server.instanceId
+    )
+}
+
 export async function setError(
     server: PluginsServer,
     pluginError: PluginError | null,
