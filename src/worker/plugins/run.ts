@@ -58,10 +58,6 @@ export async function runProcessEvent(server: PluginsServer, event: PluginEvent)
 
             try {
                 returnedEvent = (await processEvent(returnedEvent)) || null
-                if (returnedEvent.team_id != teamId) {
-                    returnedEvent = null // don't try to ingest events with modified teamIDs
-                    throw new Error('Illegal Operation: Plugin tried to change teamID')
-                }
                 pluginsSucceeded.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
             } catch (error) {
                 await processError(server, pluginConfig, error, returnedEvent)
@@ -79,9 +75,14 @@ export async function runProcessEvent(server: PluginsServer, event: PluginEvent)
         }
     }
 
+    // Ensure that team ID stays unmodified
+    if (returnedEvent && typeof returnedEvent == 'object') {
+        returnedEvent.team_id = teamId
+    }
+
     if (pluginsSucceeded.length > 0 || pluginsFailed.length > 0) {
-        event.properties = {
-            ...event.properties,
+        returnedEvent.properties = {
+            ...returnedEvent.properties,
             $plugins_succeeded: pluginsSucceeded,
             $plugins_failed: pluginsFailed,
         }
@@ -130,6 +131,10 @@ export async function runProcessEventBatch(server: PluginsServer, batch: PluginE
         }
 
         for (const event of returnedEvents) {
+            // Ensure that team ID stays unmodified
+            if (event && typeof event == 'object') {
+                event.team_id = teamId
+            }
             if (event && (pluginsSucceeded.length > 0 || pluginsFailed.length > 0)) {
                 event.properties = {
                     ...event.properties,

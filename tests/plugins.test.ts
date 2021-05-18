@@ -5,7 +5,7 @@ import { LogLevel, PluginsServer, PluginTaskType } from '../src/types'
 import { clearError, processError } from '../src/utils/db/error'
 import { createServer } from '../src/utils/db/server'
 import { loadPlugin } from '../src/worker/plugins/loadPlugin'
-import { runProcessEvent } from '../src/worker/plugins/run'
+import { runProcessEvent, runProcessEventBatch } from '../src/worker/plugins/run'
 import { loadSchedule, setupPlugins } from '../src/worker/plugins/setup'
 import {
     commonOrganizationId,
@@ -196,12 +196,13 @@ test('local plugin with broken index.js does not do much', async () => {
     unlink()
 })
 
-test('plugin changing teamID throws error', async () => {
+test('plugin cannot change team ID (single)', async () => {
     getPluginRows.mockReturnValueOnce([
         mockPluginWithArchive(`
-            function processEvent (event, meta) { 
+            function processEvent (event, meta) {
                 event.team_id = 400
-                return event }
+                return event
+            }
         `),
     ])
 
@@ -209,27 +210,20 @@ test('plugin changing teamID throws error', async () => {
     getPluginAttachmentRows.mockReturnValueOnce([])
 
     await setupPlugins(mockServer)
-    const { pluginConfigs } = mockServer
 
-    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
-    const returnedEvent = await runProcessEvent(mockServer, event)
+    const originalEvent = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
+    const returnedEvent = await runProcessEvent(mockServer, originalEvent)
 
-    expect(returnedEvent).toEqual(null)
-
-    expect(processError).toHaveBeenCalledWith(
-        mockServer,
-        pluginConfigs.get(39)!,
-        Error('Illegal Operation: Plugin tried to change teamID'),
-        null
-    )
+    expect(returnedEvent!.team_id).toEqual(2)
 })
 
-test('plugin changing teamID prevents ingestion', async () => {
+test('plugin cannot change team ID (batch)', async () => {
     getPluginRows.mockReturnValueOnce([
         mockPluginWithArchive(`
-            function processEvent (event, meta) { 
-                event.team_id = 400
-                return event }
+            function processEventBatch (events, meta) {
+                events[0].team_id = 400
+                return event
+            }
         `),
     ])
 
@@ -238,10 +232,10 @@ test('plugin changing teamID prevents ingestion', async () => {
 
     await setupPlugins(mockServer)
 
-    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
-    const returnedEvent = await runProcessEvent(mockServer, event)
+    const originalEvent = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
+    const returnedEvents = await runProcessEventBatch(mockServer, [originalEvent])
 
-    expect(returnedEvent).toEqual(null)
+    expect(returnedEvents[0]!.team_id).toEqual(2)
 })
 
 test('plugin throwing error does not prevent ingestion and failure is noted in event', async () => {
