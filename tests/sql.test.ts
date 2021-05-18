@@ -152,7 +152,7 @@ describe('disablePlugin', () => {
 
         await disablePlugin(server, 39)
         expect(server.db.postgresQuery).toHaveBeenCalledWith(
-            `UPDATE posthog_pluginconfig SET enabled='f' WHERE team_id=$1 AND plugin_id=$2 AND enabled='t'`,
+            `UPDATE posthog_pluginconfig SET enabled='f' WHERE id=$1 AND enabled='t'`,
             [39],
             'disablePlugin'
         )
