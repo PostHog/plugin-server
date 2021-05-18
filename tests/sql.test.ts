@@ -149,10 +149,10 @@ describe('disablePlugin', () => {
     test('disablePlugin query builds correctly', async () => {
         server.db.postgresQuery = jest.fn() as any
 
-        await disablePlugin(server, 2, 60)
+        await disablePlugin(server, 39)
         expect(server.db.postgresQuery).toHaveBeenCalledWith(
             `UPDATE posthog_pluginconfig SET enabled='f' WHERE team_id=$1 AND plugin_id=$2 AND enabled='t'`,
-            [2, 60],
+            [39],
             'disablePlugin'
         )
     })
@@ -162,7 +162,7 @@ describe('disablePlugin', () => {
         expect(rowsBefore[0].plugin_id).toEqual(60)
         expect(rowsBefore[0].enabled).toEqual(true)
 
-        await disablePlugin(server, 2, 60)
+        await disablePlugin(server, 39)
 
         const rowsAfter = await getPluginConfigRows(server)
         expect(rowsAfter).toEqual([])
