@@ -52,7 +52,13 @@ test('setupPlugins and runProcessEvent', async () => {
     expect(setPluginCapabilities).toHaveBeenCalled()
 
     expect(Array.from(plugins.entries())).toEqual([
-        [60, { ...plugin60, capabilities: ['processEvent', 'processEventBatch'] }],
+        [
+            60,
+            {
+                ...plugin60,
+                capabilities: { jobs: [], scheduled_tasks: [], methods: ['processEvent', 'processEventBatch'] },
+            },
+        ],
     ])
     expect(Array.from(pluginConfigs.keys())).toEqual([39])
 
@@ -463,7 +469,13 @@ test('plugin with archive loads capabilities', async () => {
     const { pluginConfigs } = mockServer
 
     const pluginConfig = pluginConfigs.get(39)!
-    expect(pluginConfig.plugin!.capabilities!.sort()).toEqual(['processEvent', 'processEventBatch', 'setupPlugin'])
+    expect(pluginConfig.plugin!.capabilities!.methods.sort()).toEqual([
+        'processEvent',
+        'processEventBatch',
+        'setupPlugin',
+    ])
+    expect(pluginConfig.plugin!.capabilities!.jobs).toHaveLength(0)
+    expect(pluginConfig.plugin!.capabilities!.scheduled_tasks).toHaveLength(0)
 })
 
 test('plugin with archive loads all capabilities, no random caps', async () => {
@@ -487,13 +499,9 @@ test('plugin with archive loads all capabilities, no random caps', async () => {
     const { pluginConfigs } = mockServer
 
     const pluginConfig = pluginConfigs.get(39)!
-    expect(pluginConfig.plugin!.capabilities!.sort()).toEqual([
-        'onEvent',
-        'processEvent',
-        'processEventBatch',
-        'runEveryHour',
-        'jobs',
-    ])
+    expect(pluginConfig.plugin!.capabilities!.methods.sort()).toEqual(['onEvent', 'processEvent', 'processEventBatch'])
+    expect(pluginConfig.plugin!.capabilities!.jobs).toEqual(['x'])
+    expect(pluginConfig.plugin!.capabilities!.scheduled_tasks).toEqual(['runEveryHour'])
 })
 
 test('plugin with source file loads capabilities', async () => {
@@ -511,7 +519,9 @@ test('plugin with source file loads capabilities', async () => {
     const { pluginConfigs } = mockServer
 
     const pluginConfig = pluginConfigs.get(39)!
-    expect(pluginConfig.plugin!.capabilities!.sort()).toEqual(['onEvent', 'processEvent', 'processEventBatch'])
+    expect(pluginConfig.plugin!.capabilities!.methods.sort()).toEqual(['onEvent', 'processEvent', 'processEventBatch'])
+    expect(pluginConfig.plugin!.capabilities!.jobs).toEqual([])
+    expect(pluginConfig.plugin!.capabilities!.scheduled_tasks).toEqual([])
 
     unlink()
 })
@@ -531,8 +541,14 @@ test('plugin with source code loads capabilities', async () => {
     const { pluginConfigs } = mockServer
 
     const pluginConfig = pluginConfigs.get(39)!
-    console.log(pluginConfig.plugin!.capabilities!.sort())
-    expect(pluginConfig.plugin!.capabilities!.sort()).toEqual(['onSnapshot', 'processEvent', 'processEventBatch'])
+
+    expect(pluginConfig.plugin!.capabilities!.methods.sort()).toEqual([
+        'onSnapshot',
+        'processEvent',
+        'processEventBatch',
+    ])
+    expect(pluginConfig.plugin!.capabilities!.jobs).toEqual([])
+    expect(pluginConfig.plugin!.capabilities!.scheduled_tasks).toEqual([])
 })
 
 test('reloading plugins after config changes', async () => {

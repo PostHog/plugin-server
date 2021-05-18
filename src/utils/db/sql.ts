@@ -1,4 +1,5 @@
 import {
+    Capabilities,
     Plugin,
     PluginAttachmentDB,
     PluginConfig,
@@ -54,13 +55,13 @@ export async function getPluginConfigRows(server: PluginsServer): Promise<Plugin
 export async function setPluginCapabilities(
     server: PluginsServer,
     pluginConfig: PluginConfig,
-    capabilities: string[]
+    capabilities: Capabilities
 ): Promise<void> {
     console.log('Setting capabilities', capabilities, pluginConfig)
     // see https://github.com/brianc/node-postgres/issues/442 for why stringify
     await server.db.postgresQuery(
         'UPDATE posthog_plugin SET capabilities = ($1) WHERE id = $2',
-        [JSON.stringify(capabilities), pluginConfig.plugin_id],
+        [capabilities, pluginConfig.plugin_id],
         'setPluginCapabilities'
     )
     await server.db.createPluginLogEntry(

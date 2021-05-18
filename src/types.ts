@@ -161,7 +161,13 @@ export interface Plugin {
     from_web?: boolean
     created_at: string
     updated_at: string
-    capabilities?: string[]
+    capabilities?: Capabilities
+}
+
+export interface Capabilities {
+    jobs: string[]
+    scheduled_tasks: string[]
+    methods: string[]
 }
 
 export interface PluginConfig {

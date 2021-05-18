@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
-import { PluginConfig, PluginJsonConfig, PluginsServer } from '../../types'
+import { Capabilities, PluginConfig, PluginJsonConfig, PluginsServer } from '../../types'
 import { processError } from '../../utils/db/error'
 import { setPluginCapabilities } from '../../utils/db/sql'
 import { getFileFromArchive, pluginDigest } from '../../utils/utils'
@@ -103,7 +103,7 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
     // infer on load implies there's no lazy loading, but all workers get
     // these properties loaded
     const vm = await pluginConfig.vm?.resolveInternalVm
-    const capabilities: string[] = []
+    const capabilities: Capabilities = { scheduled_tasks: [], jobs: [], methods: [] }
 
     const tasks = vm?.tasks
     const methods = vm?.methods
@@ -111,7 +111,7 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
     if (methods) {
         for (const [key, value] of Object.entries(methods)) {
             if (value !== undefined) {
-                capabilities.push(key)
+                capabilities.methods.push(key)
             }
         }
     }
@@ -119,14 +119,17 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
     if (tasks?.schedule) {
         for (const [key, value] of Object.entries(tasks.schedule)) {
             if (value) {
-                capabilities.push(key)
+                capabilities.scheduled_tasks.push(key)
             }
         }
     }
 
-    // TODO: Is a job a valid capability?
-    if (tasks?.job && Object.keys(tasks.job).length > 0) {
-        capabilities.push('jobs')
+    if (tasks?.job) {
+        for (const [key, value] of Object.entries(tasks.job)) {
+            if (value) {
+                capabilities.jobs.push(key)
+            }
+        }
     }
 
     await setPluginCapabilities(server, pluginConfig, capabilities)
