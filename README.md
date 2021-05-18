@@ -78,7 +78,7 @@ Courtesy of GitHub Actions.
 
 The story begins with `pluginServer.ts -> startPluginServer`, which is the main thread of the plugin server.
 
-This main thread spawns 4 worker threads, managed using Piscina. Each worker thread runs 10 tasks.<sup>[1](#f1)</sup>
+This main thread spawns 4 worker threads, managed using Piscina. Each worker thread runs 10 tasks in parallel.<sup>[1](#f1)</sup>
 
 ### The main thread
 
@@ -86,19 +86,22 @@ Let's talk about the main thread first. This has:
 
 1. `pubSub`: a Redis powered pubSub mechanism for reloading plugins whenever a message is published by the main PostHog app.
 
-2. `server`: sets up connections to required DBs and queues(clickhouse, Kafka, Postgres, Redis), via `server.ts -> createServer`. This is a shared setup between the main and worker threads
+2. `server`: sets up connections to required DBs and queues (clickhouse, Kafka, Postgres, Redis), via `server.ts -> createServer`. This is a shared setup between the main and worker threads.
 
 3. `fastifyInstance`: sets up a web server. Unused for now, but may be used for enabling webhooks in the future.
 
-4. `piscina`: this is the thread manager. `makePiscina` creates the manager, while `createWorker` creates the worker threads.
+4. `piscina`: this is the worker thread pool. `makePiscina` creates the manager, while `createWorker` creates the worker threads.
 
 5. `scheduleControl`: The scheduled job controller. Responsible for adding piscina tasks for scheduled jobs, when the time comes.
    The schedule information makes it into `server.pluginSchedule` via `vm.ts -> createPluginConfigVM -> __tasks`, which parses for `runEvery*` tasks, and
    then used in `src/workers/plugins/setup.ts -> loadSchedule`. More about the vm internals in a bit.
 
-6. `jobQueueConsumer`: The internal job queue consumer. This enables retries, scheduling jobs in the future (once) (Note: this is the difference between `scheduleControl` and this internal `jobQueue`). While `scheduleControl` is triggered via `runEveryMinute`, `runEveryHour` tasks, the `jobQueueConsumer` deals with `meta.jobs.doX(event).runAt(new Date())`.
+    Scheduled tasks are controlled with [Redlock](https://redis.io/topics/distlock) (redis-based distributed lock), and run on only one plugin server instance in the entire cluster.
 
-    Enqueuing jobs is managed by `job-queue-manager.ts`, which is backed by a Graphile-worker (`graphile-queue.ts`)
+6. `jobQueueConsumer`: The internal job queue consumer. This enables retries, scheduling jobs in the future (once) (Note: this is the difference between `scheduleControl` and this internal `jobQueue`). While `scheduleControl` is triggered via `runEveryMinute`, `runEveryHour` tasks, the `jobQueueConsumer` deals with `meta.jobs.doX(event).runAt(new Date())`.
+   The job queue consumer is also controlled with [Redlock](https://redis.io/topics/distlock), and runs on only one plugin server instance in the entire cluster.
+
+    Jobs are enqueued by `job-queue-manager.ts`, which is backed by Postgres-based [Graphile-worker](https://github.com/graphile/worker) (`graphile-queue.ts`)
 
 7. `queue`: Wait, another queue?
 
@@ -118,15 +121,15 @@ That's all for the main thread. Onto the workers now: It all begins with `worker
 
 What's new here is `setupPlugins` and `createTaskRunner`.
 
-1. `setupPlugins`: Does `loadPluginsFromDB` and then `loadPlugins` (which creates VMs lazily for each plugin+team). TeamID represents a company using plugins, and each team can have it's own set of plugins enabled. The PluginConfig shows which team the config belongs to, the plugin to run, and the VM to run it in.
+1. `setupPlugins`: Does `loadPluginsFromDB` and then `loadPlugins` (which creates VMs lazily for each plugin+team). `team_id` represents a company using plugins, and each team can have its own set of plugins enabled. The PluginConfig shows which team the config belongs to, the plugin to run, and the VM to run it in.
 
 2. `createTaskRunner`: There's some excellent wizardry happening here. `makePiscina` of `piscina.js` sets up the workers to run the existing file itself (using `__filename` in the setup config, returning `createWorker()`. This `createWorker()` is a function returning `createTaskRunner`, which is a [curried function](https://javascript.info/currying-partials), which given `{task, args}`, returns `workerTasks[task](server, args)`. These worker tasks are available in `src/worker/tasks.ts`.
 
 ### Worker Lifecycle
 
-TODO: what happens with getPLuginRows, getPluginConfigRows and SetupPlugins.
+TODO: what happens with getPluginRows, getPluginConfigRows and SetupPlugins.
 
-Q: Where is teamID populated? At event creation time? (in posthog/posthog? row.pk)
+Q: Where is `team_id` populated? At event creation time? (in posthog/posthog? row.pk)
 
 ### VM Internals
 
