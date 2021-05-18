@@ -15,6 +15,7 @@ jest.mock('../../src/utils/db/sql')
 const mockConfig = {
     plugin_id: 60,
     team_id: 2,
+    id: 39,
 }
 
 describe('LazyPluginVM', () => {
