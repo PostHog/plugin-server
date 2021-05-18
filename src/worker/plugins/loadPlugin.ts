@@ -6,7 +6,11 @@ import { processError } from '../../utils/db/error'
 import { setPluginCapabilities } from '../../utils/db/sql'
 import { getFileFromArchive, pluginDigest } from '../../utils/utils'
 
-export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Promise<boolean> {
+export async function loadPlugin(
+    server: PluginsServer,
+    pluginConfig: PluginConfig,
+    prevConfig?: PluginConfig
+): Promise<boolean> {
     const { plugin } = pluginConfig
 
     if (!plugin) {
@@ -54,7 +58,7 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
                 indexJs,
                 `local ${pluginDigest(plugin)} from "${pluginPath}"!`
             )
-            await inferPluginCapabilities(server, pluginConfig)
+            await inferPluginCapabilities(server, pluginConfig, prevConfig)
             return true
         } else if (plugin.archive) {
             let config: PluginJsonConfig = {}
@@ -74,7 +78,7 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
 
             if (indexJs) {
                 void pluginConfig.vm?.initialize!(server, pluginConfig, indexJs, pluginDigest(plugin))
-                await inferPluginCapabilities(server, pluginConfig)
+                await inferPluginCapabilities(server, pluginConfig, prevConfig)
                 return true
             } else {
                 pluginConfig.vm?.failInitialization!()
@@ -82,7 +86,7 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
             }
         } else if (plugin.plugin_type === 'source' && plugin.source) {
             void pluginConfig.vm?.initialize!(server, pluginConfig, plugin.source, pluginDigest(plugin))
-            await inferPluginCapabilities(server, pluginConfig)
+            await inferPluginCapabilities(server, pluginConfig, prevConfig)
             return true
         } else {
             pluginConfig.vm?.failInitialization!()
@@ -99,7 +103,7 @@ export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConf
     return false
 }
 
-async function inferPluginCapabilities(server: PluginsServer, pluginConfig: PluginConfig) {
+async function inferPluginCapabilities(server: PluginsServer, pluginConfig: PluginConfig, prevConfig?: PluginConfig) {
     // infer on load implies there's no lazy loading, but all workers get
     // these properties loaded
     const vm = await pluginConfig.vm?.resolveInternalVm
@@ -111,7 +115,7 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
     if (methods) {
         for (const [key, value] of Object.entries(methods)) {
             if (value !== undefined) {
-                capabilities.methods.push(key)
+                capabilities.methods!.push(key)
             }
         }
     }
@@ -119,7 +123,7 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
     if (tasks?.schedule) {
         for (const [key, value] of Object.entries(tasks.schedule)) {
             if (value) {
-                capabilities.scheduled_tasks.push(key)
+                capabilities.scheduled_tasks!.push(key)
             }
         }
     }
@@ -127,11 +131,22 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
     if (tasks?.job) {
         for (const [key, value] of Object.entries(tasks.job)) {
             if (value) {
-                capabilities.jobs.push(key)
+                capabilities.jobs!.push(key)
             }
         }
     }
 
-    await setPluginCapabilities(server, pluginConfig, capabilities)
+    const prevCapabilities = prevConfig?.plugin?.capabilities
+    if (
+        prevCapabilities &&
+        capabilities.jobs?.sort().toString() == prevCapabilities.jobs?.sort().toString() &&
+        capabilities.scheduled_tasks?.sort().toString() == prevCapabilities.scheduled_tasks?.sort().toString() &&
+        capabilities.methods?.sort().toString() == prevCapabilities.methods?.sort().toString()
+    ) {
+        // pass - no change in capabilities
+    } else {
+        await setPluginCapabilities(server, pluginConfig, capabilities)
+    }
+
     pluginConfig.plugin!.capabilities = capabilities
 }

@@ -48,7 +48,7 @@ export const plugin60: Plugin = {
     is_preinstalled: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    capabilities: { jobs: [], scheduled_tasks: [], methods: [] }, // inferred on setup
+    capabilities: {}, // inferred on setup
 }
 
 export const pluginAttachment1: PluginAttachmentDB = {
