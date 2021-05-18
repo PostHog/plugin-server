@@ -165,9 +165,9 @@ export interface Plugin {
 }
 
 export interface Capabilities {
-    jobs: string[]
-    scheduled_tasks: string[]
-    methods: string[]
+    jobs?: string[]
+    scheduled_tasks?: string[]
+    methods?: string[]
 }
 
 export interface PluginConfig {
