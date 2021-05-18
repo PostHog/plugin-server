@@ -97,7 +97,7 @@ describe('LazyPluginVM', () => {
 
             expect(status.warn).toHaveBeenCalledWith('⚠️', 'Failed to load some plugin')
             expect(processError).toHaveBeenCalledWith(mockServer, mockConfig, error)
-            expect(disablePlugin).toHaveBeenCalledWith(mockServer, 2, 60)
+            expect(disablePlugin).toHaveBeenCalledWith(mockServer, 39)
             expect(mockServer.db.createPluginLogEntry).toHaveBeenCalledWith(
                 mockConfig,
                 PluginLogEntrySource.System,
