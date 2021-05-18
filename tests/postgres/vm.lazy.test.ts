@@ -12,9 +12,10 @@ jest.mock('../../src/utils/db/error')
 jest.mock('../../src/utils/status')
 jest.mock('../../src/utils/db/sql')
 
-const mockConfig = {
+const x = {
     plugin_id: 60,
     team_id: 2,
+    id: 39,
 }
 
 describe('LazyPluginVM', () => {
