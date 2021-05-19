@@ -131,7 +131,6 @@ export async function runProcessEventBatch(server: PluginsServer, batch: PluginE
                         }
                     }
                     if (wasChangedTeamIdFound) {
-                        console.log(new IllegalOperationError('dds').name, 'xxx')
                         throw new IllegalOperationError('Plugin tried to change event.team_id')
                     }
                     pluginsSucceeded.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
