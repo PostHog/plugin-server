@@ -22,10 +22,6 @@ const isIpv6 = (str: string) =>
 
 const validateHostOrUrl = (hostOrUrl: any) => {
     if (typeof hostOrUrl != 'string') {
-        console.log(typeof hostOrUrl, hostOrUrl)
-        console.log(typeof hostOrUrl, hostOrUrl)
-        console.log(typeof hostOrUrl, hostOrUrl)
-
         throw new Error('URL/Host must be a string!')
     }
     if (
