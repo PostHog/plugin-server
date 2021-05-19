@@ -902,3 +902,47 @@ test('onSnapshot', async () => {
     await vm.methods.onSnapshot(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=$snapshot')
 })
+
+test('redshift-pool prevents unsafe host', async () => {
+    const indexJs = `
+        import { RedshiftPool } from 'redshift-pool'
+
+        async function setupPlugin (meta) {
+            global.redshiftPool = new RedshiftPool({
+                user: 'awsuser',
+                password: '12345678',
+                host: 'redshift-cluster-1.kjsfdhgfid.us-east-1.redshiff.amazonaws.com',
+                database: 'dev',
+                port: 5439,
+                max: 2
+              }) 
+        }
+        
+    `
+    await resetTestDatabase(indexJs)
+    await expect(createPluginConfigVM(mockServer, pluginConfig39, indexJs)).rejects.toThrow(
+        'Host is not a valid Redshift host'
+    )
+})
+
+test('redshift-pool prevents unsafe db name', async () => {
+    const indexJs = `
+        import { RedshiftPool } from 'redshift-pool'
+
+        async function setupPlugin (meta) {
+            global.redshiftPool = new RedshiftPool({
+                user: 'awsuser',
+                password: '12345678',
+                host: 'redshift-cluster-1.kjsfdhgfid.us-east-1.redshift.amazonaws.com',
+                database: 'posthog',
+                port: 5439,
+                max: 2
+              }) 
+        }
+        
+    `
+    await resetTestDatabase(indexJs)
+    await expect(createPluginConfigVM(mockServer, pluginConfig39, indexJs)).rejects.toThrow(
+        'Database name is not allowed'
+    )
+})
