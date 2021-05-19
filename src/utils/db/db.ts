@@ -324,7 +324,7 @@ export class DB {
                                     team_id: teamId,
                                     is_identified: isIdentified,
                                     id: uuid,
-                                    deleted: 0
+                                    is_deleted: 0
                                 })
                             ),
                         },
@@ -436,7 +436,7 @@ export class DB {
                                     team_id: person.team_id,
                                     is_identified: person.is_identified,
                                     id: person.uuid,
-                                    deleted: 1
+                                    is_deleted: 1
                                 })
                             ),
                         },
