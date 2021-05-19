@@ -106,8 +106,13 @@ export async function loadPlugin(
 async function inferPluginCapabilities(server: PluginsServer, pluginConfig: PluginConfig, prevConfig?: PluginConfig) {
     // infer on load implies there's no lazy loading, but all workers get
     // these properties loaded
+
+    if (!pluginConfig.plugin) {
+        throw new Error(`'PluginConfig missing plugin: ${pluginConfig}`)
+    }
+
     const vm = await pluginConfig.vm?.resolveInternalVm
-    const capabilities: Capabilities = { scheduled_tasks: [], jobs: [], methods: [] }
+    const capabilities: Required<Capabilities> = { scheduled_tasks: [], jobs: [], methods: [] }
 
     const tasks = vm?.tasks
     const methods = vm?.methods
@@ -123,7 +128,7 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
     if (tasks?.schedule) {
         for (const [key, value] of Object.entries(tasks.schedule)) {
             if (value) {
-                capabilities.scheduled_tasks!.push(key)
+                capabilities.scheduled_tasks.push(key)
             }
         }
     }
@@ -131,7 +136,7 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
     if (tasks?.job) {
         for (const [key, value] of Object.entries(tasks.job)) {
             if (value) {
-                capabilities.jobs!.push(key)
+                capabilities.jobs.push(key)
             }
         }
     }
@@ -148,5 +153,5 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
         await setPluginCapabilities(server, pluginConfig, capabilities)
     }
 
-    pluginConfig.plugin!.capabilities = capabilities
+    pluginConfig.plugin.capabilities = capabilities
 }
