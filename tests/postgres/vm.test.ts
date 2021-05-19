@@ -675,6 +675,24 @@ test('fetch via require', async () => {
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
 
+test('fetch fails with dangerous host', async () => {
+    const indexJs = `
+        async function processEvent (event, meta) {
+            const response = await fetch('dangerous.amazonaws.com')
+            event.properties = await response.json()
+            return event
+        }
+    `
+    await resetTestDatabase(indexJs)
+    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'fetched',
+    }
+
+    await expect(vm.methods.processEvent(event)).rejects.toThrow('Host dangerous.amazonaws.com is not allowed')
+})
+
 test('attachments', async () => {
     const indexJs = `
         async function processEvent (event, meta) {
@@ -901,4 +919,39 @@ test('onSnapshot', async () => {
     }
     await vm.methods.onSnapshot(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=$snapshot')
+})
+
+test('pg.Client prevents unsafe host in config object', async () => {
+    const indexJs = `
+        import { Client } from 'pg'
+        async function setupPlugin (meta) {
+            const client = new Client({
+                user: 'awsuser',
+                password: '12345678',
+                host: 'dangerous.amazonaws.com',
+                database: 'posthog',
+                port: 5439,
+                max: 2
+              }) 
+        }
+        
+    `
+    await resetTestDatabase(indexJs)
+    await expect(createPluginConfigVM(mockServer, pluginConfig39, indexJs)).rejects.toThrow(
+        'Host dangerous.amazonaws.com is not allowed'
+    )
+})
+
+test('pg.Client prevents unsafe host in connection string', async () => {
+    const indexJs = `
+        import { Client } from 'pg'
+        async function setupPlugin (meta) {
+            const client = new Client('postgresql://dbuser:secretpassword@localhost:5439/mydb') 
+        }
+        
+    `
+    await resetTestDatabase(indexJs)
+    await expect(createPluginConfigVM(mockServer, pluginConfig39, indexJs)).rejects.toThrow(
+        'Host localhost is not allowed'
+    )
 })
