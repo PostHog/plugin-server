@@ -5,7 +5,7 @@ import { LogLevel, PluginsServer, PluginTaskType } from '../src/types'
 import { clearError, processError } from '../src/utils/db/error'
 import { createServer } from '../src/utils/db/server'
 import { loadPlugin } from '../src/worker/plugins/loadPlugin'
-import { IllegalOperationError,runProcessEvent, runProcessEventBatch } from '../src/worker/plugins/run'
+import { IllegalOperationError, runProcessEvent, runProcessEventBatch } from '../src/worker/plugins/run'
 import { loadSchedule, setupPlugins } from '../src/worker/plugins/setup'
 import {
     commonOrganizationId,
