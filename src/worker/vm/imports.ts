@@ -23,10 +23,27 @@ interface URLLike {
 // 93.184.216.34 = example.com
 const RESTRICTED_IP_RANGES = ['93.184.216.34', '172.31.0.0/16']
 
+const isIpInRestrictedRange = (ip: string): boolean => {
+    if (ip.startsWith('127') || ip === '0.0.0.0') {
+        return true
+    }
+    for (const range of RESTRICTED_IP_RANGES) {
+        if (ipRangeCheck(ip, range)) {
+            return true
+        }
+    }
+    return false
+}
+
 const validateHostOrUrl = async (hostOrUrl: any) => {
     if (typeof hostOrUrl !== 'string') {
         throw new IllegalOperationError(`Invalid host/URL ${hostOrUrl}: Not a string or URLLike object`)
     }
+
+    if (net.isIP(hostOrUrl) && isIpInRestrictedRange(hostOrUrl)) {
+        throw new IllegalOperationError(`IP ${hostOrUrl} is not allowed for security reasons`)
+    }
+
     if (hostOrUrl.includes('localhost') || net.isIP(hostOrUrl)) {
         throw new IllegalOperationError(`${hostOrUrl} is not allowed for security reasons`)
     }
@@ -37,11 +54,8 @@ const validateHostOrUrl = async (hostOrUrl: any) => {
     }
 
     const lookupResult = await dns.promises.lookup(parsedHost)
-
-    for (const range of RESTRICTED_IP_RANGES) {
-        if (ipRangeCheck(lookupResult.address, range)) {
-            throw new IllegalOperationError(`Host ${parsedHost} is not allowed for security reasons`)
-        }
+    if (isIpInRestrictedRange(lookupResult.address)) {
+        throw new IllegalOperationError(`IP ${lookupResult} is not allowed for security reasons`)
     }
 }
 
