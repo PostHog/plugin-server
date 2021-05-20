@@ -19,19 +19,14 @@ interface URLLike {
     href: string
 }
 
-// 93.184.216.34 = example.com
-const RESTRICTED_IP_RANGES = ['93.184.216.34', '172.31.0.0/16']
+// ['93.184.216.34', '172.31.0.0/16']
+const RESTRICTED_IP_RANGES =
+    process.env.NODE_ENV === 'test'
+        ? ['127.0.0.1/8', '116.203.255.68']
+        : (process.env.RESTRICTED_IP_RANGES || '').split(',')
 
 const isIpInRestrictedRange = (ip: string): boolean => {
-    if (ip.startsWith('127') || ip === '0.0.0.0') {
-        return true
-    }
-    for (const range of RESTRICTED_IP_RANGES) {
-        if (ipRangeCheck(ip, range)) {
-            return true
-        }
-    }
-    return false
+    return ipRangeCheck(ip, RESTRICTED_IP_RANGES)
 }
 
 const validateHostOrUrl = async (hostOrUrl: any) => {
@@ -43,7 +38,7 @@ const validateHostOrUrl = async (hostOrUrl: any) => {
         throw new IllegalOperationError(`IP ${hostOrUrl} is not allowed for security reasons`)
     }
 
-    if (hostOrUrl.includes('localhost')) {
+    if (hostOrUrl.startsWith('http://localhost')) {
         throw new IllegalOperationError(`${hostOrUrl} is not allowed for security reasons`)
     }
 
@@ -54,16 +49,16 @@ const validateHostOrUrl = async (hostOrUrl: any) => {
 
     const lookupResult = await dns.promises.lookup(parsedHost)
     if (isIpInRestrictedRange(lookupResult.address)) {
-        throw new IllegalOperationError(`IP ${lookupResult} is not allowed for security reasons`)
+        throw new IllegalOperationError(`IP ${lookupResult.address} is not allowed for security reasons`)
     }
 }
 
-const fetch = async (url: string | URLLike, init?: RequestInit) => {
+const fetch = async (url: string | URLLike, init: RequestInit = {}) => {
     if (typeof url === 'object' && 'href' in url) {
         url = url.href
     }
     await validateHostOrUrl(url)
-    return await nodeFetch(url, init)
+    return await nodeFetch(url, { ...init, redirect: 'error' })
 }
 
 export const imports = {

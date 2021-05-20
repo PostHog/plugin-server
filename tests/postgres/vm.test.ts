@@ -104,7 +104,7 @@ test('teardownPlugin', async () => {
     })
     expect(fetch).not.toHaveBeenCalled()
     await vm.methods.teardownPlugin()
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho')
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho', { redirect: 'error' })
 })
 
 test('processEvent', async () => {
@@ -627,7 +627,7 @@ test('fetch', async () => {
     }
 
     await vm.methods.processEvent(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', { redirect: 'error' })
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
@@ -649,7 +649,7 @@ test('fetch via import', async () => {
     }
 
     await vm.methods.processEvent(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', { redirect: 'error' })
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
@@ -670,7 +670,7 @@ test('fetch via require', async () => {
     }
 
     await vm.methods.processEvent(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', { redirect: 'error' })
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
@@ -678,7 +678,7 @@ test('fetch via require', async () => {
 test('fetch fails with dangerous host', async () => {
     const indexJs = `
         async function processEvent (event, meta) {
-            const response = await fetch('https://dangerous.amazonaws.com')
+            const response = await fetch('https://app-116-203-255-68.nip.io')
             event.properties = await response.json()
             return event
         }
@@ -690,13 +690,15 @@ test('fetch fails with dangerous host', async () => {
         event: 'fetched',
     }
 
-    await expect(vm.methods.processEvent(event)).rejects.toThrow('Invalid hostname for https://dangerous.amazonaws.com')
+    await expect(vm.methods.processEvent(event)).rejects.toThrow(
+        'IP 116.203.255.68 is not allowed for security reasons'
+    )
 })
 
 test('fetch looks up dns and throws on unsafe IP', async () => {
     const indexJs = `
         async function processEvent (event, meta) {
-            const response = await fetch('https://example.com')
+            const response = await fetch('https://app-116-203-255-68.nip.io')
             event.properties = await response.json()
             return event
         }
@@ -708,7 +710,9 @@ test('fetch looks up dns and throws on unsafe IP', async () => {
         event: 'fetched',
     }
 
-    await expect(vm.methods.processEvent(event)).rejects.toThrow('Host example.com is not allowed')
+    await expect(vm.methods.processEvent(event)).rejects.toThrow(
+        'IP 116.203.255.68 is not allowed for security reasons'
+    )
 })
 
 test('attachments', async () => {
@@ -920,7 +924,7 @@ test('onEvent', async () => {
         event: 'onEvent',
     }
     await vm.methods.onEvent(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=onEvent')
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=onEvent', { redirect: 'error' })
 })
 
 test('onSnapshot', async () => {
@@ -936,26 +940,5 @@ test('onSnapshot', async () => {
         event: '$snapshot',
     }
     await vm.methods.onSnapshot(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=$snapshot')
-})
-
-test('pg.Client prevents unsafe database name in config object', async () => {
-    const indexJs = `
-        import { Client } from 'pg'
-        async function setupPlugin (meta) {
-            const client = new Client({
-                user: 'awsuser',
-                password: '12345678',
-                host: 'somedbhost.com',
-                database: 'posthog',
-                port: 5439,
-                max: 2
-              }) 
-        }
-        
-    `
-    await resetTestDatabase(indexJs)
-    await expect(createPluginConfigVM(mockServer, pluginConfig39, indexJs)).rejects.toThrow(
-        'Database name posthog not allowed'
-    )
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=$snapshot', { redirect: 'error' })
 })
