@@ -1,7 +1,7 @@
 import {
-    Capabilities,
     Plugin,
     PluginAttachmentDB,
+    PluginCapabilities,
     PluginConfig,
     PluginConfigId,
     PluginError,
@@ -55,19 +55,12 @@ export async function getPluginConfigRows(server: PluginsServer): Promise<Plugin
 export async function setPluginCapabilities(
     server: PluginsServer,
     pluginConfig: PluginConfig,
-    capabilities: Capabilities
+    capabilities: PluginCapabilities
 ): Promise<void> {
     await server.db.postgresQuery(
         'UPDATE posthog_plugin SET capabilities = ($1) WHERE id = $2',
         [capabilities, pluginConfig.plugin_id],
         'setPluginCapabilities'
-    )
-    await server.db.createPluginLogEntry(
-        pluginConfig,
-        PluginLogEntrySource.System,
-        PluginLogEntryType.Info,
-        `Set plugin capabilities (instance ID ${server.instanceId}).`,
-        server.instanceId
     )
 }
 

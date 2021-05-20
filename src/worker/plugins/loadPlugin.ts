@@ -1,7 +1,8 @@
+import equal from 'fast-deep-equal'
 import * as fs from 'fs'
 import * as path from 'path'
 
-import { Capabilities, PluginConfig, PluginJsonConfig, PluginsServer } from '../../types'
+import { PluginCapabilities, PluginConfig, PluginJsonConfig, PluginsServer } from '../../types'
 import { processError } from '../../utils/db/error'
 import { setPluginCapabilities } from '../../utils/db/sql'
 import { getFileFromArchive, pluginDigest } from '../../utils/utils'
@@ -103,7 +104,11 @@ export async function loadPlugin(
     return false
 }
 
-async function inferPluginCapabilities(server: PluginsServer, pluginConfig: PluginConfig, prevConfig?: PluginConfig) {
+async function inferPluginCapabilities(
+    server: PluginsServer,
+    pluginConfig: PluginConfig,
+    prevConfig?: PluginConfig
+): Promise<void> {
     // infer on load implies there's no lazy loading, but all workers get
     // these properties loaded
 
@@ -112,14 +117,14 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
     }
 
     const vm = await pluginConfig.vm?.resolveInternalVm
-    const capabilities: Required<Capabilities> = { scheduled_tasks: [], jobs: [], methods: [] }
+    const capabilities: Required<PluginCapabilities> = { scheduled_tasks: [], jobs: [], methods: [] }
 
     const tasks = vm?.tasks
     const methods = vm?.methods
 
     if (methods) {
         for (const [key, value] of Object.entries(methods)) {
-            if (value !== undefined) {
+            if (value) {
                 capabilities.methods!.push(key)
             }
         }
@@ -142,14 +147,7 @@ async function inferPluginCapabilities(server: PluginsServer, pluginConfig: Plug
     }
 
     const prevCapabilities = prevConfig?.plugin?.capabilities
-    if (
-        prevCapabilities &&
-        capabilities.jobs?.sort().toString() == prevCapabilities.jobs?.sort().toString() &&
-        capabilities.scheduled_tasks?.sort().toString() == prevCapabilities.scheduled_tasks?.sort().toString() &&
-        capabilities.methods?.sort().toString() == prevCapabilities.methods?.sort().toString()
-    ) {
-        // pass - no change in capabilities
-    } else {
+    if (!equal(prevCapabilities, capabilities)) {
         await setPluginCapabilities(server, pluginConfig, capabilities)
     }
 
