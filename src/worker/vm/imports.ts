@@ -6,7 +6,7 @@ import dns from 'dns'
 import * as genericPool from 'generic-pool'
 import ipRangeCheck from 'ip-range-check'
 import net from 'net'
-import nodeFetch, { RequestInit } from 'node-fetch'
+import nodeFetch, { RequestInit, Response } from 'node-fetch'
 import pg from 'pg'
 import snowflake from 'snowflake-sdk'
 import url from 'url'
@@ -53,12 +53,20 @@ const validateHostOrUrl = async (hostOrUrl: any) => {
     }
 }
 
-const fetch = async (url: string | URLLike, init: RequestInit = {}) => {
+const fetch = async (url: string | URLLike, init?: RequestInit) => {
     if (typeof url === 'object' && 'href' in url) {
         url = url.href
     }
+    await checkRedirectChain(url)
+    return await nodeFetch(url, init)
+}
+
+const checkRedirectChain = async (url: string) => {
     await validateHostOrUrl(url)
-    return await nodeFetch(url, { ...init, redirect: 'error' })
+    const res = await nodeFetch(url, { redirect: 'manual' })
+    if (res.headers && res.headers.get('location')) {
+        await checkRedirectChain(res.headers.get('location')!)
+    }
 }
 
 export const imports = {

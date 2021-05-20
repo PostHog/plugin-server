@@ -104,7 +104,7 @@ test('teardownPlugin', async () => {
     })
     expect(fetch).not.toHaveBeenCalled()
     await vm.methods.teardownPlugin()
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho', { redirect: 'error' })
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho', expect.anything())
 })
 
 test('processEvent', async () => {
@@ -627,7 +627,7 @@ test('fetch', async () => {
     }
 
     await vm.methods.processEvent(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', { redirect: 'error' })
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', expect.anything())
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
@@ -649,7 +649,7 @@ test('fetch via import', async () => {
     }
 
     await vm.methods.processEvent(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', { redirect: 'error' })
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', expect.anything())
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
@@ -670,7 +670,7 @@ test('fetch via require', async () => {
     }
 
     await vm.methods.processEvent(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', { redirect: 'error' })
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', expect.anything())
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
@@ -924,7 +924,7 @@ test('onEvent', async () => {
         event: 'onEvent',
     }
     await vm.methods.onEvent(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=onEvent', { redirect: 'error' })
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=onEvent', expect.anything())
 })
 
 test('onSnapshot', async () => {
@@ -940,5 +940,5 @@ test('onSnapshot', async () => {
         event: '$snapshot',
     }
     await vm.methods.onSnapshot(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=$snapshot', { redirect: 'error' })
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=$snapshot', expect.anything())
 })
