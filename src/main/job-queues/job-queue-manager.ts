@@ -1,20 +1,9 @@
 import * as Sentry from '@sentry/node'
 
-import { EnqueuedJob, JobQueue, OnJobCallback, PluginsServer } from '../../types'
+import { EnqueuedJob, JobQueue, JobQueueType, OnJobCallback, PluginsServer } from '../../types'
 import { status } from '../../utils/status'
 import { logOrThrowJobQueueError } from '../../utils/utils'
-import { FsQueue } from './fs-queue'
-import { GraphileQueue } from './graphile-queue'
-
-enum JobQueueType {
-    FS = 'fs',
-    Graphile = 'graphile',
-}
-
-const queues: Record<JobQueueType, (server: PluginsServer) => JobQueue> = {
-    fs: () => new FsQueue(),
-    graphile: (pluginsServer: PluginsServer) => new GraphileQueue(pluginsServer),
-}
+import { jobQueueMap } from './job-queues'
 
 export class JobQueueManager implements JobQueue {
     pluginsServer: PluginsServer
@@ -30,8 +19,8 @@ export class JobQueueManager implements JobQueue {
 
         this.jobQueues = this.jobQueueTypes.map(
             (queue): JobQueue => {
-                if (queues[queue]) {
-                    return queues[queue](pluginsServer)
+                if (jobQueueMap[queue]) {
+                    return jobQueueMap[queue].getQueue(pluginsServer)
                 } else {
                     throw new Error(`Unknown job queue "${queue}"`)
                 }

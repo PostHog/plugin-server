@@ -139,6 +139,26 @@ export interface JobQueue {
     disconnectProducer: () => Promise<void> | void
 }
 
+export enum JobQueueType {
+    FS = 'fs',
+    Graphile = 'graphile',
+}
+
+export enum JobQueuePersistence {
+    /** Job queues that store jobs on the local server */
+    Local = 'local',
+    /** Remote persistent job queues that can be read from concurrently */
+    Concurrent = 'concurrent',
+    /** Remote persistent job queues that must be read from one redlocked server at a time */
+    Redlocked = 'redlocked',
+}
+
+export type JobQueueExport = {
+    type: JobQueueType
+    persistence: JobQueuePersistence
+    getQueue: (serverConfig: PluginsServerConfig) => JobQueue
+}
+
 export type PluginId = number
 export type PluginConfigId = number
 export type TeamId = number
