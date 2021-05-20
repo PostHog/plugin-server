@@ -66,6 +66,7 @@
         "graphile-worker": "^0.11.1",
         "hot-shots": "^8.2.1",
         "ioredis": "^4.19.2",
+        "ip-range-check": "^0.2.0",
         "kafkajs": "^1.15.0",
         "lru-cache": "^6.0.0",
         "luxon": "^1.25.0",

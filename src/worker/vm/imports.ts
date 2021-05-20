@@ -4,6 +4,7 @@ import * as AWS from 'aws-sdk'
 import crypto from 'crypto'
 import dns from 'dns'
 import * as genericPool from 'generic-pool'
+import ipRangeCheck from 'ip-range-check'
 import nodeFetch from 'node-fetch'
 import nodePostgres from 'pg'
 import { parse } from 'pg-connection-string'
@@ -14,7 +15,7 @@ import * as zlib from 'zlib'
 import { writeToFile } from './extensions/test-utils'
 
 // 93.184.216.34 = example.com
-const RESTRICTED_IPS = ['93.184.216.34']
+const RESTRICTED_IP_RANGES = ['93.184.216.34', '172.31.0.0/16']
 
 const isIpv6 = (str: string) =>
     /(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))/.test(
@@ -41,8 +42,10 @@ const validateHostOrUrl = async (hostOrUrl: any) => {
 
     const lookupResult = await dns.promises.lookup(parsedHost)
 
-    if (RESTRICTED_IPS.includes(lookupResult.address)) {
-        throw new Error(`Host ${parsedHost} is not allowed`)
+    for (const range of RESTRICTED_IP_RANGES) {
+        if (ipRangeCheck(lookupResult.address, range)) {
+            throw new Error(`Host ${parsedHost} is not allowed`)
+        }
     }
 }
 

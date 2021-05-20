@@ -678,7 +678,7 @@ test('fetch via require', async () => {
 test('fetch fails with dangerous host', async () => {
     const indexJs = `
         async function processEvent (event, meta) {
-            const response = await fetch('dangerous.amazonaws.com')
+            const response = await fetch('https://dangerous.amazonaws.com')
             event.properties = await response.json()
             return event
         }
@@ -690,7 +690,7 @@ test('fetch fails with dangerous host', async () => {
         event: 'fetched',
     }
 
-    await expect(vm.methods.processEvent(event)).rejects.toThrow('Host dangerous.amazonaws.com is not allowed')
+    await expect(vm.methods.processEvent(event)).rejects.toThrow('Invalid hostname for https://dangerous.amazonaws.com')
 })
 
 test('fetch looks up dns and throws on unsafe IP', async () => {
@@ -946,7 +946,7 @@ test('pg.Client prevents unsafe database name in config object', async () => {
             const client = new Client({
                 user: 'awsuser',
                 password: '12345678',
-                host: 'dangerous.amazonaws.com',
+                host: 'somedbhost.com',
                 database: 'posthog',
                 port: 5439,
                 max: 2
