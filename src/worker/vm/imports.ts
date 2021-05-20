@@ -43,7 +43,7 @@ const validateHostOrUrl = async (hostOrUrl: any) => {
         throw new IllegalOperationError(`IP ${hostOrUrl} is not allowed for security reasons`)
     }
 
-    if (hostOrUrl.includes('localhost') || net.isIP(hostOrUrl)) {
+    if (hostOrUrl.includes('localhost')) {
         throw new IllegalOperationError(`${hostOrUrl} is not allowed for security reasons`)
     }
 
