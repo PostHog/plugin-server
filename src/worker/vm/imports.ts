@@ -16,10 +16,6 @@ import { writeToFile } from './extensions/test-utils'
 // 93.184.216.34 = example.com
 const RESTRICTED_IPS = ['93.184.216.34']
 
-const isIpv4 = (str: string) =>
-    /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(
-        str
-    )
 const isIpv6 = (str: string) =>
     /(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))/.test(
         str
@@ -29,19 +25,17 @@ const validateHostOrUrl = async (hostOrUrl: any) => {
     if (typeof hostOrUrl != 'string') {
         throw new Error(`Invalid host/URL ${hostOrUrl}`)
     }
-    if (
-        (hostOrUrl.includes('amazonaws.com') && !hostOrUrl.includes('redshift.amazonaws.com')) ||
-        hostOrUrl.includes('localhost') ||
-        hostOrUrl.includes('posthog.net') ||
-        isIpv4(hostOrUrl) ||
-        isIpv6(hostOrUrl)
-    ) {
+    if (hostOrUrl.includes('localhost') || isIpv6(hostOrUrl)) {
         throw new Error(`Host ${hostOrUrl} is not allowed`)
     }
 
     const parsedHost = url.parse(hostOrUrl).hostname
 
-    if (!parsedHost) {
+    if (
+        !parsedHost || // IPv4 addresses return a null host, IPv6 addresses do not
+        (parsedHost.includes('amazonaws.com') && parsedHost !== 'redshift.amazonaws.com') ||
+        parsedHost.includes('posthog.net')
+    ) {
         throw new Error(`Invalid hostname for ${hostOrUrl}`)
     }
 
