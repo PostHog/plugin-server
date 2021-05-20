@@ -88,8 +88,8 @@ test('teardownPlugin', async () => {
         function setupPlugin (meta) {
             meta.global.data = 'haha'
         }
-        function teardownPlugin (meta) {
-            fetch('https://google.com/results.json?query=' + meta.global.data)
+        async function teardownPlugin (meta) {
+            await fetch('https://google.com/results.json?query=' + meta.global.data)
         }
         function processEvent (event, meta) {
             meta.global.data = event.properties.haha
@@ -693,6 +693,24 @@ test('fetch fails with dangerous host', async () => {
     await expect(vm.methods.processEvent(event)).rejects.toThrow('Host dangerous.amazonaws.com is not allowed')
 })
 
+test('fetch looks up dns and throws on unsafe IP', async () => {
+    const indexJs = `
+        async function processEvent (event, meta) {
+            const response = await fetch('https://example.com')
+            event.properties = await response.json()
+            return event
+        }
+    `
+    await resetTestDatabase(indexJs)
+    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'fetched',
+    }
+
+    await expect(vm.methods.processEvent(event)).rejects.toThrow('Host example.com is not allowed')
+})
+
 test('attachments', async () => {
     const indexJs = `
         async function processEvent (event, meta) {
@@ -921,7 +939,7 @@ test('onSnapshot', async () => {
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=$snapshot')
 })
 
-test('pg.Client prevents unsafe host in config object', async () => {
+test('pg.Client prevents unsafe database name in config object', async () => {
     const indexJs = `
         import { Client } from 'pg'
         async function setupPlugin (meta) {
@@ -938,20 +956,6 @@ test('pg.Client prevents unsafe host in config object', async () => {
     `
     await resetTestDatabase(indexJs)
     await expect(createPluginConfigVM(mockServer, pluginConfig39, indexJs)).rejects.toThrow(
-        'Host dangerous.amazonaws.com is not allowed'
-    )
-})
-
-test('pg.Client prevents unsafe host in connection string', async () => {
-    const indexJs = `
-        import { Client } from 'pg'
-        async function setupPlugin (meta) {
-            const client = new Client('postgresql://dbuser:secretpassword@localhost:5439/mydb') 
-        }
-        
-    `
-    await resetTestDatabase(indexJs)
-    await expect(createPluginConfigVM(mockServer, pluginConfig39, indexJs)).rejects.toThrow(
-        'Host localhost is not allowed'
+        'Database name posthog not allowed'
     )
 })
