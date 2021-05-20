@@ -7,8 +7,7 @@ import * as genericPool from 'generic-pool'
 import ipRangeCheck from 'ip-range-check'
 import net from 'net'
 import nodeFetch, { RequestInit } from 'node-fetch'
-import nodePostgres from 'pg'
-import { parse } from 'pg-connection-string'
+import pg from 'pg'
 import snowflake from 'snowflake-sdk'
 import url from 'url'
 import * as zlib from 'zlib'
@@ -67,21 +66,6 @@ const fetch = async (url: string | URLLike, init?: RequestInit) => {
     return await nodeFetch(url, init)
 }
 
-class Client extends nodePostgres.Client {
-    constructor(config: string | nodePostgres.ClientConfig) {
-        let database: string
-        if (typeof config === 'string') {
-            database = parse(config).database || ''
-        } else {
-            database = config.database || ''
-        }
-        if (database === 'posthog') {
-            throw new IllegalOperationError('Database name posthog not allowed')
-        }
-        super(config)
-    }
-}
-
 export const imports = {
     crypto: crypto,
     zlib: zlib,
@@ -91,7 +75,7 @@ export const imports = {
     '@google-cloud/bigquery': { BigQuery },
     '@posthog/plugin-contrib': contrib,
     'aws-sdk': AWS,
-    pg: { Client },
+    pg: pg,
     ...(process.env.NODE_ENV === 'test'
         ? {
               'test-utils/write-to-file': writeToFile,
