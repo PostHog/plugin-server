@@ -76,6 +76,11 @@ export interface PluginsServerConfig extends Record<string, any> {
     JOB_QUEUE_GRAPHILE_URL: string
     JOB_QUEUE_GRAPHILE_SCHEMA: string
     JOB_QUEUE_GRAPHILE_PREPARED_STATEMENTS: boolean
+    JOB_QUEUE_S3_AWS_ACCESS_KEY: string
+    JOB_QUEUE_S3_AWS_SECRET_ACCESS_KEY: string
+    JOB_QUEUE_S3_AWS_REGION: string
+    JOB_QUEUE_S3_BUCKET_NAME: string
+    JOB_QUEUE_S3_PREFIX: string
     CRASH_IF_NO_PERSISTENT_JOB_QUEUE: boolean
     STALENESS_RESTART_SECONDS: number
 }
@@ -142,6 +147,7 @@ export interface JobQueue {
 export enum JobQueueType {
     FS = 'fs',
     Graphile = 'graphile',
+    S3 = 's3',
 }
 
 export enum JobQueuePersistence {
