@@ -12,11 +12,10 @@ describe('ActionManager()', () => {
     beforeEach(async () => {
         ;[server, closeServer] = await createServer()
         await resetTestDatabase()
-        actionManager = new ActionManager(server.db, server)
+        actionManager = new ActionManager(server.db)
         await actionManager.prepare()
     })
     afterEach(async () => {
-        await actionManager.close()
         await closeServer()
     })
 
@@ -55,7 +54,7 @@ describe('ActionManager()', () => {
             )
 
             // This is normally done by Django async in such a situation
-            await (actionManager.pubSub.taskMap['fetch-action']('67') as Promise<void>)
+            await actionManager.fetchAction(67)
             const reloadedAction = actionManager.getAction(67)
 
             expect(reloadedAction).toMatchObject({

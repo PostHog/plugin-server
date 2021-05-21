@@ -24,6 +24,7 @@ import { Client } from '../../utils/celery/client'
 import { DB } from '../../utils/db/db'
 import { KafkaProducerWrapper } from '../../utils/db/kafka-producer-wrapper'
 import { elementsToString, personInitialAndUTMProperties, sanitizeEventName, timeoutGuard } from '../../utils/db/utils'
+import { PubSub } from '../../utils/pubsub'
 import { status } from '../../utils/status'
 import { castTimestampOrNow, filterIncrementProperties, UUID, UUIDT } from '../../utils/utils'
 import { ActionManager } from './action-manager'
@@ -41,6 +42,7 @@ export class EventsProcessor {
     teamManager: TeamManager
     personManager: PersonManager
     actionManager: ActionManager
+    pubSub: PubSub
 
     constructor(pluginsServer: PluginsServer) {
         this.ready = false
@@ -51,7 +53,11 @@ export class EventsProcessor {
         this.celery = new Client(pluginsServer.db, pluginsServer.CELERY_DEFAULT_QUEUE)
         this.teamManager = new TeamManager(pluginsServer.db)
         this.personManager = new PersonManager(pluginsServer)
-        this.actionManager = new ActionManager(pluginsServer.db, pluginsServer)
+        this.actionManager = new ActionManager(pluginsServer.db)
+        this.pubSub = new PubSub(pluginsServer, {
+            'fetch-action': async (message) => await this.actionManager.fetchAction(parseInt(message)),
+            'delete-action': (message) => this.actionManager.deleteAction(parseInt(message)),
+        })
 
         this.posthog = nodePostHog('sTMFPsFhdP1Ssg', { fetch })
         if (process.env.NODE_ENV === 'test') {
@@ -61,11 +67,12 @@ export class EventsProcessor {
 
     public async prepare(): Promise<void> {
         await this.actionManager.prepare()
+        await this.pubSub.start()
         this.ready = true
     }
 
     public async close(): Promise<void> {
-        await this.actionManager.close()
+        await this.pubSub.stop()
     }
 
     public async processEvent(
