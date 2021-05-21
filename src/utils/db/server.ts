@@ -193,7 +193,6 @@ export async function createServer(
             clearInterval(eventLoopLagInterval)
         }
         server.mmdbUpdateJob?.cancel()
-        await server.eventsProcessor?.close()
         await server.jobQueueManager?.disconnectProducer()
         if (kafkaProducer) {
             clearInterval(kafkaProducer.flushInterval)

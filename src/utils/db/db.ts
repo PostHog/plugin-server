@@ -704,20 +704,10 @@ export class DB {
 
     public async fetchAllActionsMap(): Promise<Record<Action['id'], Action>> {
         const rawActions: RawAction[] = (
-            await this.postgresQuery(
-                `
-                SELECT * FROM posthog_action`,
-                undefined,
-                'fetchActions'
-            )
+            await this.postgresQuery(`SELECT * FROM posthog_action`, undefined, 'fetchActions')
         ).rows
         const actionSteps: ActionStep[] = (
-            await this.postgresQuery(
-                `
-                SELECT * FROM posthog_actionstep`,
-                undefined,
-                'fetchActionSteps'
-            )
+            await this.postgresQuery(`SELECT * FROM posthog_actionstep`, undefined, 'fetchActionSteps')
         ).rows
         const actionsMap: Record<Action['id'], Action> = {}
         for (const rawAction of rawActions) {
@@ -731,23 +721,13 @@ export class DB {
 
     public async fetchAction(id: Action['id']): Promise<Action | null> {
         const rawActions: RawAction[] = (
-            await this.postgresQuery(
-                `
-                SELECT * FROM posthog_action WHERE id = $1`,
-                [id],
-                'fetchActions'
-            )
+            await this.postgresQuery(`SELECT * FROM posthog_action WHERE id = $1`, [id], 'fetchActions')
         ).rows
         if (!rawActions.length) {
             return null
         }
         const steps: ActionStep[] = (
-            await this.postgresQuery(
-                `
-                SELECT * FROM posthog_actionstep WHERE action_id = $1`,
-                [id],
-                'fetchActionSteps'
-            )
+            await this.postgresQuery(`SELECT * FROM posthog_actionstep WHERE action_id = $1`, [id], 'fetchActionSteps')
         ).rows
         const action: Action = { ...rawActions[0], steps }
         return action
