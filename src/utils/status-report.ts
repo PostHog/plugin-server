@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/node'
 import * as schedule from 'node-schedule'
 
 import { PluginFunction } from './../types'
