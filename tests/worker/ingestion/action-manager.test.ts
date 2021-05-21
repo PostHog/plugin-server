@@ -54,7 +54,7 @@ describe('ActionManager()', () => {
             )
 
             // This is normally done by Django async in such a situation
-            await actionManager.fetchAction(67)
+            await actionManager.reloadAction(67)
             const reloadedAction = actionManager.getAction(67)
 
             expect(reloadedAction).toMatchObject({

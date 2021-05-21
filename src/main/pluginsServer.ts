@@ -141,13 +141,17 @@ export async function startPluginsServer(
             void jobQueueConsumer?.resume()
         })
 
-        // use one extra connection for Redis-based PubSub
+        // use one extra Redis connection for pub-sub
         pubSub = new PubSub(server, {
             [server.PLUGINS_RELOAD_PUBSUB_CHANNEL]: async () => {
                 status.info('⚡', 'Reloading plugins!')
                 await piscina?.broadcastTask({ task: 'reloadPlugins' })
                 await scheduleControl?.reloadSchedule()
             },
+            'reload-action': async (message) =>
+                await piscina?.broadcastTask({ task: 'reloadAction', args: { actionId: parseInt(message) } }),
+            'drop-action': async (message) =>
+                await piscina?.broadcastTask({ task: 'dropAction`', args: { actionId: parseInt(message) } }),
         })
         await pubSub.start()
 

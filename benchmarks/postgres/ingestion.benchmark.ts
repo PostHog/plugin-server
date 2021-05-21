@@ -63,7 +63,6 @@ describe('ingestion benchmarks', () => {
     })
 
     afterEach(async () => {
-        await eventsProcessor.close()
         await stopServer?.()
     })
 

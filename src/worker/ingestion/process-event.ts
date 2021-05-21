@@ -42,7 +42,6 @@ export class EventsProcessor {
     teamManager: TeamManager
     personManager: PersonManager
     actionManager: ActionManager
-    pubSub: PubSub
 
     constructor(pluginsServer: PluginsServer) {
         this.ready = false
@@ -54,10 +53,6 @@ export class EventsProcessor {
         this.teamManager = new TeamManager(pluginsServer.db)
         this.personManager = new PersonManager(pluginsServer)
         this.actionManager = new ActionManager(pluginsServer.db)
-        this.pubSub = new PubSub(pluginsServer, {
-            'fetch-action': async (message) => await this.actionManager.fetchAction(parseInt(message)),
-            'delete-action': (message) => this.actionManager.deleteAction(parseInt(message)),
-        })
 
         this.posthog = nodePostHog('sTMFPsFhdP1Ssg', { fetch })
         if (process.env.NODE_ENV === 'test') {
@@ -67,12 +62,7 @@ export class EventsProcessor {
 
     public async prepare(): Promise<void> {
         await this.actionManager.prepare()
-        await this.pubSub.start()
         this.ready = true
-    }
-
-    public async close(): Promise<void> {
-        await this.pubSub.stop()
     }
 
     public async processEvent(

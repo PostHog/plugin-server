@@ -140,7 +140,6 @@ export const createProcessEventTests = (
     })
 
     afterEach(async () => {
-        await eventsProcessor.close()
         await server.redisPool.release(redis)
         await stopServer?.()
     })

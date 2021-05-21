@@ -27,7 +27,7 @@ export class ActionManager {
         return this.actionCache[id]
     }
 
-    public async fetchAction(id: Action['id']): Promise<void> {
+    public async reloadAction(id: Action['id']): Promise<void> {
         const refetchedAction = await this.db.fetchAction(id)
         if (refetchedAction) {
             status.info(
@@ -49,7 +49,7 @@ export class ActionManager {
         }
     }
 
-    public deleteAction(id: Action['id']): void {
+    public dropAction(id: Action['id']): void {
         if (id in this.actionCache) {
             status.info('🍿', `Deleted action ID ${id} from cache`)
             delete this.actionCache[id]
