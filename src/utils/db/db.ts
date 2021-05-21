@@ -249,9 +249,12 @@ export class DB {
     public async fetchPersons(database: Database = Database.Postgres): Promise<Person[] | ClickHousePerson[]> {
         if (database === Database.ClickHouse) {
             const query = `
-                SELECT * FROM person FINAL JOIN (
+                SELECT * FROM person
+                FINAL
+                JOIN (
                     SELECT id, max(_timestamp) as _timestamp FROM person GROUP BY team_id, id
                 ) as person_max ON person.id = person_max.id AND person._timestamp = person_max._timestamp
+                WHERE is_deleted = 0
             `
             return (await this.clickhouseQuery(query)).data.map((row) => {
                 const { 'person_max._timestamp': _discard1, 'person_max.id': _discard2, ...rest } = row
@@ -327,6 +330,7 @@ export class DB {
                                     team_id: teamId,
                                     is_identified: isIdentified,
                                     id: uuid,
+                                    is_deleted: 0,
                                 })
                             ),
                         },
@@ -425,7 +429,26 @@ export class DB {
             await client.query('DELETE FROM posthog_person WHERE id = $1', [person.id])
         })
         if (this.clickhouse) {
-            await this.clickhouseQuery(`ALTER TABLE person DELETE WHERE id = '${escapeClickHouseString(person.uuid)}'`)
+            if (this.kafkaProducer) {
+                await this.kafkaProducer.queueMessage({
+                    topic: KAFKA_PERSON,
+                    messages: [
+                        {
+                            value: Buffer.from(
+                                JSON.stringify({
+                                    created_at: castTimestampOrNow(person.created_at, TimestampFormat.ClickHouse),
+                                    properties: JSON.stringify(person.properties),
+                                    team_id: person.team_id,
+                                    is_identified: person.is_identified,
+                                    id: person.uuid,
+                                    is_deleted: 1,
+                                })
+                            ),
+                        },
+                    ],
+                })
+            }
+
             await this.clickhouseQuery(
                 `ALTER TABLE person_distinct_id DELETE WHERE person_id = '${escapeClickHouseString(person.uuid)}'`
             )
