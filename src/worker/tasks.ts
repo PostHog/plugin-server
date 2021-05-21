@@ -9,9 +9,6 @@ import { teardownPlugins } from './plugins/teardown'
 type TaskRunner = (server: PluginsServer, args: any) => Promise<any> | any
 
 export const workerTasks: Record<string, TaskRunner> = {
-    hello: (server, args) => {
-        return `hello ${args}!`
-    },
     onEvent: (server, args: { event: PluginEvent }) => {
         return runOnEvent(server, args.event)
     },
