@@ -68,14 +68,10 @@ class StatusReport {
         if (this.statusReportJobConfigured) {
             return
         }
-        try {
-            this.statusReportJob = schedule.scheduleJob('0 * * * *', () => {
-                this.captureStatusReport()
-            })
-            this.statusReportJobConfigured = true
-        } catch (err) {
-            Sentry.captureException(err, { tags: { plugin_seconds_report: '1' } })
-        }
+        this.statusReportJob = schedule.scheduleJob('0 * * * *', () => {
+            this.captureStatusReport()
+        })
+        this.statusReportJobConfigured = true
     }
 
     public stopStatusReportSchedule(): void {
