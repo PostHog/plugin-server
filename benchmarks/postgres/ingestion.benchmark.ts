@@ -52,6 +52,7 @@ describe('ingestion benchmarks', () => {
             LOG_LEVEL: LogLevel.Log,
         })
         eventsProcessor = new EventsProcessor(server)
+        await eventsProcessor.prepare()
         team = await getFirstTeam(server)
         now = DateTime.utc()
 
@@ -62,6 +63,7 @@ describe('ingestion benchmarks', () => {
     })
 
     afterEach(async () => {
+        await eventsProcessor.close()
         await stopServer?.()
     })
 

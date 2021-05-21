@@ -2,7 +2,6 @@ import { ReaderModel } from '@maxmind/geoip2-node'
 import Piscina from '@posthog/piscina'
 import * as Sentry from '@sentry/node'
 import { FastifyInstance } from 'fastify'
-import Redis from 'ioredis'
 import net, { AddressInfo } from 'net'
 import * as schedule from 'node-schedule'
 
@@ -10,8 +9,9 @@ import { defaultConfig } from '../config/config'
 import { JobQueueConsumerControl, PluginsServer, PluginsServerConfig, Queue, ScheduleControl } from '../types'
 import { createServer } from '../utils/db/server'
 import { killProcess } from '../utils/kill'
+import { PubSub } from '../utils/pubsub'
 import { status } from '../utils/status'
-import { createRedis, delay, getPiscinaStats } from '../utils/utils'
+import { delay, getPiscinaStats } from '../utils/utils'
 import { startQueue } from './ingestion-queues/queue'
 import { startJobQueueConsumer } from './job-queues/job-queue-consumer'
 import { createMmdbServer, performMmdbStalenessCheck, prepareMmdb } from './services/mmdb'
@@ -41,7 +41,7 @@ export async function startPluginsServer(
 
     status.info('ℹ️', `${serverConfig.WORKER_CONCURRENCY} workers, ${serverConfig.TASKS_PER_WORKER} tasks per worker`)
 
-    let pubSub: Redis.Redis | undefined
+    let pubSub: PubSub | undefined
     let server: PluginsServer | undefined
     let fastifyInstance: FastifyInstance | undefined
     let pingJob: schedule.Job | undefined
@@ -73,7 +73,7 @@ export async function startPluginsServer(
         }
         lastActivityCheck && clearInterval(lastActivityCheck)
         await queue?.stop()
-        await pubSub?.quit()
+        await pubSub?.stop()
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
         await jobQueueConsumer?.stop()
@@ -141,17 +141,15 @@ export async function startPluginsServer(
             void jobQueueConsumer?.resume()
         })
 
-        // use one extra connection for redis pubsub
-        pubSub = await createRedis(server)
-        await pubSub.subscribe(server.PLUGINS_RELOAD_PUBSUB_CHANNEL)
-        pubSub.on('message', async (channel: string, message) => {
-            if (channel === server!.PLUGINS_RELOAD_PUBSUB_CHANNEL) {
+        // use one extra connection for Redis-based PubSub
+        pubSub = new PubSub(server, {
+            [server.PLUGINS_RELOAD_PUBSUB_CHANNEL]: async () => {
                 status.info('⚡', 'Reloading plugins!')
-
                 await piscina?.broadcastTask({ task: 'reloadPlugins' })
                 await scheduleControl?.reloadSchedule()
-            }
+            },
         })
+        await pubSub.start()
 
         if (server.jobQueueManager) {
             const queueString = server.jobQueueManager.getJobQueueTypesAsString()

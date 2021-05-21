@@ -10,6 +10,8 @@ import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_PLUGIN_LOG_ENTRIES } from '../../config/kafka-topics'
 import {
+    Action,
+    ActionStep,
     ClickHouseEvent,
     ClickHousePerson,
     ClickHousePersonDistinctId,
@@ -26,6 +28,7 @@ import {
     PluginLogEntryType,
     PostgresSessionRecordingEvent,
     PropertyDefinitionType,
+    RawAction,
     RawOrganization,
     RawPerson,
     SessionRecordingEvent,
@@ -398,7 +401,7 @@ export class DB {
                 return `|| CASE WHEN (COALESCE(properties->>'${sanitizedPropName}', '0')~E'^([-+])?[0-9\.]+$')
                     THEN jsonb_build_object('${sanitizedPropName}', (COALESCE(properties->>'${sanitizedPropName}','0')::numeric + $${
                     index + 1
-                })) 
+                }))
                     ELSE '{}'
                 END `
             })
@@ -682,14 +685,71 @@ export class DB {
         return entry
     }
 
+    // EventDefinition
+
     public async fetchEventDefinitions(): Promise<EventDefinitionType[]> {
         return (await this.postgresQuery('SELECT * FROM posthog_eventdefinition', undefined, 'fetchEventDefinitions'))
             .rows as EventDefinitionType[]
     }
 
+    // PropertyDefinition
+
     public async fetchPropertyDefinitions(): Promise<PropertyDefinitionType[]> {
         return (
             await this.postgresQuery('SELECT * FROM posthog_propertydefinition', undefined, 'fetchPropertyDefinitions')
         ).rows as PropertyDefinitionType[]
+    }
+
+    // Action & ActionStep
+
+    public async fetchAllActionsMap(): Promise<Record<Action['id'], Action>> {
+        const rawActions: RawAction[] = (
+            await this.postgresQuery(
+                `
+                SELECT * FROM posthog_action`,
+                undefined,
+                'fetchActions'
+            )
+        ).rows
+        const actionSteps: ActionStep[] = (
+            await this.postgresQuery(
+                `
+                SELECT * FROM posthog_actionstep`,
+                undefined,
+                'fetchActionSteps'
+            )
+        ).rows
+        const actionsMap: Record<Action['id'], Action> = {}
+        for (const rawAction of rawActions) {
+            actionsMap[rawAction.id] = { ...rawAction, steps: [] }
+        }
+        for (const actionStep of actionSteps) {
+            actionsMap[actionStep.action_id].steps.push(actionStep)
+        }
+        return actionsMap
+    }
+
+    public async fetchAction(id: Action['id']): Promise<Action | null> {
+        const rawActions: RawAction[] = (
+            await this.postgresQuery(
+                `
+                SELECT * FROM posthog_action WHERE id = $1`,
+                [id],
+                'fetchActions'
+            )
+        ).rows
+        if (!rawActions.length) {
+            return null
+        }
+        const steps: ActionStep[] = (
+            await this.postgresQuery(
+                `
+                SELECT * FROM posthog_actionstep WHERE action_id = $1`,
+                [id],
+                'fetchActionSteps'
+            )
+        ).rows
+        const action: Action = { ...rawActions[0], steps }
+        return action
     }
 }

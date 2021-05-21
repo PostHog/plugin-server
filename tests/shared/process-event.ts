@@ -128,6 +128,7 @@ export const createProcessEventTests = (
         returned.server = server
         returned.stopServer = stopServer
         eventsProcessor = new EventsProcessor(server)
+        await eventsProcessor.prepare()
         queryCounter = 0
         processEventCounter = 0
         team = await getFirstTeam(server)
@@ -139,6 +140,7 @@ export const createProcessEventTests = (
     })
 
     afterEach(async () => {
+        await eventsProcessor.close()
         await server.redisPool.release(redis)
         await stopServer?.()
     })

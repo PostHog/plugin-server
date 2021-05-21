@@ -175,6 +175,7 @@ export async function createServer(
 
     // :TODO: This is only used on worker threads, not main
     server.eventsProcessor = new EventsProcessor(server as PluginsServer)
+    await server.eventsProcessor.prepare()
     server.jobQueueManager = new JobQueueManager(server as PluginsServer)
 
     try {
@@ -192,6 +193,7 @@ export async function createServer(
             clearInterval(eventLoopLagInterval)
         }
         server.mmdbUpdateJob?.cancel()
+        await server.eventsProcessor?.close()
         await server.jobQueueManager?.disconnectProducer()
         if (kafkaProducer) {
             clearInterval(kafkaProducer.flushInterval)

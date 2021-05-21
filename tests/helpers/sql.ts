@@ -1,7 +1,18 @@
 import { Pool, PoolClient } from 'pg'
 
 import { defaultConfig } from '../../src/config/config'
-import { Plugin, PluginAttachmentDB, PluginConfig, PluginsServer, PluginsServerConfig, Team } from '../../src/types'
+import {
+    ActionStep,
+    Plugin,
+    PluginAttachmentDB,
+    PluginConfig,
+    PluginsServer,
+    PluginsServerConfig,
+    PropertyOperator,
+    RawAction,
+    RawOrganization,
+    Team,
+} from '../../src/types'
 import { UUIDT } from '../../src/utils/utils'
 import {
     commonOrganizationId,
@@ -29,6 +40,8 @@ export async function resetTestDatabase(
     } catch {}
 
     await db.query(`
+        DELETE FROM posthog_actionstep;
+        DELETE FROM posthog_action;
         DELETE FROM posthog_element;
         DELETE FROM posthog_elementgroup;
         DELETE FROM posthog_sessionrecordingevent;
@@ -109,7 +122,8 @@ export async function createUserTeamAndOrganization(
         personalization: '{}',
         setup_section_2_completed: true,
         for_internal_metrics: false,
-    })
+        available_features: [],
+    } as RawOrganization)
     await insertRow(db, 'posthog_organizationmembership', {
         id: organizationMembershipId,
         organization_id: organizationId,
@@ -142,6 +156,32 @@ export async function createUserTeamAndOrganization(
         test_account_filters: [],
         timezone: 'UTC',
         data_attributes: JSON.stringify(['data-attr']),
+    })
+    await insertRow(db, 'posthog_action', {
+        id: 67,
+        team_id: teamId,
+        name: 'Test Action',
+        created_at: new Date().toISOString(),
+        created_by_id: userId,
+        deleted: false,
+        post_to_slack: false,
+        slack_message_format: '',
+        is_calculating: false,
+        updated_at: new Date().toISOString(),
+        last_calculated_at: new Date().toISOString(),
+    } as RawAction)
+    await insertRow(db, 'posthog_actionstep', {
+        id: 911,
+        action_id: 67,
+        tag_name: null,
+        text: null,
+        href: null,
+        selector: null,
+        url: null,
+        url_matching: null,
+        name: null,
+        event: null,
+        properties: JSON.stringify([{ type: 'event', operator: PropertyOperator.Exact, key: 'foo', value: ['bar'] }]),
     })
 }
 
