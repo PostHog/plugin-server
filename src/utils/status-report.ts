@@ -76,7 +76,7 @@ class StatusReport {
     public stopStatusReportSchedule(): void {
         this.captureStatusReport()
         posthog.flush()
-        if (this.statusReportJob) {
+        if (this.statusReportJobConfigured) {
             this.statusReportJob.cancel()
         }
     }
