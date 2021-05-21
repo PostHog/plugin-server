@@ -61,11 +61,25 @@ const fetch = async (url: string | URLLike, init?: RequestInit) => {
     return await nodeFetch(url, init)
 }
 
-const checkRedirectChain = async (url: string) => {
+const checkRedirectChain = async (
+    url: string,
+    originalUrl: string = url,
+    numberOfRedirectsFollowed = 0,
+    setOfRedirectsFollowed: Set<string> = new Set()
+) => {
+    if (numberOfRedirectsFollowed >= 10 || setOfRedirectsFollowed.has(url)) {
+        throw new IllegalOperationError(`${originalUrl} flagged as unsafe after too many redirects`)
+    }
     await validateHostOrUrl(url)
     const res = await nodeFetch(url, { redirect: 'manual' })
     if (res.headers && res.headers.get('location')) {
-        await checkRedirectChain(res.headers.get('location')!)
+        setOfRedirectsFollowed.add(res.headers.get('location')!)
+        await checkRedirectChain(
+            res.headers.get('location')!,
+            originalUrl,
+            numberOfRedirectsFollowed + 1,
+            setOfRedirectsFollowed
+        )
     }
 }
 
