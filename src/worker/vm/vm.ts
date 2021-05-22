@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
 import { VM } from 'vm2'
 
-import { PluginConfig, PluginConfigVMReponse, PluginsServer } from '../../types'
+import { PluginConfig, PluginConfigVMResponse, PluginsServer } from '../../types'
 import { createCache } from './extensions/cache'
 import { createConsole } from './extensions/console'
 import { createGeoIp } from './extensions/geoip'
@@ -11,12 +11,13 @@ import { createPosthog } from './extensions/posthog'
 import { createStorage } from './extensions/storage'
 import { imports } from './imports'
 import { transformCode } from './transforms'
+import { upgradeExportEvents } from './upgrades/export-events'
 
 export async function createPluginConfigVM(
     server: PluginsServer,
     pluginConfig: PluginConfig, // NB! might have team_id = 0
     indexJs: string
-): Promise<PluginConfigVMReponse> {
+): Promise<PluginConfigVMResponse> {
     const transformedCode = transformCode(indexJs, server, imports)
 
     // Create virtual machine
@@ -152,6 +153,7 @@ export async function createPluginConfigVM(
             const __methods = {
                 setupPlugin: __asyncFunctionGuard(__bindMeta('setupPlugin')),
                 teardownPlugin: __asyncFunctionGuard(__bindMeta('teardownPlugin')),
+                exportEvents: __asyncFunctionGuard(__bindMeta('exportEvents')),
                 onEvent: __asyncFunctionGuard(__bindMeta('onEvent')),
                 onSnapshot: __asyncFunctionGuard(__bindMeta('onSnapshot')),
                 processEvent: __asyncFunctionGuard(__bindMeta('processEvent')),
@@ -187,15 +189,19 @@ export async function createPluginConfigVM(
                 }
             }
 
-            ${responseVar} = { __methods, __tasks, }
+            ${responseVar} = { methods: __methods, tasks: __tasks, meta: __pluginMeta, }
         })
     `)(asyncGuard)
 
-    await vm.run(`${responseVar}.__methods.setupPlugin?.()`)
+    if (vm.run(`${responseVar}.methods.exportEvents !== 'undefined'`)) {
+        upgradeExportEvents(vm, responseVar)
+    }
+
+    await vm.run(`${responseVar}.methods.setupPlugin?.()`)
 
     return {
         vm,
-        methods: vm.run(`${responseVar}.__methods`),
-        tasks: vm.run(`${responseVar}.__tasks`),
+        methods: vm.run(`${responseVar}.methods`),
+        tasks: vm.run(`${responseVar}.tasks`),
     }
 }
