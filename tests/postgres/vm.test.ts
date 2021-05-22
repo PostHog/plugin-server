@@ -1,6 +1,7 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as fetch from 'node-fetch'
 
+import { JobQueueManager } from '../../src/main/job-queues/job-queue-manager'
 import { PluginsServer } from '../../src/types'
 import { Client } from '../../src/utils/celery/client'
 import { createServer } from '../../src/utils/db/server'
@@ -10,6 +11,8 @@ import { pluginConfig39 } from '../helpers/plugins'
 import { resetTestDatabase } from '../helpers/sql'
 
 jest.mock('../../src/utils/celery/client')
+jest.mock('../../src/main/job-queues/job-queue-manager')
+jest.setTimeout(30000)
 
 const defaultEvent = {
     distinct_id: 'my_id',
@@ -39,6 +42,7 @@ test('empty plugins', async () => {
 
     expect(Object.keys(vm).sort()).toEqual(['methods', 'tasks', 'vm'])
     expect(Object.keys(vm.methods).sort()).toEqual([
+        'exportEvents',
         'onEvent',
         'onSnapshot',
         'processEvent',
@@ -901,4 +905,108 @@ test('onSnapshot', async () => {
     }
     await vm.methods.onSnapshot(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=$snapshot')
+})
+
+describe('exportEvents', () => {
+    test('normal operation', async () => {
+        const indexJs = `
+            async function exportEvents (events, meta) {
+                await fetch('https://export.com/results.json?query=' + events[0].event + '&events=' + events.length)
+            }
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(
+            mockServer,
+            {
+                ...pluginConfig39,
+                config: {
+                    ...pluginConfig39.config,
+                    exportEventsBufferBytes: 10000,
+                    exportEventsBufferSeconds: 1,
+                    exportEventsToIgnore: defaultEvent.event,
+                },
+            },
+            indexJs
+        )
+        const event: PluginEvent = {
+            ...defaultEvent,
+            event: 'exported',
+        }
+        await vm.methods.onEvent(event)
+        await vm.methods.onEvent(defaultEvent)
+        await vm.methods.onEvent(event)
+        await delay(2000)
+        expect(fetch).toHaveBeenCalledWith('https://export.com/results.json?query=exported&events=2')
+    })
+
+    test('retries', async () => {
+        const indexJs = `
+            async function exportEvents (events, meta) {
+                meta.global.ranTimes = (meta.global.ranTimes || 0) + 1;
+                if (meta.global.ranTimes < 3) {
+                    throw new RetryError('Try again')
+                } else {
+                    await fetch('https://export.com/results.json?query=' + events[0].event + '&events=' + events.length)
+                }
+            }
+        `
+        await resetTestDatabase(indexJs, { WORKER_CONCURRENCY: 1, JOB_QUEUES: 'fs' })
+        const vm = await createPluginConfigVM(
+            mockServer,
+            {
+                ...pluginConfig39,
+                config: {
+                    ...pluginConfig39.config,
+                    exportEventsBufferBytes: 10000,
+                    exportEventsBufferSeconds: 1,
+                    exportEventsToIgnore: '',
+                },
+            },
+            indexJs
+        )
+        const event: PluginEvent = {
+            ...defaultEvent,
+            event: 'exported',
+        }
+
+        // first ones will fail and be retried
+        await vm.methods.onEvent(event)
+        await vm.methods.onEvent(event)
+        await vm.methods.onEvent(event)
+        await delay(1000)
+
+        // get the enqueued job
+        expect(JobQueueManager).toHaveBeenCalled()
+        const mockJobQueueInstance = (JobQueueManager as any).mock.instances[0]
+        const mockEnqueue = mockJobQueueInstance.enqueue
+        expect(mockEnqueue).toHaveBeenCalledTimes(1)
+        expect(mockEnqueue).toHaveBeenCalledWith({
+            payload: { batch: [event, event, event], batchId: expect.any(Number), retriesPerformedSoFar: 1 },
+            pluginConfigId: 39,
+            pluginConfigTeam: 2,
+            timestamp: expect.any(Number),
+            type: 'exportEventsWithRetry',
+        })
+        const jobPayload = mockEnqueue.mock.calls[0][0].payload
+
+        // run the job directly
+        await vm.tasks.job['exportEventsWithRetry'].exec(jobPayload)
+
+        // enqueued again
+        expect(mockEnqueue).toHaveBeenCalledTimes(2)
+        expect(mockEnqueue).toHaveBeenLastCalledWith({
+            payload: { batch: jobPayload.batch, batchId: jobPayload.batchId, retriesPerformedSoFar: 2 },
+            pluginConfigId: 39,
+            pluginConfigTeam: 2,
+            timestamp: expect.any(Number),
+            type: 'exportEventsWithRetry',
+        })
+        const jobPayload2 = mockEnqueue.mock.calls[1][0].payload
+
+        // run the job a second time
+        await vm.tasks.job['exportEventsWithRetry'].exec(jobPayload2)
+
+        // now it passed
+        expect(fetch).toHaveBeenCalledWith('https://export.com/results.json?query=exported&events=3')
+    })
 })
