@@ -54,7 +54,7 @@
         "@maxmind/geoip2-node": "^2.3.1",
         "@posthog/clickhouse": "^1.7.0",
         "@posthog/piscina": "^2.2.0-posthog",
-        "@posthog/plugin-contrib": "^0.0.3",
+        "@posthog/plugin-contrib": "^0.0.4",
         "@sentry/node": "^5.29.0",
         "@sentry/tracing": "^5.29.0",
         "@types/lru-cache": "^5.1.0",

@@ -1456,10 +1456,10 @@
   optionalDependencies:
     nice-napi "^1.0.2"
 
-"@posthog/plugin-contrib@^0.0.3":
-  version "0.0.3"
-  resolved "https://registry.yarnpkg.com/@posthog/plugin-contrib/-/plugin-contrib-0.0.3.tgz#d0772c6dd9ec9944ebee9dc475e1e781256b0b5f"
-  integrity sha512-0HrE8AuPv3OLZA93RrJDbljn9u5D/wmiIkBCeckU3LL67LNozDIJgKsY4Td91zgc+b4Rlx/X0MJNp2l6BHbQqg==
+"@posthog/plugin-contrib@^0.0.4":
+  version "0.0.4"
+  resolved "https://registry.yarnpkg.com/@posthog/plugin-contrib/-/plugin-contrib-0.0.4.tgz#519bf98fe60f8b2fe71e5423141c1bdaa7473cc3"
+  integrity sha512-okPx2mIpbpiGMgWq3j9bC6u236rPFpdnSuBzWvWbmE4V9k6vSIZ4/S5w6YFnfa9o/IaudR4LVQ9h7fzXBsV5Fw==
 
 "@posthog/plugin-scaffold@0.10.0":
   version "0.10.0"

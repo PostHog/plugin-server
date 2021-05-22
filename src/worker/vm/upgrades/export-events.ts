@@ -37,7 +37,7 @@ export function upgradeExportEvents(
     const { methods, tasks, meta } = response
 
     if (!methods.exportEvents) {
-        throw new Error('VM does not expose method "exportEvents"')
+        return
     }
 
     const nanToNull = (nr: any): null | number => (isNaN(parseInt(nr)) ? null : parseInt(nr))
@@ -106,7 +106,7 @@ export function upgradeExportEvents(
     const oldOnEvent = methods.onEvent
     methods.onEvent = async (event) => {
         if (!meta.global.exportEventsToIgnore.has(event.event)) {
-            meta.global.exportEventsBuffer.add(event)
+            meta.global.exportEventsBuffer.add(event, JSON.stringify(event).length)
         }
         await oldOnEvent?.(event)
     }
