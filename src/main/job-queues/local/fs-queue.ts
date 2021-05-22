@@ -3,13 +3,17 @@ import Timeout = NodeJS.Timeout
 import * as fs from 'fs'
 import * as path from 'path'
 
-export class FsQueue implements JobQueue {
+import { JobQueueBase } from '../job-queue-base'
+
+export class FsQueue extends JobQueueBase {
     paused: boolean
     started: boolean
     interval: Timeout | null
     filename: string
 
     constructor(filename?: string) {
+        super()
+
         if (process.env.NODE_ENV !== 'test') {
             throw new Error('Can not use FsQueue outside tests')
         }
@@ -24,54 +28,43 @@ export class FsQueue implements JobQueue {
         fs.writeFileSync(this.filename, '')
     }
 
-    enqueue(job: EnqueuedJob): Promise<void> | void {
-        fs.appendFileSync(this.filename, `${JSON.stringify(job)}\n`)
-    }
-
     disconnectProducer(): void {
         // nothing to do
     }
 
+    enqueue(job: EnqueuedJob): Promise<void> | void {
+        fs.appendFileSync(this.filename, `${JSON.stringify(job)}\n`)
+    }
+
     startConsumer(onJob: OnJobCallback): void {
+        super.startConsumer(onJob)
         fs.writeFileSync(this.filename, '')
-        this.started = true
-        this.interval = setInterval(() => {
-            if (this.paused) {
-                return
-            }
-            const timestamp = new Date().valueOf()
-            const queue = fs
-                .readFileSync(this.filename)
-                .toString()
-                .split('\n')
-                .filter((a) => a)
-                .map((s) => JSON.parse(s) as EnqueuedJob)
+    }
 
-            const newQueue = queue.filter((element) => element.timestamp < timestamp)
-            if (newQueue.length > 0) {
-                const oldQueue = queue.filter((element) => element.timestamp >= timestamp)
-                fs.writeFileSync(this.filename, `${oldQueue.map((q) => JSON.stringify(q)).join('\n')}\n`)
+    async readState(): Promise<boolean> {
+        const timestamp = new Date().valueOf()
+        const queue = fs
+            .readFileSync(this.filename)
+            .toString()
+            .split('\n')
+            .filter((a) => a)
+            .map((s) => JSON.parse(s) as EnqueuedJob)
 
-                void onJob(newQueue)
-            }
-        }, 1000)
+        const newQueue = queue.filter((element) => element.timestamp < timestamp)
+
+        if (newQueue.length > 0) {
+            const oldQueue = queue.filter((element) => element.timestamp >= timestamp)
+            fs.writeFileSync(this.filename, `${oldQueue.map((q) => JSON.stringify(q)).join('\n')}\n`)
+
+            await this.onJob?.(newQueue)
+            return true
+        }
+
+        return false
     }
 
     stopConsumer(): void {
-        this.started = false
-        this.interval && clearInterval(this.interval)
+        super.stopConsumer()
         fs.unlinkSync(this.filename)
-    }
-
-    pauseConsumer(): void {
-        this.paused = true
-    }
-
-    isConsumerPaused(): boolean {
-        return this.paused
-    }
-
-    resumeConsumer(): void {
-        this.paused = false
     }
 }
