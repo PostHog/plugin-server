@@ -1,9 +1,7 @@
 import { createBuffer } from '@posthog/plugin-contrib'
-import { Plugin, PluginEvent, PluginMeta } from '@posthog/plugin-scaffold'
-import { VM } from 'vm2'
+import { ConsoleExtension, Plugin, PluginEvent, PluginMeta, RetryError } from '@posthog/plugin-scaffold'
 
-import { PluginConfigVMUpgrade } from '../../../types'
-class RetryError extends Error {}
+import { PluginConfigVMInternalResponse, PluginTaskType } from '../../../types'
 
 type ExportEventsUpgrade = Plugin<{
     global: {
@@ -21,21 +19,33 @@ type ExportEventsUpgrade = Plugin<{
     }
 }>
 
-interface ExportEventsJobPayload {
+interface ExportEventsJobPayload extends Record<string, any> {
     batch: PluginEvent[]
     batchId: number
     retriesPerformedSoFar: number
 }
 
-export function upgradeExportEvents(vm: VM, responseVar: string): void {
-    const { methods, tasks, meta } = vm.run(responseVar) as PluginConfigVMUpgrade<PluginMeta<ExportEventsUpgrade>>
+/*
+ This function injects code into a plugin VM that has exported `exportEvents`:
+ - add the global/config/jobs specified in the `ExportEventsUpgrade` type above.
+ - patch `onEvent` with code to add the event to a buffer.
+ */
+export function upgradeExportEvents(
+    response: PluginConfigVMInternalResponse<PluginMeta<ExportEventsUpgrade>>,
+    console: ConsoleExtension
+): void {
+    const { methods, tasks, meta } = response
 
     if (!methods.exportEvents) {
         throw new Error('VM does not expose method "exportEvents"')
     }
 
-    const uploadBytes = Math.max(1, Math.min(parseInt(meta.config.exportEventsBufferBytes) || 1024 * 1024, 100))
-    const uploadSeconds = Math.max(1, Math.min(parseInt(meta.config.exportEventsBufferSeconds) || 30, 600))
+    const nanToNull = (nr: any): null | number => (isNaN(parseInt(nr)) ? null : parseInt(nr))
+    const uploadBytes = Math.max(
+        1,
+        Math.min(nanToNull(meta.config.exportEventsBufferBytes) ?? 1024 * 1024, 100 * 1024 * 1024)
+    )
+    const uploadSeconds = Math.max(1, Math.min(nanToNull(meta.config.exportEventsBufferSeconds) ?? 10, 600))
 
     meta.global.exportEventsToIgnore = new Set(
         meta.config.exportEventsToIgnore
@@ -87,21 +97,17 @@ export function upgradeExportEvents(vm: VM, responseVar: string): void {
         }
     }
 
-    // Add "exportEventsWithRetry" job
-    vm.run(`(function ({ name, job }) {
-        ${responseVar}.__tasks.job[name] = { name, type: 'job', task: job }
-    })`)({
+    tasks.job['exportEventsWithRetry'] = {
         name: 'exportEventsWithRetry',
-        job: (payload: ExportEventsJobPayload) => meta.global.exportEventsWithRetry(payload, meta),
-    })
+        type: PluginTaskType.Job,
+        exec: (payload) => meta.global.exportEventsWithRetry(payload as ExportEventsJobPayload, meta),
+    }
 
-    // Patch onEvent
-    vm.run(`(function (onEvent) {
-        const oldOnEvent = ${responseVar}.__methods.onEvent;
-        ${responseVar}.__methods.onEvent = async (event) => { await oldOnEvent?.(event); await onEvent?.(event); }
-    })`)((event: PluginEvent) => {
+    const oldOnEvent = methods.onEvent
+    methods.onEvent = async (event) => {
         if (!meta.global.exportEventsToIgnore.has(event.event)) {
             meta.global.exportEventsBuffer.add(event)
         }
-    })
+        await oldOnEvent?.(event)
+    }
 }

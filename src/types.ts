@@ -1,5 +1,5 @@
 import ClickHouse from '@posthog/clickhouse'
-import { Meta,PluginAttachment, PluginConfigSchema, PluginEvent, Properties } from '@posthog/plugin-scaffold'
+import { Meta, PluginAttachment, PluginConfigSchema, PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import { Pool as GenericPool } from 'generic-pool'
 import { StatsD } from 'hot-shots'
 import { Redis } from 'ioredis'
@@ -269,7 +269,7 @@ export interface PluginConfigVMResponse {
     tasks: Record<PluginTaskType, Record<string, PluginTask>>
 }
 
-export interface PluginConfigVMUpgrade<M extends Meta> {
+export interface PluginConfigVMInternalResponse<M extends Meta = Meta> {
     methods: VMMethods
     tasks: Record<PluginTaskType, Record<string, PluginTask>>
     meta: M

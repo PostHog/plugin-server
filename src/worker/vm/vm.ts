@@ -1,3 +1,4 @@
+import { RetryError } from '@posthog/plugin-scaffold'
 import { randomBytes } from 'crypto'
 import { VM } from 'vm2'
 
@@ -27,7 +28,8 @@ export async function createPluginConfigVM(
     })
 
     // Add PostHog utilities to virtual machine
-    vm.freeze(createConsole(server, pluginConfig), 'console')
+    const vmConsole = createConsole(server, pluginConfig)
+    vm.freeze(vmConsole, 'console')
     vm.freeze(createPosthog(server, pluginConfig), 'posthog')
 
     // Add non-PostHog utilities to virtual machine
@@ -39,6 +41,8 @@ export async function createPluginConfigVM(
     if (process.env.NODE_ENV === 'test') {
         vm.freeze(setTimeout, '__jestSetTimeout')
     }
+
+    vm.freeze(RetryError, 'RetryError')
 
     // Creating this outside the vm (so not in a babel plugin for example)
     // because `setTimeout` is not available inside the vm... and we don't want to
@@ -194,7 +198,7 @@ export async function createPluginConfigVM(
     `)(asyncGuard)
 
     if (vm.run(`${responseVar}.methods.exportEvents !== 'undefined'`)) {
-        upgradeExportEvents(vm, responseVar)
+        upgradeExportEvents(vm.run(responseVar), vmConsole)
     }
 
     await vm.run(`${responseVar}.methods.setupPlugin?.()`)

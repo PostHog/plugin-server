@@ -1461,12 +1461,10 @@
   resolved "https://registry.yarnpkg.com/@posthog/plugin-contrib/-/plugin-contrib-0.0.3.tgz#d0772c6dd9ec9944ebee9dc475e1e781256b0b5f"
   integrity sha512-0HrE8AuPv3OLZA93RrJDbljn9u5D/wmiIkBCeckU3LL67LNozDIJgKsY4Td91zgc+b4Rlx/X0MJNp2l6BHbQqg==
 
-"@posthog/plugin-scaffold@0.9.0":
-  version "0.9.0"
-  resolved "https://registry.yarnpkg.com/@posthog/plugin-scaffold/-/plugin-scaffold-0.9.0.tgz#67f1eaeb526591ed6693dce2fd2eeb6a7ff69546"
-  integrity sha512-JvxTpIUsCzJcRqeEtQiAsigXyzG5fMqH0zEadEPsqfPZoznIzeNGCu37AyMewOJzId+zlgmRz1R7O1kqhbyPZg==
-  dependencies:
-    "@maxmind/geoip2-node" "^2.3.1"
+"@posthog/plugin-scaffold@0.10.0":
+  version "0.10.0"
+  resolved "https://registry.yarnpkg.com/@posthog/plugin-scaffold/-/plugin-scaffold-0.10.0.tgz#e80f57c5d3833753632607bed3ca71ebf272b12b"
+  integrity sha512-c8lNzQTBMJ0X3SCjcaD+mXZIx2thc+ptf8G4gbfT9YBFFD6TMaxs+/APMUab2aRJRbVwOsCGj9poxwuF4wxPpA==
 
 "@protobufjs/aspromise@^1.1.1", "@protobufjs/aspromise@^1.1.2":
   version "1.1.2"
