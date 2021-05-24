@@ -111,7 +111,7 @@ Let's talk about the main thread first. This has:
 
 This begins with `worker.ts` and `createWorker()`.
 
-`server` is the same setup as in the main thread.
+`hub` is the same setup as in the main thread.
 
 New functions called here are:
 
