@@ -1,15 +1,7 @@
 import { Pool, PoolClient } from 'pg'
 
 import { defaultConfig } from '../../src/config/config'
-import {
-    Hub,
-    Plugin,
-    PluginAttachmentDB,
-    PluginConfig,
-    PluginsServer,
-    PluginsServerConfig,
-    Team,
-} from '../../src/types'
+import { Hub, Plugin, PluginAttachmentDB, PluginConfig, PluginsServerConfig, Team } from '../../src/types'
 import { UUIDT } from '../../src/utils/utils'
 import {
     commonOrganizationId,

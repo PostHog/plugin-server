@@ -1,7 +1,7 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as fetch from 'node-fetch'
 
-import { hub } from '../../src/types'
+import { Hub } from '../../src/types'
 import { Client } from '../../src/utils/celery/client'
 import { createHub } from '../../src/utils/db/hub'
 import { delay } from '../../src/utils/utils'
