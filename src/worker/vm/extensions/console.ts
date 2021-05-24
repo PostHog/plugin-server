@@ -1,6 +1,6 @@
 import { ConsoleExtension } from '@posthog/plugin-scaffold'
 
-import { Hub,PluginConfig, PluginLogEntrySource, PluginLogEntryType } from '../../../types'
+import { Hub, PluginConfig, PluginLogEntrySource, PluginLogEntryType } from '../../../types'
 import { status } from '../../../utils/status'
 import { determineNodeEnv, NodeEnv, pluginDigest } from '../../../utils/utils'
 

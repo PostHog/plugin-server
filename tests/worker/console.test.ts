@@ -1,6 +1,6 @@
 import { ConsoleExtension } from '@posthog/plugin-scaffold'
 
-import { Hub,PluginLogEntryType } from '../../src/types'
+import { Hub, PluginLogEntryType } from '../../src/types'
 import { createHub } from '../../src/utils/db/hub'
 import { getPluginConfigRows } from '../../src/utils/db/sql'
 import { createConsole } from '../../src/worker/vm/extensions/console'

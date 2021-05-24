@@ -1,7 +1,7 @@
 import Piscina from '@posthog/piscina'
 import * as Sentry from '@sentry/node'
 
-import { Hub,JobQueueConsumerControl, OnJobCallback } from '../../types'
+import { Hub, JobQueueConsumerControl, OnJobCallback } from '../../types'
 import { killProcess } from '../../utils/kill'
 import { startRedlock } from '../../utils/redlock'
 import { status } from '../../utils/status'

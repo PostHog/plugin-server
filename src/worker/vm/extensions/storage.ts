@@ -1,6 +1,6 @@
 import { StorageExtension } from '@posthog/plugin-scaffold'
 
-import { Hub,PluginConfig } from '../../../types'
+import { Hub, PluginConfig } from '../../../types'
 
 export function createStorage(server: Hub, pluginConfig: PluginConfig): StorageExtension {
     const get = async function (key: string, defaultValue: unknown): Promise<unknown> {

@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
 import { VM } from 'vm2'
 
-import { Hub,PluginConfig, PluginConfigVMReponse } from '../../types'
+import { Hub, PluginConfig, PluginConfigVMReponse } from '../../types'
 import { createCache } from './extensions/cache'
 import { createConsole } from './extensions/console'
 import { createGeoIp } from './extensions/geoip'

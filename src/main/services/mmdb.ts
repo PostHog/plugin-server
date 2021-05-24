@@ -16,7 +16,7 @@ import {
     MMDB_STATUS_REDIS_KEY,
     MMDBRequestStatus,
 } from '../../config/mmdb-constants'
-import { Hub,PluginAttachmentDB } from '../../types'
+import { Hub, PluginAttachmentDB } from '../../types'
 import { status } from '../../utils/status'
 import { delay } from '../../utils/utils'
 import { ServerInstance } from '../pluginsServer'

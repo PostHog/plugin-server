@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
-import { Hub,PluginConfig, PluginJsonConfig } from '../../types'
+import { Hub, PluginConfig, PluginJsonConfig } from '../../types'
 import { processError } from '../../utils/db/error'
 import { getFileFromArchive, pluginDigest } from '../../utils/utils'
 

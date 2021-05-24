@@ -1,4 +1,4 @@
-import { Hub,PluginConfig } from '../../../types'
+import { Hub, PluginConfig } from '../../../types'
 
 type JobRunner = {
     runAt: (date: Date) => Promise<void>

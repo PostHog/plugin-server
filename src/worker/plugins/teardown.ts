@@ -1,4 +1,4 @@
-import { Hub,PluginConfig, PluginLogEntrySource, PluginLogEntryType } from '../../types'
+import { Hub, PluginConfig, PluginLogEntrySource, PluginLogEntryType } from '../../types'
 import { processError } from '../../utils/db/error'
 
 export async function teardownPlugins(server: Hub, pluginConfig?: PluginConfig): Promise<void> {
