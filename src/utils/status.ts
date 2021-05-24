@@ -1,7 +1,5 @@
 import { threadId } from 'worker_threads'
 
-import { determineNodeEnv, NodeEnv } from './utils'
-
 export type StatusMethod = (icon: string, ...message: any[]) => void
 
 export interface StatusBlueprint {
@@ -24,7 +22,8 @@ export class Status implements StatusBlueprint {
     }
 
     buildMethod(type: keyof StatusBlueprint): StatusMethod {
-        if (determineNodeEnv() == NodeEnv.Test) {
+        if (process.env.NODE_ENV?.toLowerCase() === 'test') {
+            // TODO: use determineNodeEnv() here
             return () => {} // eslint-disable-line @typescript-eslint/no-empty-function
         }
         return (icon: string, ...message: any[]) => {

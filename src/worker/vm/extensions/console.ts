@@ -18,7 +18,7 @@ function consoleFormat(...args: unknown[]): string {
 
 export function createConsole(server: PluginsServer, pluginConfig: PluginConfig): ConsoleExtension {
     async function consolePersist(type: PluginLogEntryType, ...args: unknown[]): Promise<void> {
-        if (determineNodeEnv() == NodeEnv.Development) {
+        if (determineNodeEnv() === NodeEnv.Development) {
             status.info('👉', `${type} in ${pluginDigest(pluginConfig.plugin!, pluginConfig.team_id)}:`, ...args)
         }
 
