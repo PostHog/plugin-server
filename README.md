@@ -86,7 +86,8 @@ Let's talk about the main thread first. This has:
 
 1. `pubSub` – Redis powered pub-sub mechanism for reloading plugins whenever a message is published by the main PostHog app.
 
-2. `server` – Handler of connections to required DBs and queues (ClickHouse, Kafka, Postgres, Redis), created via `server.ts -> createServer`. Every thread has its own instance.
+2. `hub` – Handler of connections to required DBs and queues (ClickHouse, Kafka, Postgres, Redis), holds loaded plugins.
+   Created via `hub.ts -> createHub`. Every thread has its own instance.
 
 3. `fastifyInstance` – Web server. Unused for now.
 
