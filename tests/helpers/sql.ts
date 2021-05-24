@@ -122,6 +122,7 @@ export async function createUserTeamAndOrganization(
         personalization: '{}',
         setup_section_2_completed: true,
         for_internal_metrics: false,
+        available_features: [],
     } as RawOrganization)
     await insertRow(db, 'posthog_organizationmembership', {
         id: organizationMembershipId,

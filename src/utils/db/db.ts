@@ -737,7 +737,9 @@ export class DB {
             actionsMap[rawAction.id] = { ...rawAction, steps: [] }
         }
         for (const actionStep of actionSteps) {
-            actionsMap[actionStep.action_id].steps.push(actionStep)
+            if (actionStep.action_id in actionsMap) {
+                actionsMap[actionStep.action_id].steps.push(actionStep)
+            }
         }
         return actionsMap
     }
