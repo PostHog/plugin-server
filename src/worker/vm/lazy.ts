@@ -11,7 +11,7 @@ import {
     PluginTaskType,
 } from '../../types'
 import { clearError, processError } from '../../utils/db/error'
-import { disablePlugin,setPluginCapabilities } from '../../utils/db/sql'
+import { disablePlugin, setPluginCapabilities } from '../../utils/db/sql'
 import { status } from '../../utils/status'
 import { createPluginConfigVM } from './vm'
 
