@@ -1,17 +1,11 @@
-import equal from 'fast-deep-equal'
 import * as fs from 'fs'
 import * as path from 'path'
 
-import { PluginCapabilities, PluginConfig, PluginJsonConfig, PluginsServer } from '../../types'
+import { PluginConfig, PluginJsonConfig, PluginsServer } from '../../types'
 import { processError } from '../../utils/db/error'
-import { setPluginCapabilities } from '../../utils/db/sql'
 import { getFileFromArchive, pluginDigest } from '../../utils/utils'
 
-export async function loadPlugin(
-    server: PluginsServer,
-    pluginConfig: PluginConfig,
-    prevConfig?: PluginConfig
-): Promise<boolean> {
+export async function loadPlugin(server: PluginsServer, pluginConfig: PluginConfig): Promise<boolean> {
     const { plugin } = pluginConfig
 
     if (!plugin) {
@@ -59,7 +53,6 @@ export async function loadPlugin(
                 indexJs,
                 `local ${pluginDigest(plugin)} from "${pluginPath}"!`
             )
-            await inferPluginCapabilities(server, pluginConfig, prevConfig)
             return true
         } else if (plugin.archive) {
             let config: PluginJsonConfig = {}
@@ -79,7 +72,6 @@ export async function loadPlugin(
 
             if (indexJs) {
                 void pluginConfig.vm?.initialize!(server, pluginConfig, indexJs, pluginDigest(plugin))
-                await inferPluginCapabilities(server, pluginConfig, prevConfig)
                 return true
             } else {
                 pluginConfig.vm?.failInitialization!()
@@ -87,7 +79,6 @@ export async function loadPlugin(
             }
         } else if (plugin.plugin_type === 'source' && plugin.source) {
             void pluginConfig.vm?.initialize!(server, pluginConfig, plugin.source, pluginDigest(plugin))
-            await inferPluginCapabilities(server, pluginConfig, prevConfig)
             return true
         } else {
             pluginConfig.vm?.failInitialization!()
@@ -102,54 +93,4 @@ export async function loadPlugin(
         await processError(server, pluginConfig, error)
     }
     return false
-}
-
-async function inferPluginCapabilities(
-    server: PluginsServer,
-    pluginConfig: PluginConfig,
-    prevConfig?: PluginConfig
-): Promise<void> {
-    // infer on load implies there's no lazy loading, but all workers get
-    // these properties loaded
-
-    if (!pluginConfig.plugin) {
-        throw new Error(`'PluginConfig missing plugin: ${pluginConfig}`)
-    }
-
-    const vm = await pluginConfig.vm?.resolveInternalVm
-    const capabilities: Required<PluginCapabilities> = { scheduled_tasks: [], jobs: [], methods: [] }
-
-    const tasks = vm?.tasks
-    const methods = vm?.methods
-
-    if (methods) {
-        for (const [key, value] of Object.entries(methods)) {
-            if (value) {
-                capabilities.methods!.push(key)
-            }
-        }
-    }
-
-    if (tasks?.schedule) {
-        for (const [key, value] of Object.entries(tasks.schedule)) {
-            if (value) {
-                capabilities.scheduled_tasks.push(key)
-            }
-        }
-    }
-
-    if (tasks?.job) {
-        for (const [key, value] of Object.entries(tasks.job)) {
-            if (value) {
-                capabilities.jobs.push(key)
-            }
-        }
-    }
-
-    const prevCapabilities = prevConfig?.plugin?.capabilities
-    if (!equal(prevCapabilities, capabilities)) {
-        await setPluginCapabilities(server, pluginConfig, capabilities)
-    }
-
-    pluginConfig.plugin.capabilities = capabilities
 }
