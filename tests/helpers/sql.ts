@@ -158,7 +158,7 @@ export async function createUserTeamAndOrganization(
         data_attributes: JSON.stringify(['data-attr']),
     })
     await insertRow(db, 'posthog_action', {
-        id: 67,
+        id: teamId + 67,
         team_id: teamId,
         name: 'Test Action',
         created_at: new Date().toISOString(),
@@ -171,8 +171,8 @@ export async function createUserTeamAndOrganization(
         last_calculated_at: new Date().toISOString(),
     } as RawAction)
     await insertRow(db, 'posthog_actionstep', {
-        id: 911,
-        action_id: 67,
+        id: teamId + 911,
+        action_id: teamId + 67,
         tag_name: null,
         text: null,
         href: null,

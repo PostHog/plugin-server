@@ -236,10 +236,6 @@ describe('createTaskRunner()', () => {
         taskRunner = createTaskRunner(server)
     })
 
-    it('handles `hello` task', async () => {
-        expect(await taskRunner({ task: 'hello', args: ['world'] })).toEqual('hello world!')
-    })
-
     it('handles `processEvent` task', async () => {
         mocked(runProcessEvent).mockReturnValue('runProcessEvent response' as any)
 
