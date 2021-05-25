@@ -5,20 +5,19 @@ import { gunzipSync, gzipSync } from 'zlib'
 
 import { EnqueuedJob, PluginsServerConfig } from '../../../types'
 import { S3Wrapper } from '../../../utils/db/s3-wrapper'
+import { UUIDT } from '../../../utils/utils'
 import { JobQueueBase } from '../job-queue-base'
 
 const S3_POLL_INTERVAL = 5000
 
 export class S3Queue extends JobQueueBase {
     serverConfig: PluginsServerConfig
-    s3: S3 | null
     s3Wrapper: S3Wrapper | null
     runner: NodeJS.Timeout | null
 
     constructor(serverConfig: PluginsServerConfig) {
         super()
         this.serverConfig = serverConfig
-        this.s3 = null
         this.s3Wrapper = null
         this.runner = null
     }
@@ -148,11 +147,34 @@ export class S3Queue extends JobQueueBase {
             secretAccessKey: this.serverConfig.JOB_QUEUE_S3_AWS_SECRET_ACCESS_KEY,
             region: this.serverConfig.JOB_QUEUE_S3_AWS_REGION,
         })
-        // check that we can connect
-        await s3Wrapper.listObjectsV2({
-            Bucket: this.serverConfig.JOB_QUEUE_S3_BUCKET_NAME,
-        })
+
+        await this.testS3Connection(s3Wrapper)
 
         return s3Wrapper
+    }
+
+    private async testS3Connection(s3Wrapper: S3Wrapper): Promise<void> {
+        const filename = `${this.serverConfig.JOB_QUEUE_S3_PREFIX || ''}CONNTEST/${new UUIDT()}.test`
+        await s3Wrapper.listObjectsV2({
+            Bucket: this.serverConfig.JOB_QUEUE_S3_BUCKET_NAME,
+            Prefix: this.serverConfig.JOB_QUEUE_S3_PREFIX,
+            MaxKeys: 2,
+        })
+        await s3Wrapper.upload({
+            Bucket: this.serverConfig.JOB_QUEUE_S3_BUCKET_NAME,
+            Key: filename,
+            Body: 'test',
+        })
+        const object = await s3Wrapper.getObject({
+            Bucket: this.serverConfig.JOB_QUEUE_S3_BUCKET_NAME,
+            Key: filename,
+        })
+        await s3Wrapper.deleteObject({
+            Bucket: this.serverConfig.JOB_QUEUE_S3_BUCKET_NAME,
+            Key: filename,
+        })
+        if (object?.Body?.toString() !== 'test') {
+            throw new Error('Read object did not equal written object')
+        }
     }
 }
