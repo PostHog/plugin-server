@@ -4,6 +4,14 @@ import { ConsoleExtension, Plugin, PluginEvent, PluginMeta, RetryError } from '@
 import { PluginConfigVMInternalResponse, PluginTaskType } from '../../../types'
 import { stringClamp } from '../../../utils/utils'
 
+const MAXIMUM_RETRIES = 15
+const EXPORT_BUFFER_BYTES_MINIMUM = 1
+const EXPORT_BUFFER_BYTES_DEFAULT = 1024 * 1024
+const EXPORT_BUFFER_BYTES_MAXIMUM = 100 * 1024 * 1024
+const EXPORT_BUFFER_SECONDS_MINIMUM = 1
+const EXPORT_BUFFER_SECONDS_DEFAULT = 10
+const EXPORT_BUFFER_SECONDS_MAXIMUM = 600
+
 type ExportEventsUpgrade = Plugin<{
     global: {
         exportEventsBuffer: ReturnType<typeof createBuffer>
@@ -41,8 +49,18 @@ export function upgradeExportEvents(
         return
     }
 
-    const uploadBytes = stringClamp(meta.config.exportEventsBufferBytes, 1024 * 1024, 1, 100 * 1024 * 1024)
-    const uploadSeconds = stringClamp(meta.config.exportEventsBufferSeconds, 10, 1, 600)
+    const uploadBytes = stringClamp(
+        meta.config.exportEventsBufferBytes,
+        EXPORT_BUFFER_BYTES_DEFAULT,
+        EXPORT_BUFFER_BYTES_MINIMUM,
+        EXPORT_BUFFER_BYTES_MAXIMUM
+    )
+    const uploadSeconds = stringClamp(
+        meta.config.exportEventsBufferSeconds,
+        EXPORT_BUFFER_SECONDS_DEFAULT,
+        EXPORT_BUFFER_SECONDS_MINIMUM,
+        EXPORT_BUFFER_SECONDS_MAXIMUM
+    )
 
     meta.global.exportEventsToIgnore = new Set(
         meta.config.exportEventsToIgnore
@@ -72,7 +90,7 @@ export function upgradeExportEvents(
             await methods.exportEvents(payload.batch)
         } catch (err) {
             if (err instanceof RetryError) {
-                if (payload.retriesPerformedSoFar < 15) {
+                if (payload.retriesPerformedSoFar < MAXIMUM_RETRIES) {
                     const nextRetrySeconds = 2 ** payload.retriesPerformedSoFar * 3
                     console.log(`Enqueued batch ${payload.batchId} for retry in ${Math.round(nextRetrySeconds)}s`)
 
