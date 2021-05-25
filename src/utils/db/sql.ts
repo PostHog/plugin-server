@@ -23,8 +23,8 @@ function pluginConfigsInForceQuery(specificField?: keyof PluginConfig): string {
        )`
 }
 
-export async function getPluginRows(server: Hub): Promise<Plugin[]> {
-    const { rows: pluginRows }: { rows: Plugin[] } = await server.db.postgresQuery(
+export async function getPluginRows(hub: Hub): Promise<Plugin[]> {
+    const { rows: pluginRows }: { rows: Plugin[] } = await hub.db.postgresQuery(
         `SELECT posthog_plugin.* FROM posthog_plugin
             WHERE id IN (${pluginConfigsInForceQuery('plugin_id')} GROUP BY posthog_pluginconfig.plugin_id)`,
         undefined,
@@ -33,8 +33,8 @@ export async function getPluginRows(server: Hub): Promise<Plugin[]> {
     return pluginRows
 }
 
-export async function getPluginAttachmentRows(server: Hub): Promise<PluginAttachmentDB[]> {
-    const { rows }: { rows: PluginAttachmentDB[] } = await server.db.postgresQuery(
+export async function getPluginAttachmentRows(hub: Hub): Promise<PluginAttachmentDB[]> {
+    const { rows }: { rows: PluginAttachmentDB[] } = await hub.db.postgresQuery(
         `SELECT posthog_pluginattachment.* FROM posthog_pluginattachment
             WHERE plugin_config_id IN (${pluginConfigsInForceQuery('id')})`,
         undefined,
@@ -43,8 +43,8 @@ export async function getPluginAttachmentRows(server: Hub): Promise<PluginAttach
     return rows
 }
 
-export async function getPluginConfigRows(server: Hub): Promise<PluginConfig[]> {
-    const { rows }: { rows: PluginConfig[] } = await server.db.postgresQuery(
+export async function getPluginConfigRows(hub: Hub): Promise<PluginConfig[]> {
+    const { rows }: { rows: PluginConfig[] } = await hub.db.postgresQuery(
         pluginConfigsInForceQuery(),
         undefined,
         'getPluginConfigRows'
@@ -64,30 +64,26 @@ export async function setPluginCapabilities(
     )
 }
 
-export async function setError(
-    server: Hub,
-    pluginError: PluginError | null,
-    pluginConfig: PluginConfig
-): Promise<void> {
-    await server.db.postgresQuery(
+export async function setError(hub: Hub, pluginError: PluginError | null, pluginConfig: PluginConfig): Promise<void> {
+    await hub.db.postgresQuery(
         'UPDATE posthog_pluginconfig SET error = $1 WHERE id = $2',
         [pluginError, typeof pluginConfig === 'object' ? pluginConfig?.id : pluginConfig],
         'updatePluginConfigError'
     )
     if (pluginError) {
-        await server.db.createPluginLogEntry(
+        await hub.db.createPluginLogEntry(
             pluginConfig,
             PluginLogEntrySource.Plugin,
             PluginLogEntryType.Error,
             pluginError.message,
-            server.instanceId,
+            hub.instanceId,
             pluginError.time
         )
     }
 }
 
-export async function disablePlugin(server: Hub, pluginConfigId: PluginConfigId): Promise<void> {
-    await server.db.postgresQuery(
+export async function disablePlugin(hub: Hub, pluginConfigId: PluginConfigId): Promise<void> {
+    await hub.db.postgresQuery(
         `UPDATE posthog_pluginconfig SET enabled='f' WHERE id=$1 AND enabled='t'`,
         [pluginConfigId],
         'disablePlugin'
