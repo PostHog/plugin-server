@@ -1,7 +1,7 @@
 import { createBuffer } from '@posthog/plugin-contrib'
 import { Plugin, PluginEvent, PluginMeta, RetryError } from '@posthog/plugin-scaffold'
 
-import { PluginConfig, PluginConfigVMInternalResponse, PluginTaskType } from '../../../types'
+import { Hub, PluginConfig, PluginConfigVMInternalResponse, PluginTaskType } from '../../../types'
 import { status } from '../../../utils/status'
 import { stringClamp } from '../../../utils/utils'
 
@@ -41,6 +41,7 @@ interface ExportEventsJobPayload extends Record<string, any> {
  * - patch `onEvent` with code to add the event to a buffer.
  */
 export function upgradeExportEvents(
+    hub: Hub,
     pluginConfig: PluginConfig,
     response: PluginConfigVMInternalResponse<PluginMeta<ExportEventsUpgrade>>
 ): void {
@@ -87,27 +88,42 @@ export function upgradeExportEvents(
         payload: ExportEventsJobPayload,
         meta: PluginMeta<ExportEventsUpgrade>
     ) => {
+        const start = new Date()
         try {
             await methods.exportEvents?.(payload.batch)
+            hub.statsd?.timing('plugin.export_events.success', start, {
+                plugin: pluginConfig.plugin?.name ?? '?',
+                teamId: pluginConfig.team_id.toString(),
+            })
         } catch (err) {
             if (err instanceof RetryError) {
                 if (payload.retriesPerformedSoFar < MAXIMUM_RETRIES) {
                     const nextRetrySeconds = 2 ** (payload.retriesPerformedSoFar + 1) * 3
+                    await meta.jobs
+                        .exportEventsWithRetry({ ...payload, retriesPerformedSoFar: payload.retriesPerformedSoFar + 1 })
+                        .runIn(nextRetrySeconds, 'seconds')
+
                     status.info(
                         '🚃',
                         `Enqueued PluginConfig ${pluginConfig.id} batch ${payload.batchId} for retry #${
                             payload.retriesPerformedSoFar + 1
                         } in ${Math.round(nextRetrySeconds)}s`
                     )
-
-                    await meta.jobs
-                        .exportEventsWithRetry({ ...payload, retriesPerformedSoFar: payload.retriesPerformedSoFar + 1 })
-                        .runIn(nextRetrySeconds, 'seconds')
+                    hub.statsd?.increment('plugin.export_events.retry_enqueued', {
+                        retry: `${payload.retriesPerformedSoFar + 1}`,
+                        plugin: pluginConfig.plugin?.name ?? '?',
+                        teamId: pluginConfig.team_id.toString(),
+                    })
                 } else {
                     status.info(
                         '☠️',
                         `Dropped PluginConfig ${pluginConfig.id} batch ${payload.batchId} after retrying ${payload.retriesPerformedSoFar} times`
                     )
+                    hub.statsd?.increment('plugin.export_events.retry_dropped', {
+                        retry: `${payload.retriesPerformedSoFar}`,
+                        plugin: pluginConfig.plugin?.name ?? '?',
+                        teamId: pluginConfig.team_id.toString(),
+                    })
                 }
             } else {
                 throw err
