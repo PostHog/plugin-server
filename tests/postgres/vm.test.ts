@@ -965,10 +965,10 @@ describe('exportEvents', () => {
             },
             indexJs
         )
-        await vm.methods.onEvent(defaultEvent)
-        await vm.methods.onEvent({ ...defaultEvent, event: 'otherEvent' })
-        await vm.methods.onEvent({ ...defaultEvent, event: 'otherEvent2' })
-        await vm.methods.onEvent({ ...defaultEvent, event: 'otherEvent3' })
+        await vm.methods.onEvent!(defaultEvent)
+        await vm.methods.onEvent!({ ...defaultEvent, event: 'otherEvent' })
+        await vm.methods.onEvent!({ ...defaultEvent, event: 'otherEvent2' })
+        await vm.methods.onEvent!({ ...defaultEvent, event: 'otherEvent3' })
         await delay(1010)
         expect(fetch).toHaveBeenCalledWith('https://export.com/results.json?query=otherEvent2&events=2')
 
@@ -1013,9 +1013,9 @@ describe('exportEvents', () => {
         }
 
         // first ones will fail and be retried
-        await vm.methods.onEvent(event)
-        await vm.methods.onEvent(event)
-        await vm.methods.onEvent(event)
+        await vm.methods.onEvent!(event)
+        await vm.methods.onEvent!(event)
+        await vm.methods.onEvent!(event)
         await delay(1010)
 
         // get the enqueued job
@@ -1076,9 +1076,9 @@ describe('exportEvents', () => {
             indexJs
         )
 
-        await vm.methods.onEvent(defaultEvent)
-        await vm.methods.onEvent(defaultEvent)
-        await vm.methods.onEvent(defaultEvent)
+        await vm.methods.onEvent!(defaultEvent)
+        await vm.methods.onEvent!(defaultEvent)
+        await vm.methods.onEvent!(defaultEvent)
         await delay(1010)
 
         const mockJobQueueInstance = (JobQueueManager as any).mock.instances[0]
@@ -1120,9 +1120,9 @@ describe('exportEvents', () => {
             ...defaultEvent,
             event: 'exported',
         }
-        await vm.methods.onEvent(event)
-        await vm.methods.onEvent(defaultEvent)
-        await vm.methods.onEvent(event)
+        await vm.methods.onEvent!(event)
+        await vm.methods.onEvent!(defaultEvent)
+        await vm.methods.onEvent!(event)
         await delay(1010)
         expect(fetch).toHaveBeenCalledTimes(4)
         expect(fetch).toHaveBeenCalledWith('https://onevent.com/')
@@ -1159,7 +1159,7 @@ describe('exportEvents', () => {
             event: 'exported',
         }
         for (let i = 0; i < 100; i++) {
-            await vm.methods.onEvent(event)
+            await vm.methods.onEvent!(event)
         }
         await delay(1010)
 
@@ -1213,7 +1213,7 @@ describe('exportEvents', () => {
             event: 'exported',
         }
         for (let i = 0; i < 100; i++) {
-            await vm.methods.onEvent(event)
+            await vm.methods.onEvent!(event)
         }
         await delay(1010)
 
