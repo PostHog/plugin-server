@@ -6,58 +6,58 @@ import { runOnEvent, runOnSnapshot, runPluginTask, runProcessEvent, runProcessEv
 import { loadSchedule, setupPlugins } from './plugins/setup'
 import { teardownPlugins } from './plugins/teardown'
 
-type TaskRunner = (server: Hub, args: any) => Promise<any> | any
+type TaskRunner = (hub: Hub, args: any) => Promise<any> | any
 
 export const workerTasks: Record<string, TaskRunner> = {
-    onEvent: (server, args: { event: PluginEvent }) => {
-        return runOnEvent(server, args.event)
+    onEvent: (hub, args: { event: PluginEvent }) => {
+        return runOnEvent(hub, args.event)
     },
-    onSnapshot: (server, args: { event: PluginEvent }) => {
-        return runOnSnapshot(server, args.event)
+    onSnapshot: (hub, args: { event: PluginEvent }) => {
+        return runOnSnapshot(hub, args.event)
     },
-    processEvent: (server, args: { event: PluginEvent }) => {
-        return runProcessEvent(server, args.event)
+    processEvent: (hub, args: { event: PluginEvent }) => {
+        return runProcessEvent(hub, args.event)
     },
-    processEventBatch: (server, args: { batch: PluginEvent[] }) => {
-        return runProcessEventBatch(server, args.batch)
+    processEventBatch: (hub, args: { batch: PluginEvent[] }) => {
+        return runProcessEventBatch(hub, args.batch)
     },
-    runJob: (server, { job }: { job: EnqueuedJob }) => {
-        return runPluginTask(server, job.type, PluginTaskType.Job, job.pluginConfigId, job.payload)
+    runJob: (hub, { job }: { job: EnqueuedJob }) => {
+        return runPluginTask(hub, job.type, PluginTaskType.Job, job.pluginConfigId, job.payload)
     },
-    runEveryMinute: (server, args: { pluginConfigId: number }) => {
-        return runPluginTask(server, 'runEveryMinute', PluginTaskType.Schedule, args.pluginConfigId)
+    runEveryMinute: (hub, args: { pluginConfigId: number }) => {
+        return runPluginTask(hub, 'runEveryMinute', PluginTaskType.Schedule, args.pluginConfigId)
     },
-    runEveryHour: (server, args: { pluginConfigId: number }) => {
-        return runPluginTask(server, 'runEveryHour', PluginTaskType.Schedule, args.pluginConfigId)
+    runEveryHour: (hub, args: { pluginConfigId: number }) => {
+        return runPluginTask(hub, 'runEveryHour', PluginTaskType.Schedule, args.pluginConfigId)
     },
-    runEveryDay: (server, args: { pluginConfigId: number }) => {
-        return runPluginTask(server, 'runEveryDay', PluginTaskType.Schedule, args.pluginConfigId)
+    runEveryDay: (hub, args: { pluginConfigId: number }) => {
+        return runPluginTask(hub, 'runEveryDay', PluginTaskType.Schedule, args.pluginConfigId)
     },
-    getPluginSchedule: (server) => {
-        return server.pluginSchedule
+    getPluginSchedule: (hub) => {
+        return hub.pluginSchedule
     },
-    ingestEvent: async (server, args: { event: PluginEvent }) => {
-        return await ingestEvent(server, args.event)
+    ingestEvent: async (hub, args: { event: PluginEvent }) => {
+        return await ingestEvent(hub, args.event)
     },
-    reloadPlugins: async (server) => {
-        await setupPlugins(server)
+    reloadPlugins: async (hub) => {
+        await setupPlugins(hub)
     },
-    reloadSchedule: async (server) => {
-        await loadSchedule(server)
+    reloadSchedule: async (hub) => {
+        await loadSchedule(hub)
     },
-    reloadAllActions: async (server) => {
-        return await server.eventsProcessor.actionManager.reloadAllActions()
+    reloadAllActions: async (hub) => {
+        return await hub.eventsProcessor.actionManager.reloadAllActions()
     },
-    reloadAction: async (server, args: { actionId: Action['id'] }) => {
-        return await server.eventsProcessor.actionManager.reloadAction(args.actionId)
+    reloadAction: async (hub, args: { actionId: Action['id'] }) => {
+        return await hub.eventsProcessor.actionManager.reloadAction(args.actionId)
     },
-    dropAction: (server, args: { actionId: Action['id'] }) => {
-        return server.eventsProcessor.actionManager.dropAction(args.actionId)
+    dropAction: (hub, args: { actionId: Action['id'] }) => {
+        return hub.eventsProcessor.actionManager.dropAction(args.actionId)
     },
-    teardownPlugins: async (server) => {
-        await teardownPlugins(server)
+    teardownPlugins: async (hub) => {
+        await teardownPlugins(hub)
     },
-    flushKafkaMessages: async (server) => {
-        await server.kafkaProducer?.flush()
+    flushKafkaMessages: async (hub) => {
+        await hub.kafkaProducer?.flush()
     },
 }
