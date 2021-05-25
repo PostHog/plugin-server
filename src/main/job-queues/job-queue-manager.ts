@@ -1,16 +1,16 @@
 import * as Sentry from '@sentry/node'
 
-import { EnqueuedJob, JobQueue, JobQueueType, OnJobCallback, PluginsServer } from '../../types'
+import { EnqueuedJob, Hub,JobQueue, JobQueueType, OnJobCallback } from '../../types'
 import { status } from '../../utils/status'
 import { logOrThrowJobQueueError } from '../../utils/utils'
 import { jobQueueMap } from './job-queues'
 
 export class JobQueueManager implements JobQueue {
-    pluginsServer: PluginsServer
+    pluginsServer: Hub
     jobQueues: JobQueue[]
     jobQueueTypes: JobQueueType[]
 
-    constructor(pluginsServer: PluginsServer) {
+    constructor(pluginsServer: Hub) {
         this.pluginsServer = pluginsServer
 
         this.jobQueueTypes = pluginsServer.JOB_QUEUES.split(',')

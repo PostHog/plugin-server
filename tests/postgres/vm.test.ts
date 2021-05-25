@@ -1,9 +1,9 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as fetch from 'node-fetch'
 
-import { PluginsServer } from '../../src/types'
+import { Hub } from '../../src/types'
 import { Client } from '../../src/utils/celery/client'
-import { createServer } from '../../src/utils/db/server'
+import { createHub } from '../../src/utils/db/hub'
 import { delay } from '../../src/utils/utils'
 import { createPluginConfigVM } from '../../src/worker/vm/vm'
 import { pluginConfig39 } from '../helpers/plugins'
@@ -20,22 +20,22 @@ const defaultEvent = {
     event: 'default event',
 }
 
-let mockServer: PluginsServer
-let stopServer: () => Promise<void>
+let hub: Hub
+let closeHub: () => Promise<void>
 
 beforeEach(async () => {
     ;(Client as any).mockClear()
-    ;[mockServer, stopServer] = await createServer()
+    ;[hub, closeHub] = await createHub()
 })
 
 afterEach(async () => {
-    await stopServer()
+    await closeHub()
     jest.clearAllMocks()
 })
 
 test('empty plugins', async () => {
     const indexJs = ''
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
 
     expect(Object.keys(vm).sort()).toEqual(['methods', 'tasks', 'vm'])
     expect(Object.keys(vm.methods).sort()).toEqual([
@@ -61,8 +61,8 @@ test('setupPlugin sync', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
-    const newEvent = await vm.methods.processEvent({ ...defaultEvent })
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+    const newEvent = await vm.methods.processEvent!({ ...defaultEvent })
     expect(newEvent.event).toEqual('haha')
 })
 
@@ -78,8 +78,8 @@ test('setupPlugin async', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
-    const newEvent = await vm.methods.processEvent({ ...defaultEvent })
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+    const newEvent = await vm.methods.processEvent!({ ...defaultEvent })
     expect(newEvent.event).toEqual('haha')
 })
 
@@ -97,13 +97,13 @@ test('teardownPlugin', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
-    await vm.methods.processEvent({
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+    await vm.methods.processEvent!({
         ...defaultEvent,
         properties: { haha: 'hoho' },
     })
     expect(fetch).not.toHaveBeenCalled()
-    await vm.methods.teardownPlugin()
+    await vm.methods.teardownPlugin!()
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho')
 })
 
@@ -115,7 +115,7 @@ test('processEvent', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
     expect(vm.methods.processEventBatch).not.toEqual(undefined)
 
@@ -123,7 +123,7 @@ test('processEvent', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     expect(event.event).toEqual('changed event')
     expect(newEvent.event).toEqual('changed event')
     expect(newEvent).toBe(event)
@@ -134,7 +134,7 @@ test('processEvent', async () => {
             event: 'original event',
         },
     ]
-    const newBatch = await vm.methods.processEventBatch(batch)
+    const newBatch = await vm.methods.processEventBatch!(batch)
     expect(batch[0].event).toEqual('changed event')
     expect(newBatch[0].event).toEqual('changed event')
     expect(newBatch[0]).toBe(batch[0])
@@ -148,7 +148,7 @@ test('async processEvent', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
     expect(vm.methods.processEventBatch).not.toEqual(undefined)
 
@@ -156,7 +156,7 @@ test('async processEvent', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     expect(event.event).toEqual('changed event')
     expect(newEvent.event).toEqual('changed event')
     expect(newEvent).toBe(event)
@@ -167,7 +167,7 @@ test('async processEvent', async () => {
             event: 'original event',
         },
     ]
-    const newBatch = await vm.methods.processEventBatch(batch)
+    const newBatch = await vm.methods.processEventBatch!(batch)
     expect(batch[0].event).toEqual('changed event')
     expect(newBatch[0].event).toEqual('changed event')
     expect(newBatch[0]).toBe(batch[0])
@@ -183,7 +183,7 @@ test('processEventBatch', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
     expect(vm.methods.processEventBatch).not.toEqual(undefined)
 
@@ -191,7 +191,7 @@ test('processEventBatch', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     expect(event.event).toEqual('changed event')
     expect(newEvent.event).toEqual('changed event')
     expect(newEvent).toBe(event)
@@ -202,7 +202,7 @@ test('processEventBatch', async () => {
             event: 'original event',
         },
     ]
-    const newBatch = await vm.methods.processEventBatch(batch)
+    const newBatch = await vm.methods.processEventBatch!(batch)
     expect(batch[0].event).toEqual('changed event')
     expect(newBatch[0].event).toEqual('changed event')
     expect(newBatch[0]).toBe(batch[0])
@@ -218,7 +218,7 @@ test('async processEventBatch', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
     expect(vm.methods.processEventBatch).not.toEqual(undefined)
 
@@ -226,7 +226,7 @@ test('async processEventBatch', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     expect(event.event).toEqual('changed event')
     expect(newEvent.event).toEqual('changed event')
     expect(newEvent).toBe(event)
@@ -237,7 +237,7 @@ test('async processEventBatch', async () => {
             event: 'original event',
         },
     ]
-    const newBatch = await vm.methods.processEventBatch(batch)
+    const newBatch = await vm.methods.processEventBatch!(batch)
     expect(batch[0].event).toEqual('changed event')
     expect(newBatch[0].event).toEqual('changed event')
     expect(newBatch[0]).toBe(batch[0])
@@ -257,7 +257,7 @@ test('processEvent && processEventBatch', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
     expect(vm.methods.processEventBatch).not.toEqual(undefined)
 
@@ -265,7 +265,7 @@ test('processEvent && processEventBatch', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     expect(event.event).toEqual('changed event 1')
     expect(newEvent.event).toEqual('changed event 1')
     expect(newEvent).toBe(event)
@@ -276,7 +276,7 @@ test('processEvent && processEventBatch', async () => {
             event: 'original event',
         },
     ]
-    const newBatch = await vm.methods.processEventBatch(batch)
+    const newBatch = await vm.methods.processEventBatch!(batch)
     expect(batch[0].event).toEqual('changed event 2')
     expect(newBatch[0].event).toEqual('changed event 2')
     expect(newBatch[0]).toBe(batch[0])
@@ -289,7 +289,7 @@ test('processEvent without returning', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     expect(vm.methods.processEvent).not.toEqual(undefined)
 
     const event: PluginEvent = {
@@ -297,7 +297,7 @@ test('processEvent without returning', async () => {
         event: 'original event',
     }
 
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     // this will be changed
     expect(event.event).toEqual('changed event')
     // but nothing was returned --> bail
@@ -314,93 +314,130 @@ test('async processEvent', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
 
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'original event',
     }
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
     expect(event.event).toEqual('changed event')
 })
 
-test('module.exports override', async () => {
-    const indexJs = `
-        function myProcessEventFunction (event, meta) {
-            event.event = 'changed event';
-            return event
+describe('vm exports', () => {
+    test('module.exports override', async () => {
+        const indexJs = `
+            function myProcessEventFunction (event, meta) {
+                event.event = 'changed event';
+                return event
+            }
+            module.exports = { processEvent: myProcessEventFunction }
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+
+        const event: PluginEvent = {
+            ...defaultEvent,
+            event: 'original event',
         }
-        module.exports = { processEvent: myProcessEventFunction }
-    `
-    await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+        await vm.methods.processEvent!(event)
 
-    const event: PluginEvent = {
-        ...defaultEvent,
-        event: 'original event',
-    }
-    await vm.methods.processEvent(event)
+        expect(event.event).toEqual('changed event')
+    })
 
-    expect(event.event).toEqual('changed event')
-})
+    test('module.exports set', async () => {
+        const indexJs = `
+            function myProcessEventFunction (event, meta) {
+                event.event = 'changed event';
+                return event
+            }
+            module.exports.processEvent = myProcessEventFunction
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
 
-test('module.exports set', async () => {
-    const indexJs = `
-        function myProcessEventFunction (event, meta) {
-            event.event = 'changed event';
-            return event
+        const event: PluginEvent = {
+            ...defaultEvent,
+            event: 'original event',
         }
-        module.exports.processEvent = myProcessEventFunction
-    `
-    await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+        await vm.methods.processEvent!(event)
 
-    const event: PluginEvent = {
-        ...defaultEvent,
-        event: 'original event',
-    }
-    await vm.methods.processEvent(event)
+        expect(event.event).toEqual('changed event')
+    })
 
-    expect(event.event).toEqual('changed event')
-})
-
-test('exports override', async () => {
-    const indexJs = `
-        function myProcessEventFunction (event, meta) {
-            event.event = 'changed event';
-            return event
+    test('exports override', async () => {
+        const indexJs = `
+            function myProcessEventFunction (event, meta) {
+                event.event = 'changed event';
+                return event
+            }
+            exports = { processEvent: myProcessEventFunction }
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+        const event: PluginEvent = {
+            ...defaultEvent,
+            event: 'original event',
         }
-        exports = { processEvent: myProcessEventFunction }
-    `
-    await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
-    const event: PluginEvent = {
-        ...defaultEvent,
-        event: 'original event',
-    }
-    await vm.methods.processEvent(event)
+        await vm.methods.processEvent!(event)
 
-    expect(event.event).toEqual('changed event')
-})
+        expect(event.event).toEqual('changed event')
+    })
 
-test('exports set', async () => {
-    const indexJs = `
-        function myProcessEventFunction (event, meta) {
-            event.event = 'changed event';
-            return event
+    test('exports set', async () => {
+        const indexJs = `
+            function myProcessEventFunction (event, meta) {
+                event.event = 'changed event';
+                return event
+            }
+            exports.processEvent = myProcessEventFunction
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+        const event: PluginEvent = {
+            ...defaultEvent,
+            event: 'original event',
         }
-        exports.processEvent = myProcessEventFunction
-    `
-    await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
-    const event: PluginEvent = {
-        ...defaultEvent,
-        event: 'original event',
-    }
-    await vm.methods.processEvent(event)
+        await vm.methods.processEvent!(event)
 
-    expect(event.event).toEqual('changed event')
+        expect(event.event).toEqual('changed event')
+    })
+
+    test('export', async () => {
+        const indexJs = `
+            export const onEvent = async (event, meta) => {
+                await fetch('https://google.com/results.json?query=' + event.event)
+            }
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+        const event: PluginEvent = {
+            ...defaultEvent,
+            event: 'export',
+        }
+        await vm.methods.onEvent!(event)
+        expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=export')
+    })
+
+    test('export default', async () => {
+        const indexJs = `
+            const MyPlugin = {
+                onEvent: async (event, meta) => {
+                    await fetch('https://google.com/results.json?query=' + event.event)
+                }
+            }
+            export default MyPlugin
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+        const event: PluginEvent = {
+            ...defaultEvent,
+            event: 'default export',
+        }
+        await vm.methods.onEvent!(event)
+        expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=default export')
+    })
 })
 
 test('meta.config', async () => {
@@ -411,13 +448,13 @@ test('meta.config', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'original event',
         properties: {},
     }
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
     expect(event.properties).toEqual(pluginConfig39.config)
 })
@@ -435,20 +472,20 @@ test('meta.cache set/get', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'original event',
         properties: {},
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(3)
 })
 
@@ -473,20 +510,20 @@ test('meta.storage set/get', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'original event',
         properties: {},
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(3)
 })
 
@@ -504,22 +541,22 @@ test('meta.cache expire', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'original event',
         properties: {},
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
 
     await delay(1200)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 })
 
@@ -536,22 +573,22 @@ test('meta.cache set ttl', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'original event',
         properties: {},
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
 
     await delay(1200)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 })
 
@@ -567,25 +604,25 @@ test('meta.cache incr', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'original event',
         properties: {},
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(3)
 })
 
 test('console.log', async () => {
-    jest.spyOn(mockServer.db, 'createPluginLogEntry')
+    jest.spyOn(hub.db, 'createPluginLogEntry')
 
     const indexJs = `
         async function processEvent (event, meta) {
@@ -594,15 +631,15 @@ test('console.log', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'logged event',
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
-    expect(mockServer.db.createPluginLogEntry).toHaveBeenCalledWith(
+    expect(hub.db.createPluginLogEntry).toHaveBeenCalledWith(
         pluginConfig39,
         'CONSOLE',
         'LOG',
@@ -620,13 +657,13 @@ test('fetch', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'fetched',
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
@@ -642,13 +679,13 @@ test('fetch via import', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'fetched',
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
@@ -663,13 +700,13 @@ test('fetch via require', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'fetched',
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
@@ -690,7 +727,7 @@ test('attachments', async () => {
         },
     }
     const vm = await createPluginConfigVM(
-        mockServer,
+        hub,
         {
             ...pluginConfig39,
             attachments,
@@ -702,7 +739,7 @@ test('attachments', async () => {
         event: 'attachments',
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
     expect(event.properties).toEqual(attachments)
 })
@@ -720,7 +757,7 @@ test('runEvery', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
 
     expect(Object.keys(vm.tasks).sort()).toEqual(['job', 'schedule'])
     expect(Object.keys(vm.tasks.schedule)).toEqual(['runEveryMinute', 'runEveryHour', 'runEveryDay'])
@@ -742,7 +779,7 @@ test('runEvery must be a function', async () => {
         const runEveryDay = { some: 'object' }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
 
     expect(Object.keys(vm.tasks.schedule)).toEqual(['runEveryMinute'])
     expect(Object.values(vm.tasks.schedule).map((v) => v?.name)).toEqual(['runEveryMinute'])
@@ -758,7 +795,7 @@ test('posthog in runEvery', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
 
     expect(Client).not.toHaveBeenCalled
 
@@ -766,8 +803,8 @@ test('posthog in runEvery', async () => {
     expect(response).toBe('haha')
 
     expect(Client).toHaveBeenCalledTimes(2)
-    expect((Client as any).mock.calls[0][1]).toEqual(mockServer.CELERY_DEFAULT_QUEUE) // webhook to celery queue
-    expect((Client as any).mock.calls[1][1]).toEqual(mockServer.PLUGINS_CELERY_QUEUE) // events out to start of plugin queue
+    expect((Client as any).mock.calls[0][1]).toEqual(hub.CELERY_DEFAULT_QUEUE) // webhook to celery queue
+    expect((Client as any).mock.calls[1][1]).toEqual(hub.PLUGINS_CELERY_QUEUE) // events out to start of plugin queue
 
     const mockClientInstance = (Client as any).mock.instances[1]
     const mockSendTask = mockClientInstance.sendTask
@@ -801,7 +838,7 @@ test('posthog in runEvery with timestamp', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
 
     expect(Client).not.toHaveBeenCalled
 
@@ -809,8 +846,8 @@ test('posthog in runEvery with timestamp', async () => {
     expect(response).toBe('haha')
 
     expect(Client).toHaveBeenCalledTimes(2)
-    expect((Client as any).mock.calls[0][1]).toEqual(mockServer.CELERY_DEFAULT_QUEUE) // webhook to celery queue
-    expect((Client as any).mock.calls[1][1]).toEqual(mockServer.PLUGINS_CELERY_QUEUE) // events out to start of plugin queue
+    expect((Client as any).mock.calls[0][1]).toEqual(hub.CELERY_DEFAULT_QUEUE) // webhook to celery queue
+    expect((Client as any).mock.calls[1][1]).toEqual(hub.PLUGINS_CELERY_QUEUE) // events out to start of plugin queue
 
     const mockClientInstance = (Client as any).mock.instances[1]
     const mockSendTask = mockClientInstance.sendTask
@@ -841,7 +878,7 @@ test('posthog.capture accepts user-defined distinct id', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
 
     expect(Client).not.toHaveBeenCalled
 
@@ -878,12 +915,12 @@ test('onEvent', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'onEvent',
     }
-    await vm.methods.onEvent(event)
+    await vm.methods.onEvent!(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=onEvent')
 })
 
@@ -894,11 +931,11 @@ test('onSnapshot', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(mockServer, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: '$snapshot',
     }
-    await vm.methods.onSnapshot(event)
+    await vm.methods.onSnapshot!(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=$snapshot')
 })

@@ -85,7 +85,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     STALENESS_RESTART_SECONDS: number
 }
 
-export interface PluginsServer extends PluginsServerConfig {
+export interface Hub extends PluginsServerConfig {
     instanceId: UUID
     // active connections to Postgres, Redis, ClickHouse, Kafka, StatsD
     db: DB
@@ -187,7 +187,13 @@ export interface Plugin {
     from_web?: boolean
     created_at: string
     updated_at: string
-    capabilities?: Record<string, any>
+    capabilities?: PluginCapabilities
+}
+
+export interface PluginCapabilities {
+    jobs?: string[]
+    scheduled_tasks?: string[]
+    methods?: string[]
 }
 
 export interface PluginConfig {
@@ -281,13 +287,13 @@ export type WorkerMethods = {
 export interface PluginConfigVMReponse {
     vm: VM
     methods: {
-        setupPlugin: () => Promise<void>
-        teardownPlugin: () => Promise<void>
-        onEvent: (event: PluginEvent) => Promise<void>
-        onSnapshot: (event: PluginEvent) => Promise<void>
-        processEvent: (event: PluginEvent) => Promise<PluginEvent>
+        setupPlugin?: () => Promise<void>
+        teardownPlugin?: () => Promise<void>
+        onEvent?: (event: PluginEvent) => Promise<void>
+        onSnapshot?: (event: PluginEvent) => Promise<void>
+        processEvent?: (event: PluginEvent) => Promise<PluginEvent>
         // DEPRECATED
-        processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
+        processEventBatch?: (batch: PluginEvent[]) => Promise<PluginEvent[]>
     }
     tasks: Record<PluginTaskType, Record<string, PluginTask>>
 }
@@ -422,6 +428,7 @@ export interface ClickHousePerson {
     team_id: number
     properties: string
     is_identified: number
+    is_deleted: number
     timestamp: string
 }
 

@@ -86,7 +86,8 @@ Let's talk about the main thread first. This has:
 
 1. `pubSub` – Redis powered pub-sub mechanism for reloading plugins whenever a message is published by the main PostHog app.
 
-2. `server` – Handler of connections to required DBs and queues (ClickHouse, Kafka, Postgres, Redis), created via `server.ts -> createServer`. Every thread has its own instance.
+2. `hub` – Handler of connections to required DBs and queues (ClickHouse, Kafka, Postgres, Redis), holds loaded plugins.
+   Created via `hub.ts -> createHub`. Every thread has its own instance.
 
 3. `fastifyInstance` – Web server. Unused for now.
 
@@ -110,7 +111,7 @@ Let's talk about the main thread first. This has:
 
 This begins with `worker.ts` and `createWorker()`.
 
-`server` is the same setup as in the main thread.
+`hub` is the same setup as in the main thread.
 
 New functions called here are:
 
@@ -126,7 +127,13 @@ TODO
 
 TODO
 
+#### How VM Extensions Work
+
+TODO
+
 ### Plugins vs. plugin configs
+
+### End Notes
 
 An `organization_id` is tied to a _company_ and its _installed plugins_, a `team_id` is tied to a _project_ and its _plugin configs_ (enabled/disabled+extra config).
 

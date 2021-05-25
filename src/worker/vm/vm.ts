@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
 import { VM } from 'vm2'
 
-import { PluginConfig, PluginConfigVMReponse, PluginsServer } from '../../types'
+import { Hub, PluginConfig, PluginConfigVMReponse } from '../../types'
 import { createCache } from './extensions/cache'
 import { createConsole } from './extensions/console'
 import { createGeoIp } from './extensions/geoip'
@@ -13,7 +13,7 @@ import { imports } from './imports'
 import { transformCode } from './transforms'
 
 export async function createPluginConfigVM(
-    server: PluginsServer,
+    server: Hub,
     pluginConfig: PluginConfig, // NB! might have team_id = 0
     indexJs: string
 ): Promise<PluginConfigVMReponse> {
@@ -105,9 +105,21 @@ export async function createPluginConfigVM(
         }
         let ${responseVar} = undefined;
         ((__asyncGuard) => {
-            // helpers to get globals
-            function __getExportDestinations () { return [exports, module.exports, global] };
-            function __getExported (key) { return __getExportDestinations().find(a => a[key])?.[key] };
+            // where to find exports
+            let exportDestinations = [
+                exports,
+                exports.default,
+                module.exports
+            ].filter(d => typeof d === 'object'); // filters out exports.default if not there
+
+            // add "global" only if nothing exported at all
+            if (!exportDestinations.find(d => Object.keys(d).length > 0)) {
+                // we can't set it to just [global], as abstractions may add exports later
+                exportDestinations.push(global)
+            }
+
+            // export helpers
+            function __getExported (key) { return exportDestinations.find(a => a[key])?.[key] };
             function __asyncFunctionGuard (func) {
                 return func ? function __innerAsyncGuard${pluginConfigIdentifier}(...args) { return __asyncGuard(func(...args)) } : func
             };
@@ -163,7 +175,7 @@ export async function createPluginConfigVM(
                 job: {},
             };
 
-            for (const exportDestination of __getExportDestinations().reverse()) {
+            for (const exportDestination of exportDestinations.reverse()) {
                 // gather the runEveryX commands and export in __tasks
                 for (const [name, value] of Object.entries(exportDestination)) {
                     if (name.startsWith("runEvery") && typeof value === 'function') {
