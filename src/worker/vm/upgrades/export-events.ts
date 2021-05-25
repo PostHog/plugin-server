@@ -25,10 +25,10 @@ interface ExportEventsJobPayload extends Record<string, any> {
     retriesPerformedSoFar: number
 }
 
-/*
- This function injects code into a plugin VM that has exported `exportEvents`:
- - add the global/config/jobs specified in the `ExportEventsUpgrade` type above.
- - patch `onEvent` with code to add the event to a buffer.
+/**
+ * Inject export abstraction code into plugin VM if it has method `exportEvents`:
+ * - add `global`/`config`/`jobs` stuff specified in the `ExportEventsUpgrade` type above,
+ * - patch `onEvent` with code to add the event to a buffer.
  */
 export function upgradeExportEvents(
     response: PluginConfigVMInternalResponse<PluginMeta<ExportEventsUpgrade>>,
@@ -104,7 +104,7 @@ export function upgradeExportEvents(
     }
 
     const oldOnEvent = methods.onEvent
-    methods.onEvent = async (event) => {
+    methods.onEvent = async (event: PluginEvent) => {
         if (!meta.global.exportEventsToIgnore.has(event.event)) {
             meta.global.exportEventsBuffer.add(event, JSON.stringify(event).length)
         }
