@@ -28,8 +28,7 @@ export async function createPluginConfigVM(
     })
 
     // Add PostHog utilities to virtual machine
-    const vmConsole = createConsole(server, pluginConfig)
-    vm.freeze(vmConsole, 'console')
+    vm.freeze(createConsole(server, pluginConfig), 'console')
     vm.freeze(createPosthog(server, pluginConfig), 'posthog')
 
     // Add non-PostHog utilities to virtual machine
@@ -197,7 +196,7 @@ export async function createPluginConfigVM(
         })
     `)(asyncGuard)
 
-    upgradeExportEvents(vm.run(responseVar), vmConsole)
+    upgradeExportEvents(vm.run(responseVar))
 
     await vm.run(`${responseVar}.methods.setupPlugin?.()`)
 

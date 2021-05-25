@@ -1,7 +1,8 @@
 import { createBuffer } from '@posthog/plugin-contrib'
-import { ConsoleExtension, Plugin, PluginEvent, PluginMeta, RetryError } from '@posthog/plugin-scaffold'
+import { Plugin, PluginEvent, PluginMeta, RetryError } from '@posthog/plugin-scaffold'
 
 import { PluginConfigVMInternalResponse, PluginTaskType } from '../../../types'
+import { status } from '../../../utils/status'
 import { stringClamp } from '../../../utils/utils'
 
 const MAXIMUM_RETRIES = 15
@@ -39,10 +40,7 @@ interface ExportEventsJobPayload extends Record<string, any> {
  * - add `global`/`config`/`jobs` stuff specified in the `ExportEventsUpgrade` type above,
  * - patch `onEvent` with code to add the event to a buffer.
  */
-export function upgradeExportEvents(
-    response: PluginConfigVMInternalResponse<PluginMeta<ExportEventsUpgrade>>,
-    console: ConsoleExtension
-): void {
+export function upgradeExportEvents(response: PluginConfigVMInternalResponse<PluginMeta<ExportEventsUpgrade>>): void {
     const { methods, tasks, meta } = response
 
     if (!methods.exportEvents) {
@@ -92,13 +90,14 @@ export function upgradeExportEvents(
             if (err instanceof RetryError) {
                 if (payload.retriesPerformedSoFar < MAXIMUM_RETRIES) {
                     const nextRetrySeconds = 2 ** payload.retriesPerformedSoFar * 3
-                    console.log(`Enqueued batch ${payload.batchId} for retry in ${Math.round(nextRetrySeconds)}s`)
+                    status.info('🚃', `Enqueued batch ${payload.batchId} for retry in ${Math.round(nextRetrySeconds)}s`)
 
                     await meta.jobs
                         .exportEventsWithRetry({ ...payload, retriesPerformedSoFar: payload.retriesPerformedSoFar + 1 })
                         .runIn(nextRetrySeconds, 'seconds')
                 } else {
-                    console.log(
+                    status.info(
+                        '☠️',
                         `Dropped batch ${payload.batchId} after retrying ${payload.retriesPerformedSoFar} times`
                     )
                 }
