@@ -2,7 +2,7 @@ import { RetryError } from '@posthog/plugin-scaffold'
 import { randomBytes } from 'crypto'
 import { VM } from 'vm2'
 
-import { PluginConfig, PluginConfigVMResponse, PluginsServer } from '../../types'
+import { Hub, PluginConfig, PluginConfigVMResponse } from '../../types'
 import { createCache } from './extensions/cache'
 import { createConsole } from './extensions/console'
 import { createGeoIp } from './extensions/geoip'
@@ -15,7 +15,7 @@ import { transformCode } from './transforms'
 import { upgradeExportEvents } from './upgrades/export-events'
 
 export async function createPluginConfigVM(
-    server: PluginsServer,
+    server: Hub,
     pluginConfig: PluginConfig, // NB! might have team_id = 0
     indexJs: string
 ): Promise<PluginConfigVMResponse> {
