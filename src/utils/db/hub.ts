@@ -175,7 +175,7 @@ export async function createHub(
 
     // :TODO: This is only used on worker threads, not main
     hub.eventsProcessor = new EventsProcessor(hub as Hub)
-    await server.eventsProcessor.prepare()
+    await hub.eventsProcessor.prepare()
     hub.jobQueueManager = new JobQueueManager(hub as Hub)
 
     try {

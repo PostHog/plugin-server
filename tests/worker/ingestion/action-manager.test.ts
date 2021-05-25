@@ -1,4 +1,4 @@
-import { Hub, PropertyOperator } from '../../../src/types'
+import { Hub, PropertyOperator, RawAction } from '../../../src/types'
 import { createHub } from '../../../src/utils/db/hub'
 import { ActionManager } from '../../../src/worker/ingestion/action-manager'
 import { resetTestDatabase } from '../../helpers/sql'
@@ -19,10 +19,13 @@ describe('ActionManager', () => {
     })
 
     it('returns the correct action', async () => {
-        const action = actionManager.getAction(67)
+        const ACTION_ID = 69
+        const ACTION_STEP_ID = 913
+
+        const action = actionManager.getAction(ACTION_ID)
 
         expect(action).toMatchObject({
-            id: 67,
+            id: ACTION_ID,
             name: 'Test Action',
             deleted: false,
             post_to_slack: false,
@@ -30,8 +33,8 @@ describe('ActionManager', () => {
             is_calculating: false,
             steps: [
                 {
-                    id: 911,
-                    action_id: 67,
+                    id: ACTION_STEP_ID,
+                    action_id: ACTION_ID,
                     tag_name: null,
                     text: null,
                     href: null,
@@ -46,17 +49,18 @@ describe('ActionManager', () => {
         })
 
         await hub.db.postgresQuery(
-            `UPDATE posthog_actionstep SET properties = jsonb_set(properties, '{0,key}', '"baz"') WHERE id = 911`,
-            undefined,
+            `UPDATE posthog_actionstep SET properties = jsonb_set(properties, '{0,key}', '"baz"') WHERE id = $1`,
+            [ACTION_STEP_ID],
             'testKey'
         )
 
         // This is normally dispatched by Django and broadcasted by Piscina
-        await actionManager.reloadAction(67)
-        const reloadedAction = actionManager.getAction(67)
+        await actionManager.reloadAction(ACTION_ID)
+
+        const reloadedAction = actionManager.getAction(ACTION_ID)
 
         expect(reloadedAction).toMatchObject({
-            id: 67,
+            id: ACTION_ID,
             name: 'Test Action',
             deleted: false,
             post_to_slack: false,
@@ -64,8 +68,8 @@ describe('ActionManager', () => {
             is_calculating: false,
             steps: [
                 {
-                    id: 911,
-                    action_id: 67,
+                    id: ACTION_STEP_ID,
+                    action_id: ACTION_ID,
                     tag_name: null,
                     text: null,
                     href: null,
@@ -78,67 +82,12 @@ describe('ActionManager', () => {
                 },
             ],
         })
-    })
-
-    it('returns the correct action when reloaded via Piscina', async () => {
-        const action = actionManager.getAction(67)
-
-        expect(action).toMatchObject({
-            id: 67,
-            name: 'Test Action',
-            deleted: false,
-            post_to_slack: false,
-            slack_message_format: '',
-            is_calculating: false,
-            steps: [
-                {
-                    id: 911,
-                    action_id: 67,
-                    tag_name: null,
-                    text: null,
-                    href: null,
-                    selector: null,
-                    url: null,
-                    url_matching: null,
-                    name: null,
-                    event: null,
-                    properties: [{ type: 'event', operator: PropertyOperator.Exact, key: 'foo', value: ['bar'] }],
-                },
-            ],
-        })
-
-        await hub.db.postgresQuery(
-            `UPDATE posthog_actionstep SET properties = jsonb_set(properties, '{0,key}', '"baz"') WHERE id = 911`,
-            undefined,
-            'testKey'
-        )
 
         // This is normally dispatched by Django and broadcasted by Piscina
-        await actionManager.reloadAction(67)
-        const reloadedAction = actionManager.getAction(67)
+        actionManager.dropAction(ACTION_ID)
 
-        expect(reloadedAction).toMatchObject({
-            id: 67,
-            name: 'Test Action',
-            deleted: false,
-            post_to_slack: false,
-            slack_message_format: '',
-            is_calculating: false,
-            steps: [
-                {
-                    id: 911,
-                    action_id: 67,
-                    tag_name: null,
-                    text: null,
-                    href: null,
-                    selector: null,
-                    url: null,
-                    url_matching: null,
-                    name: null,
-                    event: null,
-                    properties: [{ type: 'event', operator: PropertyOperator.Exact, key: 'baz', value: ['bar'] }],
-                },
-            ],
-        })
+        const droppedAction = actionManager.getAction(ACTION_ID)
+
+        expect(droppedAction).toBeUndefined()
     })
 })
