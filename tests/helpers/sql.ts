@@ -187,7 +187,7 @@ export async function createUserTeamAndOrganization(
         url_matching: null,
         name: null,
         event: null,
-        properties: JSON.stringify([{ type: 'event', operator: PropertyOperator.Exact, key: 'foo', value: ['bar'] }]),
+        properties: [{ type: 'event', operator: PropertyOperator.Exact, key: 'foo', value: ['bar'] }],
     })
 }
 
