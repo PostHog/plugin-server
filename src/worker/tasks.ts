@@ -45,6 +45,9 @@ export const workerTasks: Record<string, TaskRunner> = {
     reloadSchedule: async (server) => {
         await loadSchedule(server)
     },
+    reloadAllActions: async (server) => {
+        return await server.eventsProcessor.actionManager.reloadAllActions()
+    },
     reloadAction: async (server, args: { actionId: Action['id'] }) => {
         return await server.eventsProcessor.actionManager.reloadAction(args.actionId)
     },

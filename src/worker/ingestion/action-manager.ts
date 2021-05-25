@@ -16,7 +16,7 @@ export class ActionManager {
     }
 
     public async prepare(): Promise<void> {
-        this.actionCache = await this.db.fetchAllActionsMap()
+        await this.reloadAllActions()
         this.ready = true
     }
 
@@ -25,6 +25,11 @@ export class ActionManager {
             throw new Error('ActionManager is not ready! Run actionManager.prepare() before this')
         }
         return this.actionCache[id]
+    }
+
+    public async reloadAllActions(): Promise<void> {
+        this.actionCache = await this.db.fetchAllActionsMap()
+        status.info('🍿', 'Fetched all actions from DB anew')
     }
 
     public async reloadAction(id: Action['id']): Promise<void> {

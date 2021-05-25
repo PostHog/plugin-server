@@ -160,6 +160,10 @@ export async function startPluginsServer(
             await server!.db!.redisSet('@posthog-plugin-server/enabled-job-queues', queueString)
         }
 
+        // every 5 minutes all ActionManager caches are reloaded for eventual consistency
+        pingJob = schedule.scheduleJob('*/5 * * * *', async () => {
+            await piscina?.broadcastTask({ task: 'reloadAllActions' })
+        })
         // every 5 seconds set Redis keys @posthog-plugin-server/ping and @posthog-plugin-server/version
         pingJob = schedule.scheduleJob('*/5 * * * * *', async () => {
             await server!.db!.redisSet('@posthog-plugin-server/ping', new Date().toISOString(), 60, {
