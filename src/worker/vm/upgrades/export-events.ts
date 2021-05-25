@@ -1,7 +1,7 @@
 import { createBuffer } from '@posthog/plugin-contrib'
 import { Plugin, PluginEvent, PluginMeta, RetryError } from '@posthog/plugin-scaffold'
 
-import { PluginConfigVMInternalResponse, PluginTaskType } from '../../../types'
+import { PluginConfig, PluginConfigVMInternalResponse, PluginTaskType } from '../../../types'
 import { status } from '../../../utils/status'
 import { stringClamp } from '../../../utils/utils'
 
@@ -40,7 +40,10 @@ interface ExportEventsJobPayload extends Record<string, any> {
  * - add `global`/`config`/`jobs` stuff specified in the `ExportEventsUpgrade` type above,
  * - patch `onEvent` with code to add the event to a buffer.
  */
-export function upgradeExportEvents(response: PluginConfigVMInternalResponse<PluginMeta<ExportEventsUpgrade>>): void {
+export function upgradeExportEvents(
+    pluginConfig: PluginConfig,
+    response: PluginConfigVMInternalResponse<PluginMeta<ExportEventsUpgrade>>
+): void {
     const { methods, tasks, meta } = response
 
     if (!methods.exportEvents) {
@@ -89,8 +92,13 @@ export function upgradeExportEvents(response: PluginConfigVMInternalResponse<Plu
         } catch (err) {
             if (err instanceof RetryError) {
                 if (payload.retriesPerformedSoFar < MAXIMUM_RETRIES) {
-                    const nextRetrySeconds = 2 ** payload.retriesPerformedSoFar * 3
-                    status.info('🚃', `Enqueued batch ${payload.batchId} for retry in ${Math.round(nextRetrySeconds)}s`)
+                    const nextRetrySeconds = 2 ** (payload.retriesPerformedSoFar + 1) * 3
+                    status.info(
+                        '🚃',
+                        `Enqueued PluginConfig ${pluginConfig.id} batch ${payload.batchId} for retry #${
+                            payload.retriesPerformedSoFar + 1
+                        } in ${Math.round(nextRetrySeconds)}s`
+                    )
 
                     await meta.jobs
                         .exportEventsWithRetry({ ...payload, retriesPerformedSoFar: payload.retriesPerformedSoFar + 1 })
@@ -98,7 +106,7 @@ export function upgradeExportEvents(response: PluginConfigVMInternalResponse<Plu
                 } else {
                     status.info(
                         '☠️',
-                        `Dropped batch ${payload.batchId} after retrying ${payload.retriesPerformedSoFar} times`
+                        `Dropped PluginConfig ${pluginConfig.id} batch ${payload.batchId} after retrying ${payload.retriesPerformedSoFar} times`
                     )
                 }
             } else {

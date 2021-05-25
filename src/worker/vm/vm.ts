@@ -196,7 +196,7 @@ export async function createPluginConfigVM(
         })
     `)(asyncGuard)
 
-    upgradeExportEvents(vm.run(responseVar))
+    upgradeExportEvents(pluginConfig, vm.run(responseVar))
 
     await vm.run(`${responseVar}.methods.setupPlugin?.()`)
 
