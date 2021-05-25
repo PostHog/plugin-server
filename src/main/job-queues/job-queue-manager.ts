@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/node'
 
-import { EnqueuedJob, Hub,JobQueue, JobQueueType, OnJobCallback } from '../../types'
+import { EnqueuedJob, Hub, JobQueue, JobQueueType, OnJobCallback } from '../../types'
 import { status } from '../../utils/status'
 import { logOrThrowJobQueueError } from '../../utils/utils'
 import { jobQueueMap } from './job-queues'
