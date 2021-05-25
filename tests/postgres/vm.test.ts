@@ -66,7 +66,7 @@ test('setupPlugin sync', async () => {
     `
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
-    const newEvent = await vm.methods.processEvent({ ...defaultEvent })
+    const newEvent = await vm.methods.processEvent!({ ...defaultEvent })
     expect(newEvent.event).toEqual('haha')
 })
 
@@ -83,7 +83,7 @@ test('setupPlugin async', async () => {
     `
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
-    const newEvent = await vm.methods.processEvent({ ...defaultEvent })
+    const newEvent = await vm.methods.processEvent!({ ...defaultEvent })
     expect(newEvent.event).toEqual('haha')
 })
 
@@ -102,12 +102,12 @@ test('teardownPlugin', async () => {
     `
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
-    await vm.methods.processEvent({
+    await vm.methods.processEvent!({
         ...defaultEvent,
         properties: { haha: 'hoho' },
     })
     expect(fetch).not.toHaveBeenCalled()
-    await vm.methods.teardownPlugin()
+    await vm.methods.teardownPlugin!()
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho')
 })
 
@@ -127,7 +127,7 @@ test('processEvent', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     expect(event.event).toEqual('changed event')
     expect(newEvent.event).toEqual('changed event')
     expect(newEvent).toBe(event)
@@ -138,7 +138,7 @@ test('processEvent', async () => {
             event: 'original event',
         },
     ]
-    const newBatch = await vm.methods.processEventBatch(batch)
+    const newBatch = await vm.methods.processEventBatch!(batch)
     expect(batch[0].event).toEqual('changed event')
     expect(newBatch[0].event).toEqual('changed event')
     expect(newBatch[0]).toBe(batch[0])
@@ -160,7 +160,7 @@ test('async processEvent', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     expect(event.event).toEqual('changed event')
     expect(newEvent.event).toEqual('changed event')
     expect(newEvent).toBe(event)
@@ -171,7 +171,7 @@ test('async processEvent', async () => {
             event: 'original event',
         },
     ]
-    const newBatch = await vm.methods.processEventBatch(batch)
+    const newBatch = await vm.methods.processEventBatch!(batch)
     expect(batch[0].event).toEqual('changed event')
     expect(newBatch[0].event).toEqual('changed event')
     expect(newBatch[0]).toBe(batch[0])
@@ -195,7 +195,7 @@ test('processEventBatch', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     expect(event.event).toEqual('changed event')
     expect(newEvent.event).toEqual('changed event')
     expect(newEvent).toBe(event)
@@ -206,7 +206,7 @@ test('processEventBatch', async () => {
             event: 'original event',
         },
     ]
-    const newBatch = await vm.methods.processEventBatch(batch)
+    const newBatch = await vm.methods.processEventBatch!(batch)
     expect(batch[0].event).toEqual('changed event')
     expect(newBatch[0].event).toEqual('changed event')
     expect(newBatch[0]).toBe(batch[0])
@@ -230,7 +230,7 @@ test('async processEventBatch', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     expect(event.event).toEqual('changed event')
     expect(newEvent.event).toEqual('changed event')
     expect(newEvent).toBe(event)
@@ -241,7 +241,7 @@ test('async processEventBatch', async () => {
             event: 'original event',
         },
     ]
-    const newBatch = await vm.methods.processEventBatch(batch)
+    const newBatch = await vm.methods.processEventBatch!(batch)
     expect(batch[0].event).toEqual('changed event')
     expect(newBatch[0].event).toEqual('changed event')
     expect(newBatch[0]).toBe(batch[0])
@@ -269,7 +269,7 @@ test('processEvent && processEventBatch', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     expect(event.event).toEqual('changed event 1')
     expect(newEvent.event).toEqual('changed event 1')
     expect(newEvent).toBe(event)
@@ -280,7 +280,7 @@ test('processEvent && processEventBatch', async () => {
             event: 'original event',
         },
     ]
-    const newBatch = await vm.methods.processEventBatch(batch)
+    const newBatch = await vm.methods.processEventBatch!(batch)
     expect(batch[0].event).toEqual('changed event 2')
     expect(newBatch[0].event).toEqual('changed event 2')
     expect(newBatch[0]).toBe(batch[0])
@@ -301,7 +301,7 @@ test('processEvent without returning', async () => {
         event: 'original event',
     }
 
-    const newEvent = await vm.methods.processEvent(event)
+    const newEvent = await vm.methods.processEvent!(event)
     // this will be changed
     expect(event.event).toEqual('changed event')
     // but nothing was returned --> bail
@@ -324,7 +324,7 @@ test('async processEvent', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
     expect(event.event).toEqual('changed event')
 })
@@ -344,7 +344,7 @@ test('module.exports override', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
     expect(event.event).toEqual('changed event')
 })
@@ -364,7 +364,7 @@ test('module.exports set', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
     expect(event.event).toEqual('changed event')
 })
@@ -383,7 +383,7 @@ test('exports override', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
     expect(event.event).toEqual('changed event')
 })
@@ -402,7 +402,7 @@ test('exports set', async () => {
         ...defaultEvent,
         event: 'original event',
     }
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
     expect(event.event).toEqual('changed event')
 })
@@ -421,7 +421,7 @@ test('meta.config', async () => {
         event: 'original event',
         properties: {},
     }
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
     expect(event.properties).toEqual(pluginConfig39.config)
 })
@@ -446,13 +446,13 @@ test('meta.cache set/get', async () => {
         properties: {},
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(3)
 })
 
@@ -484,13 +484,13 @@ test('meta.storage set/get', async () => {
         properties: {},
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(3)
 })
 
@@ -515,15 +515,15 @@ test('meta.cache expire', async () => {
         properties: {},
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
 
     await delay(1200)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 })
 
@@ -547,15 +547,15 @@ test('meta.cache set ttl', async () => {
         properties: {},
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
 
     await delay(1200)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 })
 
@@ -578,13 +578,13 @@ test('meta.cache incr', async () => {
         properties: {},
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(3)
 })
 
@@ -604,7 +604,7 @@ test('console.log', async () => {
         event: 'logged event',
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
     expect(hub.db.createPluginLogEntry).toHaveBeenCalledWith(
         pluginConfig39,
@@ -630,7 +630,7 @@ test('fetch', async () => {
         event: 'fetched',
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
@@ -652,7 +652,7 @@ test('fetch via import', async () => {
         event: 'fetched',
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
@@ -673,7 +673,7 @@ test('fetch via require', async () => {
         event: 'fetched',
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
@@ -706,7 +706,7 @@ test('attachments', async () => {
         event: 'attachments',
     }
 
-    await vm.methods.processEvent(event)
+    await vm.methods.processEvent!(event)
 
     expect(event.properties).toEqual(attachments)
 })
@@ -887,7 +887,7 @@ test('onEvent', async () => {
         ...defaultEvent,
         event: 'onEvent',
     }
-    await vm.methods.onEvent(event)
+    await vm.methods.onEvent!(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=onEvent')
 })
 
@@ -903,7 +903,7 @@ test('onSnapshot', async () => {
         ...defaultEvent,
         event: '$snapshot',
     }
-    await vm.methods.onSnapshot(event)
+    await vm.methods.onSnapshot!(event)
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=$snapshot')
 })
 
