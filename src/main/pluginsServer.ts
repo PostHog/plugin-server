@@ -151,7 +151,7 @@ export async function startPluginsServer(
             'reload-action': async (message) =>
                 await piscina?.broadcastTask({ task: 'reloadAction', args: { actionId: parseInt(message) } }),
             'drop-action': async (message) =>
-                await piscina?.broadcastTask({ task: 'dropAction`', args: { actionId: parseInt(message) } }),
+                await piscina?.broadcastTask({ task: 'dropAction', args: { actionId: parseInt(message) } }),
         })
         await pubSub.start()
 
