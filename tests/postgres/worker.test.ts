@@ -142,16 +142,16 @@ describe('queue logic', () => {
             makePiscina
         )
 
-        redis = await pluginsServer.server.redisPool.acquire()
+        redis = await pluginsServer.hub.redisPool.acquire()
 
-        await redis.del(pluginsServer.server.PLUGINS_CELERY_QUEUE)
-        await redis.del(pluginsServer.server.CELERY_DEFAULT_QUEUE)
+        await redis.del(pluginsServer.hub.PLUGINS_CELERY_QUEUE)
+        await redis.del(pluginsServer.hub.CELERY_DEFAULT_QUEUE)
     })
 
     afterEach(async () => {
         // :TRICKY: Ignore errors when stopping workers.
         try {
-            await pluginsServer.server.redisPool.release(redis)
+            await pluginsServer.hub.redisPool.release(redis)
             await pluginsServer.stop()
         } catch {}
     })
@@ -176,7 +176,7 @@ describe('queue logic', () => {
 
         expect(pluginsServer.piscina.queueSize).toBe(0)
 
-        const client = new Client(pluginsServer.server.db, pluginsServer.server.PLUGINS_CELERY_QUEUE)
+        const client = new Client(pluginsServer.hub.db, pluginsServer.hub.PLUGINS_CELERY_QUEUE)
         for (let i = 0; i < 2; i++) {
             client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
         }
@@ -204,7 +204,7 @@ describe('queue logic', () => {
         const startTime = pluginsServer.piscina.duration
         while (celerySize > 0 || pluginsServer.piscina.queueSize > 0) {
             await delay(50)
-            celerySize = await redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)
+            celerySize = await redis.llen(pluginsServer.hub.PLUGINS_CELERY_QUEUE)
 
             if (pluginsServer.queue.isPaused()) {
                 pausedTimes++
@@ -229,11 +229,11 @@ describe('queue logic', () => {
 
 describe('createTaskRunner()', () => {
     let taskRunner: any
-    let server: any
+    let hub: any
 
     beforeEach(() => {
-        server = { mock: 'server' }
-        taskRunner = createTaskRunner(server)
+        hub = { mock: 'server' }
+        taskRunner = createTaskRunner(hub)
     })
 
     it('handles `processEvent` task', async () => {
@@ -243,7 +243,7 @@ describe('createTaskRunner()', () => {
             'runProcessEvent response'
         )
 
-        expect(runProcessEvent).toHaveBeenCalledWith(server, 'someEvent')
+        expect(runProcessEvent).toHaveBeenCalledWith(hub, 'someEvent')
     })
 
     it('handles `processEventBatch` task', async () => {
@@ -253,13 +253,13 @@ describe('createTaskRunner()', () => {
             'runProcessEventBatch response',
         ])
 
-        expect(runProcessEventBatch).toHaveBeenCalledWith(server, 'someBatch')
+        expect(runProcessEventBatch).toHaveBeenCalledWith(hub, 'someBatch')
     })
 
     it('handles `getPluginSchedule` task', async () => {
-        server.pluginSchedule = { runEveryDay: [66] }
+        hub.pluginSchedule = { runEveryDay: [66] }
 
-        expect(await taskRunner({ task: 'getPluginSchedule' })).toEqual(server.pluginSchedule)
+        expect(await taskRunner({ task: 'getPluginSchedule' })).toEqual(hub.pluginSchedule)
     })
 
     it('handles `ingestEvent` task', async () => {
@@ -267,7 +267,7 @@ describe('createTaskRunner()', () => {
 
         expect(await taskRunner({ task: 'ingestEvent', args: { event: 'someEvent' } })).toEqual('ingestEvent response')
 
-        expect(ingestEvent).toHaveBeenCalledWith(server, 'someEvent')
+        expect(ingestEvent).toHaveBeenCalledWith(hub, 'someEvent')
     })
 
     it('handles `ingestEvent` task', async () => {
@@ -275,7 +275,7 @@ describe('createTaskRunner()', () => {
 
         expect(await taskRunner({ task: 'ingestEvent', args: { event: 'someEvent' } })).toEqual('ingestEvent response')
 
-        expect(ingestEvent).toHaveBeenCalledWith(server, 'someEvent')
+        expect(ingestEvent).toHaveBeenCalledWith(hub, 'someEvent')
     })
 
     it('handles `runEvery` tasks', async () => {
@@ -309,10 +309,10 @@ describe('createTaskRunner()', () => {
     })
 
     it('handles `flushKafkaMessages` task', async () => {
-        server.kafkaProducer = { flush: jest.fn() }
+        hub.kafkaProducer = { flush: jest.fn() }
 
         await taskRunner({ task: 'flushKafkaMessages' })
 
-        expect(server.kafkaProducer.flush).toHaveBeenCalled()
+        expect(hub.kafkaProducer.flush).toHaveBeenCalled()
     })
 })

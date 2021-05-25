@@ -6,8 +6,8 @@ import net, { AddressInfo } from 'net'
 import * as schedule from 'node-schedule'
 
 import { defaultConfig } from '../config/config'
-import { JobQueueConsumerControl, PluginsServer, PluginsServerConfig, Queue, ScheduleControl } from '../types'
-import { createServer } from '../utils/db/server'
+import { Hub, JobQueueConsumerControl, PluginsServerConfig, Queue, ScheduleControl } from '../types'
+import { createHub } from '../utils/db/hub'
 import { killProcess } from '../utils/kill'
 import { PubSub } from '../utils/pubsub'
 import { status } from '../utils/status'
@@ -22,7 +22,7 @@ const { version } = require('../../package.json')
 
 // TODO: refactor this into a class, removing the need for many different Servers
 export type ServerInstance = {
-    server: PluginsServer
+    hub: Hub
     piscina: Piscina
     queue: Queue
     mmdb?: ReaderModel
@@ -42,14 +42,14 @@ export async function startPluginsServer(
     status.info('ℹ️', `${serverConfig.WORKER_CONCURRENCY} workers, ${serverConfig.TASKS_PER_WORKER} tasks per worker`)
 
     let pubSub: PubSub | undefined
-    let server: PluginsServer | undefined
+    let hub: Hub | undefined
     let fastifyInstance: FastifyInstance | undefined
     let pingJob: schedule.Job | undefined
     let statsJob: schedule.Job | undefined
     let piscina: Piscina | undefined
     let queue: Queue | undefined
     let jobQueueConsumer: JobQueueConsumerControl | undefined
-    let closeServer: () => Promise<void> | undefined
+    let closeHub: () => Promise<void> | undefined
     let scheduleControl: ScheduleControl | undefined
     let mmdbServer: net.Server | undefined
     let lastActivityCheck: NodeJS.Timeout | undefined
@@ -93,7 +93,7 @@ export async function startPluginsServer(
         if (piscina) {
             await stopPiscina(piscina)
         }
-        await closeServer?.()
+        await closeHub?.()
         status.info('👋', 'Over and out!')
         // wait an extra second for any misc async task to finish
         await delay(1000)
@@ -110,10 +110,10 @@ export async function startPluginsServer(
     })
 
     try {
-        ;[server, closeServer] = await createServer(serverConfig, null)
+        ;[hub, closeHub] = await createHub(serverConfig, null)
 
-        const serverInstance: Partial<ServerInstance> & Pick<ServerInstance, 'server'> = {
-            server,
+        const serverInstance: Partial<ServerInstance> & Pick<ServerInstance, 'hub'> = {
+            hub,
         }
 
         if (!serverConfig.DISABLE_MMDB) {
@@ -124,26 +124,26 @@ export async function startPluginsServer(
             )
             mmdbServer = await createMmdbServer(serverInstance)
             serverConfig.INTERNAL_MMDB_SERVER_PORT = (mmdbServer.address() as AddressInfo).port
-            server.INTERNAL_MMDB_SERVER_PORT = serverConfig.INTERNAL_MMDB_SERVER_PORT
+            hub.INTERNAL_MMDB_SERVER_PORT = serverConfig.INTERNAL_MMDB_SERVER_PORT
         }
 
         piscina = makePiscina(serverConfig)
-        if (!server.DISABLE_WEB) {
-            fastifyInstance = await startFastifyInstance(server)
+        if (!hub.DISABLE_WEB) {
+            fastifyInstance = await startFastifyInstance(hub)
         }
 
-        scheduleControl = await startSchedule(server, piscina)
-        jobQueueConsumer = await startJobQueueConsumer(server, piscina)
+        scheduleControl = await startSchedule(hub, piscina)
+        jobQueueConsumer = await startJobQueueConsumer(hub, piscina)
 
-        queue = await startQueue(server, piscina)
+        queue = await startQueue(hub, piscina)
         piscina.on('drain', () => {
             void queue?.resume()
             void jobQueueConsumer?.resume()
         })
 
         // use one extra Redis connection for pub-sub
-        pubSub = new PubSub(server, {
-            [server.PLUGINS_RELOAD_PUBSUB_CHANNEL]: async () => {
+        pubSub = new PubSub(hub, {
+            [hub.PLUGINS_RELOAD_PUBSUB_CHANNEL]: async () => {
                 status.info('⚡', 'Reloading plugins!')
                 await piscina?.broadcastTask({ task: 'reloadPlugins' })
                 await scheduleControl?.reloadSchedule()
@@ -155,9 +155,9 @@ export async function startPluginsServer(
         })
         await pubSub.start()
 
-        if (server.jobQueueManager) {
-            const queueString = server.jobQueueManager.getJobQueueTypesAsString()
-            await server!.db!.redisSet('@posthog-plugin-server/enabled-job-queues', queueString)
+        if (hub.jobQueueManager) {
+            const queueString = hub.jobQueueManager.getJobQueueTypesAsString()
+            await hub!.db!.redisSet('@posthog-plugin-server/enabled-job-queues', queueString)
         }
 
         // every 5 minutes all ActionManager caches are reloaded for eventual consistency
@@ -166,16 +166,16 @@ export async function startPluginsServer(
         })
         // every 5 seconds set Redis keys @posthog-plugin-server/ping and @posthog-plugin-server/version
         pingJob = schedule.scheduleJob('*/5 * * * * *', async () => {
-            await server!.db!.redisSet('@posthog-plugin-server/ping', new Date().toISOString(), 60, {
+            await hub!.db!.redisSet('@posthog-plugin-server/ping', new Date().toISOString(), 60, {
                 jsonSerialize: false,
             })
-            await server!.db!.redisSet('@posthog-plugin-server/version', version, undefined, { jsonSerialize: false })
+            await hub!.db!.redisSet('@posthog-plugin-server/version', version, undefined, { jsonSerialize: false })
         })
         // every 10 seconds sends stuff to StatsD
         statsJob = schedule.scheduleJob('*/10 * * * * *', () => {
             if (piscina) {
                 for (const [key, value] of Object.entries(getPiscinaStats(piscina))) {
-                    server!.statsd?.gauge(`piscina.${key}`, value)
+                    hub!.statsd?.gauge(`piscina.${key}`, value)
                 }
             }
         })
@@ -185,15 +185,15 @@ export async function startPluginsServer(
             let lastFoundActivity: number
             lastActivityCheck = setInterval(() => {
                 if (
-                    server?.lastActivity &&
-                    new Date().valueOf() - server?.lastActivity > serverConfig.STALENESS_RESTART_SECONDS * 1000 &&
-                    lastFoundActivity !== server?.lastActivity
+                    hub?.lastActivity &&
+                    new Date().valueOf() - hub?.lastActivity > serverConfig.STALENESS_RESTART_SECONDS * 1000 &&
+                    lastFoundActivity !== hub?.lastActivity
                 ) {
-                    lastFoundActivity = server?.lastActivity
+                    lastFoundActivity = hub?.lastActivity
                     const extra = {
-                        instanceId: server.instanceId.toString(),
-                        lastActivity: server.lastActivity ? new Date(server.lastActivity).toISOString() : null,
-                        lastActivityType: server.lastActivityType,
+                        instanceId: hub.instanceId.toString(),
+                        lastActivity: hub.lastActivity ? new Date(hub.lastActivity).toISOString() : null,
+                        lastActivityType: hub.lastActivityType,
                         piscina: piscina ? JSON.stringify(getPiscinaStats(piscina)) : null,
                     }
                     Sentry.captureMessage(
@@ -206,7 +206,7 @@ export async function startPluginsServer(
                         `Plugin Server has not ingested events for over ${serverConfig.STALENESS_RESTART_SECONDS} seconds! Rebooting.`,
                         extra
                     )
-                    server.statsd?.increment(`alerts.stale_plugin_server_restarted`)
+                    hub.statsd?.increment(`alerts.stale_plugin_server_restarted`)
 
                     killProcess()
                 }
@@ -219,8 +219,8 @@ export async function startPluginsServer(
 
         status.info('🚀', 'All systems go')
 
-        server.lastActivity = new Date().valueOf()
-        server.lastActivityType = 'serverStart'
+        hub.lastActivity = new Date().valueOf()
+        hub.lastActivityType = 'serverStart'
 
         return serverInstance as ServerInstance
     } catch (error) {

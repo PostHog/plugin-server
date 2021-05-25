@@ -2,11 +2,10 @@ import { Pool, PoolClient } from 'pg'
 
 import { defaultConfig } from '../../src/config/config'
 import {
-    ActionStep,
+    Hub,
     Plugin,
     PluginAttachmentDB,
     PluginConfig,
-    PluginsServer,
     PluginsServerConfig,
     PropertyOperator,
     RawAction,
@@ -84,8 +83,15 @@ async function insertRow(db: Pool, table: string, object: Record<string, any>): 
     const params = Object.keys(object)
         .map((_, i) => `\$${i + 1}`)
         .join(',')
+    const values = Object.values(object).map((value) => {
+        if (Array.isArray(value) && value.length > 0) {
+            return JSON.stringify(value)
+        }
+        return value
+    })
+
     try {
-        await db.query(`INSERT INTO ${table} (${keys}) VALUES (${params})`, Object.values(object))
+        await db.query(`INSERT INTO ${table} (${keys}) VALUES (${params})`, values)
     } catch (error) {
         console.error(`Error on table ${table} when inserting object:\n`, object, '\n', error)
         throw error
@@ -137,11 +143,11 @@ export async function createUserTeamAndOrganization(
         organization_id: organizationId,
         app_urls: [],
         name: 'TEST PROJECT',
-        event_names: JSON.stringify([]),
-        event_names_with_usage: JSON.stringify([]),
-        event_properties: JSON.stringify([]),
-        event_properties_with_usage: JSON.stringify([]),
-        event_properties_numerical: JSON.stringify([]),
+        event_names: [],
+        event_names_with_usage: [],
+        event_properties: [],
+        event_properties_with_usage: [],
+        event_properties_numerical: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         anonymize_ips: false,
@@ -155,7 +161,7 @@ export async function createUserTeamAndOrganization(
         api_token: `THIS IS NOT A TOKEN FOR TEAM ${teamId}`,
         test_account_filters: [],
         timezone: 'UTC',
-        data_attributes: JSON.stringify(['data-attr']),
+        data_attributes: ['data-attr'],
     })
     await insertRow(db, 'posthog_action', {
         id: teamId + 67,
@@ -185,16 +191,16 @@ export async function createUserTeamAndOrganization(
     })
 }
 
-export async function getTeams(server: PluginsServer): Promise<Team[]> {
-    return (await server.db.postgresQuery('SELECT * FROM posthog_team ORDER BY id', undefined, 'fetchAllTeams')).rows
+export async function getTeams(hub: Hub): Promise<Team[]> {
+    return (await hub.db.postgresQuery('SELECT * FROM posthog_team ORDER BY id', undefined, 'fetchAllTeams')).rows
 }
 
-export async function getFirstTeam(server: PluginsServer): Promise<Team> {
-    return (await getTeams(server))[0]
+export async function getFirstTeam(hub: Hub): Promise<Team> {
+    return (await getTeams(hub))[0]
 }
 
 /** Inject code onto `server` which runs a callback whenever a postgres query is performed */
-export function onQuery(server: PluginsServer, onQueryCallback: (queryText: string) => any): void {
+export function onQuery(hub: Hub, onQueryCallback: (queryText: string) => any): void {
     function spyOnQueryFunction(client: any) {
         const query = client.query.bind(client)
         client.query = (queryText: any, values?: any, callback?: any): any => {
@@ -203,10 +209,10 @@ export function onQuery(server: PluginsServer, onQueryCallback: (queryText: stri
         }
     }
 
-    spyOnQueryFunction(server.postgres)
+    spyOnQueryFunction(hub.postgres)
 
-    const postgresTransaction = server.db.postgresTransaction.bind(server.db)
-    server.db.postgresTransaction = async (transaction: (client: PoolClient) => Promise<any>): Promise<any> => {
+    const postgresTransaction = hub.db.postgresTransaction.bind(hub.db)
+    hub.db.postgresTransaction = async (transaction: (client: PoolClient) => Promise<any>): Promise<any> => {
         return await postgresTransaction(async (client: PoolClient) => {
             const query = client.query
             spyOnQueryFunction(client)
