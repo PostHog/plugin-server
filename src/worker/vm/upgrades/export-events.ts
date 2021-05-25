@@ -2,6 +2,7 @@ import { createBuffer } from '@posthog/plugin-contrib'
 import { ConsoleExtension, Plugin, PluginEvent, PluginMeta, RetryError } from '@posthog/plugin-scaffold'
 
 import { PluginConfigVMInternalResponse, PluginTaskType } from '../../../types'
+import { stringClamp } from '../../../utils/utils'
 
 type ExportEventsUpgrade = Plugin<{
     global: {
@@ -40,12 +41,8 @@ export function upgradeExportEvents(
         return
     }
 
-    const nanToNull = (nr: any): null | number => (isNaN(parseInt(nr)) ? null : parseInt(nr))
-    const uploadBytes = Math.max(
-        1,
-        Math.min(nanToNull(meta.config.exportEventsBufferBytes) ?? 1024 * 1024, 100 * 1024 * 1024)
-    )
-    const uploadSeconds = Math.max(1, Math.min(nanToNull(meta.config.exportEventsBufferSeconds) ?? 10, 600))
+    const uploadBytes = stringClamp(meta.config.exportEventsBufferBytes, 1024 * 1024, 1, 100 * 1024 * 1024)
+    const uploadSeconds = stringClamp(meta.config.exportEventsBufferSeconds, 10, 1, 600)
 
     meta.global.exportEventsToIgnore = new Set(
         meta.config.exportEventsToIgnore
