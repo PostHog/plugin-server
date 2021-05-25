@@ -88,7 +88,7 @@ export function upgradeExportEvents(
         meta: PluginMeta<ExportEventsUpgrade>
     ) => {
         try {
-            await methods.exportEvents(payload.batch)
+            await methods.exportEvents?.(payload.batch)
         } catch (err) {
             if (err instanceof RetryError) {
                 if (payload.retriesPerformedSoFar < MAXIMUM_RETRIES) {
