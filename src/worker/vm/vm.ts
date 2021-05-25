@@ -105,9 +105,20 @@ export async function createPluginConfigVM(
         }
         let ${responseVar} = undefined;
         ((__asyncGuard) => {
-            // helpers to get globals
-            function __getExportDestinations () { return [exports, module.exports, global] };
-            function __getExported (key) { return __getExportDestinations().find(a => a[key])?.[key] };
+            // where to find exports
+            let exportDestinations = [
+                exports,
+                exports.default,
+                module.exports
+            ].filter(d => typeof d === 'object' && Object.keys(d).length > 0);
+
+            // use "global" only if nothing exported at all
+            if (exportDestinations.length === 0) {
+                exportDestinations = [global]
+            }
+
+            // export helpers
+            function __getExported (key) { return exportDestinations.find(a => a?.[key])?.[key] };
             function __asyncFunctionGuard (func) {
                 return func ? function __innerAsyncGuard${pluginConfigIdentifier}(...args) { return __asyncGuard(func(...args)) } : func
             };
@@ -163,7 +174,7 @@ export async function createPluginConfigVM(
                 job: {},
             };
 
-            for (const exportDestination of __getExportDestinations().reverse()) {
+            for (const exportDestination of exportDestinations.reverse()) {
                 // gather the runEveryX commands and export in __tasks
                 for (const [name, value] of Object.entries(exportDestination)) {
                     if (name.startsWith("runEvery") && typeof value === 'function') {
