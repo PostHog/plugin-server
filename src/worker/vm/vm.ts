@@ -110,15 +110,16 @@ export async function createPluginConfigVM(
                 exports,
                 exports.default,
                 module.exports
-            ].filter(d => typeof d === 'object' && Object.keys(d).length > 0);
+            ].filter(d => typeof d === 'object'); // filters out exports.default if not there
 
-            // use "global" only if nothing exported at all
-            if (exportDestinations.length === 0) {
-                exportDestinations = [global]
+            // add "global" only if nothing exported at all
+            if (!exportDestinations.find(d => Object.keys(d).length > 0)) {
+                // we can't set it to just [global], as abstractions may add exports later
+                exportDestinations.push(global)
             }
 
             // export helpers
-            function __getExported (key) { return exportDestinations.find(a => a?.[key])?.[key] };
+            function __getExported (key) { return exportDestinations.find(a => a[key])?.[key] };
             function __asyncFunctionGuard (func) {
                 return func ? function __innerAsyncGuard${pluginConfigIdentifier}(...args) { return __asyncGuard(func(...args)) } : func
             };
