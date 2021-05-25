@@ -430,21 +430,6 @@ export interface CohortPeople {
     person_id: number
 }
 
-/** Raw Action row from database. */
-export interface RawAction {
-    id: number
-    team_id: TeamId
-    name: string | null
-    created_at: string
-    created_by_id: number | null
-    deleted: boolean
-    post_to_slack: boolean
-    slack_message_format: string
-    is_calculating: boolean
-    updated_at: string
-    last_calculated_at: string
-}
-
 /** Sync with posthog/frontend/src/types.ts */
 export enum PropertyOperator {
     Exact = 'exact',
@@ -523,6 +508,7 @@ export interface ActionStep {
 /** Raw Action row from database. */
 export interface RawAction {
     id: number
+    team_id: TeamId
     name: string | null
     created_at: string
     created_by_id: number | null
