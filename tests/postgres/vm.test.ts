@@ -416,7 +416,7 @@ describe('vm exports', () => {
             ...defaultEvent,
             event: 'export',
         }
-        await vm.methods.onEvent(event)
+        await vm.methods.onEvent!(event)
         expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=export')
     })
 
@@ -435,7 +435,7 @@ describe('vm exports', () => {
             ...defaultEvent,
             event: 'default export',
         }
-        await vm.methods.onEvent(event)
+        await vm.methods.onEvent!(event)
         expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=default export')
     })
 })
