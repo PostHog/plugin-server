@@ -979,7 +979,7 @@ describe('exportEvents', () => {
             Object.keys(vm.methods)
                 .filter((m) => !!vm.methods[m as keyof typeof vm.methods])
                 .sort()
-        ).toEqual(['exportEvents', 'onEvent'])
+        ).toEqual(['exportEvents', 'onEvent', 'teardownPlugin'])
     })
 
     test('retries', async () => {
@@ -1221,5 +1221,32 @@ describe('exportEvents', () => {
         expect((fetch as any).mock.calls).toEqual(
             Array.from(Array(100)).map(() => ['https://export.com/?length=136&count=1'])
         )
+    })
+
+    test('flushes on teardown', async () => {
+        const indexJs = `
+            async function exportEvents (events, meta) {
+                await fetch('https://export.com/results.json?query=' + events[0].event + '&events=' + events.length)
+            }
+        `
+        await resetTestDatabase(indexJs)
+        const vm = await createPluginConfigVM(
+            hub,
+            {
+                ...pluginConfig39,
+                config: {
+                    ...pluginConfig39.config,
+                    exportEventsBufferBytes: 10000,
+                    exportEventsBufferSeconds: 1000,
+                    exportEventsToIgnore: '',
+                },
+            },
+            indexJs
+        )
+        await vm.methods.onEvent!(defaultEvent)
+        expect(fetch).not.toHaveBeenCalledWith('https://export.com/results.json?query=default event&events=1')
+
+        await vm.methods.teardownPlugin!()
+        expect(fetch).toHaveBeenCalledWith('https://export.com/results.json?query=default event&events=1')
     })
 })

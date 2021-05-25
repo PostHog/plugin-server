@@ -144,4 +144,9 @@ export function upgradeExportEvents(
         }
         await oldOnEvent?.(event)
     }
+
+    const oldTeardownPlugin = methods.teardownPlugin
+    methods.teardownPlugin = async () => {
+        await Promise.all([meta.global.exportEventsBuffer.flush(), oldTeardownPlugin?.()])
+    }
 }
