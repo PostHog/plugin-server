@@ -91,7 +91,7 @@ export class LazyPluginVM {
     private async inferPluginCapabilities(
         hub: Hub,
         pluginConfig: PluginConfig,
-        vm: PluginConfigVMReponse
+        vm: PluginConfigVMResponse
     ): Promise<void> {
         if (!pluginConfig.plugin) {
             throw new Error(`'PluginConfig missing plugin: ${pluginConfig}`)

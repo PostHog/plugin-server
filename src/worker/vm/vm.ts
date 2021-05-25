@@ -15,21 +15,21 @@ import { transformCode } from './transforms'
 import { upgradeExportEvents } from './upgrades/export-events'
 
 export async function createPluginConfigVM(
-    server: Hub,
+    hub: Hub,
     pluginConfig: PluginConfig, // NB! might have team_id = 0
     indexJs: string
 ): Promise<PluginConfigVMResponse> {
-    const transformedCode = transformCode(indexJs, server, imports)
+    const transformedCode = transformCode(indexJs, hub, imports)
 
     // Create virtual machine
     const vm = new VM({
-        timeout: server.TASK_TIMEOUT * 1000 + 1,
+        timeout: hub.TASK_TIMEOUT * 1000 + 1,
         sandbox: {},
     })
 
     // Add PostHog utilities to virtual machine
-    vm.freeze(createConsole(server, pluginConfig), 'console')
-    vm.freeze(createPosthog(server, pluginConfig), 'posthog')
+    vm.freeze(createConsole(hub, pluginConfig), 'console')
+    vm.freeze(createPosthog(hub, pluginConfig), 'posthog')
 
     // Add non-PostHog utilities to virtual machine
     vm.freeze(imports['node-fetch'], 'fetch')
@@ -47,7 +47,7 @@ export async function createPluginConfigVM(
     // because `setTimeout` is not available inside the vm... and we don't want to
     // make it available for now, as it makes it easier to create malicious code
     const asyncGuard = async (promise: () => Promise<any>) => {
-        const timeout = server.TASK_TIMEOUT
+        const timeout = hub.TASK_TIMEOUT
         return await Promise.race([
             promise,
             new Promise((resolve, reject) =>
@@ -65,12 +65,12 @@ export async function createPluginConfigVM(
 
     vm.freeze(
         {
-            cache: createCache(server, pluginConfig.plugin_id, pluginConfig.team_id),
+            cache: createCache(hub, pluginConfig.plugin_id, pluginConfig.team_id),
             config: pluginConfig.config,
             attachments: pluginConfig.attachments,
-            storage: createStorage(server, pluginConfig),
-            geoip: createGeoIp(server),
-            jobs: createJobs(server, pluginConfig),
+            storage: createStorage(hub, pluginConfig),
+            geoip: createGeoIp(hub),
+            jobs: createJobs(hub, pluginConfig),
         },
         '__pluginHostMeta'
     )
@@ -86,17 +86,15 @@ export async function createPluginConfigVM(
 
     // Add a secret hash to the end of some function names, so that we can (sometimes) identify
     // the crashed plugin if it throws an uncaught exception in a promise.
-    if (!server.pluginConfigSecrets.has(pluginConfig.id)) {
+    if (!hub.pluginConfigSecrets.has(pluginConfig.id)) {
         const secret = randomBytes(16).toString('hex')
-        server.pluginConfigSecrets.set(pluginConfig.id, secret)
-        server.pluginConfigSecretLookup.set(secret, pluginConfig.id)
+        hub.pluginConfigSecrets.set(pluginConfig.id, secret)
+        hub.pluginConfigSecretLookup.set(secret, pluginConfig.id)
     }
 
     // Keep the format of this in sync with `pluginConfigIdFromStack` in utils.ts
     // Only place this after functions whose names match /^__[a-zA-Z0-9]+$/
-    const pluginConfigIdentifier = `__PluginConfig_${pluginConfig.id}_${server.pluginConfigSecrets.get(
-        pluginConfig.id
-    )}`
+    const pluginConfigIdentifier = `__PluginConfig_${pluginConfig.id}_${hub.pluginConfigSecrets.get(pluginConfig.id)}`
     const responseVar = `__pluginDetails${randomBytes(64).toString('hex')}`
 
     // Explicitly passing __asyncGuard to the returned function from `vm.run` in order
@@ -208,7 +206,7 @@ export async function createPluginConfigVM(
         })
     `)(asyncGuard)
 
-    upgradeExportEvents(pluginConfig, vm.run(responseVar))
+    upgradeExportEvents(hub, pluginConfig, vm.run(responseVar))
 
     await vm.run(`${responseVar}.methods.setupPlugin?.()`)
 
