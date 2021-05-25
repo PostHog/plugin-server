@@ -59,12 +59,8 @@ export function upgradeExportEvents(
                 batchId: Math.floor(Math.random() * 1000000),
                 retriesPerformedSoFar: 0,
             }
-            const firstThroughQueue = false // TODO: might make sense sometimes? e.g. when we are processing too many tasks already?
-            if (firstThroughQueue) {
-                await meta.jobs.exportEventsWithRetry(jobPayload).runNow()
-            } else {
-                await meta.global.exportEventsWithRetry(jobPayload, meta)
-            }
+            // Running the first export code directly, without a job in between
+            await meta.global.exportEventsWithRetry(jobPayload, meta)
         },
     })
 
