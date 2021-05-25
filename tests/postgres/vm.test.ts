@@ -916,7 +916,7 @@ describe('exportEvents', () => {
         `
         await resetTestDatabase(indexJs)
         const vm = await createPluginConfigVM(
-            mockServer,
+            hub,
             {
                 ...pluginConfig39,
                 config: {
@@ -958,7 +958,7 @@ describe('exportEvents', () => {
         `
         await resetTestDatabase(indexJs)
         const vm = await createPluginConfigVM(
-            mockServer,
+            hub,
             {
                 ...pluginConfig39,
                 config: {
@@ -1026,7 +1026,7 @@ describe('exportEvents', () => {
         `
         await resetTestDatabase(indexJs)
         const vm = await createPluginConfigVM(
-            mockServer,
+            hub,
             {
                 ...pluginConfig39,
                 config: {
@@ -1067,7 +1067,7 @@ describe('exportEvents', () => {
         `
         await resetTestDatabase(indexJs)
         const vm = await createPluginConfigVM(
-            mockServer,
+            hub,
             {
                 ...pluginConfig39,
                 config: {
@@ -1101,7 +1101,7 @@ describe('exportEvents', () => {
         `
         await resetTestDatabase(indexJs)
         const vm = await createPluginConfigVM(
-            mockServer,
+            hub,
             {
                 ...pluginConfig39,
                 config: {
@@ -1155,7 +1155,7 @@ describe('exportEvents', () => {
         `
         await resetTestDatabase(indexJs)
         const vm = await createPluginConfigVM(
-            mockServer,
+            hub,
             {
                 ...pluginConfig39,
                 config: {
