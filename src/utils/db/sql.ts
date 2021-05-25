@@ -1,4 +1,5 @@
 import {
+    Hub,
     Plugin,
     PluginAttachmentDB,
     PluginCapabilities,
@@ -7,7 +8,6 @@ import {
     PluginError,
     PluginLogEntrySource,
     PluginLogEntryType,
-    PluginsServer,
 } from '../../types'
 import { TeamId } from './../../types'
 
@@ -23,7 +23,7 @@ function pluginConfigsInForceQuery(specificField?: keyof PluginConfig): string {
        )`
 }
 
-export async function getPluginRows(server: PluginsServer): Promise<Plugin[]> {
+export async function getPluginRows(server: Hub): Promise<Plugin[]> {
     const { rows: pluginRows }: { rows: Plugin[] } = await server.db.postgresQuery(
         `SELECT posthog_plugin.* FROM posthog_plugin
             WHERE id IN (${pluginConfigsInForceQuery('plugin_id')} GROUP BY posthog_pluginconfig.plugin_id)`,
@@ -33,7 +33,7 @@ export async function getPluginRows(server: PluginsServer): Promise<Plugin[]> {
     return pluginRows
 }
 
-export async function getPluginAttachmentRows(server: PluginsServer): Promise<PluginAttachmentDB[]> {
+export async function getPluginAttachmentRows(server: Hub): Promise<PluginAttachmentDB[]> {
     const { rows }: { rows: PluginAttachmentDB[] } = await server.db.postgresQuery(
         `SELECT posthog_pluginattachment.* FROM posthog_pluginattachment
             WHERE plugin_config_id IN (${pluginConfigsInForceQuery('id')})`,
@@ -43,7 +43,7 @@ export async function getPluginAttachmentRows(server: PluginsServer): Promise<Pl
     return rows
 }
 
-export async function getPluginConfigRows(server: PluginsServer): Promise<PluginConfig[]> {
+export async function getPluginConfigRows(server: Hub): Promise<PluginConfig[]> {
     const { rows }: { rows: PluginConfig[] } = await server.db.postgresQuery(
         pluginConfigsInForceQuery(),
         undefined,
@@ -53,11 +53,11 @@ export async function getPluginConfigRows(server: PluginsServer): Promise<Plugin
 }
 
 export async function setPluginCapabilities(
-    server: PluginsServer,
+    hub: Hub,
     pluginConfig: PluginConfig,
     capabilities: PluginCapabilities
 ): Promise<void> {
-    await server.db.postgresQuery(
+    await hub.db.postgresQuery(
         'UPDATE posthog_plugin SET capabilities = ($1) WHERE id = $2',
         [capabilities, pluginConfig.plugin_id],
         'setPluginCapabilities'
@@ -65,7 +65,7 @@ export async function setPluginCapabilities(
 }
 
 export async function setError(
-    server: PluginsServer,
+    server: Hub,
     pluginError: PluginError | null,
     pluginConfig: PluginConfig
 ): Promise<void> {
@@ -86,7 +86,7 @@ export async function setError(
     }
 }
 
-export async function disablePlugin(server: PluginsServer, pluginConfigId: PluginConfigId): Promise<void> {
+export async function disablePlugin(server: Hub, pluginConfigId: PluginConfigId): Promise<void> {
     await server.db.postgresQuery(
         `UPDATE posthog_pluginconfig SET enabled='f' WHERE id=$1 AND enabled='t'`,
         [pluginConfigId],

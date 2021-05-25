@@ -1,12 +1,12 @@
 import equal from 'fast-deep-equal'
 
 import {
+    Hub,
     PluginCapabilities,
     PluginConfig,
     PluginConfigVMReponse,
     PluginLogEntrySource,
     PluginLogEntryType,
-    PluginsServer,
     PluginTask,
     PluginTaskType,
 } from '../../types'
@@ -16,42 +16,37 @@ import { status } from '../../utils/status'
 import { createPluginConfigVM } from './vm'
 
 export class LazyPluginVM {
-    initialize?: (server: PluginsServer, pluginConfig: PluginConfig, indexJs: string, logInfo: string) => Promise<void>
+    initialize?: (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo: string) => Promise<void>
     failInitialization?: () => void
     resolveInternalVm: Promise<PluginConfigVMReponse | null>
 
     constructor() {
         this.resolveInternalVm = new Promise((resolve) => {
-            this.initialize = async (
-                server: PluginsServer,
-                pluginConfig: PluginConfig,
-                indexJs: string,
-                logInfo = ''
-            ) => {
+            this.initialize = async (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo = '') => {
                 try {
-                    const vm = await createPluginConfigVM(server, pluginConfig, indexJs)
-                    await server.db.createPluginLogEntry(
+                    const vm = await createPluginConfigVM(hub, pluginConfig, indexJs)
+                    await hub.db.createPluginLogEntry(
                         pluginConfig,
                         PluginLogEntrySource.System,
                         PluginLogEntryType.Info,
-                        `Plugin loaded (instance ID ${server.instanceId}).`,
-                        server.instanceId
+                        `Plugin loaded (instance ID ${hub.instanceId}).`,
+                        hub.instanceId
                     )
                     status.info('🔌', `Loaded ${logInfo}`)
-                    void clearError(server, pluginConfig)
-                    await this.inferPluginCapabilities(server, pluginConfig, vm)
+                    void clearError(hub, pluginConfig)
+                    await this.inferPluginCapabilities(hub, pluginConfig, vm)
                     resolve(vm)
                 } catch (error) {
-                    await server.db.createPluginLogEntry(
+                    await hub.db.createPluginLogEntry(
                         pluginConfig,
                         PluginLogEntrySource.System,
                         PluginLogEntryType.Error,
-                        `Plugin failed to load and was disabled (instance ID ${server.instanceId}).`,
-                        server.instanceId
+                        `Plugin failed to load and was disabled (instance ID ${hub.instanceId}).`,
+                        hub.instanceId
                     )
                     status.warn('⚠️', `Failed to load ${logInfo}`)
-                    void disablePlugin(server, pluginConfig.id)
-                    void processError(server, pluginConfig, error)
+                    void disablePlugin(hub, pluginConfig.id)
+                    void processError(hub, pluginConfig, error)
                     resolve(null)
                 }
             }
@@ -90,7 +85,7 @@ export class LazyPluginVM {
     }
 
     private async inferPluginCapabilities(
-        server: PluginsServer,
+        hub: Hub,
         pluginConfig: PluginConfig,
         vm: PluginConfigVMReponse
     ): Promise<void> {
@@ -129,7 +124,7 @@ export class LazyPluginVM {
 
         const prevCapabilities = pluginConfig.plugin.capabilities
         if (!equal(prevCapabilities, capabilities)) {
-            await setPluginCapabilities(server, pluginConfig, capabilities)
+            await setPluginCapabilities(hub, pluginConfig, capabilities)
             pluginConfig.plugin.capabilities = capabilities
         }
     }
