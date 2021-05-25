@@ -73,11 +73,12 @@ export class JobQueueBase implements JobQueue {
 
     protected async syncState(): Promise<void> {
         if (this.started && !this.paused) {
-            if (!this.timeout) {
-                // eslint-disable-next-line @typescript-eslint/await-thenable
-                const hadSomething = await this.readState()
-                this.timeout = setTimeout(() => this.syncState(), hadSomething ? 0 : this.intervalSeconds)
+            if (this.timeout) {
+                clearTimeout(this.timeout)
             }
+            // eslint-disable-next-line @typescript-eslint/await-thenable
+            const hadSomething = await this.readState()
+            this.timeout = setTimeout(() => this.syncState(), hadSomething ? 0 : this.intervalSeconds * 1000)
         } else {
             if (this.timeout) {
                 clearTimeout(this.timeout)
