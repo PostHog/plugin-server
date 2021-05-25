@@ -727,10 +727,16 @@ export class DB {
 
     public async fetchAllActionsMap(): Promise<Record<Action['id'], Action>> {
         const rawActions: RawAction[] = (
-            await this.postgresQuery(`SELECT * FROM posthog_action`, undefined, 'fetchActions')
+            await this.postgresQuery(`SELECT * FROM posthog_action WHERE deleted = FALSE`, undefined, 'fetchActions')
         ).rows
         const actionSteps: ActionStep[] = (
-            await this.postgresQuery(`SELECT * FROM posthog_actionstep`, undefined, 'fetchActionSteps')
+            await this.postgresQuery(
+                `SELECT posthog_actionstep.*, posthog_action.deleted FROM posthog_actionstep
+            JOIN posthog_action ON (posthog_action.id = posthog_actionstep.action_id)
+            WHERE posthog_action.deleted = FALSE`,
+                undefined,
+                'fetchActionSteps'
+            )
         ).rows
         const actionsMap: Record<Action['id'], Action> = {}
         for (const rawAction of rawActions) {
@@ -746,7 +752,11 @@ export class DB {
 
     public async fetchAction(id: Action['id']): Promise<Action | null> {
         const rawActions: RawAction[] = (
-            await this.postgresQuery(`SELECT * FROM posthog_action WHERE id = $1`, [id], 'fetchActions')
+            await this.postgresQuery(
+                `SELECT * FROM posthog_action WHERE id = $1 AND deleted = FALSE`,
+                [id],
+                'fetchActions'
+            )
         ).rows
         if (!rawActions.length) {
             return null
