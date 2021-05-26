@@ -26,8 +26,8 @@ describe('ActionManager', () => {
     it('returns the correct actions generally', async () => {
         const action = actionManager.getTeamActions(TEAM_ID)
 
-        expect(action.length).toEqual(1)
-        expect(action[0]).toMatchObject({
+        expect(Object.values(action!).length).toEqual(1)
+        expect(action![ACTION_ID]).toMatchObject({
             id: ACTION_ID,
             name: 'Test Action',
             deleted: false,
@@ -62,8 +62,8 @@ describe('ActionManager', () => {
 
         const reloadedAction = actionManager.getTeamActions(TEAM_ID)
 
-        expect(reloadedAction.length).toEqual(1)
-        expect(reloadedAction[0]).toMatchObject({
+        expect(Object.values(action!).length).toEqual(1)
+        expect(reloadedAction![ACTION_ID]).toMatchObject({
             id: ACTION_ID,
             name: 'Test Action',
             deleted: false,
@@ -92,14 +92,14 @@ describe('ActionManager', () => {
 
         const droppedAction = actionManager.getTeamActions(TEAM_ID)
 
-        expect(droppedAction).toEqual([])
+        expect(Object.values(droppedAction!).length).toEqual(0)
     })
 
     it('returns the correct actions when deleted = TRUE', async () => {
         const action = actionManager.getTeamActions(TEAM_ID)
 
-        expect(action.length).toEqual(1)
-        expect(action[0]).toMatchObject({
+        expect(Object.values(action!).length).toEqual(1)
+        expect(action![ACTION_ID]).toMatchObject({
             id: ACTION_ID,
             name: 'Test Action',
             deleted: false,
@@ -130,6 +130,6 @@ describe('ActionManager', () => {
 
         const droppedAction = actionManager.getTeamActions(TEAM_ID)
 
-        expect(droppedAction).toEqual([])
+        expect(Object.values(droppedAction!).length).toEqual(0)
     })
 })

@@ -3,7 +3,8 @@ import { DB } from '../../utils/db/db'
 import { status } from '../../utils/status'
 import { groupBy } from '../../utils/utils'
 
-type ActionCache = Record<Team['id'], Record<Action['id'], Action>>
+export type ActionMap = Record<Action['id'], Action>
+type ActionCache = Record<Team['id'], ActionMap>
 
 export class ActionManager {
     private ready: boolean
@@ -21,11 +22,11 @@ export class ActionManager {
         this.ready = true
     }
 
-    public getTeamActions(teamId: Team['id']): Action[] {
+    public getTeamActions(teamId: Team['id']): ActionMap | null {
         if (!this.ready) {
             throw new Error('ActionManager is not ready! Run actionManager.prepare() before this')
         }
-        return Object.values(this.actionCache[teamId] ?? {})
+        return this.actionCache[teamId] || null
     }
 
     public async reloadAllActions(): Promise<void> {
