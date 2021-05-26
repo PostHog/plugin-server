@@ -16,12 +16,21 @@ import { EventsProcessor } from './worker/ingestion/process-event'
 import { LazyPluginVM } from './worker/vm/lazy'
 
 export enum LogLevel {
+    None = 'none',
     Debug = 'debug',
     Info = 'info',
     Log = 'log',
     Warn = 'warn',
     Error = 'error',
-    None = 'none',
+}
+
+export const logLevelToNumber: Record<LogLevel, number> = {
+    [LogLevel.None]: 0,
+    [LogLevel.Debug]: 10,
+    [LogLevel.Info]: 20,
+    [LogLevel.Log]: 30,
+    [LogLevel.Warn]: 40,
+    [LogLevel.Error]: 50,
 }
 
 export interface PluginsServerConfig extends Record<string, any> {
@@ -76,6 +85,11 @@ export interface PluginsServerConfig extends Record<string, any> {
     JOB_QUEUE_GRAPHILE_URL: string
     JOB_QUEUE_GRAPHILE_SCHEMA: string
     JOB_QUEUE_GRAPHILE_PREPARED_STATEMENTS: boolean
+    JOB_QUEUE_S3_AWS_ACCESS_KEY: string
+    JOB_QUEUE_S3_AWS_SECRET_ACCESS_KEY: string
+    JOB_QUEUE_S3_AWS_REGION: string
+    JOB_QUEUE_S3_BUCKET_NAME: string
+    JOB_QUEUE_S3_PREFIX: string
     CRASH_IF_NO_PERSISTENT_JOB_QUEUE: boolean
     STALENESS_RESTART_SECONDS: number
 }
@@ -137,6 +151,27 @@ export interface JobQueue {
     connectProducer: () => Promise<void> | void
     enqueue: (job: EnqueuedJob) => Promise<void> | void
     disconnectProducer: () => Promise<void> | void
+}
+
+export enum JobQueueType {
+    FS = 'fs',
+    Graphile = 'graphile',
+    S3 = 's3',
+}
+
+export enum JobQueuePersistence {
+    /** Job queues that store jobs on the local server */
+    Local = 'local',
+    /** Remote persistent job queues that can be read from concurrently */
+    Concurrent = 'concurrent',
+    /** Remote persistent job queues that must be read from one redlocked server at a time */
+    Redlocked = 'redlocked',
+}
+
+export type JobQueueExport = {
+    type: JobQueueType
+    persistence: JobQueuePersistence
+    getQueue: (serverConfig: PluginsServerConfig) => JobQueue
 }
 
 export type PluginId = number
@@ -327,6 +362,7 @@ export interface RawOrganization {
     name: string
     created_at: string
     updated_at: string
+    available_features: string[]
 }
 
 /** Usable Team model. */
@@ -436,6 +472,101 @@ export interface CohortPeople {
     id: number
     cohort_id: number
     person_id: number
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export enum PropertyOperator {
+    Exact = 'exact',
+    IsNot = 'is_not',
+    IContains = 'icontains',
+    NotIContains = 'not_icontains',
+    Regex = 'regex',
+    NotRegex = 'not_regex',
+    GreaterThan = 'gt',
+    LessThan = 'lt',
+    IsSet = 'is_set',
+    IsNotSet = 'is_not_set',
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+interface BasePropertyFilter {
+    key: string
+    value: string | number | Array<string | number> | null
+    label?: string
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export interface EventPropertyFilter extends BasePropertyFilter {
+    type: 'event'
+    operator: PropertyOperator
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export interface PersonPropertyFilter extends BasePropertyFilter {
+    type: 'person'
+    operator: PropertyOperator
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export interface ElementPropertyFilter extends BasePropertyFilter {
+    type: 'element'
+    key: 'tag_name' | 'text' | 'href' | 'selector'
+    operator: PropertyOperator
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export interface CohortPropertyFilter extends BasePropertyFilter {
+    type: 'cohort'
+    key: 'id'
+    value: number
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export type ActionStepProperties =
+    | EventPropertyFilter
+    | PersonPropertyFilter
+    | ElementPropertyFilter
+    | CohortPropertyFilter
+
+/** Sync with posthog/frontend/src/types.ts */
+export enum ActionStepUrlMatching {
+    Contains = 'contains',
+    Regex = 'regex',
+    Exact = 'exact',
+}
+
+export interface ActionStep {
+    id: number
+    action_id: number
+    tag_name: string | null
+    text: string | null
+    href: string | null
+    selector: string | null
+    url: string | null
+    url_matching: ActionStepUrlMatching | null
+    name: string | null
+    event: string | null
+    properties: ActionStepProperties[] | null
+}
+
+/** Raw Action row from database. */
+export interface RawAction {
+    id: number
+    team_id: TeamId
+    name: string | null
+    created_at: string
+    created_by_id: number | null
+    deleted: boolean
+    post_to_slack: boolean
+    slack_message_format: string
+    is_calculating: boolean
+    updated_at: string
+    last_calculated_at: string
+}
+
+/** Usable Action model. */
+export interface Action extends RawAction {
+    steps: ActionStep[]
 }
 
 export interface SessionRecordingEvent {
