@@ -725,7 +725,7 @@ export class DB {
 
     // Action & ActionStep
 
-    public async fetchAllActionsMap(): Promise<Record<Action['id'], Action>> {
+    public async fetchAllActions(): Promise<Action[]> {
         const rawActions: RawAction[] = (
             await this.postgresQuery(`SELECT * FROM posthog_action WHERE deleted = FALSE`, undefined, 'fetchActions')
         ).rows
@@ -747,7 +747,7 @@ export class DB {
                 actionsMap[actionStep.action_id].steps.push(actionStep)
             }
         }
-        return actionsMap
+        return Object.values(actionsMap)
     }
 
     public async fetchAction(id: Action['id']): Promise<Action | null> {
