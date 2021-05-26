@@ -16,12 +16,21 @@ import { EventsProcessor } from './worker/ingestion/process-event'
 import { LazyPluginVM } from './worker/vm/lazy'
 
 export enum LogLevel {
+    None = 'none',
     Debug = 'debug',
     Info = 'info',
     Log = 'log',
     Warn = 'warn',
     Error = 'error',
-    None = 'none',
+}
+
+export const logLevelToNumber: Record<LogLevel, number> = {
+    [LogLevel.None]: 0,
+    [LogLevel.Debug]: 10,
+    [LogLevel.Info]: 20,
+    [LogLevel.Log]: 30,
+    [LogLevel.Warn]: 40,
+    [LogLevel.Error]: 50,
 }
 
 export interface PluginsServerConfig extends Record<string, any> {
