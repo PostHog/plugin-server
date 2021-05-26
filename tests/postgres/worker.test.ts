@@ -10,6 +10,7 @@ import { createHub } from '../../src/utils/db/hub'
 import { KafkaProducerWrapper } from '../../src/utils/db/kafka-producer-wrapper'
 import { delay, UUIDT } from '../../src/utils/utils'
 import { ActionManager } from '../../src/worker/ingestion/action-manager'
+import { ActionMatcher } from '../../src/worker/ingestion/action-matcher'
 import { ingestEvent } from '../../src/worker/ingestion/ingest-event'
 import { makePiscina } from '../../src/worker/piscina'
 import { runPluginTask, runProcessEvent, runProcessEventBatch } from '../../src/worker/plugins/run'
@@ -45,6 +46,7 @@ beforeEach(() => {
     jest.spyOn(ActionManager.prototype, 'reloadAllActions')
     jest.spyOn(ActionManager.prototype, 'reloadAction')
     jest.spyOn(ActionManager.prototype, 'dropAction')
+    jest.spyOn(ActionMatcher.prototype, 'match')
 })
 
 test('piscina worker test', async () => {
@@ -311,6 +313,14 @@ describe('createTaskRunner()', () => {
         await taskRunner({ task: 'reloadSchedule' })
 
         expect(loadSchedule).toHaveBeenCalled()
+    })
+
+    it('handles `matchActions` task', async () => {
+        const dummyEvent = createEvent()
+
+        await taskRunner({ task: 'matchActions', args: { event: dummyEvent } })
+
+        expect(hub.actionMatcher.match).toHaveBeenCalledWith(dummyEvent)
     })
 
     it('handles `reloadAllActions` task', async () => {

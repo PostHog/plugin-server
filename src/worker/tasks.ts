@@ -37,8 +37,10 @@ export const workerTasks: Record<string, TaskRunner> = {
         return hub.pluginSchedule
     },
     ingestEvent: async (hub, args: { event: PluginEvent }) => {
-        await hub.actionMatcher.match(args.event) // TODO: do something with action matching results
         return await ingestEvent(hub, args.event)
+    },
+    matchActions: async (hub, args: { event: PluginEvent }) => {
+        return await hub.actionMatcher.match(args.event) // TODO: do something with action matching results
     },
     reloadPlugins: async (hub) => {
         await setupPlugins(hub)
