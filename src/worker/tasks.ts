@@ -37,6 +37,7 @@ export const workerTasks: Record<string, TaskRunner> = {
         return hub.pluginSchedule
     },
     ingestEvent: async (hub, args: { event: PluginEvent }) => {
+        await hub.actionMatcher.match(args.event) // TODO: do something with action matching results
         return await ingestEvent(hub, args.event)
     },
     reloadPlugins: async (hub) => {
@@ -46,13 +47,13 @@ export const workerTasks: Record<string, TaskRunner> = {
         await loadSchedule(hub)
     },
     reloadAllActions: async (hub) => {
-        return await hub.eventsProcessor.actionManager.reloadAllActions()
+        return await hub.actionMatcher.reloadAllActions()
     },
     reloadAction: async (hub, args: { teamId: Team['id']; actionId: Action['id'] }) => {
-        return await hub.eventsProcessor.actionManager.reloadAction(args.teamId, args.actionId)
+        return await hub.actionMatcher.reloadAction(args.teamId, args.actionId)
     },
     dropAction: (hub, args: { teamId: Team['id']; actionId: Action['id'] }) => {
-        return hub.eventsProcessor.actionManager.dropAction(args.teamId, args.actionId)
+        return hub.actionMatcher.dropAction(args.teamId, args.actionId)
     },
     teardownPlugins: async (hub) => {
         await teardownPlugins(hub)

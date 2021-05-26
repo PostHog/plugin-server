@@ -13,6 +13,7 @@ import { ConnectionOptions } from 'tls'
 import { defaultConfig } from '../../config/config'
 import { JobQueueManager } from '../../main/job-queues/job-queue-manager'
 import { Hub, PluginsServerConfig } from '../../types'
+import { ActionMatcher } from '../../worker/ingestion/action-matcher'
 import { EventsProcessor } from '../../worker/ingestion/process-event'
 import { killProcess } from '../kill'
 import { status } from '../status'
@@ -174,8 +175,9 @@ export async function createHub(
     }
 
     // :TODO: This is only used on worker threads, not main
+    hub.actionMatcher = new ActionMatcher(db)
+    await hub.actionMatcher.prepare()
     hub.eventsProcessor = new EventsProcessor(hub as Hub)
-    await hub.eventsProcessor.prepare()
     hub.jobQueueManager = new JobQueueManager(hub as Hub)
 
     try {

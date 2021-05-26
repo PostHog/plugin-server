@@ -12,6 +12,7 @@ import { VM } from 'vm2'
 import { DB } from './utils/db/db'
 import { KafkaProducerWrapper } from './utils/db/kafka-producer-wrapper'
 import { UUID } from './utils/utils'
+import { ActionMatcher } from './worker/ingestion/action-matcher'
 import { EventsProcessor } from './worker/ingestion/process-event'
 import { LazyPluginVM } from './worker/vm/lazy'
 
@@ -114,6 +115,7 @@ export interface Hub extends PluginsServerConfig {
     pluginConfigSecrets: Map<PluginConfigId, string>
     pluginConfigSecretLookup: Map<string, PluginConfigId>
     // tools
+    actionMatcher: ActionMatcher
     eventsProcessor: EventsProcessor
     jobQueueManager: JobQueueManager
     // diagnostics
