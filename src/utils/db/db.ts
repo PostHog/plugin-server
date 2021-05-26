@@ -29,6 +29,7 @@ import {
     RawOrganization,
     RawPerson,
     SessionRecordingEvent,
+    TeamId,
     TimestampFormat,
 } from '../../types'
 import { instrumentQuery } from '../metrics'
@@ -714,5 +715,20 @@ export class DB {
         return (
             await this.postgresQuery('SELECT * FROM posthog_propertydefinition', undefined, 'fetchPropertyDefinitions')
         ).rows as PropertyDefinitionType[]
+    }
+
+    public async fetchInternalMetricsTeam(): Promise<TeamId | null> {
+        const { rows } = await this.postgresQuery(
+            `
+            SELECT posthog_team.id as team_id
+            FROM posthog_team
+            INNER JOIN posthog_organization ON posthog_organization.id = posthog_team.organization_id
+            WHERE for_internal_metrics
+        `,
+            undefined,
+            'fetchInternalMetricsTeam'
+        )
+
+        return rows.length > 0 ? rows[0].team_id : null
     }
 }

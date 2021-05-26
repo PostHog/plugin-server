@@ -65,6 +65,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         JOB_QUEUE_GRAPHILE_PREPARED_STATEMENTS: false,
         CRASH_IF_NO_PERSISTENT_JOB_QUEUE: false,
         STALENESS_RESTART_SECONDS: 0,
+        CAPTURE_INTERNAL_METRICS: false,
     }
 }
 
@@ -113,6 +114,7 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         CRASH_IF_NO_PERSISTENT_JOB_QUEUE:
             'refuse to start unless there is a properly configured persistent job queue (e.g. graphile)',
         STALENESS_RESTART_SECONDS: 'trigger a restart if no event ingested for this duration',
+        CAPTURE_INTERNAL_METRICS: 'capture internal metrics for posthog in posthog',
     }
 }
 
