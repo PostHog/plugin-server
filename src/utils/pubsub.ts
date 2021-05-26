@@ -1,3 +1,4 @@
+import { captureException } from '@sentry/node'
 import { Redis } from 'ioredis'
 
 import { PluginsServerConfig } from '../types'
@@ -31,10 +32,12 @@ export class PubSub {
         this.redis.on('message', (channel: string, message: string) => {
             const task: PubSubTask | undefined = this.taskMap[channel]
             if (!task) {
-                throw new Error(
-                    `Received a pubsub message for unassociated channel ${channel}! Associated channels are: ${Object.keys(
-                        this.taskMap
-                    ).join(', ')}`
+                captureException(
+                    new Error(
+                        `Received a pubsub message for unassociated channel ${channel}! Associated channels are: ${Object.keys(
+                            this.taskMap
+                        ).join(', ')}`
+                    )
                 )
             }
             void task(message)
