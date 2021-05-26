@@ -462,7 +462,7 @@ export function sanitizeEvent(event: PluginEvent): PluginEvent {
 }
 
 export enum NodeEnv {
-    Development = 'dev',
+    Development = 'development',
     Production = 'prod',
     Test = 'test',
 }

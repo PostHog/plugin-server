@@ -639,6 +639,9 @@ test('console.log', async () => {
 
     await vm.methods.processEvent!(event)
 
+    // logs are saved async every 100ms
+    await delay(200)
+
     expect(hub.db.createPluginLogEntry).toHaveBeenCalledWith(
         pluginConfig39,
         'CONSOLE',

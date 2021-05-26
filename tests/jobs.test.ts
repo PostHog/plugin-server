@@ -147,7 +147,7 @@ describe('job queues', () => {
             describe('invalid host/domain', () => {
                 // This crashes the tests as well. So... it, uhm, passes :D.
                 // The crash only happens when running in Github Actions of course, so hard to debug.
-                // This mode will not be activated by default, and we will not use it on cloud (yet).
+                // This mode is not activated by default, and not used on cloud (yet?).
                 test.skip('crash', async () => {
                     const config = await initTest(
                         {
