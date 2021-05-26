@@ -44,6 +44,7 @@ export async function startPluginsServer(
     let pubSub: PubSub | undefined
     let hub: Hub | undefined
     let fastifyInstance: FastifyInstance | undefined
+    let actionsReloadJob: schedule.Job | undefined
     let pingJob: schedule.Job | undefined
     let statsJob: schedule.Job | undefined
     let piscina: Piscina | undefined
@@ -74,6 +75,7 @@ export async function startPluginsServer(
         lastActivityCheck && clearInterval(lastActivityCheck)
         await queue?.stop()
         await pubSub?.stop()
+        actionsReloadJob && schedule.cancelJob(actionsReloadJob)
         pingJob && schedule.cancelJob(pingJob)
         statsJob && schedule.cancelJob(statsJob)
         await jobQueueConsumer?.stop()
@@ -161,7 +163,7 @@ export async function startPluginsServer(
         }
 
         // every 5 minutes all ActionManager caches are reloaded for eventual consistency
-        pingJob = schedule.scheduleJob('*/5 * * * *', async () => {
+        actionsReloadJob = schedule.scheduleJob('*/5 * * * *', async () => {
             await piscina?.broadcastTask({ task: 'reloadAllActions' })
         })
         // every 5 seconds set Redis keys @posthog-plugin-server/ping and @posthog-plugin-server/version
