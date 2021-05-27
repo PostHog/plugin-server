@@ -6,7 +6,7 @@ import { StatsD } from 'hot-shots'
 import Redis from 'ioredis'
 import { ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
-import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg'
 
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_PLUGIN_LOG_ENTRIES } from '../../config/kafka-topics'
 import {
@@ -35,6 +35,7 @@ import {
     TimestampFormat,
 } from '../../types'
 import { instrumentQuery } from '../metrics'
+import { status } from '../status'
 import {
     castTimestampOrNow,
     clickHouseTimestampToISO,
@@ -79,14 +80,18 @@ export class DB {
     // Postgres
 
     public postgresQuery<R extends QueryResultRow = any, I extends any[] = any[]>(
-        queryTextOrConfig: string | QueryConfig<I>,
+        query: string,
         values: I | undefined,
         tag: string
     ): Promise<QueryResult<R>> {
         return instrumentQuery(this.statsd, 'query.postgres', tag, async () => {
-            const timeout = timeoutGuard('Postgres slow query warning after 30 sec', { queryTextOrConfig, values })
+            const timeout = timeoutGuard('Postgres slow query warning after 30 sec', { query, values })
             try {
-                return await this.postgres.query(queryTextOrConfig, values)
+                return await this.postgres.query(query, values)
+            } catch (error) {
+                captureException(error, { extra: { query: query, values: JSON.stringify(values) } })
+                status.error('🔴', error.message)
+                throw error
             } finally {
                 clearTimeout(timeout)
             }
@@ -125,8 +130,13 @@ export class DB {
                 throw new Error('ClickHouse connection has not been provided to this DB instance!')
             }
             const timeout = timeoutGuard('ClickHouse slow query warning after 30 sec', { query })
+
             try {
                 return await this.clickhouse.querying(query, options)
+            } catch (error) {
+                captureException(error, { extra: { query: query } })
+                status.error('🔴', error.message)
+                throw error
             } finally {
                 clearTimeout(timeout)
             }
