@@ -274,7 +274,7 @@ test('plugin changing event.team_id throws error (batch)', async () => {
         },
         team_id: 2,
     }
-    expect(returnedEvent).toEqual([expectedReturnedEvent])
+    expect(returnedEvent).toEqual(expectedReturnedEvent)
 
     expect(processError).toHaveBeenCalledWith(
         hub,
