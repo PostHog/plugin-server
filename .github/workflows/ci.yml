@@ -101,6 +101,8 @@ jobs:
 
             - name: Run the linked plugin server from under `posthog/plugins`
               timeout-minutes: 2
+              env:
+                  DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/posthog'
               run: |
                   cd posthog/plugins
                   yarn link "@posthog/plugin-server"
