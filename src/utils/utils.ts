@@ -5,7 +5,7 @@ import AdmZip from 'adm-zip'
 import { randomBytes } from 'crypto'
 import Redis, { RedisOptions } from 'ioredis'
 import { DateTime } from 'luxon'
-import { Pool, PoolClient, PoolConfig } from 'pg'
+import { Pool, PoolConfig } from 'pg'
 import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
@@ -565,4 +565,13 @@ export function filterIncrementProperties(incrementProperties: unknown): Record<
     }
 
     return filteredIncrementProperties
+}
+
+export function clamp(value: number, min: number, max: number): number {
+    return value > max ? max : value < min ? min : value
+}
+
+export function stringClamp(value: string, def: number, min: number, max: number): number {
+    const nanToNull = (nr: number): null | number => (isNaN(nr) ? null : nr)
+    return clamp(nanToNull(parseInt(value)) ?? def, min, max)
 }

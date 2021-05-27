@@ -176,6 +176,7 @@ export async function createHub(
 
     // :TODO: This is only used on worker threads, not main
     hub.eventsProcessor = new EventsProcessor(hub as Hub)
+    await hub.eventsProcessor.prepare()
     hub.jobQueueManager = new JobQueueManager(hub as Hub)
 
     if (serverConfig.CAPTURE_INTERNAL_METRICS) {
