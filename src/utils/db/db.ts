@@ -32,6 +32,7 @@ import {
     RawOrganization,
     RawPerson,
     SessionRecordingEvent,
+    Team,
     TimestampFormat,
 } from '../../types'
 import { instrumentQuery } from '../metrics'
@@ -39,6 +40,7 @@ import {
     castTimestampOrNow,
     clickHouseTimestampToISO,
     escapeClickHouseString,
+    groupBy,
     sanitizeSqlIdentifier,
     tryTwice,
     UUID,
@@ -748,6 +750,15 @@ export class DB {
             }
         }
         return Object.values(actionsMap)
+    }
+
+    public async fetchAllActionsGroupedByTeam(): Promise<Record<Team['id'], Record<Action['id'], Action>>> {
+        return Object.fromEntries(
+            Object.entries(groupBy(await this.fetchAllActions(), 'team_id')).map(([teamId, actions]) => [
+                teamId,
+                groupBy(actions, 'id', true),
+            ])
+        )
     }
 
     public async fetchAction(id: Action['id']): Promise<Action | null> {

@@ -1,7 +1,6 @@
 import { Action, Team } from '../../types'
 import { DB } from '../../utils/db/db'
 import { status } from '../../utils/status'
-import { groupBy } from '../../utils/utils'
 
 export type ActionMap = Record<Action['id'], Action>
 type ActionCache = Record<Team['id'], ActionMap>
@@ -30,12 +29,7 @@ export class ActionManager {
     }
 
     public async reloadAllActions(): Promise<void> {
-        this.actionCache = Object.fromEntries(
-            Object.entries(groupBy(await this.db.fetchAllActions(), 'team_id')).map(([teamId, actions]) => [
-                teamId,
-                groupBy(actions, 'id', true),
-            ])
-        )
+        this.actionCache = await this.db.fetchAllActionsGroupedByTeam()
         status.info('🍿', 'Fetched all actions from DB anew')
     }
 
