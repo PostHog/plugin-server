@@ -46,20 +46,20 @@ export class ActionManager {
             status.info(
                 '🍿',
                 wasCachedAlready
-                    ? `Refetched action ID ${actionId} from DB`
-                    : `Fetched new action ID ${actionId} from DB`
+                    ? `Refetched action ID ${actionId} (team ID ${teamId}) from DB`
+                    : `Fetched new action ID ${actionId} (team ID ${teamId}) from DB`
             )
             this.actionCache[teamId][actionId] = refetchedAction
         } else if (wasCachedAlready) {
             status.info(
                 '🍿',
-                `Tried to fetch action ID ${actionId} from DB, but it wasn't found in DB, so deleted from cache instead`
+                `Tried to fetch action ID ${actionId} (team ID ${teamId}) from DB, but it wasn't found in DB, so deleted from cache instead`
             )
             delete this.actionCache[teamId][actionId]
         } else {
             status.info(
                 '🍿',
-                `Tried to fetch action ID ${actionId} from DB, but it wasn't found in DB or cache, so did nothing instead`
+                `Tried to fetch action ID ${actionId} (team ID ${teamId}) from DB, but it wasn't found in DB or cache, so did nothing instead`
             )
         }
     }
@@ -67,12 +67,12 @@ export class ActionManager {
     public dropAction(teamId: Team['id'], actionId: Action['id']): void {
         const wasCachedAlready = teamId in this.actionCache && actionId in this.actionCache[teamId]
         if (wasCachedAlready) {
-            status.info('🍿', `Deleted action ID ${actionId} from cache`)
+            status.info('🍿', `Deleted action ID ${actionId} (team ID ${teamId}) from cache`)
             delete this.actionCache[teamId][actionId]
         } else {
             status.info(
                 '🍿',
-                `Tried to delete action ID ${actionId} from cache, but it wasn't found in cache, so did nothing instead`
+                `Tried to delete action ID ${actionId} (team ID ${teamId}) from cache, but it wasn't found in cache, so did nothing instead`
             )
         }
     }
