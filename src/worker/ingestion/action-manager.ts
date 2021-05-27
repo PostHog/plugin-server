@@ -22,11 +22,11 @@ export class ActionManager {
         this.ready = true
     }
 
-    public getTeamActions(teamId: Team['id']): ActionMap | null {
+    public getTeamActions(teamId: Team['id']): ActionMap {
         if (!this.ready) {
             throw new Error('ActionManager is not ready! Run actionManager.prepare() before this')
         }
-        return this.actionCache[teamId] || null
+        return this.actionCache[teamId] || {}
     }
 
     public async reloadAllActions(): Promise<void> {

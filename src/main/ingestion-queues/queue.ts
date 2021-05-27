@@ -50,6 +50,11 @@ export async function startQueue(
             server.lastActivityType = 'ingestEvent'
             return piscina.runTask({ task: 'ingestEvent', args: { event } })
         },
+        matchActions: (event: PluginEvent) => {
+            server.lastActivity = new Date().valueOf()
+            server.lastActivityType = 'matchActions'
+            return piscina.runTask({ task: 'matchActions', args: { event } })
+        },
         ...workerMethods,
     }
 

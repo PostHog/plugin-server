@@ -377,6 +377,7 @@ export class EventsProcessor {
         if (elements && elements.length) {
             delete properties['$elements']
             elementsList = elements.map((el) => ({
+                // Synced with ActionMatcher
                 text: el['$el_text']?.slice(0, 400),
                 tag_name: el['tag_name'],
                 href: el['attr__href']?.slice(0, 2048),
