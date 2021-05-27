@@ -186,7 +186,10 @@ describe('queue logic', () => {
         expect(pluginsServer.piscina.queueSize).toBe(0)
 
         const client = new Client(pluginsServer.hub.db, pluginsServer.hub.PLUGINS_CELERY_QUEUE)
-        for (let i = 0; i < 2; i++) {
+
+        let tasksSentSoFar = 0
+
+        for (tasksSentSoFar; tasksSentSoFar < 2; tasksSentSoFar++) {
             client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
         }
 
@@ -199,13 +202,13 @@ describe('queue logic', () => {
         await delay(5000)
 
         expect(pluginsServer.piscina.queueSize).toBe(0)
-        // 2 x (processEvent + onEvent + ingestEvent + matchActions)
-        expect(pluginsServer.piscina.completed).toBe(baseCompleted + 2 * 4)
+        // tasksSentSoFar * (processEvent + onEvent + ingestEvent + matchActions)
+        expect(pluginsServer.piscina.completed).toBe(baseCompleted + tasksSentSoFar * 4)
         expect(pluginsServer.queue.isPaused()).toBe(false)
 
         // 2 tasks * 2 threads = 4 active
         // 2 threads * 2 threads = 4 queue excess
-        for (let i = 0; i < 50; i++) {
+        for (tasksSentSoFar; tasksSentSoFar < 52; tasksSentSoFar++) {
             client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
         }
 
@@ -227,7 +230,8 @@ describe('queue logic', () => {
         expect(pausedTimes).toBeGreaterThanOrEqual(10)
         expect(pluginsServer.queue.isPaused()).toBe(false)
         expect(pluginsServer.piscina.queueSize).toBe(0)
-        expect(pluginsServer.piscina.completed).toEqual(baseCompleted + 156)
+        // tasksSentSoFar x (processEvent + onEvent + ingestEvent + matchActions)
+        expect(pluginsServer.piscina.completed).toEqual(baseCompleted + tasksSentSoFar * 4)
 
         const duration = pluginsServer.piscina.duration - startTime
         const expectedTimeMs = (50 / 4) * 1000
