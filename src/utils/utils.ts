@@ -597,3 +597,12 @@ export function groupBy<T extends Record<string, any>, K extends keyof T>(
               return grouping
           }, {} as Record<T[K], T[]>)
 }
+
+export function clamp(value: number, min: number, max: number): number {
+    return value > max ? max : value < min ? min : value
+}
+
+export function stringClamp(value: string, def: number, min: number, max: number): number {
+    const nanToNull = (nr: number): null | number => (isNaN(nr) ? null : nr)
+    return clamp(nanToNull(parseInt(value)) ?? def, min, max)
+}
