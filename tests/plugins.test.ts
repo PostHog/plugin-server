@@ -235,6 +235,7 @@ test('plugin changing event.team_id throws error (single)', async () => {
         properties: {
             $plugins_failed: ['test-maxmind-plugin (39)'],
             $plugins_succeeded: [],
+            $plugins_deferred: [],
         },
         team_id: 2,
     }
@@ -274,6 +275,7 @@ test('plugin changing event.team_id throws error (batch)', async () => {
         properties: {
             $plugins_failed: ['test-maxmind-plugin (39)'],
             $plugins_succeeded: [],
+            $plugins_deferred: [],
         },
         team_id: 2,
     }
@@ -315,6 +317,7 @@ test('plugin throwing error does not prevent ingestion and failure is noted in e
         properties: {
             $plugins_failed: ['test-maxmind-plugin (39)'],
             $plugins_succeeded: [],
+            $plugins_deferred: [],
         },
     }
     expect(returnedEvent).toEqual(expectedReturnEvent)
@@ -348,6 +351,41 @@ test('events have property $plugins_succeeded set to the plugins that succeeded'
         properties: {
             $plugins_failed: [],
             $plugins_succeeded: ['test-maxmind-plugin (39)'],
+            $plugins_deferred: [],
+        },
+    }
+    expect(returnedEvent).toEqual(expectedReturnEvent)
+})
+
+test('events have property $plugins_deferred set to the plugins that run after processEvent', async () => {
+    // silence some spam
+    console.log = jest.fn()
+    console.error = jest.fn()
+
+    getPluginRows.mockReturnValueOnce([
+        mockPluginWithArchive(`
+            function onEvent (event) {
+                return event
+            }
+        `),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(hub)
+    const { pluginConfigs } = hub
+
+    expect(await pluginConfigs.get(39)!.vm!.getTasks(PluginTaskType.Schedule)).toEqual({})
+
+    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
+    const returnedEvent = await runProcessEvent(hub, { ...event })
+
+    const expectedReturnEvent = {
+        ...event,
+        properties: {
+            $plugins_failed: [],
+            $plugins_succeeded: [],
+            $plugins_deferred: ['test-maxmind-plugin (39)'],
         },
     }
     expect(returnedEvent).toEqual(expectedReturnEvent)
