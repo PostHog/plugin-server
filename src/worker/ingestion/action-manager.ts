@@ -30,12 +30,7 @@ export class ActionManager {
     }
 
     public async reloadAllActions(): Promise<void> {
-        this.actionCache = Object.fromEntries(
-            Object.entries(groupBy(await this.db.fetchAllActions(), 'team_id')).map(([teamId, actions]) => [
-                teamId,
-                groupBy(actions, 'id', true),
-            ])
-        )
+        this.actionCache = await this.db.fetchAllActionsGroupedByTeam()
         status.info('🍿', 'Fetched all actions from DB anew')
     }
 
