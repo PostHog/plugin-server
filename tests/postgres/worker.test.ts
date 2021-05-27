@@ -199,7 +199,8 @@ describe('queue logic', () => {
         await delay(5000)
 
         expect(pluginsServer.piscina.queueSize).toBe(0)
-        expect(pluginsServer.piscina.completed).toBe(baseCompleted + 2 * 3) // 2 x (process + on + ingest)
+        // 2 x (processEvent + onEvent + ingestEvent + matchActions)
+        expect(pluginsServer.piscina.completed).toBe(baseCompleted + 2 * 4)
         expect(pluginsServer.queue.isPaused()).toBe(false)
 
         // 2 tasks * 2 threads = 4 active
