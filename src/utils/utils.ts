@@ -3,14 +3,16 @@ import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import AdmZip from 'adm-zip'
 import { randomBytes } from 'crypto'
+import { readFileSync } from 'fs';
 import Redis, { RedisOptions } from 'ioredis'
 import { DateTime } from 'luxon'
+import { FsQueue } from 'main/job-queues/local/fs-queue'
 import { Pool, PoolConfig } from 'pg'
 import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
 
-import { LogLevel, Plugin, PluginConfigId, PluginsServerConfig, TimestampFormat } from '../types'
+import { LogLevel, Plugin, PluginConfigId, PluginJsonConfig, PluginsServerConfig, PostgresSSLMode, TimestampFormat } from '../types'
 import { status } from './status'
 
 /** Time until autoexit (due to error) gives up on graceful exit and kills the process right away. */
@@ -412,6 +414,24 @@ export function pluginDigest(plugin: Plugin, teamId?: number): string {
     return `plugin ${plugin.name} ID ${plugin.id} (${extras.join(' - ')})`
 }
 
+function createPostgresConfig(config: PluginsServerConfig) {
+    const ssl = config.POSTHOG_POSTGRES_SSL_MODE === PostgresSSLMode.Disable ? {} : {
+        rejectUnauthorized: false,
+        ca: config.POSTHOG_POSTGRES_CLI_SSL_CA ? readFileSync(config.POSTHOG_POSTGRES_CLI_SSL_CA).toString() : null,
+        key: config.POSTHOG_POSTGRES_CLI_SSL_KEY ? readFileSync(config.POSTHOG_POSTGRES_CLI_SSL_KEY).toString() : null,
+        cert: config.POSTHOG_POSTGRES_CLI_SSL_CRT ? readFileSync(config.POSTHOG_POSTGRES_CLI_SSL_CRT).toString() : null,
+    }
+
+    return {
+        database: config.POSTHOG_DB_NAME,
+        user: config.POSTHOG_DB_USER,
+        password: config.POSTHOG_DB_PASSWORD,
+        host: config.POSTHOG_POSTGRES_HOST,
+        port: config.POSTHOG_POSTGRES_PORT,
+        ssl
+    }
+}
+
 export function createPostgresPool(
     configOrDatabaseUrl: PluginsServerConfig | string,
     onError?: (error: Error) => any
@@ -422,13 +442,7 @@ export function createPostgresPool(
                   connectionString: configOrDatabaseUrl,
               }
             : configOrDatabaseUrl.POSTHOG_DB_NAME
-            ? {
-                  database: configOrDatabaseUrl.POSTHOG_DB_NAME,
-                  user: configOrDatabaseUrl.POSTHOG_DB_USER,
-                  password: configOrDatabaseUrl.POSTHOG_DB_PASSWORD,
-                  host: configOrDatabaseUrl.POSTHOG_POSTGRES_HOST,
-                  port: configOrDatabaseUrl.POSTHOG_POSTGRES_PORT,
-              }
+            ? createPostgresConfig(configOrDatabaseUrl)
             : {
                   connectionString: configOrDatabaseUrl.DATABASE_URL,
               }

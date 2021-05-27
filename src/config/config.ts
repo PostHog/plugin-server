@@ -1,6 +1,6 @@
 import os from 'os'
 
-import { LogLevel, PluginsServerConfig } from '../types'
+import { LogLevel, PluginsServerConfig, PostgresSSLMode } from '../types'
 import { stringToBoolean } from '../utils/utils'
 import { KAFKA_EVENTS_PLUGIN_INGESTION } from './kafka-topics'
 
@@ -19,6 +19,10 @@ export function getDefaultConfig(): PluginsServerConfig {
         POSTHOG_DB_PASSWORD: '',
         POSTHOG_POSTGRES_HOST: 'localhost',
         POSTHOG_POSTGRES_PORT: 5432,
+        POSTHOG_POSTGRES_SSL_MODE: PostgresSSLMode.Disable,
+        POSTHOG_POSTGRES_CLI_SSL_CA: null,
+        POSTHOG_POSTGRES_CLI_SSL_CRT: null,
+        POSTHOG_POSTGRES_CLI_SSL_KEY: null
         CLICKHOUSE_HOST: 'localhost',
         CLICKHOUSE_DATABASE: isTestEnv ? 'posthog_test' : 'default',
         CLICKHOUSE_USER: 'default',
