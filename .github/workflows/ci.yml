@@ -111,7 +111,8 @@ jobs:
                   yarn
 
                   echo "🏁 Starting the plugin server dist/ (compiled JS) via posthog(master)/plugins/"
-                  yarn start &> tmplog.txt &
+                  mkdir -p tmp
+                  yarn start &> tmp/plugin-server.log &
                   pid=$!
 
                   echo "⏳ Waiting 10 seconds to see if it runs"
@@ -122,26 +123,26 @@ jobs:
                       echo "😵 It was not running!"
                       echo "🪵 Here's the log:"
                       echo ""
-                      cat tmplog.txt
+                      cat tmp/plugin-server.log
                       exit 1
                   fi
 
                   echo '🤔 Checking if it logged "All systems go"'
-                  str=`cat tmplog.txt | grep "All systems go"`
+                  str=`cat tmp/plugin-server.log | grep "All systems go"`
                   if [ ! "$str" ];then
                       sleep 5
                       echo '😵 Did not find "All systems go" in plugin server log output!'
                       echo '🪵 Here's the log:'
                       echo ""
-                      cat tmplog.txt
+                      cat tmp/plugin-server.log
                       exit 1
                   fi
 
                   echo '✅ All systems went!'
                   echo '🪵 Here's the complete log:'
                   echo ""
-                  cat tmplog.txt
-                  rm -f tmplog.txt
+                  cat tmp/plugin-server.log
+                  rm -f tmp/plugin-server.log
 
     tests-postgres-1:
         name: Tests / Postgres + Redis (1)
