@@ -132,14 +132,14 @@ jobs:
                   if [ ! "$str" ];then
                       sleep 5
                       echo '😵 Did not find "All systems go" in plugin server log output!'
-                      echo '🪵 Here's the log:'
+                      echo "🪵 Here's the log:"
                       echo ""
                       cat tmp/plugin-server.log
                       exit 1
                   fi
 
                   echo '✅ All systems went!'
-                  echo '🪵 Here's the complete log:'
+                  echo "🪵 Here's the complete log:"
                   echo ""
                   cat tmp/plugin-server.log
                   rm -f tmp/plugin-server.log
