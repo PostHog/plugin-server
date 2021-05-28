@@ -422,7 +422,7 @@ export function pluginDigest(plugin: Plugin, teamId?: number): string {
     return `plugin ${plugin.name} ID ${plugin.id} (${extras.join(' - ')})`
 }
 
-function createPostgresConfig(config: PluginsServerConfig) {
+function createPostgresConfig(config: PluginsServerConfig): Partial<PoolConfig> {
     const ssl =
         config.POSTHOG_POSTGRES_SSL_MODE === PostgresSSLMode.Disable
             ? {}
@@ -440,7 +440,7 @@ function createPostgresConfig(config: PluginsServerConfig) {
               }
 
     return {
-        database: config.POSTHOG_DB_NAME,
+        database: config.POSTHOG_DB_NAME!,
         user: config.POSTHOG_DB_USER,
         password: config.POSTHOG_DB_PASSWORD,
         host: config.POSTHOG_POSTGRES_HOST,
