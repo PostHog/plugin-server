@@ -129,7 +129,7 @@ jobs:
                   echo '🤔 Checking if it logged "All systems go"'
                   str=`cat tmplog.txt | grep "All systems go"`
                   if [ ! "$str" ];then
-                      echo "😵 Did not find "All systems go" in plugin server log output! "
+                      echo '😵 Did not find "All systems go" in plugin server log output!'
                       echo '🪵 Here's the log:'
                       echo ""
                       cat tmplog.txt
