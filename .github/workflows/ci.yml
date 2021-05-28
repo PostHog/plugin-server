@@ -138,6 +138,7 @@ jobs:
                       exit 1
                   fi
 
+                  sleep 5
                   echo '✅ All systems went!'
                   echo "🪵 Here's the complete log:"
                   echo ""
