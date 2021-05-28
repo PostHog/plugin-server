@@ -250,7 +250,7 @@ test('plugin changing event.team_id throws error (single)', async () => {
 test('plugin changing event.team_id throws error (batch)', async () => {
     getPluginRows.mockReturnValueOnce([
         mockPluginWithArchive(`
-            function processEvent (events, meta) {
+            function processEvent (event, meta) {
                 event.team_id = 400
                 return event
             }
