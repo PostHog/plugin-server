@@ -24,7 +24,7 @@ import { DB } from '../../utils/db/db'
 import { KafkaProducerWrapper } from '../../utils/db/kafka-producer-wrapper'
 import { elementsToString, personInitialAndUTMProperties, sanitizeEventName, timeoutGuard } from '../../utils/db/utils'
 import { status } from '../../utils/status'
-import { castTimestampOrNow, filterIncrementProperties, UUID, UUIDT } from '../../utils/utils'
+import { castTimestampOrNow, extractElements, filterIncrementProperties, UUID, UUIDT } from '../../utils/utils'
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
@@ -374,19 +374,10 @@ export class EventsProcessor {
         event = sanitizeEventName(event)
         const elements: Record<string, any>[] | undefined = properties['$elements']
         let elementsList: Element[] = []
+
         if (elements && elements.length) {
             delete properties['$elements']
-            elementsList = elements.map((el) => ({
-                // Synced with ActionMatcher
-                text: el['$el_text']?.slice(0, 400),
-                tag_name: el['tag_name'],
-                href: el['attr__href']?.slice(0, 2048),
-                attr_class: el['attr__class']?.split(' '),
-                attr_id: el['attr__id'],
-                nth_child: el['nth_child'],
-                nth_of_type: el['nth_of_type'],
-                attributes: Object.fromEntries(Object.entries(el).filter(([key]) => key.startsWith('attr__'))),
-            }))
+            elementsList = extractElements(elements)
         }
 
         const team = await this.teamManager.fetchTeam(teamId)

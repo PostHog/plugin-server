@@ -493,44 +493,42 @@ export enum PropertyOperator {
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-interface BasePropertyFilter {
+interface PropertyFilterBase {
     key: string
     value: string | number | Array<string | number> | null
     label?: string
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-export interface EventPropertyFilter extends BasePropertyFilter {
+export interface PropertyFilterWithOperator extends PropertyFilterBase {
+    operator: PropertyOperator
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export interface EventPropertyFilter extends PropertyFilterWithOperator {
     type: 'event'
-    operator: PropertyOperator
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-export interface PersonPropertyFilter extends BasePropertyFilter {
+export interface PersonPropertyFilter extends PropertyFilterWithOperator {
     type: 'person'
-    operator: PropertyOperator
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-export interface ElementPropertyFilter extends BasePropertyFilter {
+export interface ElementPropertyFilter extends PropertyFilterWithOperator {
     type: 'element'
     key: 'tag_name' | 'text' | 'href' | 'selector'
-    operator: PropertyOperator
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-export interface CohortPropertyFilter extends BasePropertyFilter {
+export interface CohortPropertyFilter extends PropertyFilterBase {
     type: 'cohort'
     key: 'id'
     value: number
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-export type ActionStepProperties =
-    | EventPropertyFilter
-    | PersonPropertyFilter
-    | ElementPropertyFilter
-    | CohortPropertyFilter
+export type PropertyFilter = EventPropertyFilter | PersonPropertyFilter | ElementPropertyFilter | CohortPropertyFilter
 
 /** Sync with posthog/frontend/src/types.ts */
 export enum ActionStepUrlMatching {
@@ -550,7 +548,7 @@ export interface ActionStep {
     url_matching: ActionStepUrlMatching | null
     name: string | null
     event: string | null
-    properties: ActionStepProperties[] | null
+    properties: PropertyFilter[] | null
 }
 
 /** Raw Action row from database. */

@@ -36,7 +36,19 @@ export class ActionManager {
 
     public async reloadAction(teamId: Team['id'], actionId: Action['id']): Promise<void> {
         const refetchedAction = await this.db.fetchAction(actionId)
-        const wasCachedAlready = teamId in this.actionCache && actionId in this.actionCache[teamId]
+
+        let wasCachedAlready = true
+        if (!this.actionCache) {
+            wasCachedAlready = false
+            this.actionCache = {}
+        }
+        if (!this.actionCache[teamId]) {
+            wasCachedAlready = false
+            this.actionCache[teamId] = {}
+        } else if (!this.actionCache[teamId][actionId]) {
+            wasCachedAlready = false
+        }
+
         if (refetchedAction) {
             status.info(
                 '🍿',
@@ -60,7 +72,8 @@ export class ActionManager {
     }
 
     public dropAction(teamId: Team['id'], actionId: Action['id']): void {
-        const wasCachedAlready = teamId in this.actionCache && actionId in this.actionCache[teamId]
+        const wasCachedAlready = !!this.actionCache?.[teamId]?.[actionId]
+
         if (wasCachedAlready) {
             status.info('🍿', `Deleted action ID ${actionId} (team ID ${teamId}) from cache`)
             delete this.actionCache[teamId][actionId]

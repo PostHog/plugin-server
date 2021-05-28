@@ -10,7 +10,7 @@ import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
 
-import { LogLevel, Plugin, PluginConfigId, PluginsServerConfig, TimestampFormat } from '../types'
+import { Element, LogLevel, Plugin, PluginConfigId, PluginsServerConfig, TimestampFormat } from '../types'
 import { status } from './status'
 
 /** Time until autoexit (due to error) gives up on graceful exit and kills the process right away. */
@@ -605,4 +605,17 @@ export function clamp(value: number, min: number, max: number): number {
 export function stringClamp(value: string, def: number, min: number, max: number): number {
     const nanToNull = (nr: number): null | number => (isNaN(nr) ? null : nr)
     return clamp(nanToNull(parseInt(value)) ?? def, min, max)
+}
+
+export function extractElements(elements: Record<string, any>[]): Element[] {
+    return elements.map((el) => ({
+        text: el['$el_text']?.slice(0, 400),
+        tag_name: el['tag_name'],
+        href: el['attr__href']?.slice(0, 2048),
+        attr_class: el['attr__class']?.split(' '),
+        attr_id: el['attr__id'],
+        nth_child: el['nth_child'],
+        nth_of_type: el['nth_of_type'],
+        attributes: Object.fromEntries(Object.entries(el).filter(([key]) => key.startsWith('attr__'))),
+    }))
 }
