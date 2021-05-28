@@ -22,6 +22,7 @@ import {
     EventDefinitionType,
     Person,
     PersonDistinctId,
+    Plugin,
     PluginConfig,
     PluginLogEntry,
     PluginLogEntrySource,
@@ -788,4 +789,29 @@ export class DB {
 
         return rows.length > 0 ? rows[0].team_id : null
     }
+
+    // Plugin & PluginConfig
+    public async fetchPlugin(id: Plugin['id']): Promise<Plugin | null> {
+        const plugins: Plugin[] = (
+            await this.postgresQuery('SELECT * FROM posthog_plugin WHERE id = $1', [id], 'fetchPlugin')
+        ).rows
+
+        if (!plugins.length) {
+            return null
+        }
+        return plugins[0]
+    }
+
+    // public async fetchPluginConfig(id: PluginConfig['id']): Promise<PluginConfig | null> {
+    //     return await null
+
+    //     // const pluginconfig: Plugin[] = (
+    //     //     await this.postgresQuery('SELECT * FROM posthog_plugin WHERE id = $1', [id], 'fetchPlugin')
+    //     // ).rows
+
+    //     // if (!plugins.length) {
+    //     //     return null
+    //     // }
+    //     // return plugins[0]
+    // }
 }
