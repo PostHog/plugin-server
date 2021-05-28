@@ -210,44 +210,7 @@ test('local plugin with broken index.js does not do much', async () => {
     unlink()
 })
 
-test('plugin changing event.team_id throws error (single)', async () => {
-    getPluginRows.mockReturnValueOnce([
-        mockPluginWithArchive(`
-            function processEvent (event, meta) {
-                event.team_id = 400
-                return event
-            }
-        `),
-    ])
-
-    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
-    getPluginAttachmentRows.mockReturnValueOnce([])
-
-    await setupPlugins(hub)
-    const { pluginConfigs } = hub
-
-    const event = { event: '$test', properties: {}, team_id: 2 } as PluginEvent
-    const returnedEvent = await runProcessEvent(hub, event)
-
-    const expectedReturnedEvent = {
-        event: '$test',
-        properties: {
-            $plugins_failed: ['test-maxmind-plugin (39)'],
-            $plugins_succeeded: [],
-        },
-        team_id: 2,
-    }
-    expect(returnedEvent).toEqual(expectedReturnedEvent)
-
-    expect(processError).toHaveBeenCalledWith(
-        hub,
-        pluginConfigs.get(39)!,
-        new IllegalOperationError('Plugin tried to change event.team_id'),
-        expectedReturnedEvent
-    )
-})
-
-test('plugin changing event.team_id throws error (batch)', async () => {
+test('plugin changing event.team_id throws error', async () => {
     getPluginRows.mockReturnValueOnce([
         mockPluginWithArchive(`
             function processEvent (event, meta) {
