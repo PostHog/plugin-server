@@ -139,6 +139,7 @@ test('plugin meta has what it should have', async () => {
     const returnedEvent = await runProcessEvent(hub, event)
 
     expect(Object.keys(returnedEvent!.properties!).sort()).toEqual([
+        '$plugins_deferred',
         '$plugins_failed',
         '$plugins_succeeded',
         'attachments',
@@ -275,7 +276,6 @@ test('plugin changing event.team_id throws error (batch)', async () => {
         properties: {
             $plugins_failed: ['test-maxmind-plugin (39)'],
             $plugins_succeeded: [],
-            $plugins_deferred: [],
         },
         team_id: 2,
     }
