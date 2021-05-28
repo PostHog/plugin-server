@@ -22,7 +22,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         POSTHOG_POSTGRES_SSL_MODE: PostgresSSLMode.Disable,
         POSTHOG_POSTGRES_CLI_SSL_CA: null,
         POSTHOG_POSTGRES_CLI_SSL_CRT: null,
-        POSTHOG_POSTGRES_CLI_SSL_KEY: null
+        POSTHOG_POSTGRES_CLI_SSL_KEY: null,
         CLICKHOUSE_HOST: 'localhost',
         CLICKHOUSE_DATABASE: isTestEnv ? 'posthog_test' : 'default',
         CLICKHOUSE_USER: 'default',
