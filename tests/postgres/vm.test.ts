@@ -46,7 +46,6 @@ test('empty plugins', async () => {
         'onEvent',
         'onSnapshot',
         'processEvent',
-        'processEventBatch',
         'setupPlugin',
         'teardownPlugin',
     ])
