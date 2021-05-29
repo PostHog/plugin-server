@@ -536,6 +536,17 @@ export class DB {
         }
     }
 
+    // Cohort & CohortPeople
+
+    public async doesPersonBelongToCohort(cohortId: number, personId: Person['id']): Promise<boolean> {
+        const selectResult = await this.postgresQuery(
+            `SELECT EXISTS (SELECT 1 FROM posthog_cohortpeople WHERE cohort_id = $1 AND person_id = $2);`,
+            [cohortId, personId],
+            'doesPersonBelongToCohort'
+        )
+        return selectResult.rows[0]
+    }
+
     // Organization
 
     public async fetchOrganization(organizationId: string): Promise<RawOrganization | undefined> {

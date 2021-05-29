@@ -10,6 +10,7 @@ import {
     Element,
     ElementPropertyFilter,
     EventPropertyFilter,
+    Person,
     PersonPropertyFilter,
     PropertyFilter,
     PropertyFilterWithOperator,
@@ -18,6 +19,13 @@ import {
 import { DB } from '../../utils/db/db'
 import { extractElements } from '../../utils/utils'
 import { ActionManager } from './action-manager'
+
+const propertyOperatorToRequiredValueType: Partial<Record<PropertyOperator, string>> = {
+    [PropertyOperator.IContains]: 'string',
+    [PropertyOperator.NotIContains]: 'string',
+    [PropertyOperator.Regex]: 'string',
+    [PropertyOperator.NotRegex]: 'string',
+}
 
 export class ActionMatcher {
     private db: DB
@@ -37,11 +45,20 @@ export class ActionMatcher {
     }
 
     /** Get all actions matched to the event. */
-    public match(event: PluginEvent): Action[] {
+    public async match(event: PluginEvent): Promise<Action[]> {
         const teamActions: Action[] = Object.values(this.actionManager.getTeamActions(event.team_id))
         const rawElements: Record<string, any>[] | undefined = event.properties?.['$elements']
         const elements: Element[] = rawElements ? extractElements(rawElements) : []
-        const matches: Action[] = teamActions.filter((action) => this.checkAction(event, elements, action))
+        const matching: boolean[] = await Promise.all(
+            teamActions.map((action) => this.checkAction(event, elements, action))
+        )
+        const matches: Action[] = []
+        for (let i = 0; i < matching.length; i++) {
+            const result = matching[i]
+            if (result) {
+                matches.push(teamActions[i])
+            }
+        }
         return matches
     }
 
@@ -51,8 +68,13 @@ export class ActionMatcher {
      * Return whether the event is a match for the action.
      * The event is considered a match if any of the action's steps (match groups) is a match.
      */
-    public checkAction(event: PluginEvent, elements: Element[], action: Action): boolean {
-        return action.steps.some((step) => this.checkStep(event, elements, step))
+    public async checkAction(event: PluginEvent, elements: Element[], action: Action): Promise<boolean> {
+        for (const step of action.steps) {
+            if (await this.checkStep(event, elements, step)) {
+                return true
+            }
+        }
+        return false
     }
 
     /**
@@ -61,12 +83,12 @@ export class ActionMatcher {
      * Return whether the event is a match for the step (match group).
      * The event is considered a match if no subcheck fails. Many subchecks are usually irrelevant and skipped.
      */
-    private checkStep(event: PluginEvent, elements: Element[], step: ActionStep): boolean {
+    private async checkStep(event: PluginEvent, elements: Element[], step: ActionStep): Promise<boolean> {
         return (
             this.checkStepElement(elements, step) &&
             this.checkStepUrl(event, step) &&
             this.checkStepEvent(event, step) &&
-            this.checkStepFilters(event, elements, step)
+            (await this.checkStepFilters(event, elements, step))
             /* && this.checkStepName(event, step) – is ActionStep.name relevant at all??? */
         )
     }
@@ -156,132 +178,138 @@ export class ActionMatcher {
      * Return whether the event is a match for the step's fiter constraints.
      * Step property: `properties`.
      */
-    private checkStepFilters(event: PluginEvent, elements: Element[], step: ActionStep): boolean {
+    private async checkStepFilters(event: PluginEvent, elements: Element[], step: ActionStep): Promise<boolean> {
         // CHECK CONDITIONS, OTHERWISE SKIPPED, OTHERWISE SKIPPED
         if (step.properties && step.properties.length) {
             // EVERY FILTER MUST BE A MATCH
-            return step.properties.every((filter) => checkEventAgainstFilter(event, elements, filter))
+            for (const filter of step.properties) {
+                if (!(await this.checkEventAgainstFilter(event, elements, filter))) {
+                    return false
+                }
+            }
         }
         return true
     }
-}
 
-/**
- * Sublevel 3 of action matching.
- */
-function checkEventAgainstFilter(event: PluginEvent, elements: Element[], filter: PropertyFilter): boolean {
-    switch (filter.type) {
-        case 'event':
-            return checkEventAgainstEventFilter(event, filter)
-        case 'person':
-            return checkEventAgainstPersonFilter(event, filter)
-        case 'element':
-            return checkEventAgainstElementFilter(elements, filter)
-        case 'cohort':
-            return checkEventAgainstCohortFilter(event, filter)
-        default:
-            return false
-    }
-}
-
-const propertyOperatorToRequiredValueType: Partial<Record<PropertyOperator, string>> = {
-    [PropertyOperator.IContains]: 'string',
-    [PropertyOperator.NotIContains]: 'string',
-    [PropertyOperator.Regex]: 'string',
-    [PropertyOperator.NotRegex]: 'string',
-}
-
-/**
- * Sublevel 5 of action matching.
- */
-function checkPropertiesAgainstFilter(
-    properties: Properties | null | undefined,
-    filter: PropertyFilterWithOperator
-): boolean {
-    if (!properties) {
-        return false // MISMATCH DUE TO LACK OF PROPERTIES THAT COULD FULFILL CONDITION
+    /**
+     * Sublevel 3 of action matching.
+     */
+    private async checkEventAgainstFilter(
+        event: PluginEvent,
+        elements: Element[],
+        filter: PropertyFilter
+    ): Promise<boolean> {
+        switch (filter.type) {
+            case 'event':
+                return this.checkEventAgainstEventFilter(event, filter)
+            case 'person':
+                return this.checkEventAgainstPersonFilter(event, filter)
+            case 'element':
+                return this.checkEventAgainstElementFilter(elements, filter)
+            case 'cohort':
+                return await this.checkEventAgainstCohortFilter(event, person, filter)
+            default:
+                return false
+        }
     }
 
-    const possibleValues = Array.isArray(filter.value) ? filter.value : [filter.value]
-    const foundValue = properties[filter.key]
-    let foundValueLowerCase: string // only calculated if needed for a case-insensitive operator
-
-    const requiredValueType = propertyOperatorToRequiredValueType[filter.operator]
-    if (requiredValueType && typeof foundValue !== requiredValueType) {
-        return false // MISMATCH DUE TO VALUE TYPE INCOMPATIBLE WITH OPERATOR SUPPORT
+    /**
+     * Sublevel 4 of action matching.
+     */
+    private checkEventAgainstEventFilter(event: PluginEvent, filter: EventPropertyFilter): boolean {
+        return this.checkPropertiesAgainstFilter(event.properties, filter)
     }
 
-    let test: (possibleValue: any) => boolean
-    switch (filter.operator) {
-        case PropertyOperator.Exact:
-            test = (possibleValue) => possibleValue === foundValue
-            break
-        case PropertyOperator.IsNot:
-            test = (possibleValue) => possibleValue !== foundValue
-            break
-        case PropertyOperator.IContains:
-            foundValueLowerCase = foundValue.toLowerCase()
-            test = (possibleValue) =>
-                typeof possibleValue === 'string' && foundValueLowerCase.includes(possibleValue.toLowerCase())
-            break
-        case PropertyOperator.NotIContains:
-            foundValueLowerCase = foundValue.toLowerCase()
-            test = (possibleValue) =>
-                typeof possibleValue === 'string' && !foundValueLowerCase.includes(possibleValue.toLowerCase())
-            break
-        case PropertyOperator.Regex:
-            test = (possibleValue) => typeof possibleValue === 'string' && new RegExp(possibleValue).test(foundValue)
-            break
-        case PropertyOperator.NotRegex:
-            test = (possibleValue) => typeof possibleValue === 'string' && !new RegExp(possibleValue).test(foundValue)
-            break
-        case PropertyOperator.GreaterThan:
-            test = (possibleValue) => foundValue > possibleValue
-            break
-        case PropertyOperator.LessThan:
-            test = (possibleValue) => foundValue < possibleValue
-            break
-        case PropertyOperator.IsSet:
-            test = () => foundValue !== undefined
-            break
-        case PropertyOperator.IsNotSet:
-            test = () => foundValue === undefined
-            break
-        default:
-            throw new Error(`Operator ${filter.operator} is unknown and can't be used for event property filtering!`)
+    /**
+     * Sublevel 4 of action matching.
+     */
+    private checkEventAgainstPersonFilter(event: PluginEvent, filter: PersonPropertyFilter): boolean {
+        return this.checkPropertiesAgainstFilter(person.properties, filter) // TODO: get person here for use instead of event
     }
 
-    return possibleValues.some(test) // ANY OF POSSIBLE VALUES MUST BE A MATCH AGAINST THE FOUND VALUE
-}
+    /**
+     * Sublevel 4 of action matching.
+     */
+    private checkEventAgainstElementFilter(elements: Element[], filter: ElementPropertyFilter): boolean {
+        // TODO: make sure this makes sense this way!
+        return elements.some((element) => this.checkPropertiesAgainstFilter(element, filter))
+    }
 
-/**
- * Sublevel 4 of action matching.
- */
-function checkEventAgainstEventFilter(event: PluginEvent, filter: EventPropertyFilter): boolean {
-    return checkPropertiesAgainstFilter(event.properties, filter)
-}
+    /**
+     * Sublevel 4 of action matching.
+     */
+    private async checkEventAgainstCohortFilter(
+        event: PluginEvent,
+        person: Person,
+        filter: CohortPropertyFilter
+    ): Promise<boolean> {
+        return await this.db.doesPersonBelongToCohort(parseInt((filter.value as unknown) as any), person.id)
+    }
 
-/**
- * Sublevel 4 of action matching.
- */
-function checkEventAgainstPersonFilter(event: PluginEvent, filter: PersonPropertyFilter): boolean {
-    return checkPropertiesAgainstFilter(event.properties, filter) // TODO: get person here for use instead of event
-}
+    /**
+     * Sublevel 5 of action matching.
+     */
+    private checkPropertiesAgainstFilter(
+        properties: Properties | null | undefined,
+        filter: PropertyFilterWithOperator
+    ): boolean {
+        if (!properties) {
+            return false // MISMATCH DUE TO LACK OF PROPERTIES THAT COULD FULFILL CONDITION
+        }
 
-/**
- * Sublevel 4 of action matching.
- */
-function checkEventAgainstElementFilter(elements: Element[], filter: ElementPropertyFilter): boolean {
-    // TODO: make sure this makes sense this way!
-    return elements.some((element) => checkPropertiesAgainstFilter(element, filter))
-}
+        const possibleValues = Array.isArray(filter.value) ? filter.value : [filter.value]
+        const foundValue = properties[filter.key]
+        let foundValueLowerCase: string // only calculated if needed for a case-insensitive operator
 
-/**
- * Sublevel 4 of action matching.
- */
-function checkEventAgainstCohortFilter(event: PluginEvent, filter: CohortPropertyFilter): boolean {
-    // TODO: check against dynamic cohort (CohortPeople)
-    // TODO: check against static cohort for ClickHouse – realistically can be done later as this is almost unused
-    // and not present in original query_db_by_action
-    return false
+        const requiredValueType = propertyOperatorToRequiredValueType[filter.operator]
+        if (requiredValueType && typeof foundValue !== requiredValueType) {
+            return false // MISMATCH DUE TO VALUE TYPE INCOMPATIBLE WITH OPERATOR SUPPORT
+        }
+
+        let test: (possibleValue: any) => boolean
+        switch (filter.operator) {
+            case PropertyOperator.Exact:
+                test = (possibleValue) => possibleValue === foundValue
+                break
+            case PropertyOperator.IsNot:
+                test = (possibleValue) => possibleValue !== foundValue
+                break
+            case PropertyOperator.IContains:
+                foundValueLowerCase = foundValue.toLowerCase()
+                test = (possibleValue) =>
+                    typeof possibleValue === 'string' && foundValueLowerCase.includes(possibleValue.toLowerCase())
+                break
+            case PropertyOperator.NotIContains:
+                foundValueLowerCase = foundValue.toLowerCase()
+                test = (possibleValue) =>
+                    typeof possibleValue === 'string' && !foundValueLowerCase.includes(possibleValue.toLowerCase())
+                break
+            case PropertyOperator.Regex:
+                test = (possibleValue) =>
+                    typeof possibleValue === 'string' && new RegExp(possibleValue).test(foundValue)
+                break
+            case PropertyOperator.NotRegex:
+                test = (possibleValue) =>
+                    typeof possibleValue === 'string' && !new RegExp(possibleValue).test(foundValue)
+                break
+            case PropertyOperator.GreaterThan:
+                test = (possibleValue) => foundValue > possibleValue
+                break
+            case PropertyOperator.LessThan:
+                test = (possibleValue) => foundValue < possibleValue
+                break
+            case PropertyOperator.IsSet:
+                test = () => foundValue !== undefined
+                break
+            case PropertyOperator.IsNotSet:
+                test = () => foundValue === undefined
+                break
+            default:
+                throw new Error(
+                    `Operator ${filter.operator} is unknown and can't be used for event property filtering!`
+                )
+        }
+
+        return possibleValues.some(test) // ANY OF POSSIBLE VALUES MUST BE A MATCH AGAINST THE FOUND VALUE
+    }
 }
