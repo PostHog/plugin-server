@@ -20,7 +20,6 @@ import { extractElements } from '../../utils/utils'
 import { ActionManager } from './action-manager'
 
 export class ActionMatcher {
-    private isReady: boolean
     private db: DB
     private actionManager: ActionManager
 
@@ -29,19 +28,12 @@ export class ActionMatcher {
     public reloadAction: typeof ActionManager.prototype.reloadAction
     public dropAction: typeof ActionManager.prototype.dropAction
 
-    constructor(db: DB) {
-        this.isReady = false
+    constructor(db: DB, actionManager: ActionManager) {
         this.db = db
-        this.actionManager = new ActionManager(db)
+        this.actionManager = actionManager
         this.reloadAllActions = this.actionManager.reloadAllActions.bind(this.actionManager)
         this.reloadAction = this.actionManager.reloadAction.bind(this.actionManager)
         this.dropAction = this.actionManager.dropAction.bind(this.actionManager)
-    }
-
-    /** Prepare ActionMatcher instance for matching by ensuring action data is loaded. */
-    public async prepare(): Promise<void> {
-        await this.actionManager.prepare()
-        this.isReady = true
     }
 
     /** Get all actions matched to the event. */
@@ -288,8 +280,8 @@ function checkEventAgainstElementFilter(elements: Element[], filter: ElementProp
  * Sublevel 4 of action matching.
  */
 function checkEventAgainstCohortFilter(event: PluginEvent, filter: CohortPropertyFilter): boolean {
-    // TODO: check against dynamic cohort for Postgres
-    // TODO: check against dynamic cohort for ClickHouse
-    // TODO: check against static cohort for ClickHouse
+    // TODO: check against dynamic cohort (CohortPeople)
+    // TODO: check against static cohort for ClickHouse – realistically can be done later as this is almost unused
+    // and not present in original query_db_by_action
     return false
 }

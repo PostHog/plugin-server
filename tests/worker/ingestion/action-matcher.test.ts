@@ -2,7 +2,6 @@ import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 
 import { Action, ActionStep, ActionStepUrlMatching, Hub, RawAction } from '../../../src/types'
 import { createHub } from '../../../src/utils/db/hub'
-import { delay } from '../../../src/utils/utils'
 import { ActionMatcher } from '../../../src/worker/ingestion/action-matcher'
 import { commonUserId } from '../../helpers/plugins'
 import { insertRow, resetTestDatabase } from '../../helpers/sql'

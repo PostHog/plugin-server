@@ -1,7 +1,6 @@
 import { Action, Team } from '../../types'
 import { DB } from '../../utils/db/db'
 import { status } from '../../utils/status'
-import { groupBy } from '../../utils/utils'
 
 export type ActionMap = Record<Action['id'], Action>
 type ActionCache = Record<Team['id'], ActionMap>
