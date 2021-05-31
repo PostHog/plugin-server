@@ -1,12 +1,12 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 
-import { PluginsServer, WorkerMethods } from '../../types'
+import { Hub, WorkerMethods } from '../../types'
 import { timeoutGuard } from '../../utils/db/utils'
 import { status } from '../../utils/status'
 
 export async function ingestEvent(
-    server: PluginsServer,
+    server: Hub,
     workerMethods: WorkerMethods,
     event: PluginEvent,
     checkAndPause?: () => void // pause incoming messages if we are slow in getting them out again
@@ -51,6 +51,7 @@ export async function ingestEvent(
     }
 
     server.statsd?.timing('kafka_queue.each_event', eachEventStartTimer)
+    server.internalMetrics?.incr('$$plugin_server_events_processed')
 
     countAndLogEvents()
 }
@@ -62,7 +63,7 @@ async function runInstrumentedFunction({
     func,
     statsKey,
 }: {
-    server: PluginsServer
+    server: Hub
     event: PluginEvent
     timeoutMessage: string
     statsKey: string

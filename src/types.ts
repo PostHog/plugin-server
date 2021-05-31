@@ -1,5 +1,5 @@
 import ClickHouse from '@posthog/clickhouse'
-import { PluginAttachment, PluginConfigSchema, PluginEvent, Properties } from '@posthog/plugin-scaffold'
+import { Meta, PluginAttachment, PluginConfigSchema, PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import { Pool as GenericPool } from 'generic-pool'
 import { StatsD } from 'hot-shots'
 import { Redis } from 'ioredis'
@@ -11,17 +11,27 @@ import { VM } from 'vm2'
 
 import { DB } from './utils/db/db'
 import { KafkaProducerWrapper } from './utils/db/kafka-producer-wrapper'
+import { InternalMetrics } from './utils/internal-metrics'
 import { UUID } from './utils/utils'
 import { EventsProcessor } from './worker/ingestion/process-event'
 import { LazyPluginVM } from './worker/vm/lazy'
 
 export enum LogLevel {
+    None = 'none',
     Debug = 'debug',
     Info = 'info',
     Log = 'log',
     Warn = 'warn',
     Error = 'error',
-    None = 'none',
+}
+
+export const logLevelToNumber: Record<LogLevel, number> = {
+    [LogLevel.None]: 0,
+    [LogLevel.Debug]: 10,
+    [LogLevel.Info]: 20,
+    [LogLevel.Log]: 30,
+    [LogLevel.Warn]: 40,
+    [LogLevel.Error]: 50,
 }
 
 export interface PluginsServerConfig extends Record<string, any> {
@@ -57,9 +67,6 @@ export interface PluginsServerConfig extends Record<string, any> {
     POSTHOG_REDIS_PORT: number
     BASE_DIR: string
     PLUGINS_RELOAD_PUBSUB_CHANNEL: string
-    DISABLE_WEB: boolean
-    WEB_PORT: number
-    WEB_HOSTNAME: string
     LOG_LEVEL: LogLevel
     SENTRY_DSN: string | null
     STATSD_HOST: string | null
@@ -76,11 +83,17 @@ export interface PluginsServerConfig extends Record<string, any> {
     JOB_QUEUE_GRAPHILE_URL: string
     JOB_QUEUE_GRAPHILE_SCHEMA: string
     JOB_QUEUE_GRAPHILE_PREPARED_STATEMENTS: boolean
+    JOB_QUEUE_S3_AWS_ACCESS_KEY: string
+    JOB_QUEUE_S3_AWS_SECRET_ACCESS_KEY: string
+    JOB_QUEUE_S3_AWS_REGION: string
+    JOB_QUEUE_S3_BUCKET_NAME: string
+    JOB_QUEUE_S3_PREFIX: string
     CRASH_IF_NO_PERSISTENT_JOB_QUEUE: boolean
     STALENESS_RESTART_SECONDS: number
+    CAPTURE_INTERNAL_METRICS: boolean
 }
 
-export interface PluginsServer extends PluginsServerConfig {
+export interface Hub extends PluginsServerConfig {
     instanceId: UUID
     // active connections to Postgres, Redis, ClickHouse, Kafka, StatsD
     db: DB
@@ -89,7 +102,9 @@ export interface PluginsServer extends PluginsServerConfig {
     clickhouse?: ClickHouse
     kafka?: Kafka
     kafkaProducer?: KafkaProducerWrapper
+    // metrics
     statsd?: StatsD
+    internalMetrics?: InternalMetrics
     // currently enabled plugin status
     plugins: Map<PluginId, Plugin>
     pluginConfigs: Map<PluginConfigId, PluginConfig>
@@ -139,6 +154,27 @@ export interface JobQueue {
     disconnectProducer: () => Promise<void> | void
 }
 
+export enum JobQueueType {
+    FS = 'fs',
+    Graphile = 'graphile',
+    S3 = 's3',
+}
+
+export enum JobQueuePersistence {
+    /** Job queues that store jobs on the local server */
+    Local = 'local',
+    /** Remote persistent job queues that can be read from concurrently */
+    Concurrent = 'concurrent',
+    /** Remote persistent job queues that must be read from one redlocked server at a time */
+    Redlocked = 'redlocked',
+}
+
+export type JobQueueExport = {
+    type: JobQueueType
+    persistence: JobQueuePersistence
+    getQueue: (serverConfig: PluginsServerConfig) => JobQueue
+}
+
 export type PluginId = number
 export type PluginConfigId = number
 export type TeamId = number
@@ -161,7 +197,13 @@ export interface Plugin {
     from_web?: boolean
     created_at: string
     updated_at: string
-    capabilities?: Record<string, any>
+    capabilities?: PluginCapabilities
+}
+
+export interface PluginCapabilities {
+    jobs?: string[]
+    scheduled_tasks?: string[]
+    methods?: string[]
 }
 
 export interface PluginConfig {
@@ -248,22 +290,28 @@ export type WorkerMethods = {
     onEvent: (event: PluginEvent) => Promise<void>
     onSnapshot: (event: PluginEvent) => Promise<void>
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
-    processEventBatch: (batch: PluginEvent[]) => Promise<(PluginEvent | null)[]>
     ingestEvent: (event: PluginEvent) => Promise<IngestEventResponse>
 }
 
-export interface PluginConfigVMReponse {
+export type VMMethods = {
+    setupPlugin?: () => Promise<void>
+    teardownPlugin?: () => Promise<void>
+    onEvent?: (event: PluginEvent) => Promise<void>
+    onSnapshot?: (event: PluginEvent) => Promise<void>
+    exportEvents?: (events: PluginEvent[]) => Promise<void>
+    processEvent?: (event: PluginEvent) => Promise<PluginEvent>
+}
+
+export interface PluginConfigVMResponse {
     vm: VM
-    methods: {
-        setupPlugin: () => Promise<void>
-        teardownPlugin: () => Promise<void>
-        onEvent: (event: PluginEvent) => Promise<void>
-        onSnapshot: (event: PluginEvent) => Promise<void>
-        processEvent: (event: PluginEvent) => Promise<PluginEvent>
-        // DEPRECATED
-        processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>
-    }
+    methods: VMMethods
     tasks: Record<PluginTaskType, Record<string, PluginTask>>
+}
+
+export interface PluginConfigVMInternalResponse<M extends Meta = Meta> {
+    methods: VMMethods
+    tasks: Record<PluginTaskType, Record<string, PluginTask>>
+    meta: M
 }
 
 export interface EventUsage {
@@ -312,6 +360,7 @@ export interface RawOrganization {
     name: string
     created_at: string
     updated_at: string
+    available_features: string[]
 }
 
 /** Usable Team model. */
@@ -396,6 +445,7 @@ export interface ClickHousePerson {
     team_id: number
     properties: string
     is_identified: number
+    is_deleted: number
     timestamp: string
 }
 
@@ -420,6 +470,101 @@ export interface CohortPeople {
     id: number
     cohort_id: number
     person_id: number
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export enum PropertyOperator {
+    Exact = 'exact',
+    IsNot = 'is_not',
+    IContains = 'icontains',
+    NotIContains = 'not_icontains',
+    Regex = 'regex',
+    NotRegex = 'not_regex',
+    GreaterThan = 'gt',
+    LessThan = 'lt',
+    IsSet = 'is_set',
+    IsNotSet = 'is_not_set',
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+interface BasePropertyFilter {
+    key: string
+    value: string | number | Array<string | number> | null
+    label?: string
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export interface EventPropertyFilter extends BasePropertyFilter {
+    type: 'event'
+    operator: PropertyOperator
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export interface PersonPropertyFilter extends BasePropertyFilter {
+    type: 'person'
+    operator: PropertyOperator
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export interface ElementPropertyFilter extends BasePropertyFilter {
+    type: 'element'
+    key: 'tag_name' | 'text' | 'href' | 'selector'
+    operator: PropertyOperator
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export interface CohortPropertyFilter extends BasePropertyFilter {
+    type: 'cohort'
+    key: 'id'
+    value: number
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export type ActionStepProperties =
+    | EventPropertyFilter
+    | PersonPropertyFilter
+    | ElementPropertyFilter
+    | CohortPropertyFilter
+
+/** Sync with posthog/frontend/src/types.ts */
+export enum ActionStepUrlMatching {
+    Contains = 'contains',
+    Regex = 'regex',
+    Exact = 'exact',
+}
+
+export interface ActionStep {
+    id: number
+    action_id: number
+    tag_name: string | null
+    text: string | null
+    href: string | null
+    selector: string | null
+    url: string | null
+    url_matching: ActionStepUrlMatching | null
+    name: string | null
+    event: string | null
+    properties: ActionStepProperties[] | null
+}
+
+/** Raw Action row from database. */
+export interface RawAction {
+    id: number
+    team_id: TeamId
+    name: string | null
+    created_at: string
+    created_by_id: number | null
+    deleted: boolean
+    post_to_slack: boolean
+    slack_message_format: string
+    is_calculating: boolean
+    updated_at: string
+    last_calculated_at: string
+}
+
+/** Usable Action model. */
+export interface Action extends RawAction {
+    steps: ActionStep[]
 }
 
 export interface SessionRecordingEvent {

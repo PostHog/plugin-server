@@ -41,13 +41,10 @@ export function getDefaultConfig(): PluginsServerConfig {
         POSTHOG_REDIS_PORT: 6379,
         BASE_DIR: '.',
         PLUGINS_RELOAD_PUBSUB_CHANNEL: 'reload-plugins',
-        DISABLE_WEB: true,
-        WEB_PORT: 3008,
-        WEB_HOSTNAME: '0.0.0.0',
         WORKER_CONCURRENCY: coreCount,
         TASK_TIMEOUT: 30,
         TASKS_PER_WORKER: 10,
-        LOG_LEVEL: LogLevel.Info,
+        LOG_LEVEL: isTestEnv ? LogLevel.Warn : LogLevel.Info,
         SENTRY_DSN: null,
         STATSD_HOST: null,
         STATSD_PORT: 8125,
@@ -63,8 +60,14 @@ export function getDefaultConfig(): PluginsServerConfig {
         JOB_QUEUE_GRAPHILE_URL: '',
         JOB_QUEUE_GRAPHILE_SCHEMA: 'graphile_worker',
         JOB_QUEUE_GRAPHILE_PREPARED_STATEMENTS: false,
+        JOB_QUEUE_S3_AWS_ACCESS_KEY: '',
+        JOB_QUEUE_S3_AWS_SECRET_ACCESS_KEY: '',
+        JOB_QUEUE_S3_AWS_REGION: 'us-west-1',
+        JOB_QUEUE_S3_BUCKET_NAME: '',
+        JOB_QUEUE_S3_PREFIX: '',
         CRASH_IF_NO_PERSISTENT_JOB_QUEUE: false,
         STALENESS_RESTART_SECONDS: 0,
+        CAPTURE_INTERNAL_METRICS: false,
     }
 }
 
@@ -82,9 +85,6 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         REDIS_URL: 'Redis store URL',
         BASE_DIR: 'base path for resolving local plugins',
         PLUGINS_RELOAD_PUBSUB_CHANNEL: 'Redis channel for reload events',
-        DISABLE_WEB: 'whether to disable web server',
-        WEB_PORT: 'port for web server to listen on',
-        WEB_HOSTNAME: 'hostname for web server to listen on',
         WORKER_CONCURRENCY: 'number of concurrent worker threads',
         TASK_TIMEOUT: 'how many seconds until tasks are timed out',
         TASKS_PER_WORKER: 'number of parallel tasks per worker thread',
@@ -110,9 +110,15 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
         JOB_QUEUE_GRAPHILE_URL: 'use a different postgres connection in the graphile retry queue',
         JOB_QUEUE_GRAPHILE_SCHEMA: 'the postgres schema that the graphile job queue uses',
         JOB_QUEUE_GRAPHILE_PREPARED_STATEMENTS: 'enable this to increase job queue throughput if not using pgbouncer',
+        JOB_QUEUE_S3_AWS_ACCESS_KEY: 'AWS access key for the S3 job queue',
+        JOB_QUEUE_S3_AWS_SECRET_ACCESS_KEY: 'AWS secret access key for the S3 job queue',
+        JOB_QUEUE_S3_AWS_REGION: 'AWS region for the S3 job queue',
+        JOB_QUEUE_S3_BUCKET_NAME: 'S3 bucket name for the S3 job queue',
+        JOB_QUEUE_S3_PREFIX: 'S3 filename prefix for the S3 job queue',
         CRASH_IF_NO_PERSISTENT_JOB_QUEUE:
             'refuse to start unless there is a properly configured persistent job queue (e.g. graphile)',
         STALENESS_RESTART_SECONDS: 'trigger a restart if no event ingested for this duration',
+        CAPTURE_INTERNAL_METRICS: 'capture internal metrics for posthog in posthog',
     }
 }
 

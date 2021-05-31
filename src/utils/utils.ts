@@ -5,7 +5,7 @@ import AdmZip from 'adm-zip'
 import { randomBytes } from 'crypto'
 import Redis, { RedisOptions } from 'ioredis'
 import { DateTime } from 'luxon'
-import { Pool, PoolClient, PoolConfig } from 'pg'
+import { Pool, PoolConfig } from 'pg'
 import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
@@ -565,4 +565,44 @@ export function filterIncrementProperties(incrementProperties: unknown): Record<
     }
 
     return filteredIncrementProperties
+}
+
+export function groupBy<T extends Record<string, any>, K extends keyof T>(
+    objects: T[],
+    key: K,
+    flat?: false
+): Record<T[K], T[]>
+export function groupBy<T extends Record<string, any>, K extends keyof T>(
+    objects: T[],
+    key: K,
+    flat: true
+): Record<T[K], T>
+export function groupBy<T extends Record<string, any>, K extends keyof T>(
+    objects: T[],
+    key: K,
+    flat = false
+): Record<T[K], T[] | T> {
+    return flat
+        ? objects.reduce((grouping, currentItem) => {
+              if (currentItem[key] in grouping) {
+                  throw new Error(
+                      `Key "${key}" has more than one matching value, which is not allowed in flat groupBy!`
+                  )
+              }
+              grouping[currentItem[key]] = currentItem
+              return grouping
+          }, {} as Record<T[K], T>)
+        : objects.reduce((grouping, currentItem) => {
+              ;(grouping[currentItem[key]] = grouping[currentItem[key]] || []).push(currentItem)
+              return grouping
+          }, {} as Record<T[K], T[]>)
+}
+
+export function clamp(value: number, min: number, max: number): number {
+    return value > max ? max : value < min ? min : value
+}
+
+export function stringClamp(value: string, def: number, min: number, max: number): number {
+    const nanToNull = (nr: number): null | number => (isNaN(nr) ? null : nr)
+    return clamp(nanToNull(parseInt(value)) ?? def, min, max)
 }

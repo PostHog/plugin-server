@@ -1,6 +1,6 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 
-import { PluginConfig, PluginsServer, PluginTaskType } from '../../types'
+import { Hub, PluginConfig, PluginTaskType } from '../../types'
 import { processError } from '../../utils/db/error'
 
 export class IllegalOperationError extends Error {
@@ -11,7 +11,7 @@ export class IllegalOperationError extends Error {
     }
 }
 
-export async function runOnEvent(server: PluginsServer, event: PluginEvent): Promise<void> {
+export async function runOnEvent(server: Hub, event: PluginEvent): Promise<void> {
     const pluginsToRun = getPluginsForTeam(server, event.team_id)
 
     await Promise.all(
@@ -31,7 +31,7 @@ export async function runOnEvent(server: PluginsServer, event: PluginEvent): Pro
     )
 }
 
-export async function runOnSnapshot(server: PluginsServer, event: PluginEvent): Promise<void> {
+export async function runOnSnapshot(server: Hub, event: PluginEvent): Promise<void> {
     const pluginsToRun = getPluginsForTeam(server, event.team_id)
 
     await Promise.all(
@@ -51,13 +51,14 @@ export async function runOnSnapshot(server: PluginsServer, event: PluginEvent): 
     )
 }
 
-export async function runProcessEvent(server: PluginsServer, event: PluginEvent): Promise<PluginEvent | null> {
+export async function runProcessEvent(server: Hub, event: PluginEvent): Promise<PluginEvent | null> {
     const teamId = event.team_id
     const pluginsToRun = getPluginsForTeam(server, teamId)
     let returnedEvent: PluginEvent | null = event
 
     const pluginsSucceeded = []
     const pluginsFailed = []
+    const pluginsDeferred = []
     for (const pluginConfig of pluginsToRun) {
         const processEvent = await pluginConfig.vm?.getProcessEvent()
 
@@ -66,7 +67,7 @@ export async function runProcessEvent(server: PluginsServer, event: PluginEvent)
 
             try {
                 returnedEvent = (await processEvent(returnedEvent)) || null
-                if (returnedEvent.team_id != teamId) {
+                if (returnedEvent && returnedEvent.team_id !== teamId) {
                     returnedEvent.team_id = teamId
                     throw new IllegalOperationError('Plugin tried to change event.team_id')
                 }
@@ -85,86 +86,28 @@ export async function runProcessEvent(server: PluginsServer, event: PluginEvent)
                 return null
             }
         }
+
+        const onEvent = await pluginConfig.vm?.getOnEvent()
+        const onSnapshot = await pluginConfig.vm?.getOnSnapshot()
+        if (onEvent || onSnapshot) {
+            pluginsDeferred.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
+        }
     }
 
-    if (pluginsSucceeded.length > 0 || pluginsFailed.length > 0) {
+    if (pluginsSucceeded.length > 0 || pluginsFailed.length > 0 || pluginsDeferred.length > 0) {
         event.properties = {
             ...event.properties,
             $plugins_succeeded: pluginsSucceeded,
             $plugins_failed: pluginsFailed,
+            $plugins_deferred: pluginsDeferred,
         }
     }
 
     return returnedEvent
 }
 
-export async function runProcessEventBatch(server: PluginsServer, batch: PluginEvent[]): Promise<PluginEvent[]> {
-    const eventsByTeam = new Map<number, PluginEvent[]>()
-
-    for (const event of batch) {
-        if (eventsByTeam.has(event.team_id)) {
-            eventsByTeam.get(event.team_id)!.push(event)
-        } else {
-            eventsByTeam.set(event.team_id, [event])
-        }
-    }
-
-    let allReturnedEvents: PluginEvent[] = []
-
-    for (const [teamId, teamEvents] of eventsByTeam.entries()) {
-        const pluginsToRun = getPluginsForTeam(server, teamId)
-
-        let returnedEvents: PluginEvent[] = teamEvents
-        const pluginsSucceeded = []
-        const pluginsFailed = []
-        for (const pluginConfig of pluginsToRun) {
-            const timer = new Date()
-            const processEventBatch = await pluginConfig.vm?.getProcessEventBatch()
-            if (processEventBatch && returnedEvents.length > 0) {
-                try {
-                    returnedEvents = (await processEventBatch(returnedEvents)) || []
-                    let wasChangedTeamIdFound = false
-                    for (const returnedEvent of returnedEvents) {
-                        if (returnedEvent.team_id != teamId) {
-                            returnedEvent.team_id = teamId
-                            wasChangedTeamIdFound = true
-                        }
-                    }
-                    if (wasChangedTeamIdFound) {
-                        throw new IllegalOperationError('Plugin tried to change event.team_id')
-                    }
-                    pluginsSucceeded.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
-                } catch (error) {
-                    await processError(server, pluginConfig, error, returnedEvents[0])
-                    server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.process_event_batch.ERROR`)
-                    pluginsFailed.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
-                }
-                server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.process_event_batch`, timer)
-                server.statsd?.timing('plugin.process_event_batch', timer, {
-                    plugin: pluginConfig.plugin?.name ?? '?',
-                    teamId: teamId.toString(),
-                })
-            }
-        }
-
-        for (const event of returnedEvents) {
-            if (event && (pluginsSucceeded.length > 0 || pluginsFailed.length > 0)) {
-                event.properties = {
-                    ...event.properties,
-                    $plugins_succeeded: pluginsSucceeded,
-                    $plugins_failed: pluginsFailed,
-                }
-            }
-        }
-
-        allReturnedEvents = allReturnedEvents.concat(returnedEvents)
-    }
-
-    return allReturnedEvents.filter(Boolean)
-}
-
 export async function runPluginTask(
-    server: PluginsServer,
+    server: Hub,
     taskName: string,
     taskType: PluginTaskType,
     pluginConfigId: number,
@@ -189,6 +132,6 @@ export async function runPluginTask(
     return response
 }
 
-function getPluginsForTeam(server: PluginsServer, teamId: number): PluginConfig[] {
+function getPluginsForTeam(server: Hub, teamId: number): PluginConfig[] {
     return server.pluginConfigsPerTeam.get(teamId) || []
 }

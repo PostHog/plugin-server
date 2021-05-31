@@ -10,6 +10,8 @@ import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_PLUGIN_LOG_ENTRIES } from '../../config/kafka-topics'
 import {
+    Action,
+    ActionStep,
     ClickHouseEvent,
     ClickHousePerson,
     ClickHousePersonDistinctId,
@@ -26,9 +28,11 @@ import {
     PluginLogEntryType,
     PostgresSessionRecordingEvent,
     PropertyDefinitionType,
+    RawAction,
     RawOrganization,
     RawPerson,
     SessionRecordingEvent,
+    Team,
     TimestampFormat,
 } from '../../types'
 import { instrumentQuery } from '../metrics'
@@ -246,9 +250,12 @@ export class DB {
     public async fetchPersons(database: Database = Database.Postgres): Promise<Person[] | ClickHousePerson[]> {
         if (database === Database.ClickHouse) {
             const query = `
-                SELECT * FROM person FINAL JOIN (
+                SELECT * FROM person
+                FINAL
+                JOIN (
                     SELECT id, max(_timestamp) as _timestamp FROM person GROUP BY team_id, id
                 ) as person_max ON person.id = person_max.id AND person._timestamp = person_max._timestamp
+                WHERE is_deleted = 0
             `
             return (await this.clickhouseQuery(query)).data.map((row) => {
                 const { 'person_max._timestamp': _discard1, 'person_max.id': _discard2, ...rest } = row
@@ -324,6 +331,7 @@ export class DB {
                                     team_id: teamId,
                                     is_identified: isIdentified,
                                     id: uuid,
+                                    is_deleted: 0,
                                 })
                             ),
                         },
@@ -398,7 +406,7 @@ export class DB {
                 return `|| CASE WHEN (COALESCE(properties->>'${sanitizedPropName}', '0')~E'^([-+])?[0-9\.]+$')
                     THEN jsonb_build_object('${sanitizedPropName}', (COALESCE(properties->>'${sanitizedPropName}','0')::numeric + $${
                     index + 1
-                })) 
+                }))
                     ELSE '{}'
                 END `
             })
@@ -422,7 +430,26 @@ export class DB {
             await client.query('DELETE FROM posthog_person WHERE id = $1', [person.id])
         })
         if (this.clickhouse) {
-            await this.clickhouseQuery(`ALTER TABLE person DELETE WHERE id = '${escapeClickHouseString(person.uuid)}'`)
+            if (this.kafkaProducer) {
+                await this.kafkaProducer.queueMessage({
+                    topic: KAFKA_PERSON,
+                    messages: [
+                        {
+                            value: Buffer.from(
+                                JSON.stringify({
+                                    created_at: castTimestampOrNow(person.created_at, TimestampFormat.ClickHouse),
+                                    properties: JSON.stringify(person.properties),
+                                    team_id: person.team_id,
+                                    is_identified: person.is_identified,
+                                    id: person.uuid,
+                                    is_deleted: 1,
+                                })
+                            ),
+                        },
+                    ],
+                })
+            }
+
             await this.clickhouseQuery(
                 `ALTER TABLE person_distinct_id DELETE WHERE person_id = '${escapeClickHouseString(person.uuid)}'`
             )
@@ -682,14 +709,83 @@ export class DB {
         return entry
     }
 
+    // EventDefinition
+
     public async fetchEventDefinitions(): Promise<EventDefinitionType[]> {
         return (await this.postgresQuery('SELECT * FROM posthog_eventdefinition', undefined, 'fetchEventDefinitions'))
             .rows as EventDefinitionType[]
     }
 
+    // PropertyDefinition
+
     public async fetchPropertyDefinitions(): Promise<PropertyDefinitionType[]> {
         return (
             await this.postgresQuery('SELECT * FROM posthog_propertydefinition', undefined, 'fetchPropertyDefinitions')
         ).rows as PropertyDefinitionType[]
+    }
+
+    // Action & ActionStep
+
+    public async fetchAllActionsGroupedByTeam(): Promise<Record<Team['id'], Record<Action['id'], Action>>> {
+        const rawActions: RawAction[] = (
+            await this.postgresQuery(`SELECT * FROM posthog_action WHERE deleted = FALSE`, undefined, 'fetchActions')
+        ).rows
+        const actionSteps: (ActionStep & { team_id: Team['id'] })[] = (
+            await this.postgresQuery(
+                `SELECT posthog_actionstep.*, posthog_action.team_id
+                    FROM posthog_actionstep JOIN posthog_action ON (posthog_action.id = posthog_actionstep.action_id)
+                    WHERE posthog_action.deleted = FALSE`,
+                undefined,
+                'fetchActionSteps'
+            )
+        ).rows
+        const actions: Record<Team['id'], Record<Action['id'], Action>> = {}
+        for (const rawAction of rawActions) {
+            if (!actions[rawAction.team_id]) {
+                actions[rawAction.team_id] = {}
+            }
+            actions[rawAction.team_id][rawAction.id] = { ...rawAction, steps: [] }
+        }
+        for (const actionStep of actionSteps) {
+            if (actions[actionStep.team_id]?.[actionStep.action_id]) {
+                actions[actionStep.team_id][actionStep.action_id].steps.push(actionStep)
+            }
+        }
+        return actions
+    }
+
+    public async fetchAction(id: Action['id']): Promise<Action | null> {
+        const rawActions: RawAction[] = (
+            await this.postgresQuery(
+                `SELECT * FROM posthog_action WHERE id = $1 AND deleted = FALSE`,
+                [id],
+                'fetchActions'
+            )
+        ).rows
+        if (!rawActions.length) {
+            return null
+        }
+        const steps: ActionStep[] = (
+            await this.postgresQuery(`SELECT * FROM posthog_actionstep WHERE action_id = $1`, [id], 'fetchActionSteps')
+        ).rows
+        const action: Action = { ...rawActions[0], steps }
+        return action
+    }
+
+    // Team Internal Metrics
+
+    public async fetchInternalMetricsTeam(): Promise<Team['id'] | null> {
+        const { rows } = await this.postgresQuery(
+            `
+            SELECT posthog_team.id as team_id
+            FROM posthog_team
+            INNER JOIN posthog_organization ON posthog_organization.id = posthog_team.organization_id
+            WHERE for_internal_metrics
+        `,
+            undefined,
+            'fetchInternalMetricsTeam'
+        )
+
+        return rows.length > 0 ? rows[0].team_id : null
     }
 }

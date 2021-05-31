@@ -5,6 +5,7 @@ import { clearError, processError } from '../../src/utils/db/error'
 import { status } from '../../src/utils/status'
 import { LazyPluginVM } from '../../src/worker/vm/lazy'
 import { createPluginConfigVM } from '../../src/worker/vm/vm'
+import { plugin60 } from '../helpers/plugins'
 import { disablePlugin } from '../helpers/sqlMock'
 
 jest.mock('../../src/worker/vm/vm')
@@ -16,6 +17,7 @@ const mockConfig = {
     plugin_id: 60,
     team_id: 2,
     id: 39,
+    plugin: { ...plugin60 },
 }
 
 describe('LazyPluginVM', () => {
@@ -49,7 +51,6 @@ describe('LazyPluginVM', () => {
             void initializeVm(vm)
 
             expect(await vm.getProcessEvent()).toEqual('processEvent')
-            expect(await vm.getProcessEventBatch()).toEqual(null)
             expect(await vm.getTask('someTask', PluginTaskType.Schedule)).toEqual(null)
             expect(await vm.getTask('runEveryMinute', PluginTaskType.Schedule)).toEqual('runEveryMinute')
             expect(await vm.getTasks(PluginTaskType.Schedule)).toEqual(mockVM.tasks.schedule)
@@ -84,7 +85,6 @@ describe('LazyPluginVM', () => {
             void initializeVm(vm)
 
             expect(await vm.getProcessEvent()).toEqual(null)
-            expect(await vm.getProcessEventBatch()).toEqual(null)
             expect(await vm.getTask('runEveryMinute', PluginTaskType.Schedule)).toEqual(null)
             expect(await vm.getTasks(PluginTaskType.Schedule)).toEqual({})
         })
