@@ -1,57 +1,60 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 
-import { EnqueuedJob, PluginsServer, PluginTaskType } from '../types'
+import { Action, EnqueuedJob, Hub, PluginTaskType, Team } from '../types'
 import { ingestEvent } from './ingestion/ingest-event'
-import { runOnEvent, runOnSnapshot, runPluginTask, runProcessEvent, runProcessEventBatch } from './plugins/run'
+import { runOnEvent, runOnSnapshot, runPluginTask, runProcessEvent } from './plugins/run'
 import { loadSchedule, setupPlugins } from './plugins/setup'
 import { teardownPlugins } from './plugins/teardown'
 
-type TaskRunner = (server: PluginsServer, args: any) => Promise<any> | any
+type TaskRunner = (hub: Hub, args: any) => Promise<any> | any
 
 export const workerTasks: Record<string, TaskRunner> = {
-    hello: (server, args) => {
-        return `hello ${args}!`
+    onEvent: (hub, args: { event: PluginEvent }) => {
+        return runOnEvent(hub, args.event)
     },
-    onEvent: (server, args: { event: PluginEvent }) => {
-        return runOnEvent(server, args.event)
+    onSnapshot: (hub, args: { event: PluginEvent }) => {
+        return runOnSnapshot(hub, args.event)
     },
-    onSnapshot: (server, args: { event: PluginEvent }) => {
-        return runOnSnapshot(server, args.event)
+    processEvent: (hub, args: { event: PluginEvent }) => {
+        return runProcessEvent(hub, args.event)
     },
-    processEvent: (server, args: { event: PluginEvent }) => {
-        return runProcessEvent(server, args.event)
+    runJob: (hub, { job }: { job: EnqueuedJob }) => {
+        return runPluginTask(hub, job.type, PluginTaskType.Job, job.pluginConfigId, job.payload)
     },
-    processEventBatch: (server, args: { batch: PluginEvent[] }) => {
-        return runProcessEventBatch(server, args.batch)
+    runEveryMinute: (hub, args: { pluginConfigId: number }) => {
+        return runPluginTask(hub, 'runEveryMinute', PluginTaskType.Schedule, args.pluginConfigId)
     },
-    runJob: (server, { job }: { job: EnqueuedJob }) => {
-        return runPluginTask(server, job.type, PluginTaskType.Job, job.pluginConfigId, job.payload)
+    runEveryHour: (hub, args: { pluginConfigId: number }) => {
+        return runPluginTask(hub, 'runEveryHour', PluginTaskType.Schedule, args.pluginConfigId)
     },
-    runEveryMinute: (server, args: { pluginConfigId: number }) => {
-        return runPluginTask(server, 'runEveryMinute', PluginTaskType.Schedule, args.pluginConfigId)
+    runEveryDay: (hub, args: { pluginConfigId: number }) => {
+        return runPluginTask(hub, 'runEveryDay', PluginTaskType.Schedule, args.pluginConfigId)
     },
-    runEveryHour: (server, args: { pluginConfigId: number }) => {
-        return runPluginTask(server, 'runEveryHour', PluginTaskType.Schedule, args.pluginConfigId)
+    getPluginSchedule: (hub) => {
+        return hub.pluginSchedule
     },
-    runEveryDay: (server, args: { pluginConfigId: number }) => {
-        return runPluginTask(server, 'runEveryDay', PluginTaskType.Schedule, args.pluginConfigId)
+    ingestEvent: async (hub, args: { event: PluginEvent }) => {
+        return await ingestEvent(hub, args.event)
     },
-    getPluginSchedule: (server) => {
-        return server.pluginSchedule
+    reloadPlugins: async (hub) => {
+        await setupPlugins(hub)
     },
-    ingestEvent: async (server, args: { event: PluginEvent }) => {
-        return await ingestEvent(server, args.event)
+    reloadSchedule: async (hub) => {
+        await loadSchedule(hub)
     },
-    reloadPlugins: async (server) => {
-        await setupPlugins(server)
+    reloadAllActions: async (hub) => {
+        return await hub.eventsProcessor.actionManager.reloadAllActions()
     },
-    reloadSchedule: async (server) => {
-        await loadSchedule(server)
+    reloadAction: async (hub, args: { teamId: Team['id']; actionId: Action['id'] }) => {
+        return await hub.eventsProcessor.actionManager.reloadAction(args.teamId, args.actionId)
     },
-    teardownPlugins: async (server) => {
-        await teardownPlugins(server)
+    dropAction: (hub, args: { teamId: Team['id']; actionId: Action['id'] }) => {
+        return hub.eventsProcessor.actionManager.dropAction(args.teamId, args.actionId)
     },
-    flushKafkaMessages: async (server) => {
-        await server.kafkaProducer?.flush()
+    teardownPlugins: async (hub) => {
+        await teardownPlugins(hub)
+    },
+    flushKafkaMessages: async (hub) => {
+        await hub.kafkaProducer?.flush()
     },
 }

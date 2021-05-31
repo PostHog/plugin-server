@@ -9,9 +9,9 @@ import { Event as EventProto, IEvent } from '../../config/idl/protos'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from '../../config/kafka-topics'
 import {
     Element,
+    Hub,
     Person,
     PersonDistinctId,
-    PluginsServer,
     PostgresSessionRecordingEvent,
     SessionRecordingEvent,
     TeamId,
@@ -23,19 +23,23 @@ import { KafkaProducerWrapper } from '../../utils/db/kafka-producer-wrapper'
 import { elementsToString, personInitialAndUTMProperties, sanitizeEventName, timeoutGuard } from '../../utils/db/utils'
 import { status } from '../../utils/status'
 import { castTimestampOrNow, filterIncrementProperties, UUID, UUIDT } from '../../utils/utils'
+import { ActionManager } from './action-manager'
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
 export class EventsProcessor {
-    pluginsServer: PluginsServer
+    ready: boolean
+    pluginsServer: Hub
     db: DB
     clickhouse: ClickHouse | undefined
     kafkaProducer: KafkaProducerWrapper | undefined
     celery: Client
     teamManager: TeamManager
     personManager: PersonManager
+    actionManager: ActionManager
 
-    constructor(pluginsServer: PluginsServer) {
+    constructor(pluginsServer: Hub) {
+        this.ready = false
         this.pluginsServer = pluginsServer
         this.db = pluginsServer.db
         this.clickhouse = pluginsServer.clickhouse
@@ -43,6 +47,12 @@ export class EventsProcessor {
         this.celery = new Client(pluginsServer.db, pluginsServer.CELERY_DEFAULT_QUEUE)
         this.teamManager = new TeamManager(pluginsServer.db)
         this.personManager = new PersonManager(pluginsServer)
+        this.actionManager = new ActionManager(pluginsServer.db)
+    }
+
+    public async prepare(): Promise<void> {
+        await this.actionManager.prepare()
+        this.ready = true
     }
 
     public async processEvent(
@@ -55,6 +65,9 @@ export class EventsProcessor {
         sentAt: DateTime | null,
         eventUuid: string
     ): Promise<IEvent | SessionRecordingEvent> {
+        if (!this.ready) {
+            throw new Error('EventsProcessor is not ready! Run eventsProcessor.prepare() before this')
+        }
         if (!UUID.validateString(eventUuid, false)) {
             throw new Error(`Not a valid UUID: "${eventUuid}"`)
         }

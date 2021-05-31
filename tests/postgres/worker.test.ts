@@ -4,18 +4,22 @@ import { mocked } from 'ts-jest/utils'
 
 import { ServerInstance, startPluginsServer } from '../../src/main/pluginsServer'
 import { loadPluginSchedule } from '../../src/main/services/schedule'
-import { LogLevel } from '../../src/types'
+import { Hub, LogLevel } from '../../src/types'
 import { Client } from '../../src/utils/celery/client'
+import { createHub } from '../../src/utils/db/hub'
+import { KafkaProducerWrapper } from '../../src/utils/db/kafka-producer-wrapper'
 import { delay, UUIDT } from '../../src/utils/utils'
+import { ActionManager } from '../../src/worker/ingestion/action-manager'
 import { ingestEvent } from '../../src/worker/ingestion/ingest-event'
 import { makePiscina } from '../../src/worker/piscina'
-import { runPluginTask, runProcessEvent, runProcessEventBatch } from '../../src/worker/plugins/run'
+import { runPluginTask, runProcessEvent } from '../../src/worker/plugins/run'
 import { loadSchedule, setupPlugins } from '../../src/worker/plugins/setup'
 import { teardownPlugins } from '../../src/worker/plugins/teardown'
 import { createTaskRunner } from '../../src/worker/worker'
 import { resetTestDatabase } from '../helpers/sql'
 import { setupPiscina } from '../helpers/worker'
 
+jest.mock('../../src/worker/ingestion/action-manager')
 jest.mock('../../src/utils/db/sql')
 jest.mock('../../src/utils/status')
 jest.mock('../../src/worker/ingestion/ingest-event')
@@ -38,6 +42,9 @@ function createEvent(index = 0): PluginEvent {
 
 beforeEach(() => {
     console.debug = jest.fn()
+    jest.spyOn(ActionManager.prototype, 'reloadAllActions')
+    jest.spyOn(ActionManager.prototype, 'reloadAction')
+    jest.spyOn(ActionManager.prototype, 'dropAction')
 })
 
 test('piscina worker test', async () => {
@@ -55,7 +62,6 @@ test('piscina worker test', async () => {
     const piscina = setupPiscina(workerThreads, 10)
 
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
-    const processEventBatch = (batch: PluginEvent[]) => piscina.runTask({ task: 'processEventBatch', args: { batch } })
     const runEveryDay = (pluginConfigId: number) => piscina.runTask({ task: 'runEveryDay', args: { pluginConfigId } })
     const ingestEvent = (event: PluginEvent) => piscina.runTask({ task: 'ingestEvent', args: { event } })
 
@@ -64,9 +70,6 @@ test('piscina worker test', async () => {
 
     const event = await processEvent(createEvent())
     expect(event.properties['somewhere']).toBe('over the rainbow')
-
-    const eventBatch = await processEventBatch([createEvent()])
-    expect(eventBatch[0]!.properties['somewhere']).toBe('over the rainbow')
 
     const everyDayReturn = await runEveryDay(39)
     expect(everyDayReturn).toBe(4)
@@ -142,16 +145,16 @@ describe('queue logic', () => {
             makePiscina
         )
 
-        redis = await pluginsServer.server.redisPool.acquire()
+        redis = await pluginsServer.hub.redisPool.acquire()
 
-        await redis.del(pluginsServer.server.PLUGINS_CELERY_QUEUE)
-        await redis.del(pluginsServer.server.CELERY_DEFAULT_QUEUE)
+        await redis.del(pluginsServer.hub.PLUGINS_CELERY_QUEUE)
+        await redis.del(pluginsServer.hub.CELERY_DEFAULT_QUEUE)
     })
 
     afterEach(async () => {
         // :TRICKY: Ignore errors when stopping workers.
         try {
-            await pluginsServer.server.redisPool.release(redis)
+            await pluginsServer.hub.redisPool.release(redis)
             await pluginsServer.stop()
         } catch {}
     })
@@ -176,7 +179,7 @@ describe('queue logic', () => {
 
         expect(pluginsServer.piscina.queueSize).toBe(0)
 
-        const client = new Client(pluginsServer.server.db, pluginsServer.server.PLUGINS_CELERY_QUEUE)
+        const client = new Client(pluginsServer.hub.db, pluginsServer.hub.PLUGINS_CELERY_QUEUE)
         for (let i = 0; i < 2; i++) {
             client.sendTask('posthog.tasks.process_event.process_event_with_plugins', args, {})
         }
@@ -204,7 +207,7 @@ describe('queue logic', () => {
         const startTime = pluginsServer.piscina.duration
         while (celerySize > 0 || pluginsServer.piscina.queueSize > 0) {
             await delay(50)
-            celerySize = await redis.llen(pluginsServer.server.PLUGINS_CELERY_QUEUE)
+            celerySize = await redis.llen(pluginsServer.hub.PLUGINS_CELERY_QUEUE)
 
             if (pluginsServer.queue.isPaused()) {
                 pausedTimes++
@@ -229,15 +232,15 @@ describe('queue logic', () => {
 
 describe('createTaskRunner()', () => {
     let taskRunner: any
-    let server: any
+    let hub: Hub
+    let closeHub: () => Promise<void>
 
-    beforeEach(() => {
-        server = { mock: 'server' }
-        taskRunner = createTaskRunner(server)
+    beforeEach(async () => {
+        ;[hub, closeHub] = await createHub()
+        taskRunner = createTaskRunner(hub)
     })
-
-    it('handles `hello` task', async () => {
-        expect(await taskRunner({ task: 'hello', args: ['world'] })).toEqual('hello world!')
+    afterEach(async () => {
+        await closeHub()
     })
 
     it('handles `processEvent` task', async () => {
@@ -247,23 +250,13 @@ describe('createTaskRunner()', () => {
             'runProcessEvent response'
         )
 
-        expect(runProcessEvent).toHaveBeenCalledWith(server, 'someEvent')
-    })
-
-    it('handles `processEventBatch` task', async () => {
-        mocked(runProcessEventBatch).mockReturnValue(['runProcessEventBatch response'] as any)
-
-        expect(await taskRunner({ task: 'processEventBatch', args: { batch: 'someBatch' } })).toEqual([
-            'runProcessEventBatch response',
-        ])
-
-        expect(runProcessEventBatch).toHaveBeenCalledWith(server, 'someBatch')
+        expect(runProcessEvent).toHaveBeenCalledWith(hub, 'someEvent')
     })
 
     it('handles `getPluginSchedule` task', async () => {
-        server.pluginSchedule = { runEveryDay: [66] }
+        hub.pluginSchedule = { runEveryDay: [66] }
 
-        expect(await taskRunner({ task: 'getPluginSchedule' })).toEqual(server.pluginSchedule)
+        expect(await taskRunner({ task: 'getPluginSchedule' })).toEqual(hub.pluginSchedule)
     })
 
     it('handles `ingestEvent` task', async () => {
@@ -271,7 +264,7 @@ describe('createTaskRunner()', () => {
 
         expect(await taskRunner({ task: 'ingestEvent', args: { event: 'someEvent' } })).toEqual('ingestEvent response')
 
-        expect(ingestEvent).toHaveBeenCalledWith(server, 'someEvent')
+        expect(ingestEvent).toHaveBeenCalledWith(hub, 'someEvent')
     })
 
     it('handles `ingestEvent` task', async () => {
@@ -279,7 +272,7 @@ describe('createTaskRunner()', () => {
 
         expect(await taskRunner({ task: 'ingestEvent', args: { event: 'someEvent' } })).toEqual('ingestEvent response')
 
-        expect(ingestEvent).toHaveBeenCalledWith(server, 'someEvent')
+        expect(ingestEvent).toHaveBeenCalledWith(hub, 'someEvent')
     })
 
     it('handles `runEvery` tasks', async () => {
@@ -306,6 +299,24 @@ describe('createTaskRunner()', () => {
         expect(loadSchedule).toHaveBeenCalled()
     })
 
+    it('handles `reloadAllActions` task', async () => {
+        await taskRunner({ task: 'reloadAllActions' })
+
+        expect(hub.eventsProcessor.actionManager.reloadAllActions).toHaveBeenCalledWith()
+    })
+
+    it('handles `reloadAction` task', async () => {
+        await taskRunner({ task: 'reloadAction', args: { teamId: 2, actionId: 777 } })
+
+        expect(hub.eventsProcessor.actionManager.reloadAction).toHaveBeenCalledWith(2, 777)
+    })
+
+    it('handles `dropAction` task', async () => {
+        await taskRunner({ task: 'dropAction', args: { teamId: 2, actionId: 777 } })
+
+        expect(hub.eventsProcessor.actionManager.dropAction).toHaveBeenCalledWith(2, 777)
+    })
+
     it('handles `teardownPlugin` task', async () => {
         await taskRunner({ task: 'teardownPlugins' })
 
@@ -313,10 +324,10 @@ describe('createTaskRunner()', () => {
     })
 
     it('handles `flushKafkaMessages` task', async () => {
-        server.kafkaProducer = { flush: jest.fn() }
+        hub.kafkaProducer = ({ flush: jest.fn() } as unknown) as KafkaProducerWrapper
 
         await taskRunner({ task: 'flushKafkaMessages' })
 
-        expect(server.kafkaProducer.flush).toHaveBeenCalled()
+        expect(hub.kafkaProducer.flush).toHaveBeenCalled()
     })
 })

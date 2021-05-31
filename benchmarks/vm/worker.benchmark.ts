@@ -27,36 +27,16 @@ function processOneEvent(
     return processEvent(defaultEvent)
 }
 
-function processOneBatch(
-    processEventBatch: (batch: PluginEvent[]) => Promise<PluginEvent[]>,
-    batchSize: number,
-    batchIndex: number
-): Promise<PluginEvent[]> {
-    const events = [...Array(batchSize)].map((_, i) => ({
-        distinct_id: 'my_id',
-        ip: '127.0.0.1',
-        site_url: 'http://localhost',
-        team_id: 2,
-        now: new Date().toISOString(),
-        event: 'default event',
-        properties: { key: 'value', batchIndex, indexInBatch: i },
-    }))
-
-    return processEventBatch(events)
-}
-
 async function processCountEvents(piscina: ReturnType<typeof makePiscina>, count: number, batchSize = 1) {
     const maxPromises = 1000
     const promises = Array(maxPromises)
     const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
-    const processEventBatch = (batch: PluginEvent[]) => piscina.runTask({ task: 'processEventBatch', args: { batch } })
 
-    const groups = Math.ceil(count / maxPromises)
+    const groups = Math.ceil((count * batchSize) / maxPromises)
     for (let j = 0; j < groups; j++) {
-        const groupCount = groups === 1 ? count : j === groups - 1 ? count % maxPromises : maxPromises
+        const groupCount = groups === 1 ? count : j === groups - 1 ? (count * batchSize) % maxPromises : maxPromises
         for (let i = 0; i < groupCount; i++) {
-            promises[i] =
-                batchSize === 1 ? processOneEvent(processEvent, i) : processOneBatch(processEventBatch, batchSize, i)
+            promises[i] = processOneEvent(processEvent, i)
         }
         await Promise.all(promises)
     }
@@ -85,7 +65,7 @@ test('piscina worker benchmark', async () => {
     const tests: { testName: string; events: number; testCode: string }[] = [
         {
             testName: 'simple',
-            events: 10000,
+            events: 5000,
             testCode: `
                 function processEvent (event, meta) {
                     event.properties = { "somewhere": "over the rainbow" };
@@ -98,7 +78,7 @@ test('piscina worker benchmark', async () => {
             // the for/while/do loops, to throw if they are too long, running
             // those comparisons 200k * 10k * runs * threads times is bit too much
             testName: 'for2k',
-            events: 10000,
+            events: 5000,
             testCode: `
                 function processEvent (event, meta) {
                     let j = 0; for(let i = 0; i < 2000; i++) { j = i };
@@ -109,7 +89,7 @@ test('piscina worker benchmark', async () => {
         },
         {
             testName: 'timeout100ms',
-            events: 10000,
+            events: 5000,
             testCode: `
                 async function processEvent (event, meta) {
                     await new Promise(resolve => __jestSetTimeout(() => resolve(), 100))
