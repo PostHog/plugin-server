@@ -135,8 +135,7 @@ export async function createHub(
         timeStr ? DateTime.fromSQL(timeStr, { zone: 'utc' }).toISO() : null
     )
 
-    const configOrDatabaseUrl = serverConfig.DATABASE_URL ? serverConfig.DATABASE_URL : serverConfig
-    const postgres = createPostgresPool(configOrDatabaseUrl)
+    const postgres = createPostgresPool(serverConfig)
 
     const redisPool = createPool<Redis.Redis>(
         {
