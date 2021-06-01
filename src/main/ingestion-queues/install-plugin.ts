@@ -24,6 +24,15 @@ export async function installPlugin(
 
     checkAndPause?.()
 
+    // TODO: leaving things here for now, but next steps:
+    /*
+        1. Installation id as part of pluginConfig
+        2. setup new piscina pool to be used here for installPlugin task
+        3. Trickle down, fix everything on those "test_worker"s
+        4. Trickle back up, figure out how to send results back via Celery
+            4.1: consider making the queue separate, if very different things
+        5. Do the Django Tango
+    */
     response = await runInstrumentedFunction({
         server,
         event,
