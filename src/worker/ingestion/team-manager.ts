@@ -103,20 +103,32 @@ export class TeamManager {
         await this.cacheEventNamesAndProperties(team.id)
 
         if (!this.eventNamesCache.get(team.id)?.has(event)) {
+            const newId = new UUIDT().toString()
             await this.db.postgresQuery(
                 `INSERT INTO posthog_eventdefinition (id, name, volume_30_day, query_usage_30_day, team_id) VALUES ($1, $2, NULL, NULL, $3) ON CONFLICT DO NOTHING`,
-                [new UUIDT().toString(), event, team.id],
+                [newId, event, team.id],
                 'insertEventDefinition'
+            )
+            await this.db.postgresQuery(
+                `INSERT INTO ee_enterpriseeventdefinition (eventdefinition_ptr_id, team_id) VALUES ($1, $2, NULL, NULL, $3) ON CONFLICT DO NOTHING`,
+                [newId, team.id],
+                'insertEnterpriseEventDefinition'
             )
             this.eventNamesCache.get(team.id)?.add(event)
         }
 
         for (const [key, value] of Object.entries(properties)) {
             if (!this.eventPropertiesCache.get(team.id)?.has(key)) {
+                const newId = new UUIDT().toString()
                 await this.db.postgresQuery(
                     `INSERT INTO posthog_propertydefinition (id, name, is_numerical, volume_30_day, query_usage_30_day, team_id) VALUES ($1, $2, $3, NULL, NULL, $4) ON CONFLICT DO NOTHING`,
-                    [new UUIDT().toString(), key, typeof value === 'number', team.id],
+                    [newId, key, typeof value === 'number', team.id],
                     'insertPropertyDefinition'
+                )
+                await this.db.postgresQuery(
+                    `INSERT INTO ee_enterprisepropertydefinition (propertydefinition_ptr_id, team_id) VALUES ($1, $2, $3, NULL, NULL, $4) ON CONFLICT DO NOTHING`,
+                    [newId, team.id],
+                    'insertEnterprisePropertyDefinition'
                 )
                 this.eventPropertiesCache.get(team.id)?.add(key)
             }
