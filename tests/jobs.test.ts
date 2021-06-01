@@ -152,8 +152,8 @@ describe('job queues', () => {
                 expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runIn']])
             })
 
-            test.only('polls for jobs in future', async () => {
-                const DELAY = 10000 // 10s
+            test('polls for jobs in future', async () => {
+                const DELAY = 3000 // 3s
 
                 // return something to be picked up after a few loops (poll interval is 100ms)
                 const now = Date.now()

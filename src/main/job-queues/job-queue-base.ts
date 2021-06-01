@@ -81,8 +81,8 @@ export class JobQueueBase implements JobQueue {
                 clearTimeout(this.timeout)
             }
             // eslint-disable-next-line @typescript-eslint/await-thenable
-            await this.readState()
-            this.timeout = setTimeout(() => this.syncState(), this.intervalSeconds * 1000)
+            const hadSomething = await this.readState()
+            this.timeout = setTimeout(() => this.syncState(), hadSomething ? 0 : this.intervalSeconds * 1000)
         } else {
             if (this.timeout) {
                 clearTimeout(this.timeout)

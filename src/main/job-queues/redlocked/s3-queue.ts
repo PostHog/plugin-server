@@ -13,13 +13,11 @@ const S3_POLL_INTERVAL = 5
 export class S3Queue extends JobQueueBase {
     serverConfig: PluginsServerConfig
     s3Wrapper: S3Wrapper | null
-    runner: NodeJS.Timeout | null
 
     constructor(serverConfig: PluginsServerConfig) {
         super()
         this.serverConfig = serverConfig
         this.s3Wrapper = null
-        this.runner = null
         this.intervalSeconds = S3_POLL_INTERVAL
     }
 
