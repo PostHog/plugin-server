@@ -36,9 +36,11 @@ export class JobQueueBase implements JobQueue {
     startConsumer(onJob: OnJobCallback): void
     // eslint-disable-next-line @typescript-eslint/require-await
     async startConsumer(onJob: OnJobCallback): Promise<void> {
-        this.started = true
         this.onJob = onJob
-        await this.syncState()
+        if (!this.started) {
+            this.started = true
+            await this.syncState()
+        }
     }
 
     stopConsumer(): void
@@ -62,8 +64,10 @@ export class JobQueueBase implements JobQueue {
     resumeConsumer(): void
     // eslint-disable-next-line @typescript-eslint/require-await
     async resumeConsumer(): Promise<void> {
-        this.paused = false
-        await this.syncState()
+        if (this.paused) {
+            this.paused = false
+            await this.syncState()
+        }
     }
 
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -77,8 +81,8 @@ export class JobQueueBase implements JobQueue {
                 clearTimeout(this.timeout)
             }
             // eslint-disable-next-line @typescript-eslint/await-thenable
-            const hadSomething = await this.readState()
-            this.timeout = setTimeout(() => this.syncState(), hadSomething ? 0 : this.intervalSeconds * 1000)
+            await this.readState()
+            this.timeout = setTimeout(() => this.syncState(), this.intervalSeconds * 1000)
         } else {
             if (this.timeout) {
                 clearTimeout(this.timeout)
