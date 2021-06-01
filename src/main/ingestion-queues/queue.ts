@@ -2,7 +2,7 @@ import Piscina from '@posthog/piscina'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 
-import { Hub, Queue, WorkerMethods } from '../../types'
+import { Hub, PluginId, Queue, WorkerMethods } from '../../types'
 import { status } from '../../utils/status'
 import { sanitizeEvent, UUIDT } from '../../utils/utils'
 import { CeleryQueue } from './celery-queue'
@@ -52,6 +52,7 @@ export async function startQueue(
         if (server.KAFKA_ENABLED) {
             return await startQueueKafka(server, piscina, mergedWorkerMethods)
         } else {
+            //  TODO: start redis for install plugin step, always
             return startQueueRedis(server, piscina, mergedWorkerMethods)
         }
     } catch (error) {
@@ -60,7 +61,7 @@ export async function startQueue(
     }
 }
 
-function startQueueRedis(server: Hub, piscina: Piscina | undefined, workerMethods: WorkerMethods): Queue {
+function startQueueRedis(server: Hub, piscina: Piscina, workerMethods: WorkerMethods): Queue {
     const celeryQueue = new CeleryQueue(server.db, server.PLUGINS_CELERY_QUEUE)
 
     celeryQueue.register(
@@ -87,6 +88,18 @@ function startQueueRedis(server: Hub, piscina: Piscina | undefined, workerMethod
             try {
                 const checkAndPause = () => pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
                 await ingestEvent(server, workerMethods, event, checkAndPause)
+            } catch (e) {
+                Sentry.captureException(e)
+            }
+        }
+    )
+
+    celeryQueue.register(
+        'posthog.tasks.test.install_plugin',
+        async (plugin_id: PluginId, team_id: number, plugin_installation_id: number) => {
+            try {
+                const checkAndPause = () => pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
+                await installPlugin(server, piscina, plugin_id, team_id, plugin_installation_id, checkAndPause)
             } catch (e) {
                 Sentry.captureException(e)
             }
