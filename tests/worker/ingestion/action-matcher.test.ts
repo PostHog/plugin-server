@@ -1,6 +1,6 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 
-import { Action, ActionStep, ActionStepUrlMatching, Hub, RawAction } from '../../../src/types'
+import { Action, ActionStep, ActionStepUrlMatching, Element, Hub, RawAction } from '../../../src/types'
 import { createHub } from '../../../src/utils/db/hub'
 import { ActionMatcher } from '../../../src/worker/ingestion/action-matcher'
 import { commonUserId } from '../../helpers/plugins'
@@ -73,133 +73,175 @@ describe('ActionMatcher', () => {
         }
     }
 
-    it('returns no match if action has no steps', async () => {
-        const actionDefinition: Action = await createTestAction([])
+    describe('#match()', () => {
+        it('returns no match if action has no steps', async () => {
+            const actionDefinition: Action = await createTestAction([])
 
-        const event: PluginEvent = createTestEvent()
+            const event: PluginEvent = createTestEvent()
 
-        expect(actionMatcher.match(event)).toEqual([])
-    })
-
-    it('returns a match in case of URL contains page view', async () => {
-        const actionDefinition: Action = await createTestAction([
-            {
-                url: 'example.com',
-                url_matching: ActionStepUrlMatching.Contains,
-                event: '$pageview',
-            },
-        ])
-
-        const eventPosthog: PluginEvent = createTestEvent({
-            properties: { $current_url: 'http://posthog.com/pricing' },
-        })
-        const eventExample: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://example.com/' },
+            expect(await actionMatcher.match(event)).toEqual([])
         })
 
-        expect(actionMatcher.match(eventPosthog)).toEqual([])
-        expect(actionMatcher.match(eventExample)).toEqual([actionDefinition])
-    })
+        it('returns a match in case of URL contains page view', async () => {
+            const actionDefinition: Action = await createTestAction([
+                {
+                    url: 'example.com',
+                    url_matching: ActionStepUrlMatching.Contains,
+                    event: '$pageview',
+                },
+            ])
 
-    it('returns a match in case of URL contains page views with % and _', async () => {
-        const actionDefinition: Action = await createTestAction([
-            {
-                url: 'exampl_.com/%.html',
-                url_matching: ActionStepUrlMatching.Contains,
-                event: '$pageview',
-            },
-        ])
+            const eventPosthog: PluginEvent = createTestEvent({
+                properties: { $current_url: 'http://posthog.com/pricing' },
+            })
+            const eventExample: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://example.com/' },
+            })
 
-        const eventExample: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://example.com/' },
-        })
-        const eventExampleHtml: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://example.com/index.html' },
-        })
-
-        expect(actionMatcher.match(eventExample)).toEqual([])
-        expect(actionMatcher.match(eventExampleHtml)).toEqual([actionDefinition])
-    })
-
-    it('returns a match in case of URL matches regex page views', async () => {
-        const actionDefinition: Action = await createTestAction([
-            {
-                url: String.raw`^https?:\/\/example\.com\/\d+(\/[a-r]*\/?)?$`,
-                url_matching: ActionStepUrlMatching.Regex,
-                event: '$pageview',
-            },
-        ])
-
-        const eventExampleOk1: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://example.com/23/hello' },
-        })
-        const eventExampleOk2: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://example.com/3/abc/' },
-        })
-        const eventExampleBad1: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://example.com/3/xyz/' },
-        })
-        const eventExampleBad2: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://example.com/' },
-        })
-        const eventExampleBad3: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://example.com/uno/dos/' },
-        })
-        const eventExampleBad4: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://example.com/1foo/' },
+            expect(await actionMatcher.match(eventPosthog)).toEqual([])
+            expect(await actionMatcher.match(eventExample)).toEqual([actionDefinition])
         })
 
-        expect(actionMatcher.match(eventExampleOk1)).toEqual([actionDefinition])
-        expect(actionMatcher.match(eventExampleOk2)).toEqual([actionDefinition])
-        expect(actionMatcher.match(eventExampleBad1)).toEqual([])
-        expect(actionMatcher.match(eventExampleBad2)).toEqual([])
-        expect(actionMatcher.match(eventExampleBad3)).toEqual([])
-        expect(actionMatcher.match(eventExampleBad4)).toEqual([])
-    })
+        it('returns a match in case of URL contains page views with % and _', async () => {
+            const actionDefinition: Action = await createTestAction([
+                {
+                    url: 'exampl_.com/%.html',
+                    url_matching: ActionStepUrlMatching.Contains,
+                    event: '$pageview',
+                },
+            ])
 
-    it('returns a match in case of URL matches exactly page views', async () => {
-        const actionDefinition: Action = await createTestAction([
-            {
-                url: 'https://www.mozilla.org/de/',
-                url_matching: ActionStepUrlMatching.Exact,
-                event: '$pageview',
-            },
-        ])
+            const eventExample: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://example.com/' },
+            })
+            const eventExampleHtml: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://example.com/index.html' },
+            })
 
-        const eventExampleOk: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://www.mozilla.org/de/' },
-        })
-        const eventExampleBad1: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://www.mozilla.org/de' },
-        })
-        const eventExampleBad2: PluginEvent = createTestEvent({
-            properties: { $current_url: 'https://www.mozilla.org/de/firefox/' },
+            expect(await actionMatcher.match(eventExample)).toEqual([])
+            expect(await actionMatcher.match(eventExampleHtml)).toEqual([actionDefinition])
         })
 
-        expect(actionMatcher.match(eventExampleOk)).toEqual([actionDefinition])
-        expect(actionMatcher.match(eventExampleBad1)).toEqual([])
-        expect(actionMatcher.match(eventExampleBad2)).toEqual([])
-    })
+        it('returns a match in case of URL matches regex page views', async () => {
+            const actionDefinition: Action = await createTestAction([
+                {
+                    url: String.raw`^https?:\/\/example\.com\/\d+(\/[a-r]*\/?)?$`,
+                    url_matching: ActionStepUrlMatching.Regex,
+                    event: '$pageview',
+                },
+            ])
 
-    it('returns a match in case of exact event name', async () => {
-        const actionDefinition: Action = await createTestAction([
-            {
+            const eventExampleOk1: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://example.com/23/hello' },
+            })
+            const eventExampleOk2: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://example.com/3/abc/' },
+            })
+            const eventExampleBad1: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://example.com/3/xyz/' },
+            })
+            const eventExampleBad2: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://example.com/' },
+            })
+            const eventExampleBad3: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://example.com/uno/dos/' },
+            })
+            const eventExampleBad4: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://example.com/1foo/' },
+            })
+
+            expect(await actionMatcher.match(eventExampleOk1)).toEqual([actionDefinition])
+            expect(await actionMatcher.match(eventExampleOk2)).toEqual([actionDefinition])
+            expect(await actionMatcher.match(eventExampleBad1)).toEqual([])
+            expect(await actionMatcher.match(eventExampleBad2)).toEqual([])
+            expect(await actionMatcher.match(eventExampleBad3)).toEqual([])
+            expect(await actionMatcher.match(eventExampleBad4)).toEqual([])
+        })
+
+        it('returns a match in case of URL matches exactly page views', async () => {
+            const actionDefinition: Action = await createTestAction([
+                {
+                    url: 'https://www.mozilla.org/de/',
+                    url_matching: ActionStepUrlMatching.Exact,
+                    event: '$pageview',
+                },
+            ])
+
+            const eventExampleOk: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://www.mozilla.org/de/' },
+            })
+            const eventExampleBad1: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://www.mozilla.org/de' },
+            })
+            const eventExampleBad2: PluginEvent = createTestEvent({
+                properties: { $current_url: 'https://www.mozilla.org/de/firefox/' },
+            })
+
+            expect(await actionMatcher.match(eventExampleOk)).toEqual([actionDefinition])
+            expect(await actionMatcher.match(eventExampleBad1)).toEqual([])
+            expect(await actionMatcher.match(eventExampleBad2)).toEqual([])
+        })
+
+        it('returns a match in case of exact event name', async () => {
+            const actionDefinition: Action = await createTestAction([
+                {
+                    event: 'meow',
+                },
+            ])
+
+            const eventExampleOk: PluginEvent = createTestEvent({
                 event: 'meow',
-            },
-        ])
+            })
+            const eventExampleBad1: PluginEvent = createTestEvent({
+                event: '$meow',
+            })
+            const eventExampleBad2: PluginEvent = createTestEvent({
+                event: 'WOOF',
+            })
 
-        const eventExampleOk: PluginEvent = createTestEvent({
-            event: 'meow',
+            expect(await actionMatcher.match(eventExampleOk)).toEqual([actionDefinition])
+            expect(await actionMatcher.match(eventExampleBad1)).toEqual([])
+            expect(await actionMatcher.match(eventExampleBad2)).toEqual([])
         })
-        const eventExampleBad1: PluginEvent = createTestEvent({
-            event: '$meow',
-        })
-        const eventExampleBad2: PluginEvent = createTestEvent({
-            event: 'WOOF',
+    })
+
+    describe('#checkElementsAgainstSelector()', () => {
+        it('handles any descendant selector', () => {
+            const elements: Element[] = [
+                { tag_name: 'main' },
+                { tag_name: 'div', attr_class: ['top'] },
+                { tag_name: 'h1', attr_class: ['headline'] },
+            ]
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main h1')).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main .headline')).toBeTruthy()
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'h1 div')).toBeFalsy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'top main')).toBeFalsy()
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main div')).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main .top')).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'div h1')).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'div .headline')).toBeTruthy()
         })
 
-        expect(actionMatcher.match(eventExampleOk)).toEqual([actionDefinition])
-        expect(actionMatcher.match(eventExampleBad1)).toEqual([])
-        expect(actionMatcher.match(eventExampleBad2)).toEqual([])
+        it('handles direct descendant selector', () => {
+            const elements: Element[] = [
+                { tag_name: 'main' },
+                { tag_name: 'div', attr_class: ['top'] },
+                { tag_name: 'h1', attr_class: ['headline'] },
+            ]
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > h1')).toBeFalsy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > .headline')).toBeFalsy()
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'h1 > div')).toBeFalsy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'top > main')).toBeFalsy()
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > div')).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > .top')).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'div > h1')).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'div > .headline')).toBeTruthy()
+        })
     })
 })

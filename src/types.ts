@@ -520,6 +520,7 @@ export interface PersonPropertyFilter extends PropertyFilterWithOperator {
 export interface ElementPropertyFilter extends PropertyFilterWithOperator {
     type: 'element'
     key: 'tag_name' | 'text' | 'href' | 'selector'
+    value: string
 }
 
 /** Sync with posthog/frontend/src/types.ts */
