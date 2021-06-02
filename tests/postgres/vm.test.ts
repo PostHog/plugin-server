@@ -971,7 +971,7 @@ describe('exportEvents', () => {
         await vm.methods.onEvent!({ ...defaultEvent, event: 'otherEvent' })
         await vm.methods.onEvent!({ ...defaultEvent, event: 'otherEvent2' })
         await vm.methods.onEvent!({ ...defaultEvent, event: 'otherEvent3' })
-        await delay(1010)
+        await delay(1500)
         expect(fetch).toHaveBeenCalledWith(
             'https://export.com/results.json?query=otherEvent2&events=2',
             extendedExpect.passOnAnything()
@@ -1021,7 +1021,7 @@ describe('exportEvents', () => {
         await vm.methods.onEvent!(event)
         await vm.methods.onEvent!(event)
         await vm.methods.onEvent!(event)
-        await delay(1010)
+        await delay(1500)
 
         // get the enqueued job
         expect(JobQueueManager).toHaveBeenCalled()
@@ -1087,7 +1087,7 @@ describe('exportEvents', () => {
         await vm.methods.onEvent!(defaultEvent)
         await vm.methods.onEvent!(defaultEvent)
         await vm.methods.onEvent!(defaultEvent)
-        await delay(1010)
+        await delay(1500)
 
         const mockJobQueueInstance = (JobQueueManager as any).mock.instances[0]
         const mockEnqueue = mockJobQueueInstance.enqueue
@@ -1131,7 +1131,7 @@ describe('exportEvents', () => {
         await vm.methods.onEvent!(event)
         await vm.methods.onEvent!(defaultEvent)
         await vm.methods.onEvent!(event)
-        await delay(1010)
+        await delay(1500)
         expect(fetch).toHaveBeenCalledTimes(4)
         expect(fetch).toHaveBeenCalledWith('https://onevent.com/', extendedExpect.passOnAnything())
         expect(fetch).toHaveBeenCalledWith(
@@ -1172,7 +1172,7 @@ describe('exportEvents', () => {
         for (let i = 0; i < 100; i++) {
             await vm.methods.onEvent!(event)
         }
-        await delay(1010)
+        await delay(1500)
 
         expect(fetch).toHaveBeenCalledTimes(15)
         expect((fetch as any).mock.calls).toEqual([
@@ -1226,7 +1226,7 @@ describe('exportEvents', () => {
         for (let i = 0; i < 100; i++) {
             await vm.methods.onEvent!(event)
         }
-        await delay(1010)
+        await delay(1500)
 
         expect(fetch).toHaveBeenCalledTimes(100)
         expect((fetch as any).mock.calls).toEqual(
