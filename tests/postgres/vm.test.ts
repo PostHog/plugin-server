@@ -14,6 +14,20 @@ jest.mock('../../src/utils/celery/client')
 jest.mock('../../src/main/job-queues/job-queue-manager')
 jest.setTimeout(30000)
 
+// passOnAnything is needed to match any object + undefined, null, etc.
+// expect.anything() will not match null and undefined
+const passOnAnything = () => ({
+    message: () => 'Ok',
+    pass: true,
+})
+
+const extendedExpect = expect as ExtendedExpect
+extendedExpect.extend({
+    passOnAnything,
+})
+
+type ExtendedExpect = typeof expect & { passOnAnything: () => Record<string, any> }
+
 const defaultEvent = {
     distinct_id: 'my_id',
     ip: '127.0.0.1',
@@ -106,7 +120,7 @@ test('teardownPlugin', async () => {
     })
     expect(fetch).not.toHaveBeenCalled()
     await vm.methods.teardownPlugin!()
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho', expect.anything())
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=hoho', extendedExpect.passOnAnything())
 })
 
 test('processEvent', async () => {
@@ -360,7 +374,10 @@ describe('vm exports', () => {
             event: 'export',
         }
         await vm.methods.onEvent!(event)
-        expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=export')
+        expect(fetch).toHaveBeenCalledWith(
+            'https://google.com/results.json?query=export',
+            extendedExpect.passOnAnything()
+        )
     })
 
     test('export default', async () => {
@@ -379,7 +396,10 @@ describe('vm exports', () => {
             event: 'default export',
         }
         await vm.methods.onEvent!(event)
-        expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=default export')
+        expect(fetch).toHaveBeenCalledWith(
+            'https://google.com/results.json?query=default export',
+            extendedExpect.passOnAnything()
+        )
     })
 })
 
@@ -587,7 +607,7 @@ test('console.log', async () => {
         'CONSOLE',
         'LOG',
         'logged event',
-        expect.anything()
+        extendedExpect.passOnAnything()
     )
 })
 
@@ -607,7 +627,7 @@ test('fetch', async () => {
     }
 
     await vm.methods.processEvent!(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', expect.anything())
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', extendedExpect.passOnAnything())
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
@@ -629,7 +649,7 @@ test('fetch via import', async () => {
     }
 
     await vm.methods.processEvent!(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', expect.anything())
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', extendedExpect.passOnAnything())
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
@@ -650,7 +670,7 @@ test('fetch via require', async () => {
     }
 
     await vm.methods.processEvent!(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', expect.anything())
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched', extendedExpect.passOnAnything())
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
 })
@@ -670,7 +690,7 @@ test('fetch fails with dangerous host', async () => {
         event: 'fetched',
     }
 
-    await expect(vm.methods.processEvent(event)).rejects.toThrow(
+    await expect(vm.methods.processEvent!(event)).rejects.toThrow(
         'IP 116.203.255.68 is not allowed for security reasons'
     )
 })
@@ -690,7 +710,7 @@ test('fetch looks up dns and throws on unsafe IP', async () => {
         event: 'fetched',
     }
 
-    await expect(vm.methods.processEvent(event)).rejects.toThrow(
+    await expect(vm.methods.processEvent!(event)).rejects.toThrow(
         'IP 116.203.255.68 is not allowed for security reasons'
     )
 })
@@ -904,7 +924,7 @@ test('onEvent', async () => {
         event: 'onEvent',
     }
     await vm.methods.onEvent!(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=onEvent', expect.anything())
+    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=onEvent', extendedExpect.passOnAnything())
 })
 
 test('onSnapshot', async () => {
@@ -920,7 +940,10 @@ test('onSnapshot', async () => {
         event: '$snapshot',
     }
     await vm.methods.onSnapshot!(event)
-    expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=$snapshot', expect.anything())
+    expect(fetch).toHaveBeenCalledWith(
+        'https://google.com/results.json?query=$snapshot',
+        extendedExpect.passOnAnything()
+    )
 })
 
 describe('exportEvents', () => {
@@ -949,7 +972,10 @@ describe('exportEvents', () => {
         await vm.methods.onEvent!({ ...defaultEvent, event: 'otherEvent2' })
         await vm.methods.onEvent!({ ...defaultEvent, event: 'otherEvent3' })
         await delay(1010)
-        expect(fetch).toHaveBeenCalledWith('https://export.com/results.json?query=otherEvent2&events=2')
+        expect(fetch).toHaveBeenCalledWith(
+            'https://export.com/results.json?query=otherEvent2&events=2',
+            extendedExpect.passOnAnything()
+        )
 
         // adds exportEventsWithRetry job and onEvent function
         expect(Object.keys(vm.tasks.job)).toEqual(['exportEventsWithRetry'])
@@ -1029,7 +1055,10 @@ describe('exportEvents', () => {
         await vm.tasks.job['exportEventsWithRetry'].exec(jobPayload2)
 
         // now it passed
-        expect(fetch).toHaveBeenCalledWith('https://export.com/results.json?query=exported&events=3')
+        expect(fetch).toHaveBeenCalledWith(
+            'https://export.com/results.json?query=exported&events=3',
+            extendedExpect.passOnAnything()
+        )
     })
 
     test('max retries', async () => {
@@ -1104,8 +1133,11 @@ describe('exportEvents', () => {
         await vm.methods.onEvent!(event)
         await delay(1010)
         expect(fetch).toHaveBeenCalledTimes(4)
-        expect(fetch).toHaveBeenCalledWith('https://onevent.com/')
-        expect(fetch).toHaveBeenCalledWith('https://export.com/results.json?query=exported&events=2')
+        expect(fetch).toHaveBeenCalledWith('https://onevent.com/', extendedExpect.passOnAnything())
+        expect(fetch).toHaveBeenCalledWith(
+            'https://export.com/results.json?query=exported&events=2',
+            extendedExpect.passOnAnything()
+        )
     })
 
     test('buffers bytes with exportEventsBufferBytes', async () => {
@@ -1144,21 +1176,21 @@ describe('exportEvents', () => {
 
         expect(fetch).toHaveBeenCalledTimes(15)
         expect((fetch as any).mock.calls).toEqual([
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=946&count=7'],
-            ['https://export.com/?length=271&count=2'],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=946&count=7', extendedExpect.passOnAnything()],
+            ['https://export.com/?length=271&count=2', extendedExpect.passOnAnything()],
         ])
     })
 
@@ -1198,7 +1230,10 @@ describe('exportEvents', () => {
 
         expect(fetch).toHaveBeenCalledTimes(100)
         expect((fetch as any).mock.calls).toEqual(
-            Array.from(Array(100)).map(() => ['https://export.com/?length=136&count=1'])
+            Array.from(Array(100)).map(() => [
+                'https://export.com/?length=136&count=1',
+                extendedExpect.passOnAnything(),
+            ])
         )
     })
 
@@ -1226,6 +1261,9 @@ describe('exportEvents', () => {
         expect(fetch).not.toHaveBeenCalledWith('https://export.com/results.json?query=default event&events=1')
 
         await vm.methods.teardownPlugin!()
-        expect(fetch).toHaveBeenCalledWith('https://export.com/results.json?query=default event&events=1')
+        expect(fetch).toHaveBeenCalledWith(
+            'https://export.com/results.json?query=default event&events=1',
+            extendedExpect.passOnAnything()
+        )
     })
 })

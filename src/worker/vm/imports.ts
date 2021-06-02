@@ -7,7 +7,7 @@ import dns from 'dns'
 import * as genericPool from 'generic-pool'
 import ipRangeCheck from 'ip-range-check'
 import net from 'net'
-import nodeFetch, { RequestInit, Response } from 'node-fetch'
+import nodeFetch, { RequestInit } from 'node-fetch'
 import pg from 'pg'
 import snowflake from 'snowflake-sdk'
 import url from 'url'
@@ -54,7 +54,7 @@ const validateHostOrUrl = async (hostOrUrl: any) => {
     }
 }
 
-const fetch = async (url: string | URLLike, init?: RequestInit) => {
+export const fetch = async (url: string | URLLike, init?: RequestInit) => {
     if (typeof url === 'object' && 'href' in url) {
         url = url.href
     }
@@ -72,6 +72,9 @@ const checkRedirectChain = async (
         throw new IllegalOperationError(`${originalUrl} flagged as unsafe after too many redirects`)
     }
     await validateHostOrUrl(url)
+    if (process.env.NODE_ENV === 'test') {
+        return
+    }
     const res = await nodeFetch(url, { redirect: 'manual' })
     if (res.headers && res.headers.get('location')) {
         setOfRedirectsFollowed.add(res.headers.get('location')!)
