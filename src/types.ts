@@ -294,7 +294,6 @@ export type WorkerMethods = {
     onEvent: (event: PluginEvent) => Promise<void>
     onSnapshot: (event: PluginEvent) => Promise<void>
     processEvent: (event: PluginEvent) => Promise<PluginEvent | null>
-    processEventBatch: (batch: PluginEvent[]) => Promise<(PluginEvent | null)[]>
     ingestEvent: (event: PluginEvent) => Promise<IngestEventResponse>
     matchActions: (event: PluginEvent) => Promise<void>
 }
@@ -306,8 +305,6 @@ export type VMMethods = {
     onSnapshot?: (event: PluginEvent) => Promise<void>
     exportEvents?: (events: PluginEvent[]) => Promise<void>
     processEvent?: (event: PluginEvent) => Promise<PluginEvent>
-    // DEPRECATED
-    processEventBatch?: (batch: PluginEvent[]) => Promise<PluginEvent[]>
 }
 
 export interface PluginConfigVMResponse {
