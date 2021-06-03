@@ -46,10 +46,14 @@ export class ActionMatcher {
     }
 
     /** Get all actions matched to the event. */
-    public async match(event: PluginEvent, elements: Element[], eventId?: number): Promise<Action[]> {
+    public async match(event: PluginEvent, eventId?: number, elements?: Element[]): Promise<Action[]> {
         const teamActions: Action[] = Object.values(this.actionManager.getTeamActions(event.team_id))
+        if (!elements) {
+            const rawElements: Record<string, any>[] | undefined = event.properties?.['$elements']
+            elements = rawElements ? extractElements(rawElements) : []
+        }
         const matching: boolean[] = await Promise.all(
-            teamActions.map((action) => this.checkAction(event, elements, action))
+            teamActions.map((action) => this.checkAction(event, elements!, action))
         )
         const matches: Action[] = []
         for (let i = 0; i < matching.length; i++) {

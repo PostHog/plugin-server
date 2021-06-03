@@ -246,7 +246,7 @@ describe('ActionMatcher', () => {
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'div > .headline')).toBeTruthy()
         })
 
-        it('handles direct descendant selector edge cases', () => {
+        it('handles direct descendant selector edge cases 1', () => {
             const elements: Element[] = [
                 { tag_name: 'h1', attr_class: ['headline'] },
                 { tag_name: 'div', attr_class: ['inner'] },
@@ -268,6 +268,20 @@ describe('ActionMatcher', () => {
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > .outer')).toBeTruthy()
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'div > h1')).toBeTruthy()
             expect(actionMatcher.checkElementsAgainstSelector(elements, '.inner > .headline')).toBeTruthy()
+        })
+
+        it('handles direct descendant selector edge cases 2', () => {
+            const elements: Element[] = [
+                { tag_name: 'span' },
+                { tag_name: 'div' },
+                { tag_name: 'a' },
+                { tag_name: 'div' },
+                { tag_name: 'div' },
+                { tag_name: 'aside' },
+                { tag_name: 'section' },
+            ]
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'aside div > span')).toBeTruthy()
         })
     })
 })
