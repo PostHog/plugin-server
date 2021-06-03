@@ -110,6 +110,9 @@ describe('LazyPluginVM', () => {
             for (let i = 0; i < 16; ++i) {
                 jest.runOnlyPendingTimers()
                 await vm.resolveInternalVm
+
+                // plugin methods are always null throughout retries
+                expect(await vm.getProcessEvent()).toEqual(null)
             }
 
             // plugin setup is retried 15 times with exponential backoff

@@ -154,6 +154,7 @@ export const plugin70 = {
     archive: createZipBuffer('test-plugin', {
         indexJs: `
             import { RetryError } from '@posthog/plugin-scaffold'
-            function setupPlugin () { throw new RetryError('I always fail!') }`,
+            export function setupPlugin () { throw new RetryError('I always fail!') }
+            export function processEvent (event) { return event }`,
     }),
 }
