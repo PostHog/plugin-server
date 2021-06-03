@@ -623,3 +623,5 @@ export interface PropertyDefinitionType {
     query_usage_30_day: number | null
     team_id: number
 }
+
+export type PluginFunction = 'onEvent' | 'processEvent' | 'onSnapshot' | 'pluginTask'
