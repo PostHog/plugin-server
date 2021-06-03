@@ -54,13 +54,13 @@ export class LazyPluginVM {
                     status.warn('⚠️', error.message)
                     if (isRetryError && this.totalAttemptsToInitialize < 15) {
                         const nextRetryMs = 2 ** this.totalAttemptsToInitialize * 3000
-                        const nextRetryLogMessage = `${Math.round(nextRetryMs / 1000)}s`
+                        const nextRetrySeconds = `${Math.round(nextRetryMs / 1000)}s`
                         status.warn(
                             '⚠️',
-                            `Failed to load ${logInfo}. Retrying to initialize it in ${nextRetryLogMessage}.`
+                            `Failed to load ${logInfo}. Retrying to initialize it in ${nextRetrySeconds}.`
                         )
                         await createPluginLogEntry(
-                            `Plugin failed to load but its initialization will be retried in ${nextRetryLogMessage} (instance ID ${hub.instanceId}).`,
+                            `Plugin failed to load but its initialization will be retried in ${nextRetrySeconds} (instance ID ${hub.instanceId}).`,
                             PluginLogEntryType.Error
                         )
                         setTimeout(() => {
