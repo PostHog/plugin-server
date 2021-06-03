@@ -55,7 +55,7 @@ describe('ActionMatcher', () => {
         )
         await insertRow(hub.db.postgres, 'posthog_action', action)
         await Promise.all(steps.map((step) => insertRow(hub.db.postgres, 'posthog_actionstep', step)))
-        await actionMatcher.reloadAction(action.team_id, action.id)
+        await hub.actionManager.reloadAction(action.team_id, action.id)
         return { ...action, steps }
     }
 

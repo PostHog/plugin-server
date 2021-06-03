@@ -32,17 +32,9 @@ export class ActionMatcher {
     private db: DB
     private actionManager: ActionManager
 
-    // Exposed actionManager methods
-    public reloadAllActions: typeof ActionManager.prototype.reloadAllActions
-    public reloadAction: typeof ActionManager.prototype.reloadAction
-    public dropAction: typeof ActionManager.prototype.dropAction
-
     constructor(db: DB, actionManager: ActionManager) {
         this.db = db
         this.actionManager = actionManager
-        this.reloadAllActions = this.actionManager.reloadAllActions.bind(this.actionManager)
-        this.reloadAction = this.actionManager.reloadAction.bind(this.actionManager)
-        this.dropAction = this.actionManager.dropAction.bind(this.actionManager)
     }
 
     /** Get all actions matched to the event. */
