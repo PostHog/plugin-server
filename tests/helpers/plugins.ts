@@ -147,3 +147,13 @@ export const mockPluginSourceCode = (indexJs: string): Plugin => ({
     url: undefined,
     source: indexJs,
 })
+
+export const plugin70 = {
+    ...plugin60,
+    id: 70,
+    archive: createZipBuffer('test-plugin', {
+        indexJs: `
+            import { RetryError } from '@posthog/plugin-scaffold'
+            function setupPlugin () { throw new RetryError('I always fail!') }`,
+    }),
+}

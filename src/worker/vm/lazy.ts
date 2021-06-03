@@ -1,6 +1,5 @@
 import { RetryError } from '@posthog/plugin-scaffold'
 import equal from 'fast-deep-equal'
-import * as schedule from 'node-schedule'
 
 import {
     Hub,
@@ -16,7 +15,6 @@ import { clearError, processError } from '../../utils/db/error'
 import { disablePlugin, setPluginCapabilities } from '../../utils/db/sql'
 import { status } from '../../utils/status'
 import { createPluginConfigVM } from './vm'
-
 export class LazyPluginVM {
     initialize?: (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo: string) => Promise<void>
     failInitialization?: () => void
@@ -53,16 +51,13 @@ export class LazyPluginVM {
                     status.warn('⚠️', error.message)
                     if (isRetryError && this.totalAttemptsToInitialize < 15) {
                         const nextRetryMs = 2 ** this.totalAttemptsToInitialize * 3000
+                        const nextRetryLogMessage = `${Math.round(nextRetryMs / 1000)}s`
                         status.warn(
                             '⚠️',
-                            `Failed to load ${logInfo}. Retrying to initialize it in ${Math.round(
-                                nextRetryMs / 1000
-                            )}s.`
+                            `Failed to load ${logInfo}. Retrying to initialize it in ${nextRetryLogMessage}.`
                         )
                         await createPluginLogEntry(
-                            `Plugin failed to load but its initialization will be retried in ${Math.round(
-                                nextRetryMs / 1000
-                            )}s (instance ID ${hub.instanceId}).`,
+                            `Plugin failed to load but its initialization will be retried in ${nextRetryLogMessage} (instance ID ${hub.instanceId}).`,
                             (error = true)
                         )
                         setTimeout(() => {
@@ -72,12 +67,11 @@ export class LazyPluginVM {
                         resolve(null)
                         return
                     }
-                    status.warn('⚠️', `Failed to load ${logInfo}. Disabling plugin.`)
-                    const additionalContextOnFailure = isRetryError
-                        ? `The server tried to initialize it ${this.totalAttemptsToInitialize} time${
-                              this.totalAttemptsToInitialize > 1 ? 's' : ''
-                          } before disabling it.`
-                        : ''
+                    const totalAttemptsToInitializeLogMessage = `The server tried to initialize it ${
+                        this.totalAttemptsToInitialize
+                    } time${this.totalAttemptsToInitialize > 1 ? 's' : ''} before disabling it.`
+                    status.warn('⚠️', `Failed to load ${logInfo}. ${totalAttemptsToInitializeLogMessage}`)
+                    const additionalContextOnFailure = isRetryError ? totalAttemptsToInitializeLogMessage : ''
                     await createPluginLogEntry(
                         `Plugin failed to load and was disabled (instance ID ${hub.instanceId}). ${additionalContextOnFailure}`,
                         (error = true)
