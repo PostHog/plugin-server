@@ -735,7 +735,7 @@ export class DB {
         ).rows as PropertyDefinitionType[]
     }
 
-    // Action & ActionStep
+    // Action & ActionStep & Action<>Event
 
     public async fetchAllActionsGroupedByTeam(): Promise<Record<Team['id'], Record<Action['id'], Action>>> {
         const rawActions: RawAction[] = (
@@ -781,6 +781,14 @@ export class DB {
         ).rows
         const action: Action = { ...rawActions[0], steps }
         return action
+    }
+
+    public async registerActionOccurrence(actionId: Action['id'], eventId: Event['id']): Promise<void> {
+        await this.postgresQuery(
+            `INSERT INTO posthog_action_events_2 (action_id, event_id) VALUES ($1, $2)`, // TODO: remove _2
+            [actionId, eventId],
+            'registerActionOccurrence'
+        )
     }
 
     // Team Internal Metrics

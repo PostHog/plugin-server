@@ -5,14 +5,15 @@ import { DateTime } from 'luxon'
 import { Hub, IngestEventResponse } from '../../types'
 import { timeoutGuard } from '../../utils/db/utils'
 import { status } from '../../utils/status'
+import { IEventX } from './process-event'
 
-export async function ingestEvent(server: Hub, event: PluginEvent): Promise<IngestEventResponse> {
+export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestEventResponse> {
     const timeout = timeoutGuard('Still ingesting event inside worker. Timeout warning after 30 sec!', {
         event: JSON.stringify(event),
     })
     try {
         const { distinct_id, ip, site_url, team_id, now, sent_at, uuid } = event
-        await server.eventsProcessor.processEvent(
+        const result = (await hub.eventsProcessor.processEvent(
             distinct_id,
             ip,
             site_url,
@@ -21,7 +22,10 @@ export async function ingestEvent(server: Hub, event: PluginEvent): Promise<Inge
             DateTime.fromISO(now),
             sent_at ? DateTime.fromISO(sent_at) : null,
             uuid! // it will throw if it's undefined
-        )
+        )) as IEventX
+        if (event.event !== '$snapshot' && result.id) {
+            await hub.actionMatcher.match(event, result.elements || [], result.id)
+        }
         // We don't want to return the inserted DB entry that `processEvent` returns.
         // This response is passed to piscina and would be discarded anyway.
         return { success: true }

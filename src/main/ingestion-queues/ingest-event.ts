@@ -47,13 +47,6 @@ export async function ingestEvent(
                 statsKey: `kafka_queue.single_${isSnapshot ? 'on_snapshot' : 'on_event'}`,
                 timeoutMessage: `After 30 seconds still running ${isSnapshot ? 'onSnapshot' : 'onEvent'}`,
             }),
-            runInstrumentedFunction({
-                server,
-                event: processedEvent,
-                func: (event) => workerMethods.matchActions(event),
-                statsKey: 'kafka_queue.action_matching',
-                timeoutMessage: 'After 30 seconds still matching actions',
-            }),
         ])
     }
 

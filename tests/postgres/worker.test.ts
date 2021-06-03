@@ -199,8 +199,8 @@ describe('queue logic', () => {
         await delay(5000)
 
         expect(pluginsServer.piscina.queueSize).toBe(0)
-        // tasksSentSoFar * (processEvent + onEvent + ingestEvent + matchActions)
-        expect(pluginsServer.piscina.completed).toBe(baseCompleted + tasksSentSoFar * 4)
+        // tasksSentSoFar * (processEvent + onEvent + ingestEvent)
+        expect(pluginsServer.piscina.completed).toBe(baseCompleted + tasksSentSoFar * 3)
         expect(pluginsServer.queue.isPaused()).toBe(false)
 
         // 2 tasks * 2 threads = 4 active
@@ -227,8 +227,8 @@ describe('queue logic', () => {
         expect(pausedTimes).toBeGreaterThanOrEqual(10)
         expect(pluginsServer.queue.isPaused()).toBe(false)
         expect(pluginsServer.piscina.queueSize).toBe(0)
-        // tasksSentSoFar x (processEvent + onEvent + ingestEvent + matchActions)
-        expect(pluginsServer.piscina.completed).toEqual(baseCompleted + tasksSentSoFar * 4)
+        // tasksSentSoFar x (processEvent + onEvent + ingestEvent)
+        expect(pluginsServer.piscina.completed).toEqual(baseCompleted + tasksSentSoFar * 3)
 
         const duration = pluginsServer.piscina.duration - startTime
         const expectedTimeMs = (50 / 4) * 1000
@@ -305,14 +305,6 @@ describe('createTaskRunner()', () => {
         await taskRunner({ task: 'reloadSchedule' })
 
         expect(loadSchedule).toHaveBeenCalled()
-    })
-
-    it('handles `matchActions` task', async () => {
-        const dummyEvent = createEvent()
-
-        await taskRunner({ task: 'matchActions', args: { event: dummyEvent } })
-
-        expect(hub.actionMatcher.match).toHaveBeenCalledWith(dummyEvent)
     })
 
     it('handles `reloadAllActions` task', async () => {

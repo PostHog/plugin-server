@@ -46,10 +46,8 @@ export class ActionMatcher {
     }
 
     /** Get all actions matched to the event. */
-    public async match(event: PluginEvent): Promise<Action[]> {
+    public async match(event: PluginEvent, elements: Element[], eventId?: number): Promise<Action[]> {
         const teamActions: Action[] = Object.values(this.actionManager.getTeamActions(event.team_id))
-        const rawElements: Record<string, any>[] | undefined = event.properties?.['$elements']
-        const elements: Element[] = rawElements ? extractElements(rawElements) : []
         const matching: boolean[] = await Promise.all(
             teamActions.map((action) => this.checkAction(event, elements, action))
         )
@@ -57,10 +55,12 @@ export class ActionMatcher {
         for (let i = 0; i < matching.length; i++) {
             const result = matching[i]
             if (result) {
+                if (eventId) {
+                    await this.db.registerActionOccurrence(teamActions[i].id, eventId)
+                }
                 matches.push(teamActions[i])
             }
         }
-        console.log(matches)
         return matches
     }
 
@@ -149,7 +149,7 @@ export class ActionMatcher {
      */
     private checkStepElement(elements: Element[], step: ActionStep): boolean {
         // CHECK CONDITIONS, OTHERWISE SKIPPED
-        if (step.href || step.text || (step.href && elements.length) || step.selector) {
+        if (step.href || step.text || (step.href && elements.length)) {
             return elements.some((element) => {
                 if (step.href && element.href !== step.href) {
                     return false // ELEMENT HREF IS A MISMATCH
@@ -160,11 +160,11 @@ export class ActionMatcher {
                 if (step.text && element.text !== step.text) {
                     return false // ELEMENT TEXT IS A MISMATCH
                 }
-                if (step.selector && !this.checkElementsAgainstSelector(elements, step.selector)) {
-                    return false // SELECTOR IS A MISMATCH
-                }
                 return true
             }) // AT LEAST ONE ELEMENT MUST BE A SUBMATCH
+        }
+        if (step.selector && !this.checkElementsAgainstSelector(elements, step.selector)) {
+            return false // SELECTOR IS A MISMATCH
         }
         return true
     }

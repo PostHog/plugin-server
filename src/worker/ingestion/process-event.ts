@@ -28,6 +28,11 @@ import { castTimestampOrNow, extractElements, filterIncrementProperties, UUID, U
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
+export interface IEventX extends IEvent {
+    id?: number
+    elements?: Element[]
+}
+
 export class EventsProcessor {
     pluginsServer: Hub
     db: DB
@@ -62,7 +67,7 @@ export class EventsProcessor {
         now: DateTime,
         sentAt: DateTime | null,
         eventUuid: string
-    ): Promise<IEvent | SessionRecordingEvent> {
+    ): Promise<IEventX | SessionRecordingEvent | PostgresSessionRecordingEvent> {
         if (!UUID.validateString(eventUuid, false)) {
             throw new Error(`Not a valid UUID: "${eventUuid}"`)
         }
@@ -95,7 +100,7 @@ export class EventsProcessor {
                 clearTimeout(timeout1)
             }
 
-            let result: IEvent | SessionRecordingEvent
+            let result: IEventX | SessionRecordingEvent | PostgresSessionRecordingEvent
 
             if (data['event'] === '$snapshot') {
                 const timeout2 = timeoutGuard(
@@ -436,14 +441,14 @@ export class EventsProcessor {
         timestamp?: DateTime | string,
         elements?: Element[],
         siteUrl?: string
-    ): Promise<IEvent> {
+    ): Promise<IEventX> {
         const timestampString = castTimestampOrNow(
             timestamp,
             this.kafkaProducer ? TimestampFormat.ClickHouse : TimestampFormat.ISO
         )
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
 
-        const data: IEvent = {
+        const data: IEventX = {
             uuid,
             event,
             properties: JSON.stringify(properties ?? {}),
@@ -452,6 +457,7 @@ export class EventsProcessor {
             distinctId,
             elementsChain,
             createdAt: timestampString,
+            elements,
         }
 
         if (this.kafkaProducer) {
@@ -503,6 +509,7 @@ export class EventsProcessor {
                 ],
                 'createEventInsert'
             )
+            data.id = event.id
             if (await this.teamManager.shouldSendWebhooks(teamId)) {
                 this.pluginsServer.statsd?.increment(`hooks.send_task`)
                 this.celery.sendTask('posthog.tasks.webhooks.post_event_to_webhook', [event.id, siteUrl], {})
@@ -541,13 +548,14 @@ export class EventsProcessor {
                 messages: [{ key: uuid, value: Buffer.from(JSON.stringify(data)) }],
             })
         } else {
-            const insertResult = await this.db.postgresQuery(
+            const {
+                rows: [eventCreated],
+            } = await this.db.postgresQuery(
                 'INSERT INTO posthog_sessionrecordingevent (created_at, team_id, distinct_id, session_id, timestamp, snapshot_data) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
                 [data.created_at, data.team_id, data.distinct_id, data.session_id, data.timestamp, data.snapshot_data],
                 'insertSessionRecording'
             )
-            const eventCreated = insertResult.rows[0] as PostgresSessionRecordingEvent
-            return eventCreated
+            return eventCreated as PostgresSessionRecordingEvent
         }
         return data
     }
