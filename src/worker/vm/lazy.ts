@@ -1,4 +1,6 @@
+import { RetryError } from '@posthog/plugin-scaffold'
 import equal from 'fast-deep-equal'
+import * as schedule from 'node-schedule'
 
 import {
     Hub,
@@ -18,33 +20,68 @@ import { createPluginConfigVM } from './vm'
 export class LazyPluginVM {
     initialize?: (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo: string) => Promise<void>
     failInitialization?: () => void
-    resolveInternalVm: Promise<PluginConfigVMResponse | null>
+    resolveInternalVm!: Promise<PluginConfigVMResponse | null>
+    totalAttemptsToInitialize: number
 
     constructor() {
+        this.totalAttemptsToInitialize = 0
+        this.initVM()
+    }
+
+    private initVM() {
+        this.totalAttemptsToInitialize++
         this.resolveInternalVm = new Promise((resolve) => {
             this.initialize = async (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo = '') => {
-                try {
-                    const vm = await createPluginConfigVM(hub, pluginConfig, indexJs)
+                const createPluginLogEntry = async (message: string, error = false): Promise<void> => {
                     await hub.db.createPluginLogEntry(
                         pluginConfig,
                         PluginLogEntrySource.System,
-                        PluginLogEntryType.Info,
-                        `Plugin loaded (instance ID ${hub.instanceId}).`,
+                        error ? PluginLogEntryType.Error : PluginLogEntryType.Info,
+                        message,
                         hub.instanceId
                     )
+                }
+                try {
+                    const vm = await createPluginConfigVM(hub, pluginConfig, indexJs)
+                    await createPluginLogEntry(`Plugin loaded (instance ID ${hub.instanceId}).`)
                     status.info('🔌', `Loaded ${logInfo}`)
                     void clearError(hub, pluginConfig)
                     await this.inferPluginCapabilities(hub, pluginConfig, vm)
                     resolve(vm)
                 } catch (error) {
-                    await hub.db.createPluginLogEntry(
-                        pluginConfig,
-                        PluginLogEntrySource.System,
-                        PluginLogEntryType.Error,
-                        `Plugin failed to load and was disabled (instance ID ${hub.instanceId}).`,
-                        hub.instanceId
+                    const isRetryError = error instanceof RetryError
+                    status.warn('⚠️', error.message)
+                    if (isRetryError && this.totalAttemptsToInitialize < 15) {
+                        const nextRetryMs = 2 ** this.totalAttemptsToInitialize * 100
+                        status.warn(
+                            '⚠️',
+                            `Failed to load ${logInfo}. Retrying to initialize it in ${Math.round(
+                                nextRetryMs / 1000
+                            )}s.`
+                        )
+                        await createPluginLogEntry(
+                            `Plugin failed to load but its initialization will be retried in ${Math.round(
+                                nextRetryMs / 1000
+                            )}s (instance ID ${hub.instanceId}).`,
+                            (error = true)
+                        )
+                        setTimeout(() => {
+                            this.initVM()
+                            void this.initialize?.(hub, pluginConfig, indexJs, logInfo)
+                        }, nextRetryMs)
+                        resolve(null)
+                        return
+                    }
+                    status.warn('⚠️', `Failed to load ${logInfo}. Disabling plugin.`)
+                    const additionalContextOnFailure = isRetryError
+                        ? `The server tried to initialize it ${this.totalAttemptsToInitialize} time${
+                              this.totalAttemptsToInitialize > 1 ? 's' : ''
+                          } before disabling it.`
+                        : ''
+                    await createPluginLogEntry(
+                        `Plugin failed to load and was disabled (instance ID ${hub.instanceId}). ${additionalContextOnFailure}`,
+                        (error = true)
                     )
-                    status.warn('⚠️', `Failed to load ${logInfo}`)
                     void disablePlugin(hub, pluginConfig.id)
                     void processError(hub, pluginConfig, error)
                     resolve(null)

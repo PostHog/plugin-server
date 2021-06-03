@@ -61,7 +61,6 @@ export async function runProcessEvent(server: Hub, event: PluginEvent): Promise<
     const pluginsDeferred = []
     for (const pluginConfig of pluginsToRun) {
         const processEvent = await pluginConfig.vm?.getProcessEvent()
-
         if (processEvent) {
             const timer = new Date()
 
