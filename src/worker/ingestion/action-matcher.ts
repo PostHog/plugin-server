@@ -86,6 +86,14 @@ export class ActionMatcher {
      * The event is considered a match if no subcheck fails. Many subchecks are usually irrelevant and skipped.
      */
     private async checkStep(event: PluginEvent, elements: Element[], step: ActionStep): Promise<boolean> {
+        console.log(
+            'xxx',
+            this.checkStepElement(elements, step),
+            this.checkStepUrl(event, step),
+            this.checkStepEvent(event, step),
+            await this.checkStepFilters(event, elements, step),
+            event.event
+        )
         return (
             this.checkStepElement(elements, step) &&
             this.checkStepUrl(event, step) &&
@@ -103,8 +111,7 @@ export class ActionMatcher {
      */
     private checkStepUrl(event: PluginEvent, step: ActionStep): boolean {
         // CHECK CONDITIONS, OTHERWISE SKIPPED
-        if (step.url_matching) {
-            const stepUrl = step.url || ''
+        if (step.url_matching && step.url) {
             const eventUrl = event.properties?.$current_url
             if (!eventUrl || typeof eventUrl !== 'string') {
                 return false // URL IS UNKNOWN
@@ -114,14 +121,14 @@ export class ActionMatcher {
                 case ActionStepUrlMatching.Contains:
                     // Simulating SQL LIKE behavior (_ = any single character, % = any zero or more characters)
                     // TODO: reconcile syntax discrepancies between SQL and JS regex
-                    const adjustedRegExpString = escapeStringRegexp(stepUrl).replace(/_/g, '.').replace(/%/g, '.*')
+                    const adjustedRegExpString = escapeStringRegexp(step.url).replace(/_/g, '.').replace(/%/g, '.*')
                     isUrlOk = new RegExp(`.*${adjustedRegExpString}.*`).test(eventUrl)
                     break
                 case ActionStepUrlMatching.Regex:
-                    isUrlOk = new RegExp(stepUrl).test(eventUrl)
+                    isUrlOk = new RegExp(step.url).test(eventUrl)
                     break
                 case ActionStepUrlMatching.Exact:
-                    isUrlOk = stepUrl === eventUrl
+                    isUrlOk = step.url === eventUrl
                     break
                 default:
                     throw new Error(`Unrecognized ActionStep.url_matching value ${step.url_matching}!`)
@@ -357,14 +364,16 @@ export class ActionMatcher {
         // Initial base element is the imaginary parent of the outermost known element
         let baseElementIndex = elements.length
         let wasPartMatched = true
-        for (let partIndex = 0; partIndex < parts.length; partIndex++) {
+        let partIndex = 0
+        while (partIndex < parts.length) {
+            if (baseElementIndex <= 0) {
+                // At least one part wasn't matched yet, but at the same time there are no more matchable elements left!
+                return false
+            }
             const part = parts[partIndex]
             wasPartMatched = false
             for (let depthDiff = 1; baseElementIndex - depthDiff >= 0; depthDiff++) {
                 // Subtracting depthDiff as elements are reversed, meaning outer elements have higher indexes
-                if (part.directDescendant && depthDiff > 1) {
-                    break
-                }
                 const currentElementIndex = baseElementIndex - depthDiff
                 if (
                     this.checkElementAgainstSelectorPartRequirements(elements[currentElementIndex], part.requirements)
@@ -372,6 +381,19 @@ export class ActionMatcher {
                     baseElementIndex = currentElementIndex
                     wasPartMatched = true
                     break
+                } else if (part.directDescendant) {
+                    break
+                }
+            }
+            if (wasPartMatched) {
+                partIndex++
+            } else {
+                if (part.directDescendant) {
+                    // For a direct descendant we need to check the parent parent again
+                    partIndex--
+                } else {
+                    // Otherwise we just move the base down
+                    baseElementIndex--
                 }
             }
         }

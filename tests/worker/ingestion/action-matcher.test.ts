@@ -208,16 +208,16 @@ describe('ActionMatcher', () => {
     describe('#checkElementsAgainstSelector()', () => {
         it('handles any descendant selector', () => {
             const elements: Element[] = [
-                { tag_name: 'main' },
-                { tag_name: 'div', attr_class: ['top'] },
                 { tag_name: 'h1', attr_class: ['headline'] },
+                { tag_name: 'div', attr_class: ['top'] },
+                { tag_name: 'main' },
             ]
 
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'main h1')).toBeTruthy()
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'main .headline')).toBeTruthy()
 
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'h1 div')).toBeFalsy()
-            expect(actionMatcher.checkElementsAgainstSelector(elements, 'top main')).toBeFalsy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, '.top main')).toBeFalsy()
 
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'main div')).toBeTruthy()
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'main .top')).toBeTruthy()
@@ -227,21 +227,47 @@ describe('ActionMatcher', () => {
 
         it('handles direct descendant selector', () => {
             const elements: Element[] = [
-                { tag_name: 'main' },
-                { tag_name: 'div', attr_class: ['top'] },
                 { tag_name: 'h1', attr_class: ['headline'] },
+                { tag_name: 'div', attr_class: ['top'] },
+                { tag_name: 'main' },
             ]
 
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > h1')).toBeFalsy()
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > .headline')).toBeFalsy()
 
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > .top > h1')).toBeTruthy()
+
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'h1 > div')).toBeFalsy()
-            expect(actionMatcher.checkElementsAgainstSelector(elements, 'top > main')).toBeFalsy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, '.top > main')).toBeFalsy()
 
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > div')).toBeTruthy()
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > .top')).toBeTruthy()
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'div > h1')).toBeTruthy()
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'div > .headline')).toBeTruthy()
+        })
+
+        it('handles direct descendant selector edge cases', () => {
+            const elements: Element[] = [
+                { tag_name: 'h1', attr_class: ['headline'] },
+                { tag_name: 'div', attr_class: ['inner'] },
+                { tag_name: 'div', attr_class: ['outer'] },
+                { tag_name: 'main' },
+            ]
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > h1')).toBeFalsy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > .inner')).toBeFalsy()
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > .outer > .inner > h1')).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > .inner > h1')).toBeFalsy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > .outer > h1')).toBeFalsy()
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'h1 > div')).toBeFalsy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'outer > main')).toBeFalsy()
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > div')).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'main > .outer')).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, 'div > h1')).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, '.inner > .headline')).toBeTruthy()
         })
     })
 })
