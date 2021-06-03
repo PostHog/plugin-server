@@ -431,7 +431,7 @@ export function createPostgresPool(
                   connectionString: configOrDatabaseUrl.DATABASE_URL,
               }
             : {
-                  database: configOrDatabaseUrl.POSTHOG_DB_NAME || undefined,
+                  database: configOrDatabaseUrl.POSTHOG_DB_NAME ?? undefined,
                   user: configOrDatabaseUrl.POSTHOG_DB_USER,
                   password: configOrDatabaseUrl.POSTHOG_DB_PASSWORD,
                   host: configOrDatabaseUrl.POSTHOG_POSTGRES_HOST,
