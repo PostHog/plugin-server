@@ -52,7 +52,7 @@ export class LazyPluginVM {
                     const isRetryError = error instanceof RetryError
                     status.warn('⚠️', error.message)
                     if (isRetryError && this.totalAttemptsToInitialize < 15) {
-                        const nextRetryMs = 2 ** this.totalAttemptsToInitialize * 100
+                        const nextRetryMs = 2 ** this.totalAttemptsToInitialize * 3000
                         status.warn(
                             '⚠️',
                             `Failed to load ${logInfo}. Retrying to initialize it in ${Math.round(
