@@ -1,21 +1,21 @@
 import { PluginAttachment } from '@posthog/plugin-scaffold'
 
 import { Hub, Plugin, PluginConfig, PluginConfigId, PluginId, PluginTaskType, TeamId } from '../../types'
-import { getPluginAttachmentRows, getPluginConfigRows, getPluginRows } from '../../utils/db/sql'
 import { status } from '../../utils/status'
-import { LazyPluginVM } from '../vm/lazy'
-import { loadPlugin } from './loadPlugin'
-import { teardownPlugins } from './teardown'
+import { loadPlugin } from '../../worker/plugins/loadPlugin'
+import { loadSchedule } from '../../worker/plugins/setup'
+import { teardownPlugins } from '../../worker/plugins/teardown'
+import { LazyPluginVM } from '../../worker/vm/lazy'
 
-export async function setupPlugin(hub: Hub, pluginId: Plugin['id'], pluginConfigId: PluginConfig['id']): Promise<void> {
-    // TODO: load one specific plugin
-    const { plugins, pluginConfigs, pluginConfigsPerTeam } = await loadPluginFromDB(hub)
+export async function setupPlugin(hub: Hub, pluginConfig: PluginConfig): Promise<void> {
+    const { plugins, pluginConfigs, pluginConfigsPerTeam } = await loadPluginFromDB(hub, pluginConfig)
     const pluginVMLoadPromises: Array<Promise<any>> = []
     for (const [id, pluginConfig] of pluginConfigs) {
         const plugin = plugins.get(pluginConfig.plugin_id)
         const prevConfig = hub.pluginConfigs.get(id)
         const prevPlugin = prevConfig ? hub.plugins.get(pluginConfig.plugin_id) : null
 
+        status.info('Setting up plugin: ', pluginConfig)
         if (
             prevConfig &&
             pluginConfig.updated_at === prevConfig.updated_at &&
@@ -45,15 +45,18 @@ export async function setupPlugin(hub: Hub, pluginId: Plugin['id'], pluginConfig
     void loadSchedule(hub)
 }
 
-async function loadPluginFromDB(server: Hub): Promise<Pick<Hub, 'plugins' | 'pluginConfigs' | 'pluginConfigsPerTeam'>> {
-    const pluginRows = await getPluginRows(server)
+async function loadPluginFromDB(
+    server: Hub,
+    pluginConfig: PluginConfig
+): Promise<Pick<Hub, 'plugins' | 'pluginConfigs' | 'pluginConfigsPerTeam'>> {
+    const plugin = await server.db.fetchPlugin(pluginConfig.plugin_id)
     const plugins = new Map<PluginId, Plugin>()
 
-    for (const row of pluginRows) {
-        plugins.set(row.id, row)
+    if (plugin) {
+        plugins.set(plugin.id, plugin)
     }
 
-    const pluginAttachmentRows = await getPluginAttachmentRows(server)
+    const pluginAttachmentRows = await server.db.fetchPluginAttachments(pluginConfig.id)
     const attachmentsPerConfig = new Map<TeamId, Record<string, PluginAttachment>>()
     for (const row of pluginAttachmentRows) {
         let attachments = attachmentsPerConfig.get(row.plugin_config_id!)
@@ -68,16 +71,13 @@ async function loadPluginFromDB(server: Hub): Promise<Pick<Hub, 'plugins' | 'plu
         }
     }
 
-    const pluginConfigRows = await getPluginConfigRows(server)
+    const row = await server.db.fetchPluginConfig(pluginConfig.id)
 
     const pluginConfigs = new Map<PluginConfigId, PluginConfig>()
     const pluginConfigsPerTeam = new Map<TeamId, PluginConfig[]>()
 
-    for (const row of pluginConfigRows) {
+    if (row) {
         const plugin = plugins.get(row.plugin_id)
-        if (!plugin) {
-            continue
-        }
         const pluginConfig: PluginConfig = {
             ...row,
             plugin: plugin,
@@ -88,7 +88,6 @@ async function loadPluginFromDB(server: Hub): Promise<Pick<Hub, 'plugins' | 'plu
 
         if (!row.team_id) {
             console.error(`🔴 PluginConfig(id=${row.id}) without team_id!`)
-            continue
         }
 
         let teamConfigs = pluginConfigsPerTeam.get(row.team_id)
@@ -100,29 +99,4 @@ async function loadPluginFromDB(server: Hub): Promise<Pick<Hub, 'plugins' | 'plu
     }
 
     return { plugins, pluginConfigs, pluginConfigsPerTeam }
-}
-
-export async function loadSchedule(server: Hub): Promise<void> {
-    server.pluginSchedule = null
-
-    // gather runEvery* tasks into a schedule
-    const pluginSchedule: Record<string, PluginConfigId[]> = { runEveryMinute: [], runEveryHour: [], runEveryDay: [] }
-
-    let count = 0
-
-    for (const [id, pluginConfig] of server.pluginConfigs) {
-        const tasks = (await pluginConfig.vm?.getTasks(PluginTaskType.Schedule)) ?? {}
-        for (const [taskName, task] of Object.entries(tasks)) {
-            if (task && taskName in pluginSchedule) {
-                pluginSchedule[taskName].push(id)
-                count++
-            }
-        }
-    }
-
-    if (count > 0) {
-        status.info('🔌', `Loaded ${count} scheduled tasks`)
-    }
-
-    server.pluginSchedule = pluginSchedule
 }

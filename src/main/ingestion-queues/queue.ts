@@ -7,6 +7,7 @@ import { status } from '../../utils/status'
 import { sanitizeEvent, UUIDT } from '../../utils/utils'
 import { CeleryQueue } from './celery-queue'
 import { ingestEvent } from './ingest-event'
+import { installPlugin } from './install-plugin'
 import { KafkaQueue } from './kafka-queue'
 
 export function pauseQueueIfWorkerFull(
@@ -22,6 +23,7 @@ export function pauseQueueIfWorkerFull(
 export async function startQueue(
     server: Hub,
     piscina: Piscina,
+    installPiscinaPool: Piscina,
     workerMethods: Partial<WorkerMethods> = {}
 ): Promise<Queue> {
     const mergedWorkerMethods = {
@@ -52,8 +54,8 @@ export async function startQueue(
         if (server.KAFKA_ENABLED) {
             return await startQueueKafka(server, piscina, mergedWorkerMethods)
         } else {
-            //  TODO: start redis for install plugin step, always
-            return startQueueRedis(server, piscina, mergedWorkerMethods)
+            //  TODO(nk): start redis for install plugin step, always
+            return startQueueRedis(server, piscina, installPiscinaPool, mergedWorkerMethods)
         }
     } catch (error) {
         status.error('💥', 'Failed to start event queue:\n', error)
@@ -61,7 +63,12 @@ export async function startQueue(
     }
 }
 
-function startQueueRedis(server: Hub, piscina: Piscina, workerMethods: WorkerMethods): Queue {
+function startQueueRedis(
+    server: Hub,
+    piscina: Piscina,
+    installPiscinaPool: Piscina,
+    workerMethods: WorkerMethods
+): Queue {
     const celeryQueue = new CeleryQueue(server.db, server.PLUGINS_CELERY_QUEUE)
 
     celeryQueue.register(
@@ -94,12 +101,22 @@ function startQueueRedis(server: Hub, piscina: Piscina, workerMethods: WorkerMet
         }
     )
 
+    status.info('registering install plugin task')
+    // same queue => consumed based on plugin events. Perhaps worth switching out to its own queue?
+    // Makes everything around this cleaner, too.
     celeryQueue.register(
         'posthog.tasks.test.install_plugin',
-        async (plugin_id: PluginId, team_id: number, plugin_installation_id: number) => {
+        async (plugin_id: PluginId, plugin_config_id: number, plugin_installation_id?: number) => {
             try {
-                const checkAndPause = () => pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
-                await installPlugin(server, piscina, plugin_id, team_id, plugin_installation_id, checkAndPause)
+                console.info('Received args: ', plugin_id, plugin_config_id)
+                const checkAndPause = () =>
+                    pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, installPiscinaPool)
+                return await installPlugin(
+                    server,
+                    installPiscinaPool,
+                    { plugin_id, plugin_config_id, plugin_installation_id },
+                    checkAndPause
+                )
             } catch (e) {
                 Sentry.captureException(e)
             }

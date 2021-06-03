@@ -11,6 +11,7 @@ if (isMainThread) {
                 Sentry.captureException(error)
                 console.error('⚠️', 'Piscina worker thread error:\n', error)
             })
+            console.log('🧵🧵 - building 2nd piscina pool')
             return piscina
         },
     }
@@ -19,6 +20,7 @@ if (isMainThread) {
         require('ts-node').register()
     }
 
+    console.log('🧵🧵 - building worker thread')
     const { createWorker } = require('./worker')
     const { workerData } = require('@posthog/piscina')
     module.exports = createWorker(workerData.serverConfig, threadId)

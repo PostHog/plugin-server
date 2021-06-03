@@ -23,6 +23,7 @@ import {
     Person,
     PersonDistinctId,
     Plugin,
+    PluginAttachmentDB,
     PluginConfig,
     PluginLogEntry,
     PluginLogEntrySource,
@@ -802,16 +803,26 @@ export class DB {
         return plugins[0]
     }
 
-    // public async fetchPluginConfig(id: PluginConfig['id']): Promise<PluginConfig | null> {
-    //     return await null
+    public async fetchPluginConfig(id: PluginConfig['id']): Promise<PluginConfig | null> {
+        const pluginconfigs: PluginConfig[] = (
+            await this.postgresQuery('SELECT * FROM posthog_pluginconfig WHERE id = $1', [id], 'fetchPluginConfig')
+        ).rows
 
-    //     // const pluginconfig: Plugin[] = (
-    //     //     await this.postgresQuery('SELECT * FROM posthog_plugin WHERE id = $1', [id], 'fetchPlugin')
-    //     // ).rows
+        if (!pluginconfigs.length) {
+            return null
+        }
+        return pluginconfigs[0]
+    }
 
-    //     // if (!plugins.length) {
-    //     //     return null
-    //     // }
-    //     // return plugins[0]
-    // }
+    public async fetchPluginAttachments(id: PluginConfig['id']): Promise<PluginAttachmentDB[]> {
+        const pluginattachments: PluginAttachmentDB[] = (
+            await this.postgresQuery(
+                'SELECT * FROM posthog_pluginattachment WHERE plugin_config_id = $1',
+                [id],
+                'fetchPluginAttachment'
+            )
+        ).rows
+
+        return pluginattachments
+    }
 }

@@ -6,6 +6,7 @@ import { processError } from '../utils/db/error'
 import { createHub } from '../utils/db/hub'
 import { status } from '../utils/status'
 import { cloneObject, pluginConfigIdFromStack } from '../utils/utils'
+import { teardownPlugins } from '../worker/plugins/teardown'
 import { setupPlugin } from './plugins/setup'
 import { workerTasks } from './tasks'
 
@@ -14,7 +15,7 @@ export type PiscinaTaskWorker = ({ task, args }: { task: string; args: any }) =>
 export async function createWorker(config: PluginsServerConfig, threadId: number): Promise<PiscinaTaskWorker> {
     initApp(config)
 
-    status.info('🧵', `Starting Piscina worker thread ${threadId}…`)
+    status.info('🧵🧵🧵', `Starting Install Piscina worker thread ${threadId}…`)
 
     const [hub, closeHub] = await createHub(config, threadId)
     // await setupPlugins(hub)
@@ -34,17 +35,24 @@ export const createTaskRunner = (hub: Hub): PiscinaTaskWorker => async ({ task, 
 
     Sentry.setContext('task', { task, args })
 
-    await setupPlugin(hub, args.pluginId, args.pluginConfigId)
-
     if (task in workerTasks) {
-        //TODO: add setup task here, which sets server.plugin*
+        //TODO(nk): add setup task here, which sets server.plugin*
         try {
+            status.info('Task and args: ', task, args)
+            await setupPlugin(hub, args.installConfig) // do custom setup before running the task
+
+            // TODO(nk): replace with setup from plugin when testing time comes
+            // for now, maybe include in setupPlugin?
+            // don't have to be lazy for install
+            await hub.pluginConfigs.get(args.installConfig.plugin_config_id)?.vm?.resolveInternalVm
             // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
             response = cloneObject(await workerTasks[task](hub, args))
         } catch (e) {
             status.info('🔔', e)
             Sentry.captureException(e)
             response = { error: e.message }
+        } finally {
+            await teardownPlugins(hub)
         }
     } else {
         response = { error: `Worker task "${task}" not found in: ${Object.keys(workerTasks).join(', ')}` }

@@ -1,6 +1,7 @@
 import { TaskQueue } from '@posthog/piscina/src/common'
 
 import { PluginsServerConfig } from '../types'
+import { status } from '../utils/status'
 
 // Copy From: node_modules/piscina/src/index.ts -- copied because it's not exported
 export interface PiscinaOptions {
@@ -30,14 +31,10 @@ export function createConfig(serverConfig: PluginsServerConfig, filename: string
         },
     }
 
-    if (serverConfig.WORKER_CONCURRENCY && serverConfig.WORKER_CONCURRENCY > 0) {
-        config.minThreads = serverConfig.WORKER_CONCURRENCY
-        config.maxThreads = serverConfig.WORKER_CONCURRENCY
-    }
+    status.info('Creating config for 2nd piscina pool', filename)
 
-    if (serverConfig.TASKS_PER_WORKER > 1) {
-        config.concurrentTasksPerWorker = serverConfig.TASKS_PER_WORKER
-    }
+    config.minThreads = 1
+    config.maxThreads = 1
 
     return config
 }
