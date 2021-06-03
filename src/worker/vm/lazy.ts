@@ -30,11 +30,14 @@ export class LazyPluginVM {
         this.totalAttemptsToInitialize++
         this.resolveInternalVm = new Promise((resolve) => {
             this.initialize = async (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo = '') => {
-                const createPluginLogEntry = async (message: string, error = false): Promise<void> => {
+                const createPluginLogEntry = async (
+                    message: string,
+                    logType = PluginLogEntryType.Info
+                ): Promise<void> => {
                     await hub.db.createPluginLogEntry(
                         pluginConfig,
                         PluginLogEntrySource.System,
-                        error ? PluginLogEntryType.Error : PluginLogEntryType.Info,
+                        logType,
                         message,
                         hub.instanceId
                     )
@@ -58,7 +61,7 @@ export class LazyPluginVM {
                         )
                         await createPluginLogEntry(
                             `Plugin failed to load but its initialization will be retried in ${nextRetryLogMessage} (instance ID ${hub.instanceId}).`,
-                            (error = true)
+                            PluginLogEntryType.Error
                         )
                         setTimeout(() => {
                             this.initVM()
@@ -74,9 +77,10 @@ export class LazyPluginVM {
                     const additionalContextOnFailure = isRetryError ? totalAttemptsToInitializeLogMessage : ''
                     await createPluginLogEntry(
                         `Plugin failed to load and was disabled (instance ID ${hub.instanceId}). ${additionalContextOnFailure}`,
-                        (error = true)
+                        PluginLogEntryType.Error
                     )
                     void disablePlugin(hub, pluginConfig.id)
+
                     void processError(hub, pluginConfig, error)
                     resolve(null)
                 }

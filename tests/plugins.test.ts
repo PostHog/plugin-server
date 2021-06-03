@@ -179,7 +179,7 @@ test('archive plugin with broken index.js does not do much', async () => {
     const returnedEvent = await runProcessEvent(hub, { ...event })
     expect(returnedEvent).toEqual(event)
 
-    expect(processError).toHaveBeenCalledWith(hub, pluginConfig, expect.any(SyntaxError))
+    expect(processError).toHaveBeenCalledWith(hub, pluginConfig, expect.any(Error))
     const error = mocked(processError).mock.calls[0][2]! as Error
     expect(error.message).toContain(': Unexpected token, expected ","')
 })
