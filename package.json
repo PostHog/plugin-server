@@ -76,6 +76,7 @@
         "posthog-js-lite": "^0.0.5",
         "pretty-bytes": "^5.6.0",
         "protobufjs": "^6.10.2",
+        "re2": "^1.16.0",
         "redlock": "^4.2.0",
         "snowflake-sdk": "^1.6.0",
         "tar-stream": "^2.1.4",

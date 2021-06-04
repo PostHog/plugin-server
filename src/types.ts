@@ -523,7 +523,7 @@ export interface ElementPropertyFilter extends PropertyFilterWithOperator {
 export interface CohortPropertyFilter extends PropertyFilterBase {
     type: 'cohort'
     key: 'id'
-    value: number
+    value: number | string
 }
 
 /** Sync with posthog/frontend/src/types.ts */

@@ -5,7 +5,7 @@ import { DateTime } from 'luxon'
 import { Hub, IngestEventResponse } from '../../types'
 import { timeoutGuard } from '../../utils/db/utils'
 import { status } from '../../utils/status'
-import { IEventX } from './process-event'
+import { IEventMatchable } from './process-event'
 
 export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestEventResponse> {
     const timeout = timeoutGuard('Still ingesting event inside worker. Timeout warning after 30 sec!', {
@@ -22,7 +22,7 @@ export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestE
             DateTime.fromISO(now),
             sent_at ? DateTime.fromISO(sent_at) : null,
             uuid! // it will throw if it's undefined
-        )) as IEventX
+        )) as IEventMatchable
         if (event.event !== '$snapshot' && result.id) {
             await hub.actionMatcher.match(event, result.id, result.elements)
         }

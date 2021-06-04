@@ -2,6 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold'
 import { Properties } from '@posthog/plugin-scaffold/src/types'
 import escapeStringRegexp from 'escape-string-regexp'
 import equal from 'fast-deep-equal'
+import RE2 from 're2'
 
 import {
     Action,
@@ -82,20 +83,11 @@ export class ActionMatcher {
      * The event is considered a match if no subcheck fails. Many subchecks are usually irrelevant and skipped.
      */
     private async checkStep(event: PluginEvent, elements: Element[], step: ActionStep): Promise<boolean> {
-        console.log(
-            'xxx',
-            this.checkStepElement(elements, step),
-            this.checkStepUrl(event, step),
-            this.checkStepEvent(event, step),
-            await this.checkStepFilters(event, elements, step),
-            event.event
-        )
         return (
             this.checkStepElement(elements, step) &&
             this.checkStepUrl(event, step) &&
             this.checkStepEvent(event, step) &&
             (await this.checkStepFilters(event, elements, step))
-            /* && this.checkStepName(event, step) – TODO: is ActionStep.name relevant at all??? */
         )
     }
 
@@ -112,24 +104,25 @@ export class ActionMatcher {
             if (!eventUrl || typeof eventUrl !== 'string') {
                 return false // URL IS UNKNOWN
             }
-            let isUrlOk: boolean
+            let doesUrlMatch: boolean
             switch (step.url_matching) {
                 case ActionStepUrlMatching.Contains:
                     // Simulating SQL LIKE behavior (_ = any single character, % = any zero or more characters)
-                    // TODO: reconcile syntax discrepancies between SQL and JS regex
                     const adjustedRegExpString = escapeStringRegexp(step.url).replace(/_/g, '.').replace(/%/g, '.*')
-                    isUrlOk = new RegExp(`.*${adjustedRegExpString}.*`).test(eventUrl)
+                    doesUrlMatch = new RegExp(`.*${adjustedRegExpString}.*`).test(eventUrl)
                     break
                 case ActionStepUrlMatching.Regex:
-                    isUrlOk = new RegExp(step.url).test(eventUrl)
+                    // Using RE2 here because that's what ClickHouse uses for regex matching anyway
+                    // It's also safer for user-provided patterns because of a few explicit limitations
+                    doesUrlMatch = new RE2(step.url).test(eventUrl)
                     break
                 case ActionStepUrlMatching.Exact:
-                    isUrlOk = step.url === eventUrl
+                    doesUrlMatch = step.url === eventUrl
                     break
                 default:
                     throw new Error(`Unrecognized ActionStep.url_matching value ${step.url_matching}!`)
             }
-            if (!isUrlOk) {
+            if (!doesUrlMatch) {
                 return false // URL IS A MISMATCH
             }
         }
@@ -145,19 +138,24 @@ export class ActionMatcher {
      */
     private checkStepElement(elements: Element[], step: ActionStep): boolean {
         // CHECK CONDITIONS, OTHERWISE SKIPPED
-        if (step.href || step.text || (step.href && elements.length)) {
-            return elements.some((element) => {
-                if (step.href && element.href !== step.href) {
-                    return false // ELEMENT HREF IS A MISMATCH
-                }
-                if (step.tag_name && element.tag_name !== step.tag_name) {
-                    return false // ELEMENT TAG NAME IS A MISMATCH
-                }
-                if (step.text && element.text !== step.text) {
-                    return false // ELEMENT TEXT IS A MISMATCH
-                }
-                return true
-            }) // AT LEAST ONE ELEMENT MUST BE A SUBMATCH
+        if (step.href || step.tag_name || step.text) {
+            if (
+                !elements.some((element) => {
+                    if (step.href && element.href !== step.href) {
+                        return false // ELEMENT HREF IS A MISMATCH
+                    }
+                    if (step.tag_name && element.tag_name !== step.tag_name) {
+                        return false // ELEMENT TAG NAME IS A MISMATCH
+                    }
+                    if (step.text && element.text !== step.text) {
+                        return false // ELEMENT TEXT IS A MISMATCH
+                    }
+                    return true
+                })
+            ) {
+                // AT LEAST ONE ELEMENT MUST BE A SUBMATCH
+                return false
+            }
         }
         if (step.selector && !this.checkElementsAgainstSelector(elements, step.selector)) {
             return false // SELECTOR IS A MISMATCH
@@ -206,16 +204,18 @@ export class ActionMatcher {
         elements: Element[],
         filter: PropertyFilter
     ): Promise<boolean> {
-        const person = await this.db.fetchPerson(event.team_id, event.distinct_id)
+        let person: Person | undefined
         switch (filter.type) {
             case 'event':
                 return this.checkEventAgainstEventFilter(event, filter)
             case 'person':
-                return this.checkEventAgainstPersonFilter(event, person, filter)
+                person = await this.db.fetchPerson(event.team_id, event.distinct_id)
+                return this.checkEventAgainstPersonFilter(person, filter)
             case 'element':
                 return this.checkEventAgainstElementFilter(elements, filter)
             case 'cohort':
-                return await this.checkEventAgainstCohortFilter(event, person, filter)
+                person = await this.db.fetchPerson(event.team_id, event.distinct_id)
+                return await this.checkEventAgainstCohortFilter(person, filter)
             default:
                 return false
         }
@@ -231,15 +231,11 @@ export class ActionMatcher {
     /**
      * Sublevel 4 of action matching.
      */
-    private checkEventAgainstPersonFilter(
-        event: PluginEvent,
-        person: Person | undefined,
-        filter: PersonPropertyFilter
-    ): boolean {
+    private checkEventAgainstPersonFilter(person: Person | undefined, filter: PersonPropertyFilter): boolean {
         if (!person?.properties) {
             return false
         }
-        return this.checkPropertiesAgainstFilter(person.properties, filter) // TODO: get person here for use instead of event
+        return this.checkPropertiesAgainstFilter(person.properties, filter)
     }
 
     /**
@@ -257,14 +253,20 @@ export class ActionMatcher {
      * Sublevel 4 of action matching.
      */
     private async checkEventAgainstCohortFilter(
-        event: PluginEvent,
         person: Person | undefined,
         filter: CohortPropertyFilter
     ): Promise<boolean> {
         if (!person?.properties) {
             return false
         }
-        return await this.db.doesPersonBelongToCohort(parseInt((filter.value as unknown) as any), person.id)
+        let cohortId = filter.value
+        if (typeof cohortId !== 'number') {
+            cohortId = parseInt(cohortId)
+        }
+        if (isNaN(cohortId)) {
+            throw new Error(`Can't match against invalid cohort ID value "${filter.value}!"`)
+        }
+        return await this.db.doesPersonBelongToCohort(Number(filter.value), person.id)
     }
 
     /**
@@ -306,12 +308,10 @@ export class ActionMatcher {
                     typeof possibleValue === 'string' && !foundValueLowerCase.includes(possibleValue.toLowerCase())
                 break
             case PropertyOperator.Regex:
-                test = (possibleValue) =>
-                    typeof possibleValue === 'string' && new RegExp(possibleValue).test(foundValue)
+                test = (possibleValue) => typeof possibleValue === 'string' && new RE2(possibleValue).test(foundValue)
                 break
             case PropertyOperator.NotRegex:
-                test = (possibleValue) =>
-                    typeof possibleValue === 'string' && !new RegExp(possibleValue).test(foundValue)
+                test = (possibleValue) => typeof possibleValue === 'string' && !new RE2(possibleValue).test(foundValue)
                 break
             case PropertyOperator.GreaterThan:
                 test = (possibleValue) => foundValue > possibleValue
@@ -397,19 +397,19 @@ export class ActionMatcher {
     }
 
     private checkElementAgainstSelectorPartRequirements(element: Element, requirements: Partial<Element>): boolean {
-        if (requirements['text'] && element.text !== requirements.text) {
+        if (requirements.text && element.text !== requirements.text) {
             return false
         }
-        if (requirements['tag_name'] && element.tag_name !== requirements.tag_name) {
+        if (requirements.tag_name && element.tag_name !== requirements.tag_name) {
             return false
         }
-        if (requirements['href'] && element.href !== requirements.href) {
+        if (requirements.href && element.href !== requirements.href) {
             return false
         }
-        if (requirements['attr_id'] && element.attr_id !== requirements.attr_id) {
+        if (requirements.attr_id && element.attr_id !== requirements.attr_id) {
             return false
         }
-        if (requirements['attr_class']) {
+        if (requirements.attr_class) {
             if (
                 !element.attr_class?.length ||
                 !requirements.attr_class.every((className) => element.attr_class!.includes(className))
@@ -417,13 +417,13 @@ export class ActionMatcher {
                 return false
             }
         }
-        if (requirements['nth_child'] && element.nth_child !== requirements.nth_child) {
+        if (requirements.nth_child && element.nth_child !== requirements.nth_child) {
             return false
         }
-        if (requirements['nth_of_type'] && element.nth_of_type !== requirements.nth_of_type) {
+        if (requirements.nth_of_type && element.nth_of_type !== requirements.nth_of_type) {
             return false
         }
-        if (requirements['attributes']) {
+        if (requirements.attributes) {
             const { attributes } = element
             if (!attributes) {
                 return false
@@ -451,7 +451,7 @@ class SelectorPart {
 
         const result = tag.match(SELECTOR_ATTRIBUTE_REGEX)
         if (result && tag.includes('[id=')) {
-            this.requirements['attr_id'] = result[3]
+            this.requirements.attr_id = result[3]
             tag = result[1]
         }
         if (result && tag.includes('[')) {
@@ -463,20 +463,20 @@ class SelectorPart {
         }
         if (tag.includes('nth-child(')) {
             const nthChildParts = tag.split(':nth-child(')
-            this.requirements['nth_child'] = parseInt(nthChildParts[1].replace(')', ''))
+            this.requirements.nth_child = parseInt(nthChildParts[1].replace(')', ''))
             tag = nthChildParts[0]
         }
         if (tag.includes('.')) {
             const classParts = tag.split('.')
             // Strip all slashes that are not followed by another slash
-            this.requirements['attr_class'] = classParts.slice(1)
+            this.requirements.attr_class = classParts.slice(1)
             if (escapeSlashes) {
-                this.requirements['attr_class'] = this.requirements['attr_class'].map(this.unescapeClassName.bind(this))
-            }
+                this.requirements.attr_class = this.requirements.attr_class.map(this.unescapeClassName.bind(this))
+            } // TODO: determine if we need escapeSlashes in this port
             tag = classParts[0]
         }
         if (tag) {
-            this.requirements['tag_name'] = tag
+            this.requirements.tag_name = tag
         }
     }
 

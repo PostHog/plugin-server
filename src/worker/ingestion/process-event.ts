@@ -26,7 +26,7 @@ import { castTimestampOrNow, extractElements, filterIncrementProperties, UUID, U
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
-export interface IEventX extends IEvent {
+export interface IEventMatchable extends IEvent {
     id?: number
     elements?: Element[]
 }
@@ -59,7 +59,7 @@ export class EventsProcessor {
         now: DateTime,
         sentAt: DateTime | null,
         eventUuid: string
-    ): Promise<IEventX | SessionRecordingEvent | PostgresSessionRecordingEvent> {
+    ): Promise<IEventMatchable | SessionRecordingEvent | PostgresSessionRecordingEvent> {
         if (!UUID.validateString(eventUuid, false)) {
             throw new Error(`Not a valid UUID: "${eventUuid}"`)
         }
@@ -92,7 +92,7 @@ export class EventsProcessor {
                 clearTimeout(timeout1)
             }
 
-            let result: IEventX | SessionRecordingEvent | PostgresSessionRecordingEvent
+            let result: IEventMatchable | SessionRecordingEvent | PostgresSessionRecordingEvent
 
             if (data['event'] === '$snapshot') {
                 const timeout2 = timeoutGuard(
@@ -433,14 +433,14 @@ export class EventsProcessor {
         timestamp?: DateTime | string,
         elements?: Element[],
         siteUrl?: string
-    ): Promise<IEventX> {
+    ): Promise<IEventMatchable> {
         const timestampString = castTimestampOrNow(
             timestamp,
             this.kafkaProducer ? TimestampFormat.ClickHouse : TimestampFormat.ISO
         )
         const elementsChain = elements && elements.length ? elementsToString(elements) : ''
 
-        const data: IEventX = {
+        const data: IEventMatchable = {
             uuid,
             event,
             properties: JSON.stringify(properties ?? {}),
