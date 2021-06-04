@@ -1,7 +1,13 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 
-import { Hub, PluginConfig, PluginTaskType } from '../../types'
+import { Hub, PluginConfig, PluginFunction, PluginTaskType, TeamId } from '../../types'
 import { processError } from '../../utils/db/error'
+import { statusReport } from '../../utils/status-report'
+
+function captureTimeSpentRunning(teamId: TeamId, timer: Date, func: PluginFunction): void {
+    const timeSpentRunning = new Date().getTime() - timer.getTime()
+    statusReport.addToTimeSpentRunningPlugins(teamId, timeSpentRunning, func)
+}
 
 export class IllegalOperationError extends Error {
     name = 'IllegalOperationError'
@@ -26,6 +32,7 @@ export async function runOnEvent(server: Hub, event: PluginEvent): Promise<void>
                     server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.on_event.ERROR`)
                 }
                 server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.on_event`, timer)
+                captureTimeSpentRunning(event.team_id, timer, 'onEvent')
             }
         })
     )
@@ -46,6 +53,7 @@ export async function runOnSnapshot(server: Hub, event: PluginEvent): Promise<vo
                     server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.on_event.ERROR`)
                 }
                 server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.on_event`, timer)
+                captureTimeSpentRunning(event.team_id, timer, 'onSnapshot')
             }
         })
     )
@@ -58,6 +66,7 @@ export async function runProcessEvent(server: Hub, event: PluginEvent): Promise<
 
     const pluginsSucceeded = []
     const pluginsFailed = []
+    const pluginsDeferred = []
     for (const pluginConfig of pluginsToRun) {
         const processEvent = await pluginConfig.vm?.getProcessEvent()
 
@@ -80,87 +89,30 @@ export async function runProcessEvent(server: Hub, event: PluginEvent): Promise<
                 plugin: pluginConfig.plugin?.name ?? '?',
                 teamId: teamId.toString(),
             })
+            captureTimeSpentRunning(event.team_id, timer, 'processEvent')
 
             if (!returnedEvent) {
                 return null
             }
         }
+
+        const onEvent = await pluginConfig.vm?.getOnEvent()
+        const onSnapshot = await pluginConfig.vm?.getOnSnapshot()
+        if (onEvent || onSnapshot) {
+            pluginsDeferred.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
+        }
     }
 
-    if (pluginsSucceeded.length > 0 || pluginsFailed.length > 0) {
+    if (pluginsSucceeded.length > 0 || pluginsFailed.length > 0 || pluginsDeferred.length > 0) {
         event.properties = {
             ...event.properties,
             $plugins_succeeded: pluginsSucceeded,
             $plugins_failed: pluginsFailed,
+            $plugins_deferred: pluginsDeferred,
         }
     }
 
     return returnedEvent
-}
-
-export async function runProcessEventBatch(server: Hub, batch: PluginEvent[]): Promise<PluginEvent[]> {
-    const eventsByTeam = new Map<number, PluginEvent[]>()
-
-    for (const event of batch) {
-        if (eventsByTeam.has(event.team_id)) {
-            eventsByTeam.get(event.team_id)!.push(event)
-        } else {
-            eventsByTeam.set(event.team_id, [event])
-        }
-    }
-
-    let allReturnedEvents: PluginEvent[] = []
-
-    for (const [teamId, teamEvents] of eventsByTeam.entries()) {
-        const pluginsToRun = getPluginsForTeam(server, teamId)
-
-        let returnedEvents: PluginEvent[] = teamEvents
-        const pluginsSucceeded = []
-        const pluginsFailed = []
-        for (const pluginConfig of pluginsToRun) {
-            const timer = new Date()
-            const processEventBatch = await pluginConfig.vm?.getProcessEventBatch()
-            if (processEventBatch && returnedEvents.length > 0) {
-                try {
-                    returnedEvents = (await processEventBatch(returnedEvents)) || []
-                    let wasChangedTeamIdFound = false
-                    for (const returnedEvent of returnedEvents) {
-                        if (returnedEvent.team_id != teamId) {
-                            returnedEvent.team_id = teamId
-                            wasChangedTeamIdFound = true
-                        }
-                    }
-                    if (wasChangedTeamIdFound) {
-                        throw new IllegalOperationError('Plugin tried to change event.team_id')
-                    }
-                    pluginsSucceeded.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
-                } catch (error) {
-                    await processError(server, pluginConfig, error, returnedEvents[0])
-                    server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.process_event_batch.ERROR`)
-                    pluginsFailed.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
-                }
-                server.statsd?.timing(`plugin.${pluginConfig.plugin?.name}.process_event_batch`, timer)
-                server.statsd?.timing('plugin.process_event_batch', timer, {
-                    plugin: pluginConfig.plugin?.name ?? '?',
-                    teamId: teamId.toString(),
-                })
-            }
-        }
-
-        for (const event of returnedEvents) {
-            if (event && (pluginsSucceeded.length > 0 || pluginsFailed.length > 0)) {
-                event.properties = {
-                    ...event.properties,
-                    $plugins_succeeded: pluginsSucceeded,
-                    $plugins_failed: pluginsFailed,
-                }
-            }
-        }
-
-        allReturnedEvents = allReturnedEvents.concat(returnedEvents)
-    }
-
-    return allReturnedEvents.filter(Boolean)
 }
 
 export async function runPluginTask(
@@ -185,7 +137,7 @@ export async function runPluginTask(
         await processError(server, pluginConfig || null, error)
         server.statsd?.increment(`plugin.task.${taskType}.${taskName}.${pluginConfigId}.ERROR`)
     }
-    server.statsd?.timing(`plugin.task.${taskType}.${taskName}.${pluginConfigId}`, timer)
+    captureTimeSpentRunning(pluginConfig?.team_id || 0, timer, 'pluginTask')
     return response
 }
 
