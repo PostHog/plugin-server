@@ -37,10 +37,6 @@ export class ActionManager {
         const refetchedAction = await this.db.fetchAction(actionId)
 
         let wasCachedAlready = true
-        if (!this.actionCache) {
-            wasCachedAlready = false
-            this.actionCache = {}
-        }
         if (!this.actionCache[teamId]) {
             wasCachedAlready = false
             this.actionCache[teamId] = {}
