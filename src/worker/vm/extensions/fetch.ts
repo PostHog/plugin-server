@@ -1,7 +1,7 @@
 import dns from 'dns'
 import ipRangeCheck from 'ip-range-check'
 import net from 'net'
-import nodeFetch, { HeaderInit,RequestInit, Response } from 'node-fetch'
+import nodeFetch, { HeaderInit, RequestInit, Response } from 'node-fetch'
 import url from 'url'
 
 import { IllegalOperationError } from '../../plugins/run'
