@@ -100,7 +100,7 @@ export class LazyPluginVM {
 
         if (methods) {
             for (const [key, value] of Object.entries(methods)) {
-                if (value) {
+                if (typeof value !== 'undefined') {
                     capabilities.methods.push(key)
                 }
             }
@@ -108,7 +108,7 @@ export class LazyPluginVM {
 
         if (tasks?.schedule) {
             for (const [key, value] of Object.entries(tasks.schedule)) {
-                if (value) {
+                if (typeof value !== 'undefined') {
                     capabilities.scheduled_tasks.push(key)
                 }
             }
@@ -116,7 +116,7 @@ export class LazyPluginVM {
 
         if (tasks?.job) {
             for (const [key, value] of Object.entries(tasks.job)) {
-                if (value) {
+                if (typeof value !== 'undefined') {
                     capabilities.jobs.push(key)
                 }
             }
