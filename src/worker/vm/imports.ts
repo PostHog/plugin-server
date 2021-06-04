@@ -6,6 +6,7 @@ import crypto from 'crypto'
 import * as genericPool from 'generic-pool'
 import pg from 'pg'
 import snowflake from 'snowflake-sdk'
+import * as url from 'url'
 import * as zlib from 'zlib'
 
 import { fetch } from './extensions/fetch'
@@ -13,6 +14,7 @@ import { writeToFile } from './extensions/test-utils'
 
 export const imports = {
     crypto: crypto,
+    url: url,
     zlib: zlib,
     'generic-pool': genericPool,
     'node-fetch': fetch,
