@@ -118,8 +118,6 @@ jobs:
                   echo "⏳ Waiting 10 seconds to see if it runs"
                   sleep 10
 
-                  cat tmp/plugin-server.log
-
                   echo "🤔 Checking if it's still running, as it should be"
                   if ! kill $pid > /dev/null 2>&1; then
                       echo "😵 It was not running!"
