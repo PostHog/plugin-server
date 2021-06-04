@@ -1530,7 +1530,14 @@ export const createProcessEventTests = (
 
         const [person] = await hub.db.fetchPersons()
         expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
-        expect(person.properties).toEqual({ key1: 'value1', key2: 'value2', key3: 'value4', key1_once: 'value1', key2_once: 'value2', key3_once: 'value4' })
+        expect(person.properties).toEqual({
+            key1: 'value1',
+            key2: 'value2',
+            key3: 'value4',
+            key1_once: 'value1',
+            key2_once: 'value2',
+            key3_once: 'value4',
+        })
     })
 
     test('$increment increments numerical user properties or creates a new one', async () => {
