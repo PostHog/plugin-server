@@ -1,6 +1,7 @@
 import Piscina from '@posthog/piscina'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
+import { resourceLimits } from 'worker_threads'
 
 import { Hub, Queue, WorkerMethods } from '../../types'
 import { status } from '../../utils/status'
