@@ -23,6 +23,19 @@ Let's get you developing the plugin server in no time:
 
 1. Run Postgres pipeline tests with `yarn test:postgres:{1,2}`. Run ClickHouse pipeline tests with `yarn test:clickhouse:{1,2}`. Run benchmarks with `yarn benchmark`.
 
+## Alternative modes
+
+This program's main mode of operation is processing PostHog events, but there are also a few alternative utility ones.
+Each one does a single thing. They are listed in the table below, in order of precedence.
+
+| Name        | Description                                                | CLI flags         |
+| ----------- | ---------------------------------------------------------- | ----------------- |
+| Help        | Show plugin server [configuration options](#configuration) | `-h`, `--help`    |
+| Version     | Only show currently running plugin server version          | `-v`, `--version` |
+| Healthcheck | Check plugin server health and exit with 0 or 1            | `--healthcheck`   |
+| Migrate     | Migrate Graphile job queue                                 | `--migrate`       |
+| Idle        | Start server in a completely idle, non-processing mode     | `--idle`          |
+
 ## Configuration
 
 There's a multitude of settings you can use to control the plugin server. Use them as environment variables.
@@ -55,7 +68,7 @@ There's a multitude of settings you can use to control the plugin server. Use th
 | KAFKA_PRODUCER_MAX_QUEUE_SIZE | Kafka producer batch max size before flushing                     | `20`                                  |
 | KAFKA_FLUSH_FREQUENCY_MS      | Kafka producer batch max duration before flushing                 | `500`                                 |
 | KAFKA_MAX_MESSAGE_BATCH_SIZE  | Kafka producer batch max size in bytes before flushing            | `900000`                              |
-| LOG_LEVEL                     | minimum log level                                                 | `LogLevel.Info`                       |
+| LOG_LEVEL                     | minimum log level                                                 | `'info'`                              |
 | SENTRY_DSN                    | Sentry ingestion URL                                              | `null`                                |
 | STATSD_HOST                   | StatsD host - integration disabled if this is not provided        | `null`                                |
 | STATSD_PORT                   | StatsD port                                                       | `8125`                                |
