@@ -10,7 +10,7 @@ import { killProcess } from '../src/utils/kill'
 import { delay } from '../src/utils/utils'
 import { makePiscina } from '../src/worker/piscina'
 import { createPosthog, DummyPostHog } from '../src/worker/vm/extensions/posthog'
-import { imports } from '../src/worker/vm/imports'
+import { writeToFile } from '../src/worker/vm/extensions/test-utils'
 import { resetGraphileSchema } from './helpers/graphile'
 import { pluginConfig39 } from './helpers/plugins'
 import { resetTestDatabase } from './helpers/sql'
@@ -35,7 +35,7 @@ jest.mock('../src/utils/db/sql')
 jest.mock('../src/utils/kill')
 jest.setTimeout(60000) // 60 sec timeout
 
-const { console: testConsole } = imports['test-utils/write-to-file']
+const { console: testConsole } = writeToFile
 
 const testCode = `
     import { console } from 'test-utils/write-to-file'
@@ -150,6 +150,30 @@ describe('job queues', () => {
                 posthog.capture('my event', { type: 'runIn' })
                 await waitForLogEntries(2)
                 expect(testConsole.read()).toEqual([['processEvent'], ['reply', 'runIn']])
+            })
+
+            test('polls for jobs in future', async () => {
+                const DELAY = 3000 // 3s
+
+                // return something to be picked up after a few loops (poll interval is 100ms)
+                const now = Date.now()
+
+                const job: EnqueuedJob = {
+                    type: 'pluginJob',
+                    payload: { key: 'value' },
+                    timestamp: now + DELAY,
+                    pluginConfigId: 2,
+                    pluginConfigTeam: 3,
+                }
+
+                server.hub.jobQueueManager.enqueue(job)
+                const consumedJob: EnqueuedJob = await new Promise((resolve, reject) => {
+                    server.hub.jobQueueManager.startConsumer((consumedJob) => {
+                        resolve(consumedJob[0])
+                    })
+                })
+
+                expect(consumedJob).toEqual(job)
             })
         })
 
@@ -282,6 +306,45 @@ describe('job queues', () => {
             expect(mS3WrapperInstance.deleteObject).toBeCalledWith({
                 Bucket: 'bucket-name',
                 Key: `prefix/2020-01-01/20200101-123456.123Z-deadbeef.json.gz`,
+            })
+        })
+
+        test('polls for new jobs', async () => {
+            const DELAY = 10000 // 10s
+            // calls the right functions to read the enqueued job
+            mS3WrapperInstance.mockClear()
+
+            // return something to be picked up after a few loops (poll interval is 5s)
+            const now = Date.now()
+            const date = new Date(now + DELAY).toISOString()
+            const [day, time] = date.split('T')
+            const dayTime = `${day.split('-').join('')}-${time.split(':').join('')}`
+
+            const job: EnqueuedJob = {
+                type: 'pluginJob',
+                payload: { key: 'value' },
+                timestamp: now,
+                pluginConfigId: 2,
+                pluginConfigTeam: 3,
+            }
+
+            mS3WrapperInstance.listObjectsV2.mockReturnValue({
+                Contents: [{ Key: `prefix/${day}/${dayTime}-deadbeef.json.gz` }],
+            })
+            mS3WrapperInstance.getObject.mockReturnValueOnce({
+                Body: gzipSync(Buffer.from(JSON.stringify(job), 'utf8')),
+            })
+
+            const consumedJob: EnqueuedJob = await new Promise((resolve, reject) => {
+                hub.jobQueueManager.startConsumer((consumedJob) => {
+                    resolve(consumedJob[0])
+                })
+            })
+            expect(consumedJob).toEqual(job)
+            await delay(10)
+            expect(mS3WrapperInstance.deleteObject).toBeCalledWith({
+                Bucket: 'bucket-name',
+                Key: `prefix/${day}/${dayTime}-deadbeef.json.gz`,
             })
         })
     })
