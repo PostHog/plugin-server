@@ -118,37 +118,37 @@ describe('LazyPluginVM', () => {
             // plugin setup is retried 15 times with exponential backoff
             expect((status.warn as any).mock.calls).toEqual([
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 6s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 3 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 12s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 6 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 24s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 12 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 48s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 24 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 96s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 48 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 192s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 96 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 384s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 192 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 768s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 384 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 1536s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 768 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 3072s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 1536 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 6144s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 3072 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 12288s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 6144 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 24576s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 12288 s.'],
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 49152s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 24576 s.'],
                 ['⚠️', 'I failed, please retry me!'],
                 [
                     '⚠️',
-                    'Failed to load failure plugin. The server tried to initialize it 15 times before disabling it.',
+                    'Failed to load failure plugin. Disabling it due to too many retries – tried to load it 15 times before giving up.',
                 ],
             ])
 
@@ -168,7 +168,7 @@ describe('LazyPluginVM', () => {
             // retry mechanism is called based on the error
             expect((status.warn as any).mock.calls).toEqual([
                 ['⚠️', 'I failed, please retry me!'],
-                ['⚠️', 'Failed to load failure plugin. Retrying to initialize it in 6s.'],
+                ['⚠️', 'Failed to load failure plugin. Retrying in 3 s.'],
             ])
 
             // do not fail on the second try

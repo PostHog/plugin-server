@@ -25,17 +25,51 @@ export class LazyPluginVM {
     initialize?: (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo: string) => Promise<void>
     failInitialization?: () => void
     resolveInternalVm!: Promise<PluginConfigVMResponse | null>
-    totalAttemptsToInitialize: number
-    retryTimeout: NodeJS.Timeout | null
+    totalInitAttemptsCounter: number
+    initRetryTimeout: NodeJS.Timeout | null
 
     constructor() {
-        this.totalAttemptsToInitialize = 0
-        this.retryTimeout = null
+        this.totalInitAttemptsCounter = 0
+        this.initRetryTimeout = null
         this.initVm()
     }
 
+    public async getExportEvents(): Promise<PluginConfigVMResponse['methods']['exportEvents'] | null> {
+        return (await this.resolveInternalVm)?.methods.exportEvents || null
+    }
+
+    public async getOnEvent(): Promise<PluginConfigVMResponse['methods']['onEvent'] | null> {
+        return (await this.resolveInternalVm)?.methods.onEvent || null
+    }
+
+    public async getOnSnapshot(): Promise<PluginConfigVMResponse['methods']['onSnapshot'] | null> {
+        return (await this.resolveInternalVm)?.methods.onSnapshot || null
+    }
+
+    public async getProcessEvent(): Promise<PluginConfigVMResponse['methods']['processEvent'] | null> {
+        return (await this.resolveInternalVm)?.methods.processEvent || null
+    }
+
+    public async getTeardownPlugin(): Promise<PluginConfigVMResponse['methods']['teardownPlugin'] | null> {
+        return (await this.resolveInternalVm)?.methods.teardownPlugin || null
+    }
+
+    public async getTask(name: string, type: PluginTaskType): Promise<PluginTask | null> {
+        return (await this.resolveInternalVm)?.tasks?.[type]?.[name] || null
+    }
+
+    public async getTasks(type: PluginTaskType): Promise<Record<string, PluginTask>> {
+        return (await this.resolveInternalVm)?.tasks?.[type] || {}
+    }
+
+    public clearRetryTimeoutIfExists() {
+        if (this.initRetryTimeout) {
+            clearTimeout(this.initRetryTimeout)
+        }
+    }
+
     private initVm() {
-        this.totalAttemptsToInitialize++
+        this.totalInitAttemptsCounter++
         this.resolveInternalVm = new Promise((resolve) => {
             this.initialize = async (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo = '') => {
                 const createPluginLogEntry = async (
@@ -60,79 +94,42 @@ export class LazyPluginVM {
                 } catch (error) {
                     const isRetryError = error instanceof RetryError
                     status.warn('⚠️', error.message)
-                    if (isRetryError && this.totalAttemptsToInitialize < MAX_SETUP_RETRIES) {
+                    if (isRetryError && this.totalInitAttemptsCounter < MAX_SETUP_RETRIES) {
                         const nextRetryMs =
-                            INITIALIZATION_RETRY_MULTIPLIER ** this.totalAttemptsToInitialize *
+                            INITIALIZATION_RETRY_MULTIPLIER ** (this.totalInitAttemptsCounter - 1) *
                             INITIALIZATION_RETRY_BASE_MS
-                        const nextRetrySeconds = `${Math.round(nextRetryMs / 1000)}s`
-                        status.warn(
-                            '⚠️',
-                            `Failed to load ${logInfo}. Retrying to initialize it in ${nextRetrySeconds}.`
-                        )
+                        const nextRetrySeconds = `${nextRetryMs / 1000} s`
+                        status.warn('⚠️', `Failed to load ${logInfo}. Retrying in ${nextRetrySeconds}.`)
                         await createPluginLogEntry(
-                            `Plugin failed to load but its initialization will be retried in ${nextRetrySeconds} (instance ID ${hub.instanceId}).`,
+                            `Plugin failed to load (instance ID ${hub.instanceId}). Retrying in ${nextRetrySeconds}.`,
                             PluginLogEntryType.Error
                         )
-                        this.retryTimeout = setTimeout(() => {
+                        this.initRetryTimeout = setTimeout(() => {
                             this.initVm()
                             void this.initialize?.(hub, pluginConfig, indexJs, logInfo)
                         }, nextRetryMs)
                         resolve(null)
-                        return
+                    } else {
+                        const failureContextMessage = isRetryError
+                            ? `Disabling it due to too many retries – tried to load it ${
+                                  this.totalInitAttemptsCounter
+                              } time${this.totalInitAttemptsCounter > 1 ? 's' : ''} before giving up.`
+                            : 'Disabled it.'
+                        status.warn('⚠️', `Failed to load ${logInfo}. ${failureContextMessage}`)
+                        await createPluginLogEntry(
+                            `Plugin failed to load (instance ID ${hub.instanceId}). ${failureContextMessage}`,
+                            PluginLogEntryType.Error
+                        )
+                        void disablePlugin(hub, pluginConfig.id)
+                        void processError(hub, pluginConfig, error)
+                        resolve(null)
                     }
-                    const totalAttemptsToInitializeLogMessage = `The server tried to initialize it ${
-                        this.totalAttemptsToInitialize
-                    } time${this.totalAttemptsToInitialize > 1 ? 's' : ''} before disabling it.`
-                    status.warn('⚠️', `Failed to load ${logInfo}. ${totalAttemptsToInitializeLogMessage}`)
-                    const additionalContextOnFailure = isRetryError ? totalAttemptsToInitializeLogMessage : ''
-                    await createPluginLogEntry(
-                        `Plugin failed to load and was disabled (instance ID ${hub.instanceId}). ${additionalContextOnFailure}`,
-                        PluginLogEntryType.Error
-                    )
-                    void disablePlugin(hub, pluginConfig.id)
-
-                    void processError(hub, pluginConfig, error)
-                    resolve(null)
                 }
             }
             this.failInitialization = () => {
                 resolve(null)
             }
         })
-    }
-
-    async getExportEvents(): Promise<PluginConfigVMResponse['methods']['exportEvents'] | null> {
-        return (await this.resolveInternalVm)?.methods.exportEvents || null
-    }
-
-    async getOnEvent(): Promise<PluginConfigVMResponse['methods']['onEvent'] | null> {
-        return (await this.resolveInternalVm)?.methods.onEvent || null
-    }
-
-    async getOnSnapshot(): Promise<PluginConfigVMResponse['methods']['onSnapshot'] | null> {
-        return (await this.resolveInternalVm)?.methods.onSnapshot || null
-    }
-
-    async getProcessEvent(): Promise<PluginConfigVMResponse['methods']['processEvent'] | null> {
-        return (await this.resolveInternalVm)?.methods.processEvent || null
-    }
-
-    async getTeardownPlugin(): Promise<PluginConfigVMResponse['methods']['teardownPlugin'] | null> {
-        return (await this.resolveInternalVm)?.methods.teardownPlugin || null
-    }
-
-    async getTask(name: string, type: PluginTaskType): Promise<PluginTask | null> {
-        return (await this.resolveInternalVm)?.tasks?.[type]?.[name] || null
-    }
-
-    async getTasks(type: PluginTaskType): Promise<Record<string, PluginTask>> {
-        return (await this.resolveInternalVm)?.tasks?.[type] || {}
-    }
-
-    clearRetryTimeoutIfExists() {
-        if (this.retryTimeout) {
-            clearTimeout(this.retryTimeout)
-        }
     }
 
     private async inferPluginCapabilities(
