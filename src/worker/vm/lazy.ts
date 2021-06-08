@@ -62,7 +62,7 @@ export class LazyPluginVM {
                     status.warn('⚠️', error.message)
                     if (isRetryError && this.totalAttemptsToInitialize < MAX_SETUP_RETRIES) {
                         const nextRetryMs =
-                            INITIALIZATION_RETRY_MULTIPLIER ** (this.totalAttemptsToInitialize - 1) *
+                            INITIALIZATION_RETRY_MULTIPLIER ** this.totalAttemptsToInitialize *
                             INITIALIZATION_RETRY_BASE_MS
                         const nextRetrySeconds = `${Math.round(nextRetryMs / 1000)}s`
                         status.warn(
