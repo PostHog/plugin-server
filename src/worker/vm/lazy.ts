@@ -9,6 +9,7 @@ import {
     PluginLogEntryType,
     PluginTask,
     PluginTaskType,
+    VMMethods,
 } from '../../types'
 import { clearError, processError } from '../../utils/db/error'
 import { disablePlugin, setPluginCapabilities } from '../../utils/db/sql'
@@ -100,7 +101,7 @@ export class LazyPluginVM {
 
         if (methods) {
             for (const [key, value] of Object.entries(methods)) {
-                if (typeof value !== 'undefined') {
+                if (value as VMMethods[keyof VMMethods] | undefined) {
                     capabilities.methods.push(key)
                 }
             }
@@ -108,7 +109,7 @@ export class LazyPluginVM {
 
         if (tasks?.schedule) {
             for (const [key, value] of Object.entries(tasks.schedule)) {
-                if (typeof value !== 'undefined') {
+                if (value) {
                     capabilities.scheduled_tasks.push(key)
                 }
             }
@@ -116,7 +117,7 @@ export class LazyPluginVM {
 
         if (tasks?.job) {
             for (const [key, value] of Object.entries(tasks.job)) {
-                if (typeof value !== 'undefined') {
+                if (value) {
                     capabilities.jobs.push(key)
                 }
             }
