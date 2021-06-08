@@ -16,18 +16,25 @@ import { clearError, processError } from '../../utils/db/error'
 import { disablePlugin, setPluginCapabilities } from '../../utils/db/sql'
 import { status } from '../../utils/status'
 import { createPluginConfigVM } from './vm'
+
+const MAX_SETUP_RETRIES = 15
+const INITIALIZATION_RETRY_MULTIPLIER = 2
+const INITIALIZATION_RETRY_BASE_MS = 3000
+
 export class LazyPluginVM {
     initialize?: (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo: string) => Promise<void>
     failInitialization?: () => void
     resolveInternalVm!: Promise<PluginConfigVMResponse | null>
     totalAttemptsToInitialize: number
+    retryTimeout: NodeJS.Timeout | null
 
     constructor() {
         this.totalAttemptsToInitialize = 0
-        this.initVM()
+        this.retryTimeout = null
+        this.initVm()
     }
 
-    private initVM() {
+    private initVm() {
         this.totalAttemptsToInitialize++
         this.resolveInternalVm = new Promise((resolve) => {
             this.initialize = async (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo = '') => {
@@ -53,8 +60,10 @@ export class LazyPluginVM {
                 } catch (error) {
                     const isRetryError = error instanceof RetryError
                     status.warn('⚠️', error.message)
-                    if (isRetryError && this.totalAttemptsToInitialize < 15) {
-                        const nextRetryMs = 2 ** this.totalAttemptsToInitialize * 3000
+                    if (isRetryError && this.totalAttemptsToInitialize < MAX_SETUP_RETRIES) {
+                        const nextRetryMs =
+                            INITIALIZATION_RETRY_MULTIPLIER ** (this.totalAttemptsToInitialize - 1) *
+                            INITIALIZATION_RETRY_BASE_MS
                         const nextRetrySeconds = `${Math.round(nextRetryMs / 1000)}s`
                         status.warn(
                             '⚠️',
@@ -64,8 +73,8 @@ export class LazyPluginVM {
                             `Plugin failed to load but its initialization will be retried in ${nextRetrySeconds} (instance ID ${hub.instanceId}).`,
                             PluginLogEntryType.Error
                         )
-                        setTimeout(() => {
-                            this.initVM()
+                        this.retryTimeout = setTimeout(() => {
+                            this.initVm()
                             void this.initialize?.(hub, pluginConfig, indexJs, logInfo)
                         }, nextRetryMs)
                         resolve(null)
@@ -118,6 +127,12 @@ export class LazyPluginVM {
 
     async getTasks(type: PluginTaskType): Promise<Record<string, PluginTask>> {
         return (await this.resolveInternalVm)?.tasks?.[type] || {}
+    }
+
+    clearRetryTimeoutIfExists() {
+        if (this.retryTimeout) {
+            clearTimeout(this.retryTimeout)
+        }
     }
 
     private async inferPluginCapabilities(
