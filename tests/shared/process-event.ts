@@ -18,7 +18,7 @@ import { createHub } from '../../src/utils/db/hub'
 import { hashElements } from '../../src/utils/db/utils'
 import { posthog } from '../../src/utils/posthog'
 import { delay, UUIDT } from '../../src/utils/utils'
-import { EventsProcessor } from '../../src/worker/ingestion/process-event'
+import { EventProcessingResult, EventsProcessor } from '../../src/worker/ingestion/process-event'
 import { createUserTeamAndOrganization, getFirstTeam, getTeams, onQuery, resetTestDatabase } from '../helpers/sql'
 
 jest.setTimeout(600000) // 600 sec timeout.
@@ -100,7 +100,7 @@ export const createProcessEventTests = (
         now: DateTime,
         sentAt: DateTime | null,
         eventUuid: string
-    ): Promise<IEvent | SessionRecordingEvent> {
+    ): Promise<EventProcessingResult | void> {
         const response = await eventsProcessor.processEvent(
             distinctId,
             ip,
@@ -245,9 +245,9 @@ export const createProcessEventTests = (
         )
 
         if (database === 'clickhouse') {
-            expect(queryCounter).toBe(11 + 14 /* event & prop definitions */)
+            expect(queryCounter).toBe(12 + 14 /* event & prop definitions */)
         } else if (database === 'postgresql') {
-            expect(queryCounter).toBe(15 + 14 /* event & prop definitions */)
+            expect(queryCounter).toBe(16 + 14 /* event & prop definitions */)
         }
 
         let persons = await hub.db.fetchPersons()
