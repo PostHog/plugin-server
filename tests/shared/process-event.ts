@@ -1676,24 +1676,5 @@ export const createProcessEventTests = (
         expect(person.properties).toEqual({ a: 1, b: 2, c: 3, d: 4 })
     })
 
-    test('distinct_id wrong type (number)', async () => {
-        await createPerson(hub, team, ['asdfasdfasdf'])
-        await processEvent(
-            (12345 as unknown) as string, // A number sneaked in! Should be treated as string
-            null,
-            '',
-            ({
-                event: '$pageview',
-                properties: { distinct_id: 'asdfasdfasdf', token: team.api_token },
-            } as any) as PluginEvent,
-            team.id,
-            now,
-            now,
-            new UUIDT().toString()
-        )
-        const [event] = await hub.db.fetchEvents()
-        expect(event.distinct_id).toEqual('12345')
-    })
-
     return returned
 }
