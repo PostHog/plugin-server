@@ -61,14 +61,15 @@ describe('ActionMatcher', () => {
 
     /** Return a test event created on a common base using provided property overrides. */
     function createTestEvent(overrides: Partial<PluginEvent> = {}): PluginEvent {
+        const url: string = overrides.properties?.$current_url ?? 'http://example.com/foo/'
         return {
             distinct_id: 'my_id',
             ip: '127.0.0.1',
-            site_url: 'http://localhost',
+            site_url: url,
             team_id: 2,
             now: new Date().toISOString(),
             event: '$pageview',
-            properties: { $current_url: 'https://example.com/1foo/' },
+            properties: { $current_url: url },
             ...overrides,
         }
     }
@@ -202,6 +203,43 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(eventExampleOk)).toEqual([actionDefinition])
             expect(await actionMatcher.match(eventExampleBad1)).toEqual([])
             expect(await actionMatcher.match(eventExampleBad2)).toEqual([])
+        })
+
+        it('returns a match in case of exact event name AND URL contains', async () => {
+            const actionDefinition: Action = await createTestAction([
+                {
+                    event: 'meow',
+                    url_matching: ActionStepUrlMatching.Contains,
+                    url: 'pets.com/',
+                },
+            ])
+
+            const eventExampleOk1: PluginEvent = createTestEvent({
+                event: 'meow',
+                properties: { $current_url: 'http://www.pets.com/' },
+            })
+            const eventExampleOk2: PluginEvent = createTestEvent({
+                event: 'meow',
+                properties: { $current_url: 'https://pets.com/food' },
+            })
+            const eventExampleBad1: PluginEvent = createTestEvent({
+                event: '$meow',
+                properties: { $current_url: 'https://xyz.pets.com/' },
+            })
+            const eventExampleBad2: PluginEvent = createTestEvent({
+                event: 'meow',
+                properties: { $current_url: 'https://www.pets.com.de/' },
+            })
+            const eventExampleBad3: PluginEvent = createTestEvent({
+                event: 'meow',
+                properties: { $current_url: 'https://www.pets.co' },
+            })
+
+            expect(await actionMatcher.match(eventExampleOk1)).toEqual([actionDefinition])
+            expect(await actionMatcher.match(eventExampleOk2)).toEqual([actionDefinition])
+            expect(await actionMatcher.match(eventExampleBad1)).toEqual([])
+            expect(await actionMatcher.match(eventExampleBad2)).toEqual([])
+            expect(await actionMatcher.match(eventExampleBad3)).toEqual([])
         })
     })
 
