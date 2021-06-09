@@ -179,7 +179,7 @@ export async function createHub(
     // :TODO: This is only used on worker threads, not main
     hub.actionManager = new ActionManager(db)
     await hub.actionManager.prepare()
-    hub.actionMatcher = new ActionMatcher(db, hub.actionManager)
+    hub.actionMatcher = new ActionMatcher(serverConfig, db, hub.actionManager)
     hub.eventsProcessor = new EventsProcessor(hub as Hub)
     hub.jobQueueManager = new JobQueueManager(hub as Hub)
 
