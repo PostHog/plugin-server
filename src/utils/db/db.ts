@@ -785,7 +785,7 @@ export class DB {
 
     public async registerActionOccurrence(actionId: Action['id'], eventId: Event['id']): Promise<void> {
         await this.postgresQuery(
-            `INSERT INTO posthog_action_events_2 (action_id, event_id) VALUES ($1, $2)`, // TODO: remove _2
+            `INSERT INTO posthog_action_events (action_id, event_id) VALUES ($1, $2)`,
             [actionId, eventId],
             'registerActionOccurrence'
         )

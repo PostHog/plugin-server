@@ -13,7 +13,7 @@ export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestE
     })
     try {
         const { distinct_id, ip, site_url, team_id, now, sent_at, uuid } = event
-        const result = (await hub.eventsProcessor.processEvent(
+        const result = await hub.eventsProcessor.processEvent(
             distinct_id,
             ip,
             site_url,
@@ -22,7 +22,7 @@ export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestE
             DateTime.fromISO(now),
             sent_at ? DateTime.fromISO(sent_at) : null,
             uuid! // it will throw if it's undefined
-        )) as IEventMatchable
+        )
         if (event.event !== '$snapshot' && result.id) {
             await hub.actionMatcher.match(event, result.id, result.elements)
         }

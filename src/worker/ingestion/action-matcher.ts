@@ -19,7 +19,7 @@ import {
     PropertyOperator,
 } from '../../types'
 import { DB } from '../../utils/db/db'
-import { extractElements } from '../../utils/utils'
+import { extractElements } from '../../utils/db/utils'
 import { ActionManager } from './action-manager'
 
 const propertyOperatorToRequiredValueType: Partial<Record<PropertyOperator, 'string'>> = {
@@ -39,14 +39,14 @@ export class ActionMatcher {
     }
 
     /** Get all actions matched to the event. */
-    public async match(event: PluginEvent, eventId?: number, elements?: Element[]): Promise<Action[]> {
+    public async match(event: PluginEvent, person: Person, eventId?: number, elements?: Element[]): Promise<Action[]> {
         const teamActions: Action[] = Object.values(this.actionManager.getTeamActions(event.team_id))
         if (!elements) {
             const rawElements: Record<string, any>[] | undefined = event.properties?.['$elements']
             elements = rawElements ? extractElements(rawElements) : []
         }
         const matching: boolean[] = await Promise.all(
-            teamActions.map((action) => this.checkAction(event, elements!, action))
+            teamActions.map((action) => this.checkAction(event, elements, person, action))
         )
         const matches: Action[] = []
         for (let i = 0; i < matching.length; i++) {
@@ -67,9 +67,14 @@ export class ActionMatcher {
      * Return whether the event is a match for the action.
      * The event is considered a match if any of the action's steps (match groups) is a match.
      */
-    public async checkAction(event: PluginEvent, elements: Element[], action: Action): Promise<boolean> {
+    public async checkAction(
+        event: PluginEvent,
+        elements: Element[] | undefined,
+        person: Person | undefined,
+        action: Action
+    ): Promise<boolean> {
         for (const step of action.steps) {
-            if (await this.checkStep(event, elements, step)) {
+            if (await this.checkStep(event, elements, person, step)) {
                 return true
             }
         }
@@ -82,12 +87,18 @@ export class ActionMatcher {
      * Return whether the event is a match for the step (match group).
      * The event is considered a match if no subcheck fails. Many subchecks are usually irrelevant and skipped.
      */
-    private async checkStep(event: PluginEvent, elements: Element[], step: ActionStep): Promise<boolean> {
+    private async checkStep(
+        event: PluginEvent,
+        elements: Element[] | undefined,
+        person: Person | undefined,
+        step: ActionStep
+    ): Promise<boolean> {
+        elements ||= []
         return (
             this.checkStepElement(elements, step) &&
             this.checkStepUrl(event, step) &&
             this.checkStepEvent(event, step) &&
-            (await this.checkStepFilters(event, elements, step))
+            (await this.checkStepFilters(event, elements, person, step))
         )
     }
 
@@ -183,12 +194,17 @@ export class ActionMatcher {
      * Return whether the event is a match for the step's fiter constraints.
      * Step property: `properties`.
      */
-    private async checkStepFilters(event: PluginEvent, elements: Element[], step: ActionStep): Promise<boolean> {
+    private async checkStepFilters(
+        event: PluginEvent,
+        elements: Element[],
+        person: Person | undefined,
+        step: ActionStep
+    ): Promise<boolean> {
         // CHECK CONDITIONS, OTHERWISE SKIPPED, OTHERWISE SKIPPED
         if (step.properties && step.properties.length) {
             // EVERY FILTER MUST BE A MATCH
             for (const filter of step.properties) {
-                if (!(await this.checkEventAgainstFilter(event, elements, filter))) {
+                if (!(await this.checkEventAgainstFilter(event, elements, person, filter))) {
                     return false
                 }
             }
@@ -202,19 +218,23 @@ export class ActionMatcher {
     private async checkEventAgainstFilter(
         event: PluginEvent,
         elements: Element[],
+        person: Person | undefined,
         filter: PropertyFilter
     ): Promise<boolean> {
-        let person: Person | undefined
         switch (filter.type) {
             case 'event':
                 return this.checkEventAgainstEventFilter(event, filter)
             case 'person':
-                person = await this.db.fetchPerson(event.team_id, event.distinct_id)
+                if (!person) {
+                    return false
+                }
                 return this.checkEventAgainstPersonFilter(person, filter)
             case 'element':
                 return this.checkEventAgainstElementFilter(elements, filter)
             case 'cohort':
-                person = await this.db.fetchPerson(event.team_id, event.distinct_id)
+                if (!person) {
+                    return false
+                }
                 return await this.checkEventAgainstCohortFilter(person, filter)
             default:
                 return false
@@ -252,11 +272,8 @@ export class ActionMatcher {
     /**
      * Sublevel 4 of action matching.
      */
-    private async checkEventAgainstCohortFilter(
-        person: Person | undefined,
-        filter: CohortPropertyFilter
-    ): Promise<boolean> {
-        if (!person?.properties) {
+    private async checkEventAgainstCohortFilter(person: Person, filter: CohortPropertyFilter): Promise<boolean> {
+        if (!person.properties) {
             return false
         }
         let cohortId = filter.value
