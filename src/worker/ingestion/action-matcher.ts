@@ -14,6 +14,7 @@ import {
     EventPropertyFilter,
     Person,
     PersonPropertyFilter,
+    PluginsServerConfig,
     PropertyFilter,
     PropertyFilterWithOperator,
     PropertyOperator,
@@ -30,33 +31,34 @@ const propertyOperatorToRequiredValueType: Partial<Record<PropertyOperator, 'str
 }
 
 export class ActionMatcher {
+    private config: PluginsServerConfig
     private db: DB
     private actionManager: ActionManager
 
-    constructor(db: DB, actionManager: ActionManager) {
+    constructor(config: PluginsServerConfig, db: DB, actionManager: ActionManager) {
+        this.config = config
         this.db = db
         this.actionManager = actionManager
     }
 
     /** Get all actions matched to the event. */
-    public async match(event: PluginEvent, person: Person, eventId?: number, elements?: Element[]): Promise<Action[]> {
+    public async match(event: PluginEvent, person?: Person, eventId?: number, elements?: Element[]): Promise<Action[]> {
         const teamActions: Action[] = Object.values(this.actionManager.getTeamActions(event.team_id))
         if (!elements) {
             const rawElements: Record<string, any>[] | undefined = event.properties?.['$elements']
             elements = rawElements ? extractElements(rawElements) : []
         }
-        const matching: boolean[] = await Promise.all(
+        const teamActionsMatching: boolean[] = await Promise.all(
             teamActions.map((action) => this.checkAction(event, elements, person, action))
         )
         const matches: Action[] = []
-        for (let i = 0; i < matching.length; i++) {
-            const result = matching[i]
-            if (result) {
-                if (eventId) {
-                    await this.db.registerActionOccurrence(teamActions[i].id, eventId)
-                }
+        for (let i = 0; i < teamActionsMatching.length; i++) {
+            if (teamActionsMatching[i]) {
                 matches.push(teamActions[i])
             }
+        }
+        if (this.config.PLUGIN_SERVER_ACTION_MATCHING && matches.length && eventId !== undefined) {
+            await this.db.registerEventActionOccurrences(eventId, matches)
         }
         return matches
     }

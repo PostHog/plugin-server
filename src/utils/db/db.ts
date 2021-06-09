@@ -783,11 +783,12 @@ export class DB {
         return action
     }
 
-    public async registerActionOccurrence(actionId: Action['id'], eventId: Event['id']): Promise<void> {
+    public async registerEventActionOccurrences(eventId: Event['id'], actions: Action[]): Promise<void> {
+        const valuesClause = actions.map((action, index) => `($1, $${index + 2})`).join(', ')
         await this.postgresQuery(
-            `INSERT INTO posthog_action_events (action_id, event_id) VALUES ($1, $2)`,
-            [actionId, eventId],
-            'registerActionOccurrence'
+            `INSERT INTO posthog_action_events (event_id, action_id) VALUES ${valuesClause}`,
+            [eventId, ...actions.map((action) => action.id)],
+            'registerEventActionOccurrences'
         )
     }
 

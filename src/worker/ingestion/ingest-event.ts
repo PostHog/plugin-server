@@ -23,8 +23,8 @@ export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestE
             sent_at ? DateTime.fromISO(sent_at) : null,
             uuid! // it will throw if it's undefined
         )
-        if (event.event !== '$snapshot' && result.id) {
-            await hub.actionMatcher.match(event, result.id, result.elements)
+        if (result) {
+            await hub.actionMatcher.match(event, result.person, result.eventId, result.elements)
         }
         // We don't want to return the inserted DB entry that `processEvent` returns.
         // This response is passed to piscina and would be discarded anyway.

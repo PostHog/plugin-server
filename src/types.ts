@@ -93,6 +93,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     CRASH_IF_NO_PERSISTENT_JOB_QUEUE: boolean
     STALENESS_RESTART_SECONDS: number
     CAPTURE_INTERNAL_METRICS: boolean
+    PLUGIN_SERVER_ACTION_MATCHING: boolean
 }
 
 export interface Hub extends PluginsServerConfig {
