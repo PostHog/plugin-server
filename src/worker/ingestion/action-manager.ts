@@ -45,7 +45,7 @@ export class ActionManager {
         }
 
         if (refetchedAction) {
-            status.info(
+            status.debug(
                 '🍿',
                 wasCachedAlready
                     ? `Refetched action ID ${actionId} (team ID ${teamId}) from DB`
