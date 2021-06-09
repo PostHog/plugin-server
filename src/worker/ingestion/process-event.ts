@@ -37,7 +37,6 @@ export interface EventProcessingResult {
     event: IEvent | SessionRecordingEvent | PostgresSessionRecordingEvent
     eventId?: number
     elements?: Element[]
-    person?: Person
 }
 
 export class EventsProcessor {
@@ -79,9 +78,7 @@ export class EventsProcessor {
 
         let result: EventProcessingResult | void
         try {
-            // sanitize values, even though `sanitizeEvent` should have gotten to them
-            distinctId = distinctId?.toString()
-
+            // Sanitize values, even though `sanitizeEvent` should have gotten to them
             const properties: Properties = data.properties ?? {}
             if (data['$set']) {
                 properties['$set'] = { ...properties['$set'], ...data['$set'] }
@@ -126,7 +123,7 @@ export class EventsProcessor {
             } else {
                 const timeout3 = timeoutGuard('Still running "capture". Timeout warning after 30 sec!', { eventUuid })
                 try {
-                    const [event, eventId, elements, person] = await this.capture(
+                    const [event, eventId, elements] = await this.capture(
                         eventUuid,
                         personUuid,
                         ip,
@@ -145,7 +142,6 @@ export class EventsProcessor {
                         event,
                         eventId,
                         elements,
-                        person,
                     }
                 } finally {
                     clearTimeout(timeout3)
@@ -381,7 +377,7 @@ export class EventsProcessor {
         properties: Properties,
         timestamp: DateTime,
         sentAt: DateTime | null
-    ): Promise<[IEvent, Event['id'] | undefined, Element[] | undefined, Person | undefined]> {
+    ): Promise<[IEvent, Event['id'] | undefined, Element[] | undefined]> {
         event = sanitizeEventName(event)
         const elements: Record<string, any>[] | undefined = properties['$elements']
         let elementsList: Element[] = []
@@ -426,19 +422,16 @@ export class EventsProcessor {
             )
         }
 
-        return [
-            ...(await this.createEvent(
-                eventUuid,
-                event,
-                teamId,
-                distinctId,
-                properties,
-                timestamp,
-                elementsList,
-                siteUrl
-            )),
-            await this.db.fetchPerson(teamId, distinctId),
-        ]
+        return await this.createEvent(
+            eventUuid,
+            event,
+            teamId,
+            distinctId,
+            properties,
+            timestamp,
+            elementsList,
+            siteUrl
+        )
     }
 
     private async createEvent(

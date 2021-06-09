@@ -3,17 +3,7 @@ import * as IORedis from 'ioredis'
 import { DateTime } from 'luxon'
 import { performance } from 'perf_hooks'
 
-import { IEvent } from '../../src/config/idl/protos'
-import {
-    Database,
-    Event,
-    Hub,
-    LogLevel,
-    Person,
-    PluginsServerConfig,
-    SessionRecordingEvent,
-    Team,
-} from '../../src/types'
+import { Database, Event, Hub, LogLevel, Person, PluginsServerConfig, Team } from '../../src/types'
 import { createHub } from '../../src/utils/db/hub'
 import { hashElements } from '../../src/utils/db/utils'
 import { posthog } from '../../src/utils/posthog'
@@ -245,9 +235,9 @@ export const createProcessEventTests = (
         )
 
         if (database === 'clickhouse') {
-            expect(queryCounter).toBe(12 + 14 /* event & prop definitions */)
+            expect(queryCounter).toBe(11 + 14 /* event & prop definitions */)
         } else if (database === 'postgresql') {
-            expect(queryCounter).toBe(16 + 14 /* event & prop definitions */)
+            expect(queryCounter).toBe(15 + 14 /* event & prop definitions */)
         }
 
         let persons = await hub.db.fetchPersons()
