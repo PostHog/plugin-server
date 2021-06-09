@@ -2,6 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold'
 import { Properties } from '@posthog/plugin-scaffold/src/types'
 import escapeStringRegexp from 'escape-string-regexp'
 import equal from 'fast-deep-equal'
+import { StatsD } from 'hot-shots'
 import RE2 from 're2'
 
 import {
@@ -34,15 +35,18 @@ export class ActionMatcher {
     private config: PluginsServerConfig
     private db: DB
     private actionManager: ActionManager
+    private statsd: StatsD | undefined
 
-    constructor(config: PluginsServerConfig, db: DB, actionManager: ActionManager) {
+    constructor(config: PluginsServerConfig, db: DB, actionManager: ActionManager, statsd?: StatsD) {
         this.config = config
         this.db = db
         this.actionManager = actionManager
+        this.statsd = statsd
     }
 
     /** Get all actions matched to the event. */
     public async match(event: PluginEvent, person?: Person, eventId?: number, elements?: Element[]): Promise<Action[]> {
+        const matchingStart = new Date()
         const teamActions: Action[] = Object.values(this.actionManager.getTeamActions(event.team_id))
         if (!elements) {
             const rawElements: Record<string, any>[] | undefined = event.properties?.['$elements']
@@ -60,6 +64,7 @@ export class ActionMatcher {
         if (this.config.PLUGIN_SERVER_ACTION_MATCHING && matches.length && eventId !== undefined) {
             await this.db.registerEventActionOccurrences(eventId, matches)
         }
+        this.statsd?.timing('action_matching', matchingStart)
         return matches
     }
 
@@ -122,7 +127,7 @@ export class ActionMatcher {
                 case ActionStepUrlMatching.Contains:
                     // Simulating SQL LIKE behavior (_ = any single character, % = any zero or more characters)
                     const adjustedRegExpString = escapeStringRegexp(step.url).replace(/_/g, '.').replace(/%/g, '.*')
-                    doesUrlMatch = new RegExp(`.*${adjustedRegExpString}.*`).test(eventUrl)
+                    doesUrlMatch = new RegExp(adjustedRegExpString).test(eventUrl)
                     break
                 case ActionStepUrlMatching.Regex:
                     // Using RE2 here because that's what ClickHouse uses for regex matching anyway
@@ -253,8 +258,8 @@ export class ActionMatcher {
     /**
      * Sublevel 4 of action matching.
      */
-    private checkEventAgainstPersonFilter(person: Person | undefined, filter: PersonPropertyFilter): boolean {
-        if (!person?.properties) {
+    private checkEventAgainstPersonFilter(person: Person, filter: PersonPropertyFilter): boolean {
+        if (!person.properties) {
             return false
         }
         return this.checkPropertiesAgainstFilter(person.properties, filter)
