@@ -11,9 +11,10 @@ export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestE
         event: JSON.stringify(event),
     })
     try {
-        const { distinct_id, ip, site_url, team_id, now, sent_at, uuid } = event
+        const { ip, site_url, team_id, now, sent_at, uuid } = event
+        const distinctId = event.distinct_id.toString()
         const result = await hub.eventsProcessor.processEvent(
-            distinct_id,
+            distinctId,
             ip,
             site_url,
             event,
@@ -23,7 +24,7 @@ export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestE
             uuid! // it will throw if it's undefined
         )
         if (hub.PLUGIN_SERVER_ACTION_MATCHING >= 1 && result) {
-            const person = await hub.db.fetchPerson(team_id, distinct_id)
+            const person = await hub.db.fetchPerson(team_id, distinctId)
             const actionMatches = await hub.actionMatcher.match(event, person, result.elements)
             if (hub.PLUGIN_SERVER_ACTION_MATCHING >= 2 && actionMatches.length && result.eventId !== undefined) {
                 await hub.db.registerEventActionOccurrences(result.eventId, actionMatches)

@@ -1679,7 +1679,7 @@ export const createProcessEventTests = (
     test('distinct_id wrong type (number)', async () => {
         await createPerson(hub, team, ['asdfasdfasdf'])
         await processEvent(
-            (12345 as unknown) as string,
+            (12345 as unknown) as string, // A number sneaked in! Should be treated as string
             null,
             '',
             ({
