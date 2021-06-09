@@ -5,7 +5,6 @@ import { DateTime } from 'luxon'
 import { Hub, IngestEventResponse } from '../../types'
 import { timeoutGuard } from '../../utils/db/utils'
 import { status } from '../../utils/status'
-import { IEventMatchable } from './process-event'
 
 export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestEventResponse> {
     const timeout = timeoutGuard('Still ingesting event inside worker. Timeout warning after 30 sec!', {
@@ -23,8 +22,11 @@ export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestE
             sent_at ? DateTime.fromISO(sent_at) : null,
             uuid! // it will throw if it's undefined
         )
-        if (result) {
-            await hub.actionMatcher.match(event, result.person, result.eventId, result.elements)
+        if (hub.PLUGIN_SERVER_ACTION_MATCHING >= 1 && result) {
+            const actionMatches = await hub.actionMatcher.match(event, result.person, result.elements)
+            if (hub.PLUGIN_SERVER_ACTION_MATCHING >= 2 && actionMatches.length && result.eventId !== undefined) {
+                await hub.db.registerEventActionOccurrences(result.eventId, actionMatches)
+            }
         }
         // We don't want to return the inserted DB entry that `processEvent` returns.
         // This response is passed to piscina and would be discarded anyway.

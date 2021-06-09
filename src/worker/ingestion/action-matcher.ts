@@ -32,20 +32,18 @@ const propertyOperatorToRequiredValueType: Partial<Record<PropertyOperator, 'str
 }
 
 export class ActionMatcher {
-    private config: PluginsServerConfig
     private db: DB
     private actionManager: ActionManager
     private statsd: StatsD | undefined
 
-    constructor(config: PluginsServerConfig, db: DB, actionManager: ActionManager, statsd?: StatsD) {
-        this.config = config
+    constructor(db: DB, actionManager: ActionManager, statsd?: StatsD) {
         this.db = db
         this.actionManager = actionManager
         this.statsd = statsd
     }
 
     /** Get all actions matched to the event. */
-    public async match(event: PluginEvent, person?: Person, eventId?: number, elements?: Element[]): Promise<Action[]> {
+    public async match(event: PluginEvent, person?: Person, elements?: Element[]): Promise<Action[]> {
         const matchingStart = new Date()
         const teamActions: Action[] = Object.values(this.actionManager.getTeamActions(event.team_id))
         if (!elements) {
@@ -61,10 +59,8 @@ export class ActionMatcher {
                 matches.push(teamActions[i])
             }
         }
-        if (this.config.PLUGIN_SERVER_ACTION_MATCHING && matches.length && eventId !== undefined) {
-            await this.db.registerEventActionOccurrences(eventId, matches)
-        }
-        this.statsd?.timing('action_matching', matchingStart)
+        this.statsd?.timing('action_matching_for_event', matchingStart)
+        this.statsd?.increment('action_matches_found', matches.length)
         return matches
     }
 
