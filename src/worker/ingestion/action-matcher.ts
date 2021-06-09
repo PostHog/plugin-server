@@ -96,7 +96,9 @@ export class ActionMatcher {
         person: Person | undefined,
         step: ActionStep
     ): Promise<boolean> {
-        elements ||= []
+        if (!elements) {
+            elements = []
+        }
         return (
             this.checkStepElement(elements, step) &&
             this.checkStepUrl(event, step) &&
