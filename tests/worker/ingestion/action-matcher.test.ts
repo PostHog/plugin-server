@@ -1,4 +1,5 @@
 import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
+import { DateTime } from 'luxon'
 
 import {
     Action,
@@ -10,6 +11,7 @@ import {
     RawAction,
 } from '../../../src/types'
 import { createHub } from '../../../src/utils/db/hub'
+import { UUIDT } from '../../../src/utils/utils'
 import { ActionMatcher } from '../../../src/worker/ingestion/action-matcher'
 import { commonUserId } from '../../helpers/plugins'
 import { insertRow, resetTestDatabase } from '../../helpers/sql'
@@ -652,6 +654,68 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(eventExampleBad1)).toEqual([])
             expect(await actionMatcher.match(eventExampleBad2)).toEqual([])
             expect(await actionMatcher.match(eventExampleBad3)).toEqual([])
+        })
+
+        it('returns a match in case of cohort match', async () => {
+            const testCohort = await hub.db.createCohort({ name: 'Test', created_by_id: commonUserId, team_id: 2 })
+
+            const actionDefinition: Action = await createTestAction([
+                {
+                    properties: [{ type: 'cohort', key: 'id', value: testCohort.id }],
+                },
+            ])
+
+            const randomPerson = await hub.db.createPerson(
+                DateTime.local(),
+                {},
+                actionDefinition.team_id,
+                null,
+                true,
+                new UUIDT().toString(),
+                ['random']
+            )
+            const cohortPerson = await hub.db.createPerson(
+                DateTime.local(),
+                {},
+                actionDefinition.team_id,
+                null,
+                true,
+                new UUIDT().toString(),
+                ['cohort']
+            )
+            await hub.db.addPersonToCohort(testCohort.id, cohortPerson.id)
+
+            const eventExamplePersonBad: PluginEvent = createTestEvent({
+                event: 'meow',
+                distinct_id: 'random',
+            })
+            const eventExamplePersonOk: PluginEvent = createTestEvent({
+                event: 'meow',
+                distinct_id: 'cohort',
+            })
+            const eventExamplePersonUnknown: PluginEvent = createTestEvent({
+                event: 'meow',
+                distinct_id: 'unknown',
+            })
+
+            expect(
+                await actionMatcher.match(
+                    eventExamplePersonOk,
+                    await hub.db.fetchPerson(actionDefinition.team_id, eventExamplePersonOk.distinct_id)
+                )
+            ).toEqual([actionDefinition])
+            expect(
+                await actionMatcher.match(
+                    eventExamplePersonBad,
+                    await hub.db.fetchPerson(actionDefinition.team_id, eventExamplePersonBad.distinct_id)
+                )
+            ).toEqual([])
+            expect(
+                await actionMatcher.match(
+                    eventExamplePersonUnknown,
+                    await hub.db.fetchPerson(actionDefinition.team_id, eventExamplePersonUnknown.distinct_id)
+                )
+            ).toEqual([])
         })
     })
 
