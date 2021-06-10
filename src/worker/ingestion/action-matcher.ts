@@ -115,7 +115,7 @@ export class ActionMatcher {
      */
     private checkStepUrl(event: PluginEvent, step: ActionStep): boolean {
         // CHECK CONDITIONS, OTHERWISE SKIPPED
-        if (step.url_matching && step.url) {
+        if (step.url) {
             const eventUrl = event.properties?.$current_url
             if (!eventUrl || typeof eventUrl !== 'string') {
                 return false // URL IS UNKNOWN
@@ -304,7 +304,7 @@ export class ActionMatcher {
         const foundValue = properties[filter.key]
         let foundValueLowerCase: string // only calculated if needed for a case-insensitive operator
 
-        const requiredValueType = propertyOperatorToRequiredValueType[filter.operator]
+        const requiredValueType = filter.operator && propertyOperatorToRequiredValueType[filter.operator]
         if (requiredValueType && typeof foundValue !== requiredValueType) {
             return false // MISMATCH DUE TO VALUE TYPE INCOMPATIBLE WITH OPERATOR SUPPORT
         }
