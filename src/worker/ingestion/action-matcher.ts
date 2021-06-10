@@ -130,7 +130,11 @@ export class ActionMatcher {
                 case ActionStepUrlMatching.Regex:
                     // Using RE2 here because that's what ClickHouse uses for regex matching anyway
                     // It's also safer for user-provided patterns because of a few explicit limitations
-                    doesUrlMatch = new RE2(step.url).test(eventUrl)
+                    try {
+                        doesUrlMatch = new RE2(step.url).test(eventUrl)
+                    } catch {
+                        doesUrlMatch = false
+                    }
                     break
                 case ActionStepUrlMatching.Exact:
                     doesUrlMatch = step.url === eventUrl
