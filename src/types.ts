@@ -494,7 +494,7 @@ export enum PropertyOperator {
 /** Sync with posthog/frontend/src/types.ts */
 interface PropertyFilterBase {
     key: string
-    value: string | number | Array<string | number> | null
+    value?: string | number | Array<string | number> | null
     label?: string
 }
 
