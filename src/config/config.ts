@@ -1,19 +1,24 @@
 import os from 'os'
 
 import { LogLevel, PluginsServerConfig, PostgresSSLMode } from '../types'
-import { stringToBoolean } from '../utils/utils'
+import { determineNodeEnv, NodeEnv, stringToBoolean } from '../utils/utils'
 import { KAFKA_EVENTS_PLUGIN_INGESTION } from './kafka-topics'
 
 export const defaultConfig = overrideWithEnv(getDefaultConfig())
 export const configHelp = getConfigHelp()
 
 export function getDefaultConfig(): PluginsServerConfig {
-    const isTestEnv = process.env.NODE_ENV === 'test'
+    const isTestEnv = determineNodeEnv() === NodeEnv.Test
+    const isDevEnv = determineNodeEnv() === NodeEnv.Development
     const coreCount = os.cpus().length
 
     return {
         CELERY_DEFAULT_QUEUE: 'celery',
-        DATABASE_URL: isTestEnv ? 'postgres://localhost:5432/test_posthog' : 'postgres://localhost:5432/posthog',
+        DATABASE_URL: isTestEnv
+            ? 'postgres://localhost:5432/test_posthog'
+            : isDevEnv
+            ? 'postgres://localhost:5432/posthog'
+            : null,
         POSTHOG_DB_NAME: null,
         POSTHOG_DB_USER: 'postgres',
         POSTHOG_DB_PASSWORD: '',
@@ -72,6 +77,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         CRASH_IF_NO_PERSISTENT_JOB_QUEUE: false,
         STALENESS_RESTART_SECONDS: 0,
         CAPTURE_INTERNAL_METRICS: false,
+        PLUGIN_SERVER_ACTION_MATCHING: 0,
     }
 }
 
@@ -123,6 +129,8 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
             'refuse to start unless there is a properly configured persistent job queue (e.g. graphile)',
         STALENESS_RESTART_SECONDS: 'trigger a restart if no event ingested for this duration',
         CAPTURE_INTERNAL_METRICS: 'capture internal metrics for posthog in posthog',
+        PLUGIN_SERVER_ACTION_MATCHING:
+            'whether plugin server action matching results should be used (transition period setting)',
     }
 }
 

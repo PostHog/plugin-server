@@ -30,15 +30,18 @@ export interface ExtraDatabaseRows {
 export async function resetTestDatabase(
     code?: string,
     extraServerConfig: Partial<PluginsServerConfig> = {},
-    extraRows: ExtraDatabaseRows = {}
+    extraRows: ExtraDatabaseRows = {},
+    { withExtendedTestData = true }: { withExtendedTestData?: boolean } = {}
 ): Promise<void> {
     const config = { ...defaultConfig, ...extraServerConfig }
-    const db = new Pool({ connectionString: config.DATABASE_URL })
+    const db = new Pool({ connectionString: config.DATABASE_URL! })
     try {
         await db.query('DELETE FROM ee_hook')
     } catch {}
 
     await db.query(`
+        DELETE FROM posthog_cohortpeople;
+        DELETE FROM posthog_cohort;
         DELETE FROM posthog_actionstep;
         DELETE FROM posthog_action;
         DELETE FROM posthog_element;
@@ -59,24 +62,51 @@ export async function resetTestDatabase(
         DELETE FROM posthog_organization;
         DELETE FROM posthog_user;
     `)
-
     const mocks = makePluginObjects(code)
     const teamIds = mocks.pluginConfigRows.map((c) => c.team_id)
-    await createUserTeamAndOrganization(db, teamIds[0])
-
-    for (const plugin of mocks.pluginRows.concat(extraRows.plugins ?? [])) {
-        await insertRow(db, 'posthog_plugin', plugin)
-    }
-    for (const pluginConfig of mocks.pluginConfigRows.concat(extraRows.pluginConfigs ?? [])) {
-        await insertRow(db, 'posthog_pluginconfig', pluginConfig)
-    }
-    for (const pluginAttachment of mocks.pluginAttachmentRows.concat(extraRows.pluginAttachments ?? [])) {
-        await insertRow(db, 'posthog_pluginattachment', pluginAttachment)
+    const teamIdToCreate = teamIds[0]
+    await createUserTeamAndOrganization(db, teamIdToCreate)
+    if (withExtendedTestData) {
+        await insertRow(db, 'posthog_action', {
+            id: teamIdToCreate + 67,
+            team_id: teamIdToCreate,
+            name: 'Test Action',
+            created_at: new Date().toISOString(),
+            created_by_id: commonUserId,
+            deleted: false,
+            post_to_slack: false,
+            slack_message_format: '',
+            is_calculating: false,
+            updated_at: new Date().toISOString(),
+            last_calculated_at: new Date().toISOString(),
+        } as RawAction)
+        await insertRow(db, 'posthog_actionstep', {
+            id: teamIdToCreate + 911,
+            action_id: teamIdToCreate + 67,
+            tag_name: null,
+            text: null,
+            href: null,
+            selector: null,
+            url: null,
+            url_matching: null,
+            name: null,
+            event: null,
+            properties: [{ type: 'event', operator: PropertyOperator.Exact, key: 'foo', value: ['bar'] }],
+        })
+        for (const plugin of mocks.pluginRows.concat(extraRows.plugins ?? [])) {
+            await insertRow(db, 'posthog_plugin', plugin)
+        }
+        for (const pluginConfig of mocks.pluginConfigRows.concat(extraRows.pluginConfigs ?? [])) {
+            await insertRow(db, 'posthog_pluginconfig', pluginConfig)
+        }
+        for (const pluginAttachment of mocks.pluginAttachmentRows.concat(extraRows.pluginAttachments ?? [])) {
+            await insertRow(db, 'posthog_pluginattachment', pluginAttachment)
+        }
     }
     await db.end()
 }
 
-async function insertRow(db: Pool, table: string, object: Record<string, any>): Promise<void> {
+export async function insertRow(db: Pool, table: string, object: Record<string, any>): Promise<void> {
     const keys = Object.keys(object)
         .map((key) => `"${key}"`)
         .join(',')
@@ -163,32 +193,6 @@ export async function createUserTeamAndOrganization(
         timezone: 'UTC',
         data_attributes: ['data-attr'],
     })
-    await insertRow(db, 'posthog_action', {
-        id: teamId + 67,
-        team_id: teamId,
-        name: 'Test Action',
-        created_at: new Date().toISOString(),
-        created_by_id: userId,
-        deleted: false,
-        post_to_slack: false,
-        slack_message_format: '',
-        is_calculating: false,
-        updated_at: new Date().toISOString(),
-        last_calculated_at: new Date().toISOString(),
-    } as RawAction)
-    await insertRow(db, 'posthog_actionstep', {
-        id: teamId + 911,
-        action_id: teamId + 67,
-        tag_name: null,
-        text: null,
-        href: null,
-        selector: null,
-        url: null,
-        url_matching: null,
-        name: null,
-        event: null,
-        properties: [{ type: 'event', operator: PropertyOperator.Exact, key: 'foo', value: ['bar'] }],
-    })
 }
 
 export async function getTeams(hub: Hub): Promise<Team[]> {
@@ -224,7 +228,7 @@ export function onQuery(hub: Hub, onQueryCallback: (queryText: string) => any): 
 }
 
 export async function getErrorForPluginConfig(id: number): Promise<any> {
-    const db = new Pool({ connectionString: defaultConfig.DATABASE_URL })
+    const db = new Pool({ connectionString: defaultConfig.DATABASE_URL! })
     let error
     try {
         const response = await db.query('SELECT * FROM posthog_pluginconfig WHERE id = $1', [id])

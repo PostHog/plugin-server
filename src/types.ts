@@ -13,6 +13,8 @@ import { DB } from './utils/db/db'
 import { KafkaProducerWrapper } from './utils/db/kafka-producer-wrapper'
 import { InternalMetrics } from './utils/internal-metrics'
 import { UUID } from './utils/utils'
+import { ActionManager } from './worker/ingestion/action-manager'
+import { ActionMatcher } from './worker/ingestion/action-matcher'
 import { EventsProcessor } from './worker/ingestion/process-event'
 import { LazyPluginVM } from './worker/vm/lazy'
 
@@ -48,7 +50,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     TASKS_PER_WORKER: number
     TASK_TIMEOUT: number
     CELERY_DEFAULT_QUEUE: string
-    DATABASE_URL: string
+    DATABASE_URL: string | null
     POSTHOG_DB_NAME: string | null
     POSTHOG_DB_USER: string
     POSTHOG_DB_PASSWORD: string
@@ -104,6 +106,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     CRASH_IF_NO_PERSISTENT_JOB_QUEUE: boolean
     STALENESS_RESTART_SECONDS: number
     CAPTURE_INTERNAL_METRICS: boolean
+    PLUGIN_SERVER_ACTION_MATCHING: 0 | 1 | 2
 }
 
 export interface Hub extends PluginsServerConfig {
@@ -128,6 +131,8 @@ export interface Hub extends PluginsServerConfig {
     pluginConfigSecrets: Map<PluginConfigId, string>
     pluginConfigSecretLookup: Map<string, PluginConfigId>
     // tools
+    actionManager: ActionManager
+    actionMatcher: ActionMatcher
     eventsProcessor: EventsProcessor
     jobQueueManager: JobQueueManager
     // diagnostics
@@ -478,6 +483,21 @@ export interface ClickHousePersonDistinctId {
     distinct_id: string
 }
 
+/** Usable Cohort model. */
+export interface Cohort {
+    id: number
+    name: string
+    deleted: boolean
+    groups: any[]
+    team_id: Team['id']
+    created_at: string
+    created_by_id: number
+    is_calculating: boolean
+    last_calculation: string
+    errors_calculating: number
+    is_static: boolean
+}
+
 /** Usable CohortPeople model. */
 export interface CohortPeople {
     id: number
@@ -500,44 +520,43 @@ export enum PropertyOperator {
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-interface BasePropertyFilter {
+interface PropertyFilterBase {
     key: string
-    value: string | number | Array<string | number> | null
+    value?: string | number | Array<string | number> | null
     label?: string
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-export interface EventPropertyFilter extends BasePropertyFilter {
+export interface PropertyFilterWithOperator extends PropertyFilterBase {
+    operator?: PropertyOperator
+}
+
+/** Sync with posthog/frontend/src/types.ts */
+export interface EventPropertyFilter extends PropertyFilterWithOperator {
     type: 'event'
-    operator: PropertyOperator
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-export interface PersonPropertyFilter extends BasePropertyFilter {
+export interface PersonPropertyFilter extends PropertyFilterWithOperator {
     type: 'person'
-    operator: PropertyOperator
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-export interface ElementPropertyFilter extends BasePropertyFilter {
+export interface ElementPropertyFilter extends PropertyFilterWithOperator {
     type: 'element'
     key: 'tag_name' | 'text' | 'href' | 'selector'
-    operator: PropertyOperator
+    value: string
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-export interface CohortPropertyFilter extends BasePropertyFilter {
+export interface CohortPropertyFilter extends PropertyFilterBase {
     type: 'cohort'
     key: 'id'
-    value: number
+    value: number | string
 }
 
 /** Sync with posthog/frontend/src/types.ts */
-export type ActionStepProperties =
-    | EventPropertyFilter
-    | PersonPropertyFilter
-    | ElementPropertyFilter
-    | CohortPropertyFilter
+export type PropertyFilter = EventPropertyFilter | PersonPropertyFilter | ElementPropertyFilter | CohortPropertyFilter
 
 /** Sync with posthog/frontend/src/types.ts */
 export enum ActionStepUrlMatching {
@@ -557,7 +576,7 @@ export interface ActionStep {
     url_matching: ActionStepUrlMatching | null
     name: string | null
     event: string | null
-    properties: ActionStepProperties[] | null
+    properties: PropertyFilter[] | null
 }
 
 /** Raw Action row from database. */

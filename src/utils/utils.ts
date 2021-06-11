@@ -12,19 +12,13 @@ import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
 
-import {
-    LogLevel,
-    Plugin,
-    PluginConfigId,
-    PluginJsonConfig,
-    PluginsServerConfig,
-    PostgresSSLMode,
-    TimestampFormat,
-} from '../types'
+import { LogLevel, Plugin, PluginConfigId, PluginsServerConfig, PostgresSSLMode, TimestampFormat } from '../types'
 import { status } from './status'
 
 /** Time until autoexit (due to error) gives up on graceful exit and kills the process right away. */
 const GRACEFUL_EXIT_PERIOD_SECONDS = 5
+/** Number of Redis error events until the server is killed gracefully. */
+const REDIS_ERROR_COUNTER_LIMIT = 10
 
 export function killGracefully(): void {
     status.error('⏲', 'Shutting plugin server down gracefully with SIGTERM...')
@@ -396,10 +390,17 @@ export async function createRedis(serverConfig: PluginsServerConfig): Promise<Re
         ...credentials,
         maxRetriesPerRequest: -1,
     })
+    let errorCounter = 0
     redis
         .on('error', (error) => {
+            errorCounter++
             Sentry.captureException(error)
-            status.error('🔴', 'Redis error encountered! Trying to reconnect...\n', error)
+            if (errorCounter > REDIS_ERROR_COUNTER_LIMIT) {
+                status.error('😡', 'Redis error encountered! Enough of this, I quit!\n', error)
+                killGracefully()
+            } else {
+                status.error('🔴', 'Redis error encountered! Trying to reconnect...\n', error)
+            }
         })
         .on('ready', () => {
             if (process.env.NODE_ENV !== 'test') {
@@ -453,16 +454,21 @@ export function createPostgresPool(
     configOrDatabaseUrl: PluginsServerConfig | string,
     onError?: (error: Error) => any
 ): Pool {
+    if (typeof configOrDatabaseUrl !== 'string') {
+        if (!configOrDatabaseUrl.DATABASE_URL && !configOrDatabaseUrl.POSTHOG_DB_NAME) {
+            throw new Error('Invalid configuration for Postgres: either DATABASE_URL or POSTHOG_DB_NAME required')
+        }
+    }
     const credentials: Partial<PoolConfig> =
         typeof configOrDatabaseUrl === 'string'
             ? {
                   connectionString: configOrDatabaseUrl,
               }
-            : configOrDatabaseUrl.POSTHOG_DB_NAME
-            ? createPostgresConfig(configOrDatabaseUrl)
-            : {
+            : configOrDatabaseUrl.DATABASE_URL
+            ? {
                   connectionString: configOrDatabaseUrl.DATABASE_URL,
               }
+            : createPostgresConfig(configOrDatabaseUrl)
 
     const pgPool = new Pool({
         ...credentials,
@@ -624,7 +630,7 @@ export function groupBy<T extends Record<string, any>, K extends keyof T>(
               return grouping
           }, {} as Record<T[K], T>)
         : objects.reduce((grouping, currentItem) => {
-              ;(grouping[currentItem[key]] = grouping[currentItem[key]] || []).push(currentItem)
+              (grouping[currentItem[key]] = grouping[currentItem[key]] || []).push(currentItem)
               return grouping
           }, {} as Record<T[K], T[]>)
 }
