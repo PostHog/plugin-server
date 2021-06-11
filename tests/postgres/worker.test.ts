@@ -244,7 +244,7 @@ describe('createTaskRunner()', () => {
     let closeHub: () => Promise<void>
 
     beforeEach(async () => {
-        [hub, closeHub] = await createHub()
+        ;[hub, closeHub] = await createHub()
         taskRunner = createTaskRunner(hub)
     })
     afterEach(async () => {

@@ -110,7 +110,7 @@ export async function startPluginsServer(
     })
 
     try {
-        [hub, closeHub] = await createHub(serverConfig, null)
+        ;[hub, closeHub] = await createHub(serverConfig, null)
 
         const serverInstance: Partial<ServerInstance> & Pick<ServerInstance, 'hub'> = {
             hub,

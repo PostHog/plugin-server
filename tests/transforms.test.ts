@@ -8,7 +8,7 @@ let hub: Hub
 let closeHub: () => Promise<void>
 
 beforeEach(async () => {
-    [hub, closeHub] = await createHub()
+    ;[hub, closeHub] = await createHub()
     await resetTestDatabase(`const processEvent = event => event`)
 })
 
