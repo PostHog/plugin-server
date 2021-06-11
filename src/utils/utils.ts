@@ -3,7 +3,6 @@ import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import AdmZip from 'adm-zip'
 import { randomBytes } from 'crypto'
-import { readFileSync } from 'fs'
 import Redis, { RedisOptions } from 'ioredis'
 import { DateTime } from 'luxon'
 import { Pool, PoolConfig } from 'pg'
@@ -422,33 +421,6 @@ export function pluginDigest(plugin: Plugin, teamId?: number): string {
     return `plugin ${plugin.name} ID ${plugin.id} (${extras.join(' - ')})`
 }
 
-function createPostgresConfig(config: PluginsServerConfig): Partial<PoolConfig> {
-    const ssl =
-        config.POSTHOG_POSTGRES_SSL_MODE === PostgresSSLMode.Disable
-            ? {}
-            : {
-                  rejectUnauthorized: false,
-                  ca: config.POSTHOG_POSTGRES_CLI_SSL_CA
-                      ? readFileSync(config.POSTHOG_POSTGRES_CLI_SSL_CA).toString()
-                      : '',
-                  key: config.POSTHOG_POSTGRES_CLI_SSL_KEY
-                      ? readFileSync(config.POSTHOG_POSTGRES_CLI_SSL_KEY).toString()
-                      : '',
-                  cert: config.POSTHOG_POSTGRES_CLI_SSL_CRT
-                      ? readFileSync(config.POSTHOG_POSTGRES_CLI_SSL_CRT).toString()
-                      : '',
-              }
-
-    return {
-        database: config.POSTHOG_DB_NAME!,
-        user: config.POSTHOG_DB_USER,
-        password: config.POSTHOG_DB_PASSWORD,
-        host: config.POSTHOG_POSTGRES_HOST,
-        port: config.POSTHOG_POSTGRES_PORT,
-        ssl,
-    }
-}
-
 export function createPostgresPool(
     configOrDatabaseUrl: PluginsServerConfig | string,
     onError?: (error: Error) => any
@@ -467,7 +439,25 @@ export function createPostgresPool(
             ? {
                   connectionString: configOrDatabaseUrl.DATABASE_URL,
               }
-            : createPostgresConfig(configOrDatabaseUrl)
+            : {
+                  database: configOrDatabaseUrl.POSTHOG_DB_NAME!,
+                  user: configOrDatabaseUrl.POSTHOG_DB_USER,
+                  password: configOrDatabaseUrl.POSTHOG_DB_PASSWORD,
+                  host: configOrDatabaseUrl.POSTHOG_POSTGRES_HOST,
+                  port: configOrDatabaseUrl.POSTHOG_POSTGRES_PORT,
+              }
+
+    const ssl =
+        typeof configOrDatabaseUrl === 'string'
+            ? undefined
+            : configOrDatabaseUrl.POSTHOG_POSTGRES_SSL_MODE === PostgresSSLMode.Disable
+            ? undefined
+            : {
+                  rejectUnauthorized: false,
+                  ca: configOrDatabaseUrl.POSTHOG_POSTGRES_CLI_SSL_CA || '',
+                  key: configOrDatabaseUrl.POSTHOG_POSTGRES_CLI_SSL_KEY || '',
+                  cert: configOrDatabaseUrl.POSTHOG_POSTGRES_CLI_SSL_CRT || '',
+              }
 
     const pgPool = new Pool({
         ...credentials,
@@ -477,7 +467,7 @@ export function createPostgresPool(
             ? {
                   rejectUnauthorized: false,
               }
-            : undefined,
+            : ssl,
     })
 
     const handleError =
