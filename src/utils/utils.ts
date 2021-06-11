@@ -6,7 +6,6 @@ import { randomBytes } from 'crypto'
 import { readFileSync } from 'fs'
 import Redis, { RedisOptions } from 'ioredis'
 import { DateTime } from 'luxon'
-import { FsQueue } from 'main/job-queues/local/fs-queue'
 import { Pool, PoolConfig } from 'pg'
 import { Readable } from 'stream'
 import * as tar from 'tar-stream'
@@ -630,7 +629,7 @@ export function groupBy<T extends Record<string, any>, K extends keyof T>(
               return grouping
           }, {} as Record<T[K], T>)
         : objects.reduce((grouping, currentItem) => {
-              (grouping[currentItem[key]] = grouping[currentItem[key]] || []).push(currentItem)
+              ;(grouping[currentItem[key]] = grouping[currentItem[key]] || []).push(currentItem)
               return grouping
           }, {} as Record<T[K], T[]>)
 }

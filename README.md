@@ -56,9 +56,9 @@ There's a multitude of settings you can use to control the plugin server. Use th
 | POSTHOG_DB_NAME               | Postgres database name                                            | `null`                                |
 | POSTHOG_DB_USER               | Postgres database user                                            | `'postgres'`                          |
 | POSTHOG_DB_PASSWORD           | Postgres database password                                        | `''`                                  |
-| POSTHOG_POSTGRES_HOST         | Postgres database host                                            | `localhost`                           |
+| POSTHOG_POSTGRES_HOST         | Postgres database host                                            | `'localhost'`                         |
 | POSTHOG_POSTGRES_PORT         | Postgres database port                                            | `5432`                                |
-| POSTHOG_POSTGRES_SSL_MODE     | Postgres database SSL mode                                        | `Disable`                             |
+| POSTHOG_POSTGRES_SSL_MODE     | Postgres database SSL mode                                        | `'disable'`                           |
 | POSTHOG_POSTGRES_CLI_SSL_CA   | Absolute path to the CA certificate to use for Postgres           | `null`                                |
 | POSTHOG_POSTGRES_CLI_SSL_CRT  | Absolute path to the certificate to use for Postgres client auth. | `null`                                |
 | POSTHOG_POSTGRES_CLI_SSL_KEY  | Absolute path to the private key to use for Postgres client auth. | `null`                                |
