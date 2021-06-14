@@ -3,7 +3,7 @@ import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import equal from 'fast-deep-equal'
 import { DateTime, Duration } from 'luxon'
-import { QueryResult } from 'pg'
+import { DatabaseError, QueryResult } from 'pg'
 
 import { Event as EventProto, IEvent } from '../../config/idl/protos'
 import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from '../../config/kafka-topics'
@@ -347,6 +347,11 @@ export class EventsProcessor {
 
         // Merge the distinct IDs
         for (const otherPerson of peopleToMerge) {
+            await this.db.postgresQuery(
+                'UPDATE posthog_cohortpeople SET person_id = $1 WHERE person_id = $2',
+                [mergeInto.id, otherPerson.id],
+                'updateCohortPeople'
+            )
             let failedAttempts = 0
             // Retrying merging up to `MAX_FAILED_PERSON_MERGE_ATTEMPTS` times, in case race conditions occur.
             // An example is a distinct ID being aliased in another plugin server instance,
@@ -366,20 +371,16 @@ export class EventsProcessor {
                         'otherPersonDistinctIds'
                     )
                 ).rows
-                for (const personDistinctId of otherPersonDistinctIds) {
-                    await this.db.moveDistinctId(otherPerson, personDistinctId, mergeInto)
+                for (const otherPersonDistinctId of otherPersonDistinctIds) {
+                    await this.db.moveDistinctId(otherPersonDistinctId, mergeInto)
                 }
-
-                await this.db.postgresQuery(
-                    'UPDATE posthog_cohortpeople SET person_id = $1 WHERE person_id = $2',
-                    [mergeInto.id, otherPerson.id],
-                    'updateCohortPeople'
-                )
-
                 try {
                     await this.db.deletePerson(otherPerson)
                     break // All OK, exiting retry loop
                 } catch (error) {
+                    if (!(error instanceof DatabaseError)) {
+                        throw error // Very much not OK, this is some completely unexpected error
+                    }
                     failedAttempts++
                     if (failedAttempts === MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
                         throw error // Very much not OK, failed repeatedly so rethrowing the error
