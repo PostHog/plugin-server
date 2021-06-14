@@ -33,6 +33,8 @@ import { castTimestampOrNow, filterIncrementProperties, UUID, UUIDT } from '../.
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
+const MAX_FAILED_PERSON_MERGE_ATTEMPTS = 3
+
 export interface EventProcessingResult {
     event: IEvent | SessionRecordingEvent | PostgresSessionRecordingEvent
     eventId?: number
@@ -332,7 +334,7 @@ export class EventsProcessor {
     public async mergePeople(mergeInto: Person, peopleToMerge: Person[]): Promise<void> {
         let firstSeen = mergeInto.created_at
 
-        // merge the properties
+        // Merge properties
         for (const otherPerson of peopleToMerge) {
             mergeInto.properties = { ...otherPerson.properties, ...mergeInto.properties }
             if (otherPerson.created_at < firstSeen) {
@@ -343,26 +345,48 @@ export class EventsProcessor {
 
         await this.db.updatePerson(mergeInto, { created_at: firstSeen, properties: mergeInto.properties })
 
-        // merge the distinct_ids
+        // Merge the distinct IDs
         for (const otherPerson of peopleToMerge) {
-            const otherPersonDistinctIds: PersonDistinctId[] = (
+            let failedAttempts = 0
+            // Retrying merging up to three times, in case race conditions occur.
+            // An example is a distinct ID being aliased in another plugin server instance,
+            // between `moveDistinctId` and `deletePerson` being called here
+            // – in such a case a distinct ID may be assigned to the person AFTER `otherPersonDistinctIds` was fetched,
+            // so this function is not aware of it and doesn't merge it. That then caused `deletePerson` to fail,
+            // because of foreign key constraints –
+            // the dangling distinct ID added elsewhere prevents the person from being deleted!
+            // This is low-probability so likely won't occur on second retry of this block.
+            // In the rare case of the person changing VERY often however, it may happen even a few times,
+            // in which case we'll bail and rethrow the error.
+            while (true) {
+                const otherPersonDistinctIds: PersonDistinctId[] = (
+                    await this.db.postgresQuery(
+                        'SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2',
+                        [otherPerson.id, mergeInto.team_id],
+                        'otherPersonDistinctIds'
+                    )
+                ).rows
+                for (const personDistinctId of otherPersonDistinctIds) {
+                    await this.db.moveDistinctId(otherPerson, personDistinctId, mergeInto)
+                }
+
                 await this.db.postgresQuery(
-                    'SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2',
-                    [otherPerson.id, mergeInto.team_id],
-                    'otherPersonDistinctIds'
+                    'UPDATE posthog_cohortpeople SET person_id = $1 WHERE person_id = $2',
+                    [mergeInto.id, otherPerson.id],
+                    'updateCohortPeople'
                 )
-            ).rows
-            for (const personDistinctId of otherPersonDistinctIds) {
-                await this.db.moveDistinctId(otherPerson, personDistinctId, mergeInto)
+
+                try {
+                    await this.db.deletePerson(otherPerson)
+                    break // All OK, exiting while
+                } catch (error) {
+                    failedAttempts++
+                    if (failedAttempts === MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
+                        throw error // Very much not OK, failed repeatedly so rethrowing the error
+                    }
+                    continue // Not OK, trying again to make sure that ALL IDs are merged
+                }
             }
-
-            await this.db.postgresQuery(
-                'UPDATE posthog_cohortpeople SET person_id = $1 WHERE person_id = $2',
-                [mergeInto.id, otherPerson.id],
-                'updateCohortPeople'
-            )
-
-            await this.db.deletePerson(otherPerson)
         }
     }
 
