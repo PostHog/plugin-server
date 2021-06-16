@@ -16,6 +16,7 @@ import { UUID } from './utils/utils'
 import { ActionManager } from './worker/ingestion/action-manager'
 import { ActionMatcher } from './worker/ingestion/action-matcher'
 import { EventsProcessor } from './worker/ingestion/process-event'
+import { TeamManager } from './worker/ingestion/team-manager'
 import { LazyPluginVM } from './worker/vm/lazy'
 
 export enum LogLevel {
@@ -118,6 +119,7 @@ export interface Hub extends PluginsServerConfig {
     pluginConfigSecrets: Map<PluginConfigId, string>
     pluginConfigSecretLookup: Map<string, PluginConfigId>
     // tools
+    teamManager: TeamManager
     actionManager: ActionManager
     actionMatcher: ActionMatcher
     eventsProcessor: EventsProcessor

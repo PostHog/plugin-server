@@ -16,6 +16,7 @@ import { Hub, PluginsServerConfig } from '../../types'
 import { ActionManager } from '../../worker/ingestion/action-manager'
 import { ActionMatcher } from '../../worker/ingestion/action-matcher'
 import { EventsProcessor } from '../../worker/ingestion/process-event'
+import { TeamManager } from '../../worker/ingestion/team-manager'
 import { InternalMetrics } from '../internal-metrics'
 import { killProcess } from '../kill'
 import { status } from '../status'
@@ -177,6 +178,7 @@ export async function createHub(
     }
 
     // :TODO: This is only used on worker threads, not main
+    hub.teamManager = new TeamManager(db)
     hub.actionManager = new ActionManager(db)
     await hub.actionManager.prepare()
     hub.actionMatcher = new ActionMatcher(db, hub.actionManager, statsd)
