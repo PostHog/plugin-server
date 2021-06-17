@@ -3,6 +3,7 @@ import fetch from 'node-fetch'
 import { format } from 'util'
 
 import { Action, Person } from '../../types'
+import { stringify } from '../../utils/utils'
 
 export enum WebhookType {
     Slack = 'slack',
@@ -23,11 +24,14 @@ export function determineWebhookType(url: string): WebhookType {
 
 export function getUserDetails(
     event: PluginEvent,
-    person: Person,
+    person: Person | undefined,
     siteUrl: string,
     webhookType: WebhookType
 ): [string, string] {
-    const userName = person.properties['email'] || event.distinct_id
+    if (!person) {
+        return ['undefined', 'undefined']
+    }
+    const userName = stringify(person.properties?.['email'] || event.distinct_id)
     let userMarkdown: string
     if (webhookType === WebhookType.Slack) {
         userMarkdown = `<${siteUrl}/person/${event.distinct_id}|${userName}>`
@@ -37,19 +41,15 @@ export function getUserDetails(
     return [userName, userMarkdown]
 }
 
-export function getActionDetails(
-    action: Action,
-    event: PluginEvent,
-    siteUrl: string,
-    webhookType: WebhookType
-): [string, string] {
+export function getActionDetails(action: Action, siteUrl: string, webhookType: WebhookType): [string, string] {
+    const actionName = stringify(action.name)
     let actionMarkdown: string
     if (webhookType === WebhookType.Slack) {
         actionMarkdown = `<${siteUrl}/action/${action.id}|${action.name}>`
     } else {
         actionMarkdown = `[${action.name}](${siteUrl}/action/${action.id})`
     }
-    return [String(action.name), actionMarkdown]
+    return [actionName, actionMarkdown]
 }
 
 export function getTokens(messageFormat: string): [string[], string] {
@@ -74,35 +74,23 @@ export function getValueOfToken(
 
     if (tokenParts[0] === 'user') {
         if (tokenParts[1] == 'name') {
-            ;[text, markdown] = person
-                ? getUserDetails(event, person, siteUrl, webhookType)
-                : ['undefined', 'undefined']
+            ;[text, markdown] = getUserDetails(event, person, siteUrl, webhookType)
         } else {
             const propertyName = `$${tokenParts[1]}`
-            if (event.properties && propertyName in event.properties) {
-                const property = event.properties[propertyName]
-                text = typeof property === 'string' ? property : JSON.stringify(property)
-            } else {
-                text = 'undefined'
-            }
-            markdown = text
+            const property = event.properties?.[propertyName]
+            text = markdown = stringify(property)
         }
     } else if (tokenParts[0] === 'action') {
         if (tokenParts[1] == 'name') {
-            ;[text, markdown] = getActionDetails(action, event, siteUrl, webhookType)
+            ;[text, markdown] = getActionDetails(action, siteUrl, webhookType)
         }
     } else if (tokenParts[0] == 'event') {
         if (tokenParts[1] == 'name') {
-            text = markdown = event.event
+            text = markdown = stringify(event.event)
         } else if (tokenParts[1] == 'properties' && tokenParts.length > 2) {
             const propertyName = tokenParts[2]
-            if (event.properties && propertyName in event.properties) {
-                const property = event.properties[propertyName]
-                text = typeof property === 'string' ? property : JSON.stringify(property)
-            } else {
-                text = 'undefined'
-            }
-            markdown = text
+            const property = event.properties?.[propertyName]
+            text = markdown = stringify(property)
         }
     } else {
         throw new Error()
@@ -136,7 +124,7 @@ export function getFormattedMessage(
         messageText = format(tokenizedMessage, ...values)
         messageMarkdown = format(tokenizedMessage, ...markdownValues)
     } catch (error) {
-        const [actionName, actionMarkdown] = getActionDetails(action, event, siteUrl, webhookType)
+        const [actionName, actionMarkdown] = getActionDetails(action, siteUrl, webhookType)
         messageText = `⚠ Error: There are one or more formatting errors in the message template for action "${actionName}".`
         messageMarkdown = `*⚠ Error: There are one or more formatting errors in the message template for action "${actionMarkdown}".*`
     }

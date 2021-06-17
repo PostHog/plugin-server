@@ -32,10 +32,13 @@ describe('determineWebhookType', () => {
 })
 
 describe('getUserDetails', () => {
+    const event = { distinct_id: 2 } as unknown as PluginEvent
+    const person = { properties: { email: 'test@posthog.com' } } as unknown as Person
+
     test('Slack', () => {
         const [userDetails, userDetailsMarkdown] = getUserDetails(
-            { distinct_id: 2 } as unknown as PluginEvent,
-            { properties: { email: 'test@posthog.com' } } as unknown as Person,
+            event,
+            person,
             'http://localhost:8000',
             WebhookType.Slack
         )
@@ -46,8 +49,8 @@ describe('getUserDetails', () => {
 
     test('Teams', () => {
         const [userDetails, userDetailsMarkdown] = getUserDetails(
-            { distinct_id: 2 } as unknown as PluginEvent,
-            { properties: { email: 'test@posthog.com' } } as unknown as Person,
+            event,
+            person,
             'http://localhost:8000',
             WebhookType.Teams
         )
@@ -58,10 +61,11 @@ describe('getUserDetails', () => {
 })
 
 describe('getActionDetails', () => {
+    const action = { id: 1, name: 'action1' } as Action
+
     test('Slack', () => {
         const [actionDetails, actionDetailsMarkdown] = getActionDetails(
-            { id: 1, name: 'action1' } as Action,
-            { distinct_id: 2 } as unknown as PluginEvent,
+            action,
             'http://localhost:8000',
             WebhookType.Slack
         )
@@ -72,8 +76,7 @@ describe('getActionDetails', () => {
 
     test('Teams', () => {
         const [actionDetails, actionDetailsMarkdown] = getActionDetails(
-            { id: 1, name: 'action1' } as Action,
-            { distinct_id: 2 } as unknown as PluginEvent,
+            action,
             'http://localhost:8000',
             WebhookType.Teams
         )
@@ -83,71 +86,110 @@ describe('getActionDetails', () => {
     })
 })
 
-/*
-    def test_get_tokens_well_formatted(self) -> None:
-        format1 = "[action.name] got did by [user.name]"
-        matched_tokens, tokenised_message = get_tokens(format1)
-        self.assertEqual(matched_tokens, ["action.name", "user.name"])
-        self.assertEqual(tokenised_message, "{} got did by {}")
+describe('getTokens', () => {
+    test('works', () => {
+        const format = '[action.name] got done by [user.name]'
 
-    def test_get_value_of_token_user_correct(self) -> None:
-        self.team.slack_incoming_webhook = "https://hooks.slack.com/services/"
-        event1 = Event.objects.create(team=self.team, distinct_id="2", properties={"$browser": "Chrome"})
-        action1 = Action.objects.create(team=self.team, name="action1", id=1)
+        const [matchedTokens, tokenisedMessage] = getTokens(format)
 
-        token_user_name = ["user", "name"]
-        text, markdown = get_value_of_token(action1, event1, "http://localhost:8000", token_user_name)
-        self.assertEqual(text, "2")
-        # markdown output is already tested in test_get_user_details
+        expect(matchedTokens).toStrictEqual(['action.name', 'user.name'])
+        expect(tokenisedMessage).toBe('%s got done by %s')
+    })
+})
 
-        token_user_prop = ["user", "browser"]
-        text, markdown = get_value_of_token(action1, event1, "http://localhost:8000", token_user_prop)
-        self.assertEqual(text, "Chrome")
+describe('getValueOfToken', () => {
+    const action = { id: 1, name: 'action1' } as Action
+    const event = { distinct_id: 2, properties: { $browser: 'Chrome' } } as unknown as PluginEvent
+    const person = {} as Person
 
-    def test_get_value_of_token_user_incorrect(self) -> None:
-        self.team.slack_incoming_webhook = "https://hooks.slack.com/services/"
-        event1 = Event.objects.create(team=self.team, distinct_id="2", properties={"$browser": "Chrome"})
-        action1 = Action.objects.create(team=self.team, name="action1", id=1)
+    test('user name', () => {
+        const tokenUserName = ['user', 'name']
 
-        token_user_noprop = ["user", "notaproperty"]
-        text, markdown = get_value_of_token(action1, event1, "http://localhost:8000", token_user_noprop)
-        self.assertEqual(text, "undefined")
-
-    def test_get_formatted_message(self) -> None:
-        self.team.slack_incoming_webhook = "https://hooks.slack.com/services/"
-        event1 = Event.objects.create(
-            team=self.team, distinct_id="2", properties={"$browser": "Chrome", "page_title": "Pricing"}
-        )
-        action1 = Action.objects.create(
-            team=self.team,
-            name="action1",
-            id=1,
-            slack_message_format="[user.name] from [user.browser] on [event.properties.page_title] page with [event.properties.fruit]",
+        const [text, markdown] = getValueOfToken(
+            action,
+            event,
+            person,
+            'http://localhost:8000',
+            WebhookType.Teams,
+            tokenUserName
         )
 
-        text, markdown = get_formatted_message(action1, event1, "https://localhost:8000")
-        self.assertEqual(text, "2 from Chrome on Pricing page with undefined")
+        expect(text).toBe('2')
+        expect(markdown).toBe('[2](http://localhost:8000/person/2)')
+    })
 
-    def test_get_formatted_message_default(self) -> None:
-        """
-        If slack_message_format is empty, use the default message format.
-        [action] was triggered by [user]
-        """
-        self.team.slack_incoming_webhook = "https://hooks.slack.com/services/"
-        event1 = Event.objects.create(team=self.team, distinct_id="2", properties={"$browser": "Chrome"})
-        action1 = Action.objects.create(team=self.team, name="action1", id=1, slack_message_format="")
-        text, markdown = get_formatted_message(action1, event1, "https://localhost:8000")
-        self.assertEqual(text, "action1 was triggered by 2")
+    test('user prop', () => {
+        const tokenUserPropString = ['user', 'browser']
 
-    def test_get_formatted_message_incorrect(self) -> None:
-        self.team.slack_incoming_webhook = "https://hooks.slack.com/services/"
-        event1 = Event.objects.create(team=self.team, distinct_id="2", properties={"$browser": "Chrome"})
-        action1 = Action.objects.create(
-            team=self.team,
-            name="action1",
-            id=1,
-            slack_message_format="[user.name] did thing from browser [user.bbbrowzer]",
+        const [text, markdown] = getValueOfToken(
+            action,
+            event,
+            person,
+            'http://localhost:8000',
+            WebhookType.Teams,
+            tokenUserPropString
         )
-        text, markdown = get_formatted_message(action1, event1, "https://localhost:8000")
-        self.assertIn("undefined", text)
-*/
+
+        expect(text).toBe('Chrome')
+        expect(markdown).toBe('Chrome')
+    })
+
+    test('user prop but missing', () => {
+        const tokenUserPropMissing = ['user', 'missing_property']
+
+        const [text, markdown] = getValueOfToken(
+            action,
+            event,
+            person,
+            'http://localhost:8000',
+            WebhookType.Teams,
+            tokenUserPropMissing
+        )
+
+        expect(text).toBe('undefined')
+        expect(markdown).toBe('undefined')
+    })
+})
+
+describe('getFormattedMessage', () => {
+    const event = {
+        distinct_id: 2,
+        properties: { $browser: 'Chrome', page_title: 'Pricing' },
+    } as unknown as PluginEvent
+    const person = {} as Person
+
+    test('custom format', () => {
+        const action = {
+            id: 1,
+            name: 'action1',
+            slack_message_format:
+                '[user.name] from [user.browser] on [event.properties.page_title] page with [event.properties.fruit]',
+        } as Action
+
+        const [text, markdown] = getFormattedMessage(action, event, person, 'https://localhost:8000', WebhookType.Slack)
+        expect(text).toBe('2 from Chrome on Pricing page with undefined')
+        expect(markdown).toBe('<https://localhost:8000/person/2|2> from Chrome on Pricing page with undefined')
+    })
+
+    test('default format', () => {
+        const action = { id: 1, name: 'action1', slack_message_format: '' } as Action
+
+        const [text, markdown] = getFormattedMessage(action, event, person, 'https://localhost:8000', WebhookType.Slack)
+        expect(text).toBe('action1 was triggered by 2')
+        expect(markdown).toBe(
+            '<https://localhost:8000/action/1|action1> was triggered by <https://localhost:8000/person/2|2>'
+        )
+    })
+
+    test('not quite correct format', () => {
+        const action = {
+            id: 1,
+            name: 'action1',
+            slack_message_format: '[user.name] did thing from browser [user.brauzer]',
+        } as Action
+
+        const [text, markdown] = getFormattedMessage(action, event, person, 'https://localhost:8000', WebhookType.Slack)
+        expect(text).toBe('2 did thing from browser undefined')
+        expect(markdown).toBe('<https://localhost:8000/person/2|2> did thing from browser undefined')
+    })
+})
