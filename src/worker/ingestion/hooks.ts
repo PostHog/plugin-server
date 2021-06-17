@@ -1,9 +1,14 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
+import { captureException } from '@sentry/node'
+import { StatsD } from 'hot-shots'
 import fetch from 'node-fetch'
 import { format } from 'util'
 
 import { Action, Person } from '../../types'
+import { DB } from '../../utils/db/db'
 import { stringify } from '../../utils/utils'
+import { OrganizationManager } from './organization-manager'
+import { TeamManager } from './team-manager'
 
 export enum WebhookType {
     Slack = 'slack',
@@ -132,42 +137,92 @@ export function getFormattedMessage(
     return [messageText, messageMarkdown]
 }
 
-export async function postEventToWebhook(
-    webhookUrl: string,
-    action: Action,
-    event: PluginEvent,
-    person: Person | undefined,
-    siteUrl: string
-): Promise<void> {
-    const webhookType = determineWebhookType(webhookUrl)
-    const [messageText, messageMarkdown] = getFormattedMessage(action, event, person, siteUrl, webhookType)
-    let message: Record<string, any>
-    if (webhookType === WebhookType.Slack) {
-        message = {
-            text: messageText,
-            blocks: [{ type: 'section', text: { type: 'mrkdwn', text: messageMarkdown } }],
+export class HookCannon {
+    db: DB
+    teamManager: TeamManager
+    organizationManager: OrganizationManager
+    statsd: StatsD | undefined
+
+    constructor(db: DB, teamManager: TeamManager, organizationManager: OrganizationManager, statsd?: StatsD) {
+        this.db = db
+        this.teamManager = teamManager
+        this.organizationManager = organizationManager
+        this.statsd = statsd
+    }
+
+    public async findAndFireHooks(
+        event: PluginEvent,
+        person: Person | undefined,
+        siteUrl: string,
+        actionMatches: Action[]
+    ): Promise<void> {
+        const team = await this.teamManager.fetchTeam(event.team_id)
+        const webhookUrl = team?.slack_incoming_webhook
+
+        if (webhookUrl) {
+            const webhookRequests = actionMatches
+                .filter((action) => action.post_to_slack)
+                .map((action) => {
+                    return this.postWebhook(webhookUrl, action, event, person, siteUrl)
+                })
+            void Promise.all(webhookRequests).catch((error) => captureException(error))
         }
-    } else {
-        message = {
-            text: messageMarkdown,
+
+        if (team) {
+            const organization = await this.organizationManager.fetchOrganization(team.organization_id)
+            if (organization?.available_features.includes('zapier')) {
+                const restHookRequests = actionMatches.flatMap(async (action) => {
+                    const relevantRestHooks = await this.db.fetchRelevantRestHooks(
+                        team.id,
+                        'action_performed',
+                        action.id
+                    )
+                    return Promise.all(
+                        relevantRestHooks.map((hook) => {
+                            return this.postRestHook(hook.target, event, person)
+                        })
+                    )
+                })
+                void Promise.all(restHookRequests).catch((error) => captureException(error))
+            }
         }
     }
-    await fetch(webhookUrl, {
-        method: 'POST',
-        body: JSON.stringify(message),
-        headers: { 'Content-Type': 'application/json' },
-    })
-}
 
-export async function postEventToRestHook(
-    targetUrl: string,
-    event: PluginEvent,
-    person: Person | undefined
-): Promise<void> {
-    const payload = { ...event, person }
-    await fetch(targetUrl, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-        headers: { 'Content-Type': 'application/json' },
-    })
+    private async postWebhook(
+        webhookUrl: string,
+        action: Action,
+        event: PluginEvent,
+        person: Person | undefined,
+        siteUrl: string
+    ): Promise<void> {
+        const webhookType = determineWebhookType(webhookUrl)
+        const [messageText, messageMarkdown] = getFormattedMessage(action, event, person, siteUrl, webhookType)
+        let message: Record<string, any>
+        if (webhookType === WebhookType.Slack) {
+            message = {
+                text: messageText,
+                blocks: [{ type: 'section', text: { type: 'mrkdwn', text: messageMarkdown } }],
+            }
+        } else {
+            message = {
+                text: messageMarkdown,
+            }
+        }
+        await fetch(webhookUrl, {
+            method: 'POST',
+            body: JSON.stringify(message),
+            headers: { 'Content-Type': 'application/json' },
+        })
+        this.statsd?.increment('webhook_firings')
+    }
+
+    private async postRestHook(targetUrl: string, event: PluginEvent, person: Person | undefined): Promise<void> {
+        const payload = { ...event, person }
+        await fetch(targetUrl, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: { 'Content-Type': 'application/json' },
+        })
+        this.statsd?.increment('rest_hook_firings')
+    }
 }

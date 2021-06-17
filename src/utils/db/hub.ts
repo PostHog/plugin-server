@@ -15,6 +15,7 @@ import { JobQueueManager } from '../../main/job-queues/job-queue-manager'
 import { Hub, PluginsServerConfig } from '../../types'
 import { ActionManager } from '../../worker/ingestion/action-manager'
 import { ActionMatcher } from '../../worker/ingestion/action-matcher'
+import { HookCannon } from '../../worker/ingestion/hooks'
 import { OrganizationManager } from '../../worker/ingestion/organization-manager'
 import { EventsProcessor } from '../../worker/ingestion/process-event'
 import { TeamManager } from '../../worker/ingestion/team-manager'
@@ -156,6 +157,10 @@ export async function createHub(
     )
 
     const db = new DB(postgres, redisPool, kafkaProducer, clickhouse, statsd)
+    const teamManager = new TeamManager(db)
+    const organizationManager = new OrganizationManager(db)
+    const actionManager = new ActionManager(db)
+    await actionManager.prepare()
 
     const hub: Omit<Hub, 'eventsProcessor'> = {
         ...serverConfig,
@@ -176,14 +181,15 @@ export async function createHub(
 
         pluginSchedule: null,
         pluginSchedulePromises: { runEveryMinute: {}, runEveryHour: {}, runEveryDay: {} },
+
+        teamManager,
+        organizationManager,
+        actionManager,
+        actionMatcher: new ActionMatcher(db, actionManager, statsd),
+        hookCannon: new HookCannon(db, teamManager, organizationManager, statsd),
     }
 
     // :TODO: This is only used on worker threads, not main
-    hub.teamManager = new TeamManager(db)
-    hub.organizationManager = new OrganizationManager(db)
-    hub.actionManager = new ActionManager(db)
-    await hub.actionManager.prepare()
-    hub.actionMatcher = new ActionMatcher(db, hub.actionManager, statsd)
     hub.eventsProcessor = new EventsProcessor(hub as Hub)
     hub.jobQueueManager = new JobQueueManager(hub as Hub)
 

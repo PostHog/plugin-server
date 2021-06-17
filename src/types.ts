@@ -15,6 +15,7 @@ import { InternalMetrics } from './utils/internal-metrics'
 import { UUID } from './utils/utils'
 import { ActionManager } from './worker/ingestion/action-manager'
 import { ActionMatcher } from './worker/ingestion/action-matcher'
+import { HookCannon } from './worker/ingestion/hooks'
 import { OrganizationManager } from './worker/ingestion/organization-manager'
 import { EventsProcessor } from './worker/ingestion/process-event'
 import { TeamManager } from './worker/ingestion/team-manager'
@@ -124,6 +125,7 @@ export interface Hub extends PluginsServerConfig {
     organizationManager: OrganizationManager
     actionManager: ActionManager
     actionMatcher: ActionMatcher
+    hookCannon: HookCannon
     eventsProcessor: EventsProcessor
     jobQueueManager: JobQueueManager
     // diagnostics
