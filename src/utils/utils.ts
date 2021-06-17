@@ -3,6 +3,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import AdmZip from 'adm-zip'
 import { randomBytes } from 'crypto'
+import { readFileSync } from 'fs'
 import Redis, { RedisOptions } from 'ioredis'
 import { DateTime } from 'luxon'
 import { Pool, PoolConfig } from 'pg'
@@ -421,6 +422,13 @@ export function pluginDigest(plugin: Plugin, teamId?: number): string {
     return `plugin ${plugin.name} ID ${plugin.id} (${extras.join(' - ')})`
 }
 
+function getKeyValueFromFile(config: PluginsServerConfig, key: string | null): string {
+    if (!key || !config[key]) {
+        return ''
+    }
+    return readFileSync(config[key]).toString()
+}
+
 export function createPostgresPool(
     configOrDatabaseUrl: PluginsServerConfig | string,
     onError?: (error: Error) => any
@@ -453,10 +461,10 @@ export function createPostgresPool(
             : configOrDatabaseUrl.POSTHOG_POSTGRES_SSL_MODE === PostgresSSLMode.Disable
             ? undefined
             : {
-                  rejectUnauthorized: false,
-                  ca: configOrDatabaseUrl.POSTHOG_POSTGRES_CLI_SSL_CA || '',
-                  key: configOrDatabaseUrl.POSTHOG_POSTGRES_CLI_SSL_KEY || '',
-                  cert: configOrDatabaseUrl.POSTHOG_POSTGRES_CLI_SSL_CRT || '',
+                  rejectUnauthorized: true,
+                  ca: getKeyValueFromFile(configOrDatabaseUrl, 'POSTHOG_POSTGRES_CLI_SSL_CA'),
+                  key: getKeyValueFromFile(configOrDatabaseUrl, 'POSTHOG_POSTGRES_CLI_SSL_KEY'),
+                  cert: getKeyValueFromFile(configOrDatabaseUrl, 'POSTHOG_POSTGRES_CLI_SSL_CRT'),
               }
 
     const pgPool = new Pool({
