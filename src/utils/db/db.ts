@@ -22,6 +22,7 @@ import {
     ElementGroup,
     Event,
     EventDefinitionType,
+    Hook,
     Person,
     PersonDistinctId,
     PluginConfig,
@@ -822,20 +823,38 @@ export class DB {
         )
     }
 
-    // Team Internal Metrics
+    // Team
 
+    /** Return the ID of the team that is used exclusively internally by the instance for storing metrics data. */
     public async fetchInternalMetricsTeam(): Promise<Team['id'] | null> {
         const { rows } = await this.postgresQuery(
             `
-            SELECT posthog_team.id as team_id
+            SELECT posthog_team.id AS team_id
             FROM posthog_team
             INNER JOIN posthog_organization ON posthog_organization.id = posthog_team.organization_id
-            WHERE for_internal_metrics
-        `,
+            WHERE for_internal_metrics`,
             undefined,
             'fetchInternalMetricsTeam'
         )
 
-        return rows.length > 0 ? rows[0].team_id : null
+        return rows[0]?.team_id || null
+    }
+
+    // Hook (EE)
+
+    public async fetchRelevantRestHooks(
+        teamId: Hook['team_id'],
+        event: Hook['event'],
+        resourceId: Hook['resource_id']
+    ): Promise<Hook[]> {
+        const filterByResource = resourceId !== null
+        const { rows } = await this.postgresQuery<Hook>(
+            `
+            SELECT * FROM ee_hook
+            WHERE team_id = $1 AND event = $2 ${filterByResource ? 'AND resource_id = $3' : ''}`,
+            filterByResource ? [teamId, event, resourceId] : [teamId, event],
+            'fetchRelevantRestHooks'
+        )
+        return rows
     }
 }

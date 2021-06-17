@@ -5,7 +5,7 @@ import { DateTime } from 'luxon'
 import { Hub, IngestEventResponse } from '../../types'
 import { timeoutGuard } from '../../utils/db/utils'
 import { status } from '../../utils/status'
-import { postEventToWebhook } from './webhooks'
+import { postEventToRestHook, postEventToWebhook } from './hooks'
 
 export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestEventResponse> {
     const timeout = timeoutGuard('Still ingesting event inside worker. Timeout warning after 30 sec!', {
@@ -29,13 +29,31 @@ export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestE
             const actionMatches = await hub.actionMatcher.match(event, person, result.elements)
             const team = await hub.teamManager.fetchTeam(event.team_id)
             const webhookUrl = team?.slack_incoming_webhook
+
             if (webhookUrl) {
-                await Promise.all(
-                    actionMatches
-                        .filter((action) => action.post_to_slack)
-                        .map((action) => postEventToWebhook(webhookUrl, action, event, person, site_url))
-                )
+                const webhookRequests = actionMatches
+                    .filter((action) => action.post_to_slack)
+                    .map((action) => postEventToWebhook(webhookUrl, action, event, person, site_url))
+                void Promise.all(webhookRequests).catch((error) => Sentry.captureException(error))
             }
+
+            if (
+                team &&
+                (await hub.organizationManager.fetchOrganization(team.organization_id))?.available_features.includes(
+                    'zapier'
+                )
+            ) {
+                const restHookRequests = actionMatches.flatMap(async (action) => {
+                    const relevantRestHooks = await hub.db.fetchRelevantRestHooks(
+                        team_id,
+                        'action_performed',
+                        action.id
+                    )
+                    return Promise.all(relevantRestHooks.map((hook) => postEventToRestHook(hook.target, event, person)))
+                })
+                void Promise.all(restHookRequests).catch((error) => Sentry.captureException(error))
+            }
+
             if (hub.PLUGIN_SERVER_ACTION_MATCHING >= 2 && actionMatches.length && result.eventId !== undefined) {
                 await hub.db.registerEventActionOccurrences(result.eventId, actionMatches)
             }

@@ -15,6 +15,7 @@ import { InternalMetrics } from './utils/internal-metrics'
 import { UUID } from './utils/utils'
 import { ActionManager } from './worker/ingestion/action-manager'
 import { ActionMatcher } from './worker/ingestion/action-matcher'
+import { OrganizationManager } from './worker/ingestion/organization-manager'
 import { EventsProcessor } from './worker/ingestion/process-event'
 import { TeamManager } from './worker/ingestion/team-manager'
 import { LazyPluginVM } from './worker/vm/lazy'
@@ -120,6 +121,7 @@ export interface Hub extends PluginsServerConfig {
     pluginConfigSecretLookup: Map<string, PluginConfigId>
     // tools
     teamManager: TeamManager
+    organizationManager: OrganizationManager
     actionManager: ActionManager
     actionMatcher: ActionMatcher
     eventsProcessor: EventsProcessor
@@ -182,12 +184,11 @@ export type JobQueueExport = {
     getQueue: (serverConfig: PluginsServerConfig) => JobQueue
 }
 
-export type PluginId = number
-export type PluginConfigId = number
-export type TeamId = number
-
+export type PluginId = Plugin['id']
+export type PluginConfigId = PluginConfig['id']
+export type TeamId = Team['id']
 export interface Plugin {
-    id: PluginId
+    id: number
     organization_id: string
     name: string
     plugin_type: 'local' | 'respository' | 'custom' | 'source'
@@ -214,7 +215,7 @@ export interface PluginCapabilities {
 }
 
 export interface PluginConfig {
-    id: PluginConfigId
+    id: number
     team_id: TeamId
     plugin?: Plugin
     plugin_id: PluginId
@@ -492,6 +493,18 @@ export interface CohortPeople {
     id: number
     cohort_id: number
     person_id: number
+}
+
+/** Usable Hook model. */
+export interface Hook {
+    id: number
+    team_id: number
+    user_id: number
+    resource_id: number | null
+    event: string
+    target: string
+    created: string
+    updated: string
 }
 
 /** Sync with posthog/frontend/src/types.ts */
