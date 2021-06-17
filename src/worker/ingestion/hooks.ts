@@ -10,17 +10,18 @@ export enum WebhookType {
     Teams = 'teams',
 }
 
-function determineWebhookType(url: string): WebhookType {
-    if (url.toLowerCase().includes('slack.com')) {
+export function determineWebhookType(url: string): WebhookType {
+    url = url.toLowerCase()
+    if (url.includes('slack.com')) {
         return WebhookType.Slack
     }
-    if (url.toLowerCase().includes('discord.com')) {
+    if (url.includes('discord.com')) {
         return WebhookType.Discord
     }
     return WebhookType.Teams
 }
 
-function getUserDetails(
+export function getUserDetails(
     event: PluginEvent,
     person: Person,
     siteUrl: string,
@@ -36,7 +37,7 @@ function getUserDetails(
     return [userName, userMarkdown]
 }
 
-function getActionDetails(
+export function getActionDetails(
     action: Action,
     event: PluginEvent,
     siteUrl: string,
@@ -51,7 +52,7 @@ function getActionDetails(
     return [String(action.name), actionMarkdown]
 }
 
-function getTokens(messageFormat: string): [string[], string] {
+export function getTokens(messageFormat: string): [string[], string] {
     const matchedTokens = messageFormat.match(/(?<=\[)(.*?)(?=\])/g) || []
     let tokenizedMessage = messageFormat
     if (matchedTokens.length) {
@@ -60,7 +61,7 @@ function getTokens(messageFormat: string): [string[], string] {
     return [matchedTokens, tokenizedMessage]
 }
 
-function getValueOfToken(
+export function getValueOfToken(
     action: Action,
     event: PluginEvent,
     person: Person | undefined,
@@ -109,7 +110,7 @@ function getValueOfToken(
     return [text, markdown]
 }
 
-function getFormattedMessage(
+export function getFormattedMessage(
     action: Action,
     event: PluginEvent,
     person: Person | undefined,
@@ -166,6 +167,19 @@ export async function postEventToWebhook(
     await fetch(webhookUrl, {
         method: 'POST',
         body: JSON.stringify(message),
+        headers: { 'Content-Type': 'application/json' },
+    })
+}
+
+export async function postEventToRestHook(
+    targetUrl: string,
+    event: PluginEvent,
+    person: Person | undefined
+): Promise<void> {
+    const payload = { ...event, person }
+    await fetch(targetUrl, {
+        method: 'POST',
+        body: JSON.stringify(payload),
         headers: { 'Content-Type': 'application/json' },
     })
 }
