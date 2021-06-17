@@ -13,7 +13,7 @@ import {
     VMMethods,
 } from '../../types'
 import { clearError, processError } from '../../utils/db/error'
-import { disablePlugin, setPluginCapabilities } from '../../utils/db/sql'
+import { disablePlugin, setPluginCapabilities, setPluginMetrics } from '../../utils/db/sql'
 import { status } from '../../utils/status'
 import { createPluginConfigVM } from './vm'
 
@@ -90,6 +90,7 @@ export class LazyPluginVM {
                     status.info('🔌', `Loaded ${logInfo}`)
                     void clearError(hub, pluginConfig)
                     await this.inferPluginCapabilities(hub, pluginConfig, vm)
+                    await this.inferPluginMetrics(hub, pluginConfig, vm)
                     resolve(vm)
                 } catch (error) {
                     const isRetryError = error instanceof RetryError
@@ -174,6 +175,29 @@ export class LazyPluginVM {
         if (!equal(prevCapabilities, capabilities)) {
             await setPluginCapabilities(hub, pluginConfig, capabilities)
             pluginConfig.plugin.capabilities = capabilities
+        }
+    }
+
+    private async inferPluginMetrics(hub: Hub, pluginConfig: PluginConfig, vm: PluginConfigVMResponse): Promise<void> {
+        if (!pluginConfig.plugin) {
+            throw new Error(`'PluginConfig missing plugin: ${pluginConfig}`)
+        }
+
+        let newMetrics = vm.metrics
+        const oldMetrics = pluginConfig.plugin.metrics
+        if ((pluginConfig.plugin.capabilities?.methods || []).includes('exportEvents')) {
+            newMetrics = {
+                ...newMetrics,
+                'events-seen': 'sum',
+                'events-delivered-successfully': 'sum',
+                'retry-errors': 'sum',
+                'other-errors': 'sum',
+            }
+        }
+
+        if (vm.metrics && !equal(oldMetrics, newMetrics)) {
+            await setPluginMetrics(hub, pluginConfig, newMetrics)
+            pluginConfig.plugin.metrics = newMetrics
         }
     }
 }

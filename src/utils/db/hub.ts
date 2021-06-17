@@ -6,6 +6,7 @@ import { StatsD } from 'hot-shots'
 import Redis from 'ioredis'
 import { Kafka, logLevel } from 'kafkajs'
 import { DateTime } from 'luxon'
+import * as schedule from 'node-schedule'
 import * as path from 'path'
 import { types as pgTypes } from 'pg'
 import { ConnectionOptions } from 'tls'
@@ -20,6 +21,7 @@ import { InternalMetrics } from '../internal-metrics'
 import { killProcess } from '../kill'
 import { status } from '../status'
 import { createPostgresPool, createRedis, logOrThrowJobQueueError, UUIDT } from '../utils'
+import { PluginMetricsManager } from './../plugin-metrics'
 import { DB } from './db'
 import { KafkaProducerWrapper } from './kafka-producer-wrapper'
 
@@ -187,6 +189,13 @@ export async function createHub(
         hub.internalMetrics = new InternalMetrics(hub as Hub)
     }
 
+    hub.pluginMetricsManager = new PluginMetricsManager()
+
+    // every 30min send plugin metrics
+    hub.pluginMetricsJob = schedule.scheduleJob('30 * * * * *', () => {
+        hub!.pluginMetricsManager.sendPluginMetrics(hub)
+    })
+
     try {
         await hub.jobQueueManager.connectProducer()
     } catch (error) {
@@ -208,6 +217,7 @@ export async function createHub(
             await kafkaProducer.flush()
             await kafkaProducer.producer.disconnect()
         }
+        hub.pluginMetricsJob && schedule.cancelJob(hub.pluginMetricsJob)
         await redisPool.drain()
         await redisPool.clear()
         await hub.postgres.end()

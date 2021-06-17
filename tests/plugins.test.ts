@@ -147,6 +147,7 @@ test('plugin meta has what it should have', async () => {
         'geoip',
         'global',
         'jobs',
+        'metrics',
         'storage',
     ])
     expect(returnedEvent!.properties!['attachments']).toEqual({
@@ -707,6 +708,28 @@ test('plugin lazy loads capabilities', async () => {
     await setupPlugins(hub)
     const pluginConfig = hub.pluginConfigs.get(39)!
     expect(pluginConfig.plugin!.capabilities).toEqual({})
+})
+
+test('plugin sets exported metrics', async () => {
+    getPluginRows.mockReturnValueOnce([
+        mockPluginWithArchive(`
+            export const metrics = {
+                'metric1': 'sum',
+                'metric2': 'avg'
+            }
+        `),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(hub)
+    const pluginConfig = hub.pluginConfigs.get(39)!
+    await pluginConfig.vm?.resolveInternalVm
+
+    expect(pluginConfig.plugin!.metrics).toEqual({
+        metric1: 'sum',
+        metric2: 'avg',
+    })
 })
 
 describe('loadSchedule()', () => {

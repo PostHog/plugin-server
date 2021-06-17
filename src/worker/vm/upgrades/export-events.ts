@@ -90,13 +90,18 @@ export function upgradeExportEvents(
     ) => {
         const start = new Date()
         try {
+            if (!payload.retriesPerformedSoFar) {
+                hub.pluginMetricsManager.increment(pluginConfig, 'events-seen', payload.batch.length)
+            }
             await methods.exportEvents?.(payload.batch)
             hub.statsd?.timing('plugin.export_events.success', start, {
                 plugin: pluginConfig.plugin?.name ?? '?',
                 teamId: pluginConfig.team_id.toString(),
             })
+            hub.pluginMetricsManager.increment(pluginConfig, 'events-delivered-successfully', payload.batch.length)
         } catch (err) {
             if (err instanceof RetryError) {
+                hub.pluginMetricsManager.increment(pluginConfig, 'retry-errors', payload.batch.length)
                 if (payload.retriesPerformedSoFar < MAXIMUM_RETRIES) {
                     const nextRetrySeconds = 2 ** (payload.retriesPerformedSoFar + 1) * 3
                     await meta.jobs
@@ -126,6 +131,7 @@ export function upgradeExportEvents(
                     })
                 }
             } else {
+                hub.pluginMetricsManager.increment(pluginConfig, 'other-errors', payload.batch.length)
                 throw err
             }
         }

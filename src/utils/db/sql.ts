@@ -64,6 +64,18 @@ export async function setPluginCapabilities(
     )
 }
 
+export async function setPluginMetrics(
+    hub: Hub,
+    pluginConfig: PluginConfig,
+    metrics: Record<string, string>
+): Promise<void> {
+    await hub.db.postgresQuery(
+        'UPDATE posthog_plugin SET metrics = ($1) WHERE id = $2',
+        [metrics, pluginConfig.plugin_id],
+        'setPluginMetrics'
+    )
+}
+
 export async function setError(hub: Hub, pluginError: PluginError | null, pluginConfig: PluginConfig): Promise<void> {
     await hub.db.postgresQuery(
         'UPDATE posthog_pluginconfig SET error = $1 WHERE id = $2',
