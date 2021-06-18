@@ -156,35 +156,32 @@ export class HookCannon {
         siteUrl: string,
         actionMatches: Action[]
     ): Promise<void> {
+        if (!actionMatches.length) {
+            return
+        }
+
         const team = await this.teamManager.fetchTeam(event.team_id)
-        const webhookUrl = team?.slack_incoming_webhook
+
+        if (!team) {
+            return
+        }
+
+        const webhookUrl = team.slack_incoming_webhook
+        const organization = await this.organizationManager.fetchOrganization(team.organization_id)
 
         if (webhookUrl) {
             const webhookRequests = actionMatches
                 .filter((action) => action.post_to_slack)
-                .map((action) => {
-                    return this.postWebhook(webhookUrl, action, event, person, siteUrl)
-                })
-            void Promise.all(webhookRequests).catch((error) => captureException(error))
+                .map((action) => this.postWebhook(webhookUrl, action, event, person, siteUrl))
+            await Promise.all(webhookRequests).catch((error) => captureException(error))
         }
 
-        if (team) {
-            const organization = await this.organizationManager.fetchOrganization(team.organization_id)
-            if (organization?.available_features.includes('zapier')) {
-                const restHookRequests = actionMatches.flatMap(async (action) => {
-                    const relevantRestHooks = await this.db.fetchRelevantRestHooks(
-                        team.id,
-                        'action_performed',
-                        action.id
-                    )
-                    return Promise.all(
-                        relevantRestHooks.map((hook) => {
-                            return this.postRestHook(hook.target, event, person)
-                        })
-                    )
-                })
-                void Promise.all(restHookRequests).catch((error) => captureException(error))
-            }
+        if (organization?.available_features.includes('zapier')) {
+            const restHookRequests = actionMatches.flatMap(async (action) => {
+                const relevantRestHooks = await this.db.fetchRelevantRestHooks(team.id, 'action_performed', action.id)
+                return Promise.all(relevantRestHooks.map((hook) => this.postRestHook(hook.target, event, person)))
+            })
+            await Promise.all(restHookRequests).catch((error) => captureException(error))
         }
     }
 

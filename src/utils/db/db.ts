@@ -11,6 +11,7 @@ import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_PLUGIN_LOG_ENTRIES } from '../../config/kafka-topics'
 import {
     Action,
+    ActionEventPair,
     ActionStep,
     ClickHouseEvent,
     ClickHousePerson,
@@ -814,12 +815,21 @@ export class DB {
         return action
     }
 
-    public async registerEventActionOccurrences(eventId: Event['id'], actions: Action[]): Promise<void> {
+    public async fetchActionMatches(): Promise<ActionEventPair[]> {
+        const result = await this.postgresQuery<ActionEventPair>(
+            'SELECT * FROM posthog_action_events',
+            undefined,
+            'fetchActionMatches'
+        )
+        return result.rows
+    }
+
+    public async registerActionMatch(eventId: Event['id'], actions: Action[]): Promise<void> {
         const valuesClause = actions.map((action, index) => `($1, $${index + 2})`).join(', ')
         await this.postgresQuery(
             `INSERT INTO posthog_action_events (event_id, action_id) VALUES ${valuesClause}`,
             [eventId, ...actions.map((action) => action.id)],
-            'registerEventActionOccurrences'
+            'registerActionMatch'
         )
     }
 
