@@ -578,18 +578,6 @@ export class DB {
         return insertResult.rows[0]
     }
 
-    // Organization
-
-    public async fetchOrganization(organizationId: string): Promise<RawOrganization | undefined> {
-        const selectResult = await this.postgresQuery(
-            `SELECT * FROM posthog_organization WHERE id $1`,
-            [organizationId],
-            'fetchOrganization'
-        )
-        const rawOrganization: RawOrganization = selectResult.rows[0]
-        return rawOrganization
-    }
-
     // Event
 
     public async fetchEvents(): Promise<Event[] | ClickHouseEvent[]> {
@@ -833,7 +821,27 @@ export class DB {
         )
     }
 
+    // Organization
+
+    public async fetchOrganization(organizationId: string): Promise<RawOrganization | undefined> {
+        const selectResult = await this.postgresQuery<RawOrganization>(
+            `SELECT * FROM posthog_organization WHERE id = $1`,
+            [organizationId],
+            'fetchOrganization'
+        )
+        return selectResult.rows[0]
+    }
+
     // Team
+
+    public async fetchTeam(teamId: Team['id']): Promise<Team> {
+        const selectResult = await this.postgresQuery<Team>(
+            `SELECT * FROM posthog_team WHERE id = $1`,
+            [teamId],
+            'fetchTeam'
+        )
+        return selectResult.rows[0]
+    }
 
     /** Return the ID of the team that is used exclusively internally by the instance for storing metrics data. */
     public async fetchInternalMetricsTeam(): Promise<Team['id'] | null> {

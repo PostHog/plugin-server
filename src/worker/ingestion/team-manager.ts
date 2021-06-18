@@ -29,13 +29,7 @@ export class TeamManager {
 
         const timeout = timeoutGuard(`Still running "fetchTeam". Timeout warning after 30 sec!`)
         try {
-            const teamQueryResult = await this.db.postgresQuery(
-                'SELECT * FROM posthog_team WHERE id = $1',
-                [teamId],
-                'selectTeam'
-            )
-            const team: Team | null = teamQueryResult.rows[0] || null
-
+            const team: Team | null = (await this.db.fetchTeam(teamId)) || null
             this.teamCache.set(teamId, [team, Date.now()])
             return team
         } finally {

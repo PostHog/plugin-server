@@ -21,13 +21,7 @@ export class OrganizationManager {
 
         const timeout = timeoutGuard(`Still running "fetchOrganization". Timeout warning after 30 sec!`)
         try {
-            const organizationQueryResult = await this.db.postgresQuery(
-                'SELECT * FROM posthog_organization WHERE id = $1',
-                [organizationId],
-                'selectOrganization'
-            )
-            const organization: RawOrganization | null = organizationQueryResult.rows[0] || null
-
+            const organization: RawOrganization | null = (await this.db.fetchOrganization(organizationId)) || null
             this.organizationCache.set(organizationId, [organization, Date.now()])
             return organization
         } finally {
