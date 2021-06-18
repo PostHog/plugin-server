@@ -50,15 +50,18 @@ export function getActionDetails(action: Action, siteUrl: string, webhookType: W
     const actionName = stringify(action.name)
     let actionMarkdown: string
     if (webhookType === WebhookType.Slack) {
-        actionMarkdown = `<${siteUrl}/action/${action.id}|${action.name}>`
+        actionMarkdown = `<${siteUrl}/action/${action.id}|${actionName}>`
     } else {
-        actionMarkdown = `[${action.name}](${siteUrl}/action/${action.id})`
+        actionMarkdown = `[${actionName}](${siteUrl}/action/${action.id})`
     }
     return [actionName, actionMarkdown]
 }
 
 export function getTokens(messageFormat: string): [string[], string] {
-    const matchedTokens = messageFormat.match(/(?<=\[)(.*?)(?=\])/g) || []
+    // This finds property value tokens, basically any string contained in square brackets
+    // Examples: "[foo]" is matched in "bar [foo]", "[action.name]" is matched in "action [action.name]"
+    const TOKENS_REGEX = /(?<=\[)(.*?)(?=\])/g
+    const matchedTokens = messageFormat.match(TOKENS_REGEX) || []
     let tokenizedMessage = messageFormat
     if (matchedTokens.length) {
         tokenizedMessage = tokenizedMessage.replace(/\[(.*?)\]/g, '%s')
