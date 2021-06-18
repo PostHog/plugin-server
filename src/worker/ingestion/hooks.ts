@@ -83,7 +83,8 @@ export function getValueOfToken(
         } else {
             const propertyName = `$${tokenParts[1]}`
             const property = event.properties?.[propertyName]
-            text = markdown = stringify(property)
+            text = stringify(property)
+            markdown = text
         }
     } else if (tokenParts[0] === 'action') {
         if (tokenParts[1] == 'name') {
@@ -91,12 +92,13 @@ export function getValueOfToken(
         }
     } else if (tokenParts[0] == 'event') {
         if (tokenParts[1] == 'name') {
-            text = markdown = stringify(event.event)
+            text = stringify(event.event)
         } else if (tokenParts[1] == 'properties' && tokenParts.length > 2) {
             const propertyName = tokenParts[2]
             const property = event.properties?.[propertyName]
-            text = markdown = stringify(property)
+            text = stringify(property)
         }
+        markdown = text
     } else {
         throw new Error()
     }
