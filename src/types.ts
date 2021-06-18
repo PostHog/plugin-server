@@ -57,6 +57,7 @@ export interface PluginsServerConfig extends Record<string, any> {
     POSTHOG_POSTGRES_HOST: string
     POSTHOG_POSTGRES_PORT: number
     POSTHOG_POSTGRES_SSL_MODE: PostgresSSLMode
+    POSTHOG_POSTGRES_REJECT_UNAUTHORIZED: boolean
     POSTHOG_POSTGRES_CLI_SSL_CA: string | null
     POSTHOG_POSTGRES_CLI_SSL_CRT: string | null
     POSTHOG_POSTGRES_CLI_SSL_KEY: string | null

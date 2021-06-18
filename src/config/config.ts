@@ -25,6 +25,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         POSTHOG_POSTGRES_HOST: 'localhost',
         POSTHOG_POSTGRES_PORT: 5432,
         POSTHOG_POSTGRES_SSL_MODE: PostgresSSLMode.Disable,
+        POSTHOG_POSTGRES_REJECT_UNAUTHORIZED: true,
         POSTHOG_POSTGRES_CLI_SSL_CA: null,
         POSTHOG_POSTGRES_CLI_SSL_CRT: null,
         POSTHOG_POSTGRES_CLI_SSL_KEY: null,

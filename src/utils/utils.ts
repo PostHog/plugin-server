@@ -462,7 +462,7 @@ export function createPostgresPool(
             : configOrDatabaseUrl.POSTHOG_POSTGRES_SSL_MODE === PostgresSSLMode.Disable
             ? undefined
             : {
-                  rejectUnauthorized: true,
+                  rejectUnauthorized: configOrDatabaseUrl.POSTHOG_POSTGRES_REJECT_UNAUTHORIZED,
                   ca: getKeyValueFromFile(configOrDatabaseUrl, 'POSTHOG_POSTGRES_CLI_SSL_CA'),
                   key: getKeyValueFromFile(configOrDatabaseUrl, 'POSTHOG_POSTGRES_CLI_SSL_KEY'),
                   cert: getKeyValueFromFile(configOrDatabaseUrl, 'POSTHOG_POSTGRES_CLI_SSL_CRT'),
@@ -628,7 +628,7 @@ export function groupBy<T extends Record<string, any>, K extends keyof T>(
               return grouping
           }, {} as Record<T[K], T>)
         : objects.reduce((grouping, currentItem) => {
-              ;(grouping[currentItem[key]] = grouping[currentItem[key]] || []).push(currentItem)
+              (grouping[currentItem[key]] = grouping[currentItem[key]] || []).push(currentItem)
               return grouping
           }, {} as Record<T[K], T[]>)
 }
