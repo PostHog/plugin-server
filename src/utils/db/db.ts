@@ -264,8 +264,10 @@ export class DB {
                 return rest
             }) as ClickHousePerson[]
         } else if (database === Database.Postgres) {
-            return ((await this.postgresQuery('SELECT * FROM posthog_person', undefined, 'fetchPersons'))
-                .rows as RawPerson[]).map(
+            return (
+                (await this.postgresQuery('SELECT * FROM posthog_person', undefined, 'fetchPersons'))
+                    .rows as RawPerson[]
+            ).map(
                 (rawPerson: RawPerson) =>
                     ({
                         ...rawPerson,
@@ -328,7 +330,10 @@ export class DB {
                         {
                             value: Buffer.from(
                                 JSON.stringify({
-                                    created_at: castTimestampOrNow(createdAt, TimestampFormat.ClickHouse),
+                                    created_at: castTimestampOrNow(
+                                        createdAt,
+                                        TimestampFormat.ClickHouseSecondPrecision
+                                    ),
                                     properties: JSON.stringify(properties),
                                     team_id: teamId,
                                     is_identified: isIdentified,
@@ -439,7 +444,10 @@ export class DB {
                         {
                             value: Buffer.from(
                                 JSON.stringify({
-                                    created_at: castTimestampOrNow(person.created_at, TimestampFormat.ClickHouse),
+                                    created_at: castTimestampOrNow(
+                                        person.created_at,
+                                        TimestampFormat.ClickHouseSecondPrecision
+                                    ),
                                     properties: JSON.stringify(person.properties),
                                     team_id: person.team_id,
                                     is_identified: person.is_identified,
@@ -519,11 +527,7 @@ export class DB {
         }
     }
 
-    public async moveDistinctId(
-        person: Person,
-        personDistinctId: PersonDistinctId,
-        moveToPerson: Person
-    ): Promise<void> {
+    public async moveDistinctId(personDistinctId: PersonDistinctId, moveToPerson: Person): Promise<void> {
         await this.postgresQuery(
             `UPDATE posthog_persondistinctid SET person_id = $1 WHERE id = $2`,
             [moveToPerson.id, personDistinctId.id],
@@ -617,8 +621,9 @@ export class DB {
 
     public async fetchSessionRecordingEvents(): Promise<PostgresSessionRecordingEvent[] | SessionRecordingEvent[]> {
         if (this.kafkaProducer) {
-            const events = ((await this.clickhouseQuery(`SELECT * FROM session_recording_events`))
-                .data as SessionRecordingEvent[]).map((event) => {
+            const events = (
+                (await this.clickhouseQuery(`SELECT * FROM session_recording_events`)).data as SessionRecordingEvent[]
+            ).map((event) => {
                 return {
                     ...event,
                     snapshot_data: event.snapshot_data ? JSON.parse(event.snapshot_data) : null,
