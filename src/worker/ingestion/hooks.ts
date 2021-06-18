@@ -207,7 +207,7 @@ export class HookCannon {
         }
         await fetch(webhookUrl, {
             method: 'POST',
-            body: JSON.stringify(message),
+            body: JSON.stringify(message, undefined, 4),
             headers: { 'Content-Type': 'application/json' },
         })
         this.statsd?.increment('webhook_firings')
@@ -217,7 +217,7 @@ export class HookCannon {
         const payload = { ...event, person }
         await fetch(targetUrl, {
             method: 'POST',
-            body: JSON.stringify(payload),
+            body: JSON.stringify(payload, undefined, 4),
             headers: { 'Content-Type': 'application/json' },
         })
         this.statsd?.increment('rest_hook_firings')
