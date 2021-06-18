@@ -78,7 +78,7 @@ export function getValueOfToken(
     let markdown = ''
 
     if (tokenParts[0] === 'user') {
-        if (tokenParts[1] == 'name') {
+        if (tokenParts[1] === 'name') {
             ;[text, markdown] = getUserDetails(event, person, siteUrl, webhookType)
         } else {
             const propertyName = `$${tokenParts[1]}`
@@ -87,13 +87,13 @@ export function getValueOfToken(
             markdown = text
         }
     } else if (tokenParts[0] === 'action') {
-        if (tokenParts[1] == 'name') {
+        if (tokenParts[1] === 'name') {
             ;[text, markdown] = getActionDetails(action, siteUrl, webhookType)
         }
-    } else if (tokenParts[0] == 'event') {
-        if (tokenParts[1] == 'name') {
+    } else if (tokenParts[0] === 'event') {
+        if (tokenParts[1] === 'name') {
             text = stringify(event.event)
-        } else if (tokenParts[1] == 'properties' && tokenParts.length > 2) {
+        } else if (tokenParts[1] === 'properties' && tokenParts.length > 2) {
             const propertyName = tokenParts[2]
             const property = event.properties?.[propertyName]
             text = stringify(property)
