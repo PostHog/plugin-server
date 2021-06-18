@@ -2,7 +2,7 @@ import { PluginEvent } from '@posthog/plugin-scaffold/src/types'
 import fetch from 'node-fetch'
 import { MockedFunction } from 'ts-jest/dist/utils/testing'
 
-import { Hook,Hub } from '../../../src/types'
+import { Hook, Hub } from '../../../src/types'
 import { createHub } from '../../../src/utils/db/hub'
 import { UUIDT } from '../../../src/utils/utils'
 import { ActionMatcher } from '../../../src/worker/ingestion/action-matcher'
