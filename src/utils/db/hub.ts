@@ -15,7 +15,7 @@ import { JobQueueManager } from '../../main/job-queues/job-queue-manager'
 import { Hub, PluginsServerConfig } from '../../types'
 import { ActionManager } from '../../worker/ingestion/action-manager'
 import { ActionMatcher } from '../../worker/ingestion/action-matcher'
-import { HookCannon } from '../../worker/ingestion/hooks'
+import { HookCommander } from '../../worker/ingestion/hooks'
 import { OrganizationManager } from '../../worker/ingestion/organization-manager'
 import { EventsProcessor } from '../../worker/ingestion/process-event'
 import { TeamManager } from '../../worker/ingestion/team-manager'
@@ -186,7 +186,7 @@ export async function createHub(
         organizationManager,
         actionManager,
         actionMatcher: new ActionMatcher(db, actionManager, statsd),
-        hookCannon: new HookCannon(db, teamManager, organizationManager, statsd),
+        hookCannon: new HookCommander(db, teamManager, organizationManager, statsd),
     }
 
     // :TODO: This is only used on worker threads, not main

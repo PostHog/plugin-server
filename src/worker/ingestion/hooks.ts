@@ -139,7 +139,7 @@ export function getFormattedMessage(
     return [messageText, messageMarkdown]
 }
 
-export class HookCannon {
+export class HookCommander {
     db: DB
     teamManager: TeamManager
     organizationManager: OrganizationManager
