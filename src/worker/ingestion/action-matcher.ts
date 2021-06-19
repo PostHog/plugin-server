@@ -323,7 +323,7 @@ export class ActionMatcher {
         let test: (okValue: any) => boolean
         switch (filter.operator) {
             case PropertyOperator.IsNot:
-                test = (okValue) => okValue !== foundValue
+                test = (okValue) => !castingCompare(foundValue, okValue, PropertyOperator.Exact)
                 break
             case PropertyOperator.IContains:
                 foundValueLowerCase = foundValue.toLowerCase()
