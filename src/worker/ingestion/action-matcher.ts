@@ -42,10 +42,9 @@ const emptyMatchingOperator: Partial<Record<PropertyOperator, boolean>> = {
     [PropertyOperator.NotRegex]: true,
 }
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function castingCompare(
-    a: any,
-    b: any,
+    a: any, // eslint-disable-line @typescript-eslint/explicit-module-boundary-types
+    b: any, // eslint-disable-line @typescript-eslint/explicit-module-boundary-types
     operator: PropertyOperator.Exact | PropertyOperator.LessThan | PropertyOperator.GreaterThan
 ): boolean {
     // Check basic case first
@@ -68,18 +67,21 @@ export function castingCompare(
         default:
             throw new Error(`Operator ${operator} is not supported in castingCompare!`)
     }
-    // Try to cast to number, first via stringToBoolean, and then from raw value if that fails
-    const aCast = Number(stringToBoolean(a, true) ?? a)
-    const bCast = Number(stringToBoolean(b, true) ?? b)
-    // Compare finally (if either cast value is NaN, it will be rejected here too)
-    switch (operator) {
-        case PropertyOperator.Exact:
-            return aCast == bCast
-        case PropertyOperator.LessThan:
-            return aCast < bCast
-        case PropertyOperator.GreaterThan:
-            return aCast > bCast
+    if (typeof a !== typeof b) {
+        // Try to cast to number, first via stringToBoolean, and then from raw value if that fails
+        const aCast = Number(stringToBoolean(a, true) ?? a)
+        const bCast = Number(stringToBoolean(b, true) ?? b)
+        // Compare finally (if either cast value is NaN, it will be rejected here too)
+        switch (operator) {
+            case PropertyOperator.Exact:
+                return aCast == bCast
+            case PropertyOperator.LessThan:
+                return aCast < bCast
+            case PropertyOperator.GreaterThan:
+                return aCast > bCast
+        }
     }
+    return false
 }
 
 export class ActionMatcher {
