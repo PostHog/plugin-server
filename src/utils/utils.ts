@@ -10,7 +10,7 @@ import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
 
-import { Element, LogLevel, Plugin, PluginConfigId, PluginsServerConfig, TimestampFormat } from '../types'
+import { LogLevel, Plugin, PluginConfigId, PluginsServerConfig, TimestampFormat } from '../types'
 import { status } from './status'
 
 /** Time until autoexit (due to error) gives up on graceful exit and kills the process right away. */
@@ -311,14 +311,15 @@ export function castTimestampOrNow(
         timestamp = DateTime.fromISO(timestamp)
     }
     timestamp = timestamp.toUTC()
-    if (timestampFormat === TimestampFormat.ClickHouseSecondPrecision) {
-        return timestamp.toFormat('yyyy-MM-dd HH:mm:ss')
-    } else if (timestampFormat === TimestampFormat.ClickHouse) {
-        return timestamp.toFormat('yyyy-MM-dd HH:mm:ss.u')
-    } else if (timestampFormat === TimestampFormat.ISO) {
-        return timestamp.toUTC().toISO()
-    } else {
-        throw new Error(`Unrecognized timestamp format ${timestampFormat}!`)
+    switch (timestampFormat) {
+        case TimestampFormat.ClickHouseSecondPrecision:
+            return timestamp.toFormat('yyyy-MM-dd HH:mm:ss')
+        case TimestampFormat.ClickHouse:
+            return timestamp.toFormat('yyyy-MM-dd HH:mm:ss.u')
+        case TimestampFormat.ISO:
+            return timestamp.toUTC().toISO()
+        default:
+            throw new Error(`Unrecognized timestamp format ${timestampFormat}!`)
     }
 }
 
@@ -481,11 +482,19 @@ export enum NodeEnv {
     Test = 'test',
 }
 
-export function stringToBoolean(value: unknown): boolean {
-    if (!value) {
-        return false
+export function stringToBoolean(value: unknown, strict?: false): boolean
+export function stringToBoolean(value: unknown, strict: true): boolean | null
+export function stringToBoolean(value: unknown, strict = false): boolean | null {
+    const stringValue = String(value).toLowerCase()
+    const isStrictlyTrue = ['y', 'yes', 't', 'true', 'on', '1'].includes(stringValue)
+    if (isStrictlyTrue) {
+        return true
     }
-    return ['y', 'yes', 't', 'true', 'on', '1'].includes(String(value).toLowerCase())
+    if (strict) {
+        const isStrictlyFalse = ['n', 'no', 'f', 'false', 'off', '0'].includes(stringValue)
+        return isStrictlyFalse ? false : null
+    }
+    return false
 }
 
 export function determineNodeEnv(): NodeEnv {
@@ -619,4 +628,16 @@ export function clamp(value: number, min: number, max: number): number {
 export function stringClamp(value: string, def: number, min: number, max: number): number {
     const nanToNull = (nr: number): null | number => (isNaN(nr) ? null : nr)
     return clamp(nanToNull(parseInt(value)) ?? def, min, max)
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export function stringify(value: any): string {
+    switch (typeof value) {
+        case 'string':
+            return value
+        case 'undefined':
+            return 'undefined'
+        default:
+            return JSON.stringify(value)
+    }
 }

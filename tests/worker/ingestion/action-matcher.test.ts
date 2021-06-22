@@ -7,12 +7,13 @@ import {
     ActionStepUrlMatching,
     Element,
     Hub,
+    Person,
     PropertyOperator,
     RawAction,
 } from '../../../src/types'
 import { createHub } from '../../../src/utils/db/hub'
 import { UUIDT } from '../../../src/utils/utils'
-import { ActionMatcher } from '../../../src/worker/ingestion/action-matcher'
+import { ActionMatcher, castingCompare } from '../../../src/worker/ingestion/action-matcher'
 import { commonUserId } from '../../helpers/plugins'
 import { insertRow, resetTestDatabase } from '../../helpers/sql'
 
@@ -86,6 +87,21 @@ describe('ActionMatcher', () => {
         }
     }
 
+    /** Return a test person created on a common base using provided property overrides. */
+    function createTestPerson(overrides: Partial<Person> = {}): Person {
+        const url: string = overrides.properties?.$current_url ?? 'http://example.com/foo/'
+        return {
+            id: 2,
+            team_id: 2,
+            properties: {},
+            is_user_id: 0,
+            is_identified: true,
+            uuid: 'F99FA0A1-E0C2-4CFE-A09A-4C3C4327A4C8',
+            created_at: DateTime.fromSeconds(18000000),
+            ...overrides,
+        }
+    }
+
     describe('#match()', () => {
         it('returns no match if action has no steps', async () => {
             await createTestAction([])
@@ -95,7 +111,7 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(event)).toEqual([])
         })
 
-        it('returns a match in case of property operator exact', async () => {
+        it('returns a match in case of event property operator exact', async () => {
             const actionDefinitionOpExact: Action = await createTestAction([
                 {
                     properties: [{ type: 'event', key: 'foo', value: 'bar', operator: 'exact' as PropertyOperator }],
@@ -138,7 +154,7 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(eventFooNull)).toEqual([])
         })
 
-        it('returns a match in case of property operator is not', async () => {
+        it('returns a match in case of event property operator is not', async () => {
             const actionDefinitionOpIsNot: Action = await createTestAction([
                 {
                     properties: [{ type: 'event', key: 'foo', value: 'bar', operator: 'is_not' as PropertyOperator }],
@@ -170,7 +186,7 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(eventFooNull)).toEqual([actionDefinitionOpIsNot])
         })
 
-        it('returns a match in case of property operator contains', async () => {
+        it('returns a match in case of event property operator contains', async () => {
             const actionDefinitionOpContains: Action = await createTestAction([
                 {
                     properties: [
@@ -204,7 +220,7 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(eventFooNull)).toEqual([])
         })
 
-        it('returns a match in case of property operator does not contain', async () => {
+        it('returns a match in case of event property operator does not contain', async () => {
             const actionDefinitionOpNotContains: Action = await createTestAction([
                 {
                     properties: [
@@ -238,7 +254,7 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(eventFooNull)).toEqual([actionDefinitionOpNotContains])
         })
 
-        it('returns a match in case of property operator regex', async () => {
+        it('returns a match in case of event property operator regex', async () => {
             const actionDefinitionOpRegex1: Action = await createTestAction([
                 {
                     properties: [{ type: 'event', key: 'foo', value: '^bar', operator: 'regex' as PropertyOperator }],
@@ -280,7 +296,7 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(eventFooNull)).toEqual([])
         })
 
-        it('returns a match in case of property operator not regex', async () => {
+        it('returns a match in case of event property operator not regex', async () => {
             const actionDefinitionOpNotRegex1: Action = await createTestAction([
                 {
                     properties: [
@@ -344,7 +360,7 @@ describe('ActionMatcher', () => {
             ])
         })
 
-        it('returns a match in case of property operator is set', async () => {
+        it('returns a match in case of event property operator is set', async () => {
             const actionDefinitionOpIsSet: Action = await createTestAction([
                 {
                     properties: [{ type: 'event', key: 'foo', operator: 'is_set' as PropertyOperator }],
@@ -376,7 +392,7 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(eventFooNull)).toEqual([actionDefinitionOpIsSet])
         })
 
-        it('returns a match in case of property operator is not set', async () => {
+        it('returns a match in case of event property operator is not set', async () => {
             const actionDefinitionOpIsNotSet: Action = await createTestAction([
                 {
                     properties: [{ type: 'event', key: 'foo', operator: 'is_not_set' as PropertyOperator }],
@@ -408,7 +424,7 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(eventFooNull)).toEqual([])
         })
 
-        it('returns a match in case of property operator greater than', async () => {
+        it('returns a match in case of event property operator greater than', async () => {
             const actionDefinitionOpGreaterThan: Action = await createTestAction([
                 {
                     properties: [{ type: 'event', key: 'foo', value: 5, operator: 'gt' as PropertyOperator }],
@@ -444,7 +460,7 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(eventFooNull)).toEqual([])
         })
 
-        it('returns a match in case of property operator less than', async () => {
+        it('returns a match in case of event property operator less than', async () => {
             const actionDefinitionOpLessThan: Action = await createTestAction([
                 {
                     properties: [{ type: 'event', key: 'foo', value: 5, operator: 'lt' as PropertyOperator }],
@@ -656,6 +672,51 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(eventExampleBad3)).toEqual([])
         })
 
+        it('returns a match in case of person property operator exact', async () => {
+            const actionDefinitionOpExact: Action = await createTestAction([
+                {
+                    properties: [{ type: 'person', key: 'foo', value: 'bar', operator: 'exact' as PropertyOperator }],
+                },
+            ])
+            const actionDefinitionOpUndefined: Action = await createTestAction([
+                {
+                    properties: [{ type: 'person', key: 'foo', value: 'bar' }], // undefined operator should mean "exact"
+                },
+            ])
+
+            const event = createTestEvent()
+
+            const personFooBar = createTestPerson({ properties: { foo: 'bar' } })
+            const personFooBarPolPot = createTestPerson({ properties: { foo: 'bar', pol: 'pot' } })
+            const personFooBaR = createTestPerson({ properties: { foo: 'baR' } })
+            const personFooBaz = createTestPerson({ properties: { foo: 'baz' } })
+            const personFooBarabara = createTestPerson({ properties: { foo: 'barabara' } })
+            const personFooRabarbar = createTestPerson({ properties: { foo: 'rabarbar' } })
+            const personFooNumber = createTestPerson({ properties: { foo: 7 } })
+            const personNoNothing = createTestPerson()
+            const personFigNumber = createTestPerson({ properties: { fig: 999 } })
+            const personFooTrue = createTestPerson({ properties: { foo: true } })
+            const personFooNull = createTestPerson({ properties: { foo: null } })
+
+            expect(await actionMatcher.match(event, personFooBar)).toEqual([
+                actionDefinitionOpExact,
+                actionDefinitionOpUndefined,
+            ])
+            expect(await actionMatcher.match(event, personFooBarPolPot)).toEqual([
+                actionDefinitionOpExact,
+                actionDefinitionOpUndefined,
+            ])
+            expect(await actionMatcher.match(event, personFooBaR)).toEqual([])
+            expect(await actionMatcher.match(event, personFooBaz)).toEqual([])
+            expect(await actionMatcher.match(event, personFooBarabara)).toEqual([])
+            expect(await actionMatcher.match(event, personFooRabarbar)).toEqual([])
+            expect(await actionMatcher.match(event, personFooNumber)).toEqual([])
+            expect(await actionMatcher.match(event, personNoNothing)).toEqual([])
+            expect(await actionMatcher.match(event, personFigNumber)).toEqual([])
+            expect(await actionMatcher.match(event, personFooTrue)).toEqual([])
+            expect(await actionMatcher.match(event, personFooNull)).toEqual([])
+        })
+
         it('returns a match in case of cohort match', async () => {
             const testCohort = await hub.db.createCohort({ name: 'Test', created_by_id: commonUserId, team_id: 2 })
 
@@ -716,6 +777,152 @@ describe('ActionMatcher', () => {
                     await hub.db.fetchPerson(actionDefinition.team_id, eventExamplePersonUnknown.distinct_id)
                 )
             ).toEqual([])
+        })
+
+        it('returns a match in case of element href equals', async () => {
+            const actionDefinitionLinkHref: Action = await createTestAction([
+                {
+                    href: 'https://example.com/',
+                },
+            ])
+
+            const event = createTestEvent()
+            const elementsHrefOuter: Element[] = [
+                { tag_name: 'h1', attr_class: ['headline'] },
+                { tag_name: 'a', href: 'https://example.com/' },
+                { tag_name: 'main' },
+            ]
+            const elementsHrefInner: Element[] = [
+                { tag_name: 'a', href: 'https://example.com/' },
+                { tag_name: 'h1', attr_class: ['headline'] },
+                { tag_name: 'main' },
+            ]
+            const elementsNoHref: Element[] = [
+                { tag_name: 'span' },
+                { tag_name: 'h1', attr_class: ['headline'] },
+                { tag_name: 'main' },
+            ]
+
+            expect(await actionMatcher.match(event, undefined, elementsHrefOuter)).toEqual([actionDefinitionLinkHref])
+            expect(await actionMatcher.match(event, undefined, elementsHrefInner)).toEqual([actionDefinitionLinkHref])
+            expect(await actionMatcher.match(event, undefined, elementsNoHref)).toEqual([])
+        })
+
+        it('returns a match in case of element text and tag name equals', async () => {
+            const actionDefinitionLinkHref: Action = await createTestAction([
+                {
+                    tag_name: 'h1',
+                    text: 'Hallo!',
+                },
+            ])
+
+            const event = createTestEvent()
+            const elementsHrefProper: Element[] = [
+                { tag_name: 'h1', attr_class: ['headline'], text: 'Hallo!' },
+                { tag_name: 'a', href: 'https://example.com/' },
+                { tag_name: 'main' },
+            ]
+            const elementsHrefWrongTag: Element[] = [
+                { tag_name: 'h3', attr_class: ['headline'], text: 'Hallo!' },
+                { tag_name: 'a', href: 'https://example.com/' },
+                { tag_name: 'main' },
+            ]
+            const elementsHrefWrongText: Element[] = [
+                { tag_name: 'h3', attr_class: ['headline'], text: 'Auf Wiedersehen!' },
+                { tag_name: 'a', href: 'https://example.com/' },
+                { tag_name: 'main' },
+            ]
+            const elementsHrefWrongLevel: Element[] = [
+                { tag_name: 'i', attr_class: ['headline'], text: 'Auf Wiedersehen!' },
+                { tag_name: 'h1' },
+                { tag_name: 'a', href: 'https://example.com/' },
+                { tag_name: 'main' },
+            ]
+
+            expect(await actionMatcher.match(event, undefined, elementsHrefProper)).toEqual([actionDefinitionLinkHref])
+            expect(await actionMatcher.match(event, undefined, elementsHrefWrongTag)).toEqual([])
+            expect(await actionMatcher.match(event, undefined, elementsHrefWrongText)).toEqual([])
+            expect(await actionMatcher.match(event, undefined, elementsHrefWrongLevel)).toEqual([])
+        })
+
+        it('returns a match in case of element selector', async () => {
+            const actionDefinitionAnyDescendant: Action = await createTestAction([
+                {
+                    selector: 'main h1.headline',
+                },
+            ])
+            const actionDefinitionDirectDescendant: Action = await createTestAction([
+                {
+                    selector: 'main > h1.headline',
+                },
+            ])
+            const actionDefinitionDirectHref: Action = await createTestAction([
+                {
+                    selector: 'main > a[href="https://example.com/"]',
+                },
+            ])
+
+            const event = createTestEvent()
+            const elementsHrefProperNondirect: Element[] = [
+                { tag_name: 'h1', attr_class: ['headline'], text: 'Hallo!' },
+                { tag_name: 'a', href: 'https://example.com/' },
+                { tag_name: 'main' },
+            ]
+            const elementsHrefWrongClassNondirect: Element[] = [
+                { tag_name: 'h1', attr_class: ['oof'], text: 'Hallo!' },
+                { tag_name: 'a', href: 'https://example.com/' },
+                { tag_name: 'main' },
+            ]
+            const elementsHrefProperDirect: Element[] = [
+                { tag_name: 'h1', attr_class: ['headline'], text: 'Hallo!' },
+                { tag_name: 'main' },
+            ]
+
+            expect(await actionMatcher.match(event, undefined, elementsHrefProperNondirect)).toEqual([
+                actionDefinitionAnyDescendant,
+                actionDefinitionDirectHref,
+            ])
+            expect(await actionMatcher.match(event, undefined, elementsHrefWrongClassNondirect)).toEqual([
+                actionDefinitionDirectHref,
+            ])
+            expect(await actionMatcher.match(event, undefined, elementsHrefProperDirect)).toEqual([
+                actionDefinitionAnyDescendant,
+                actionDefinitionDirectDescendant,
+            ])
+        })
+
+        it('returns a match using filter value casting, with multiple match groups', async () => {
+            const actionDefinition: Action = await createTestAction([
+                { event: 'tenet' },
+                {
+                    properties: [
+                        { key: 'insight', type: 'event', value: ['STICKINESS'], operator: PropertyOperator.Exact },
+                        {
+                            key: 'total_event_action_filters_count',
+                            type: 'event',
+                            value: '0',
+                            operator: PropertyOperator.Exact,
+                        },
+                        {
+                            key: 'total_event_actions_count',
+                            type: 'event',
+                            value: '0',
+                            operator: PropertyOperator.GreaterThan,
+                        },
+                    ],
+                },
+            ])
+
+            const eventExampleOk1: PluginEvent = createTestEvent({
+                event: 'meow',
+                properties: {
+                    insight: 'STICKINESS',
+                    total_event_action_filters_count: 0,
+                    total_event_actions_count: 4,
+                },
+            })
+
+            expect(await actionMatcher.match(eventExampleOk1)).toEqual([actionDefinition])
         })
     })
 
@@ -797,5 +1004,72 @@ describe('ActionMatcher', () => {
 
             expect(actionMatcher.checkElementsAgainstSelector(elements, 'aside div > span')).toBeTruthy()
         })
+
+        it('handles direct descendant selector edge cases 3', () => {
+            const elements: Element[] = [{ tag_name: 'span', nth_child: 2, nth_of_type: 1 }, { tag_name: 'section' }]
+
+            expect(
+                actionMatcher.checkElementsAgainstSelector(elements, 'section > span:nth-child(2):nth-of-type(1)')
+            ).toBeTruthy()
+            expect(
+                actionMatcher.checkElementsAgainstSelector(elements, 'section > span:nth-child(1):nth-of-type(1)')
+            ).toBeFalsy()
+            expect(
+                actionMatcher.checkElementsAgainstSelector(elements, 'section > span:nth-child(2):nth-of-type(3)')
+            ).toBeFalsy()
+        })
+    })
+})
+
+describe('castingCompare', () => {
+    it('compares exact', () => {
+        expect(castingCompare(2, '2', PropertyOperator.Exact)).toBeTruthy()
+        expect(castingCompare('2', 2, PropertyOperator.Exact)).toBeTruthy()
+        expect(castingCompare(true, 'true', PropertyOperator.Exact)).toBeTruthy()
+        expect(castingCompare(true, true, PropertyOperator.Exact)).toBeTruthy()
+        expect(castingCompare('90', '90', PropertyOperator.Exact)).toBeTruthy()
+        expect(castingCompare('1', true, PropertyOperator.Exact)).toBeTruthy()
+
+        expect(castingCompare('1', 'true', PropertyOperator.Exact)).toBeFalsy()
+        expect(castingCompare('1', false, PropertyOperator.Exact)).toBeFalsy()
+        expect(castingCompare(false, '1', PropertyOperator.Exact)).toBeFalsy()
+        expect(castingCompare(false, 'true', PropertyOperator.Exact)).toBeFalsy()
+    })
+    it('compares less than', () => {
+        expect(castingCompare(2, '2', PropertyOperator.LessThan)).toBeFalsy()
+        expect(castingCompare('2', 2, PropertyOperator.LessThan)).toBeFalsy()
+        expect(castingCompare('1', 'true', PropertyOperator.LessThan)).toBeFalsy()
+        expect(castingCompare('0', 'true', PropertyOperator.Exact)).toBeFalsy()
+        expect(castingCompare(true, 'true', PropertyOperator.LessThan)).toBeFalsy()
+        expect(castingCompare(true, true, PropertyOperator.LessThan)).toBeFalsy()
+        expect(castingCompare('90', '90', PropertyOperator.LessThan)).toBeFalsy()
+        expect(castingCompare('1', true, PropertyOperator.LessThan)).toBeFalsy()
+        expect(castingCompare('1', false, PropertyOperator.LessThan)).toBeFalsy()
+
+        expect(castingCompare(false, '1', PropertyOperator.LessThan)).toBeTruthy()
+        expect(castingCompare(false, 'true', PropertyOperator.LessThan)).toBeTruthy()
+        expect(castingCompare('2', 3, PropertyOperator.LessThan)).toBeTruthy()
+        expect(castingCompare('445.3', 9099.2, PropertyOperator.LessThan)).toBeTruthy()
+    })
+    it('compares greater than', () => {
+        expect(castingCompare(2, '2', PropertyOperator.GreaterThan)).toBeFalsy()
+        expect(castingCompare('2', 2, PropertyOperator.GreaterThan)).toBeFalsy()
+        expect(castingCompare('1', 'true', PropertyOperator.GreaterThan)).toBeFalsy()
+        expect(castingCompare('1', 'false', PropertyOperator.Exact)).toBeFalsy()
+        expect(castingCompare(true, 'true', PropertyOperator.GreaterThan)).toBeFalsy()
+        expect(castingCompare(true, true, PropertyOperator.GreaterThan)).toBeFalsy()
+        expect(castingCompare('90', '90', PropertyOperator.GreaterThan)).toBeFalsy()
+        expect(castingCompare('1', true, PropertyOperator.GreaterThan)).toBeFalsy()
+
+        expect(castingCompare(false, '1', PropertyOperator.GreaterThan)).toBeFalsy()
+        expect(castingCompare(false, 'true', PropertyOperator.GreaterThan)).toBeFalsy()
+        expect(castingCompare('2', 3, PropertyOperator.GreaterThan)).toBeFalsy()
+        expect(castingCompare('445.3', 9099.2, PropertyOperator.GreaterThan)).toBeFalsy()
+
+        expect(castingCompare('1', false, PropertyOperator.GreaterThan)).toBeTruthy()
+        expect(castingCompare(true, '-1', PropertyOperator.GreaterThan)).toBeTruthy()
+        expect(castingCompare(1, 'false', PropertyOperator.GreaterThan)).toBeTruthy()
+        expect(castingCompare(333, '2', PropertyOperator.GreaterThan)).toBeTruthy()
+        expect(castingCompare('9032.3', -1.2, PropertyOperator.GreaterThan)).toBeTruthy()
     })
 })
