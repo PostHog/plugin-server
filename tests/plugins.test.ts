@@ -715,7 +715,8 @@ test('plugin sets exported metrics', async () => {
         mockPluginWithArchive(`
             export const metrics = {
                 'metric1': 'sum',
-                'metric2': 'avg'
+                'metric2': 'mAx',
+                'metric3': 'MIN'
             }
         `),
     ])
@@ -728,8 +729,51 @@ test('plugin sets exported metrics', async () => {
 
     expect(pluginConfig.plugin!.metrics).toEqual({
         metric1: 'sum',
-        metric2: 'avg',
+        metric2: 'max',
+        metric3: 'min',
     })
+})
+
+test('plugin vm is not setup if metric type is unsupported', async () => {
+    getPluginRows.mockReturnValueOnce([
+        mockPluginWithArchive(`
+            export const metrics = {
+                'unsupportedMetric': 'avg',
+            }
+        `),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(hub)
+    const pluginConfig = hub.pluginConfigs.get(39)!
+    const vm = await pluginConfig.vm?.resolveInternalVm
+
+    expect(vm).toEqual(null)
+    expect(pluginConfig.plugin!.metrics).toEqual({})
+})
+
+test('metrics bla', async () => {
+    getPluginRows.mockReturnValueOnce([
+        mockPluginWithArchive(`
+            export const metrics = {
+                'metric1': 'sum',
+            }
+
+            export function processEvent(event, { metrics }) {
+                metrics.metric1.increment(10)
+            }
+        `),
+    ])
+    getPluginConfigRows.mockReturnValueOnce([pluginConfig39])
+    getPluginAttachmentRows.mockReturnValueOnce([pluginAttachment1])
+
+    await setupPlugins(hub)
+    const pluginConfig = hub.pluginConfigs.get(39)!
+    await pluginConfig.vm?.resolveInternalVm
+    await runProcessEvent(hub, {} as PluginEvent)
+
+    expect(hub.pluginMetricsManager.metricsPerPlugin).toEqual({})
 })
 
 describe('loadSchedule()', () => {

@@ -201,7 +201,7 @@ export async function createPluginConfigVM(
                 if (typeof exportDestination['metrics'] === 'object') {
                     for (const [key, value] of Object.entries(exportDestination['metrics'])) {
                         if (typeof value === 'string') {
-                            __metrics[key] = value
+                            __metrics[key] = value.toLowerCase()
                         }
                     }
                 }
