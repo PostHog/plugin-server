@@ -44,9 +44,31 @@ export class PluginMetricsManager {
 
     increment(pluginConfig: PluginConfig, metricName: string, value: number): void {
         this.setupMetricsObjectIfNeeded(pluginConfig)
-        if (!this.metricsPerPlugin[pluginConfig.id].metrics[metricName]) {
-            this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = 0
+        const currentMetric = this.metricsPerPlugin[pluginConfig.id].metrics[metricName]
+        if (!currentMetric) {
+            this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = value
+            return
         }
         this.metricsPerPlugin[pluginConfig.id].metrics[metricName] += value
+    }
+
+    max(pluginConfig: PluginConfig, metricName: string, value: number): void {
+        this.setupMetricsObjectIfNeeded(pluginConfig)
+        const currentMetric = this.metricsPerPlugin[pluginConfig.id].metrics[metricName]
+        if (!currentMetric) {
+            this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = value
+            return
+        }
+        this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = Math.max(value, currentMetric)
+    }
+
+    min(pluginConfig: PluginConfig, metricName: string, value: number): void {
+        this.setupMetricsObjectIfNeeded(pluginConfig)
+        const currentMetric = this.metricsPerPlugin[pluginConfig.id].metrics[metricName]
+        if (!currentMetric) {
+            this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = value
+            return
+        }
+        this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = Math.min(value, currentMetric)
     }
 }
