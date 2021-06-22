@@ -184,6 +184,22 @@ export class LazyPluginVM {
         }
 
         let newMetrics = vm.metrics
+        if (!newMetrics) {
+            await setPluginMetrics(hub, pluginConfig, {})
+            return
+        }
+
+        const unsupportedMetrics = Object.values(newMetrics).filter(
+            (metric) => !['sum', 'max', 'min'].includes(metric.toLowerCase())
+        )
+        if (unsupportedMetrics.length > 0) {
+            throw new Error(
+                `Only 'sum', 'max', and 'min' are supported as metric types. Invalid types received: ${unsupportedMetrics.join(
+                    ', '
+                )}`
+            )
+        }
+
         const oldMetrics = pluginConfig.plugin.metrics
         if ((pluginConfig.plugin.capabilities?.methods || []).includes('exportEvents')) {
             newMetrics = {

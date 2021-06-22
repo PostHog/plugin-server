@@ -10,36 +10,53 @@ export function createMetrics(hub: Hub, pluginConfig: PluginConfig): Metrics {
         {},
         {
             get(_, key) {
-                if (typeof key !== 'string' || !Object.keys(pluginConfig.plugin?.metrics || {}).includes(key)) {
+                const availabeMetrics = pluginConfig.plugin?.metrics || {}
+
+                if (typeof key !== 'string' || !Object.keys(availabeMetrics).includes(key)) {
                     throw new Error('Invalid metric name')
                 }
                 const defaultOptions = {
                     metricName: key,
                     pluginConfig,
                 }
-                return {
-                    increment: (value: number) => {
-                        hub.pluginMetricsManager.updateMetric({
-                            value,
-                            metricOperation: MetricMathOperations.Increment,
-                            ...defaultOptions,
-                        })
-                    },
-                    max: (value: number) => {
-                        hub.pluginMetricsManager.updateMetric({
-                            value,
-                            metricOperation: MetricMathOperations.Max,
-                            ...defaultOptions,
-                        })
-                    },
-                    min: (value: number) => {
-                        hub.pluginMetricsManager.updateMetric({
-                            value,
-                            metricOperation: MetricMathOperations.Min,
-                            ...defaultOptions,
-                        })
-                    },
+
+                if (availabeMetrics[key].toLowerCase() === 'sum') {
+                    return {
+                        increment: (value: number) => {
+                            hub.pluginMetricsManager.updateMetric({
+                                value,
+                                metricOperation: MetricMathOperations.Increment,
+                                ...defaultOptions,
+                            })
+                        },
+                    }
                 }
+
+                if (availabeMetrics[key].toLowerCase() === 'max') {
+                    return {
+                        max: (value: number) => {
+                            hub.pluginMetricsManager.updateMetric({
+                                value,
+                                metricOperation: MetricMathOperations.Max,
+                                ...defaultOptions,
+                            })
+                        },
+                    }
+                }
+
+                if (availabeMetrics[key].toLowerCase() === 'min') {
+                    return {
+                        min: (value: number) => {
+                            hub.pluginMetricsManager.updateMetric({
+                                value,
+                                metricOperation: MetricMathOperations.Min,
+                                ...defaultOptions,
+                            })
+                        },
+                    }
+                }
+
+                return {}
             },
         }
     )
