@@ -1,12 +1,19 @@
 import Piscina from '@posthog/piscina'
 
-import { Hub, PluginConfig, PluginConfigId } from './../types'
+import { Hub, MetricMathOperations, PluginConfig, PluginConfigId } from './../types'
 import { createPosthog } from './../worker/vm/extensions/posthog'
 import { UUIDT } from './utils'
 
 interface PluginMetrics {
     pluginConfig: PluginConfig
     metrics: Record<string, number>
+}
+
+interface UpdateMetricPayload {
+    pluginConfig: PluginConfig
+    metricOperation: MetricMathOperations
+    metricName: string
+    value: number
 }
 
 export class PluginMetricsManager {
@@ -42,33 +49,28 @@ export class PluginMetricsManager {
         }
     }
 
-    increment(pluginConfig: PluginConfig, metricName: string, value: number): void {
+    updateMetric({ metricOperation, pluginConfig, metricName, value }: UpdateMetricPayload) {
+        if (typeof value !== 'number') {
+            throw new Error('Only numbers are allowed for operations on metrics')
+        }
         this.setupMetricsObjectIfNeeded(pluginConfig)
         const currentMetric = this.metricsPerPlugin[pluginConfig.id].metrics[metricName]
         if (!currentMetric) {
             this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = value
             return
         }
-        this.metricsPerPlugin[pluginConfig.id].metrics[metricName] += value
-    }
-
-    max(pluginConfig: PluginConfig, metricName: string, value: number): void {
-        this.setupMetricsObjectIfNeeded(pluginConfig)
-        const currentMetric = this.metricsPerPlugin[pluginConfig.id].metrics[metricName]
-        if (!currentMetric) {
-            this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = value
-            return
+        switch (metricOperation) {
+            case MetricMathOperations.Increment:
+                this.metricsPerPlugin[pluginConfig.id].metrics[metricName] += value
+                break
+            case MetricMathOperations.Max:
+                this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = Math.max(value, currentMetric)
+                break
+            case MetricMathOperations.Min:
+                this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = Math.min(value, currentMetric)
+                break
+            default:
+                throw new Error('Unsupported metric math operation!')
         }
-        this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = Math.max(value, currentMetric)
-    }
-
-    min(pluginConfig: PluginConfig, metricName: string, value: number): void {
-        this.setupMetricsObjectIfNeeded(pluginConfig)
-        const currentMetric = this.metricsPerPlugin[pluginConfig.id].metrics[metricName]
-        if (!currentMetric) {
-            this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = value
-            return
-        }
-        this.metricsPerPlugin[pluginConfig.id].metrics[metricName] = Math.min(value, currentMetric)
     }
 }

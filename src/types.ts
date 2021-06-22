@@ -194,7 +194,14 @@ export type PluginId = Plugin['id']
 export type PluginConfigId = PluginConfig['id']
 export type TeamId = Team['id']
 
-export type MetricMathOperations = 'max' | 'min' | 'sum'
+export enum MetricMathOperations {
+    Increment = 'increment',
+    Max = 'max',
+    Min = 'min',
+}
+
+export type StoredMetricMathOperations = 'max' | 'min' | 'sum'
+export type StoredPluginMetrics = Record<string, StoredMetricMathOperations> | null
 
 export interface Plugin {
     id: number
@@ -215,7 +222,7 @@ export interface Plugin {
     created_at: string
     updated_at: string
     capabilities?: PluginCapabilities
-    metrics?: Record<string, MetricMathOperations> | null
+    metrics?: StoredPluginMetrics
 }
 
 export interface PluginCapabilities {
@@ -324,7 +331,7 @@ export interface PluginConfigVMResponse {
     vm: VM
     methods: VMMethods
     tasks: Record<PluginTaskType, Record<string, PluginTask>>
-    metrics: Record<string, string>
+    metrics: StoredPluginMetrics
 }
 
 export interface PluginConfigVMInternalResponse<M extends Meta = Meta> {

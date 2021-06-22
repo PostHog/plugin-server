@@ -188,10 +188,11 @@ export class LazyPluginVM {
         if ((pluginConfig.plugin.capabilities?.methods || []).includes('exportEvents')) {
             newMetrics = {
                 ...newMetrics,
-                'events-seen': 'sum',
-                'events-delivered-successfully': 'sum',
-                'retry-errors': 'sum',
-                'other-errors': 'sum',
+                events_seen: 'sum',
+                events_delivered_successfully: 'sum',
+                undelivered_events: 'sum',
+                retry_errors: 'sum',
+                other_errors: 'sum',
             }
         }
 

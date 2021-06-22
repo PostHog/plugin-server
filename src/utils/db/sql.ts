@@ -8,8 +8,8 @@ import {
     PluginError,
     PluginLogEntrySource,
     PluginLogEntryType,
+    StoredPluginMetrics,
 } from '../../types'
-import { TeamId } from './../../types'
 
 function pluginConfigsInForceQuery(specificField?: keyof PluginConfig): string {
     return `SELECT posthog_pluginconfig.${specificField || '*'}
@@ -67,7 +67,7 @@ export async function setPluginCapabilities(
 export async function setPluginMetrics(
     hub: Hub,
     pluginConfig: PluginConfig,
-    metrics: Record<string, string>
+    metrics: StoredPluginMetrics
 ): Promise<void> {
     await hub.db.postgresQuery(
         'UPDATE posthog_plugin SET metrics = ($1) WHERE id = $2',
