@@ -184,6 +184,8 @@ export type PluginId = number
 export type PluginConfigId = number
 export type TeamId = number
 
+export type MetricMathOperations = 'max' | 'min' | 'sum'
+
 export interface Plugin {
     id: PluginId
     organization_id: string
@@ -203,6 +205,7 @@ export interface Plugin {
     created_at: string
     updated_at: string
     capabilities?: PluginCapabilities
+    metrics?: Record<string, MetricMathOperations> | null
 }
 
 export interface PluginCapabilities {
