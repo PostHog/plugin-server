@@ -21,6 +21,7 @@ import {
 } from '../../types'
 import { DB } from '../../utils/db/db'
 import { extractElements } from '../../utils/db/utils'
+import { stringify, stringToBoolean } from '../../utils/utils'
 import { ActionManager } from './action-manager'
 
 /** These operators can only be matched if the provided filter's value has the right type. */
@@ -39,6 +40,58 @@ const emptyMatchingOperator: Partial<Record<PropertyOperator, boolean>> = {
     [PropertyOperator.IsNot]: true,
     [PropertyOperator.NotIContains]: true,
     [PropertyOperator.NotRegex]: true,
+}
+
+/** Return whether two values compare to each other according to the specified operator.
+ * This simulates the behavior of ClickHouse (or other DBMSs) which like to cast values in SELECTs to the column's type.
+ */
+export function castingCompare(
+    a: any, // eslint-disable-line @typescript-eslint/explicit-module-boundary-types
+    b: any, // eslint-disable-line @typescript-eslint/explicit-module-boundary-types
+    operator: PropertyOperator.Exact | PropertyOperator.IsNot | PropertyOperator.LessThan | PropertyOperator.GreaterThan
+): boolean {
+    // Check basic case first
+    switch (operator) {
+        case PropertyOperator.Exact:
+            if (a == b) {
+                return true
+            }
+            break
+        case PropertyOperator.IsNot:
+            if (a != b) {
+                return true
+            }
+            break
+        case PropertyOperator.LessThan:
+            if (typeof a !== 'string' && typeof b !== 'string' && a < b) {
+                return true
+            }
+            break
+        case PropertyOperator.GreaterThan:
+            if (typeof a !== 'string' && typeof b !== 'string' && a > b) {
+                return true
+            }
+            break
+        default:
+            throw new Error(`Operator ${operator} is not supported in castingCompare!`)
+    }
+    if (typeof a !== typeof b) {
+        // Try to cast to number, first via stringToBoolean, and then from raw value if that fails
+        const aCast = Number(stringToBoolean(a, true) ?? a)
+        const bCast = Number(stringToBoolean(b, true) ?? b)
+        // Compare finally (if either cast value is NaN, it will be rejected here too)
+        switch (operator) {
+            case PropertyOperator.Exact:
+                return aCast == bCast
+            case PropertyOperator.IsNot:
+                return aCast != bCast
+            case PropertyOperator.LessThan:
+                return aCast < bCast
+            case PropertyOperator.GreaterThan:
+                return aCast > bCast
+        }
+    }
+    return false
 }
 
 export class ActionMatcher {
@@ -323,28 +376,27 @@ export class ActionMatcher {
         let test: (okValue: any) => boolean
         switch (filter.operator) {
             case PropertyOperator.IsNot:
-                test = (okValue) => okValue !== foundValue
+                test = (okValue) => castingCompare(foundValue, okValue, PropertyOperator.IsNot)
                 break
             case PropertyOperator.IContains:
                 foundValueLowerCase = foundValue.toLowerCase()
-                test = (okValue) => typeof okValue === 'string' && foundValueLowerCase.includes(okValue.toLowerCase())
+                test = (okValue) => foundValueLowerCase.includes(stringify(okValue).toLowerCase())
                 break
             case PropertyOperator.NotIContains:
                 foundValueLowerCase = foundValue.toLowerCase()
-                test = (okValue) =>
-                    !(typeof okValue === 'string' && foundValueLowerCase.includes(okValue.toLowerCase()))
+                test = (okValue) => !foundValueLowerCase.includes(stringify(okValue).toLowerCase())
                 break
             case PropertyOperator.Regex:
-                test = (okValue) => typeof okValue === 'string' && new RE2(okValue).test(foundValue)
+                test = (okValue) => new RE2(stringify(okValue)).test(foundValue)
                 break
             case PropertyOperator.NotRegex:
-                test = (okValue) => !(typeof okValue === 'string' && new RE2(okValue).test(foundValue))
+                test = (okValue) => !new RE2(stringify(okValue)).test(foundValue)
                 break
             case PropertyOperator.GreaterThan:
-                test = (okValue) => foundValue > okValue
+                test = (okValue) => castingCompare(foundValue, okValue, PropertyOperator.GreaterThan)
                 break
             case PropertyOperator.LessThan:
-                test = (okValue) => foundValue < okValue
+                test = (okValue) => castingCompare(foundValue, okValue, PropertyOperator.LessThan)
                 break
             case PropertyOperator.IsSet:
                 test = () => foundValue !== undefined
@@ -354,7 +406,7 @@ export class ActionMatcher {
                 break
             case PropertyOperator.Exact:
             default:
-                test = (okValue) => okValue === foundValue
+                test = (okValue) => castingCompare(foundValue, okValue, PropertyOperator.Exact)
         }
 
         return okValues.some(test) // ANY OF POSSIBLE VALUES MUST BE A MATCH AGAINST THE FOUND VALUE
@@ -470,27 +522,54 @@ class SelectorPart {
     requirements: Partial<Element>
 
     constructor(tag: string, directDescendant: boolean, escapeSlashes: boolean) {
-        const SELECTOR_ATTRIBUTE_REGEX = /([a-zA-Z]*)\[(.*)=[\'|\"](.*)[\'|\"]\]/
+        const ATTRIBUTE_SELECTOR_REGEX = /\[(.*)=[\'|\"](.*)[\'|\"]\]/
+        const COLON_SELECTOR_REGEX = /:([A-Za-z-]+)\((\d+)\)/
+        const FINAL_TAG_REGEX = /^([A-Za-z0-9]+)/
+
         this.directDescendant = directDescendant
         this.uniqueOrder = 0
         this.requirements = {}
 
-        const result = tag.match(SELECTOR_ATTRIBUTE_REGEX)
-        if (result && tag.includes('[id=')) {
-            this.requirements.attr_id = result[3]
-            tag = result[1]
-        }
-        if (result && tag.includes('[')) {
-            if (!this.requirements.attributes) {
-                this.requirements.attributes = {}
+        let attributeSelector = tag.match(ATTRIBUTE_SELECTOR_REGEX)
+        while (attributeSelector) {
+            tag =
+                tag.slice(0, attributeSelector.index) +
+                tag.slice(attributeSelector.index! + attributeSelector[0].length)
+            const attribute = attributeSelector[1].toLowerCase()
+            switch (attribute) {
+                case 'id':
+                    this.requirements.attr_id = attributeSelector[2].toLowerCase()
+                    break
+                case 'href':
+                    this.requirements.href = attributeSelector[2]
+                    break
+                default:
+                    if (!this.requirements.attributes) {
+                        this.requirements.attributes = {}
+                    }
+                    this.requirements.attributes[attribute] = attributeSelector[2]
+                    break
             }
-            this.requirements.attributes[result[2]] = result[3]
-            tag = result[1]
+            attributeSelector = tag.match(ATTRIBUTE_SELECTOR_REGEX)
         }
-        if (tag.includes('nth-child(')) {
-            const nthChildParts = tag.split(':nth-child(')
-            this.requirements.nth_child = parseInt(nthChildParts[1].replace(')', ''))
-            tag = nthChildParts[0]
+        let colonSelector = tag.match(COLON_SELECTOR_REGEX)
+        while (colonSelector) {
+            tag = tag.slice(0, colonSelector.index) + tag.slice(colonSelector.index! + colonSelector[0].length)
+            const parsedArgument = parseInt(colonSelector[2])
+            if (!parsedArgument) {
+                continue
+            }
+            switch (colonSelector[1]) {
+                case 'nth-child':
+                    this.requirements.nth_child = parsedArgument
+                    break
+                case 'nth-of-type':
+                    this.requirements.nth_of_type = parsedArgument
+                    break
+                default:
+                    continue // unsupported selector
+            }
+            colonSelector = tag.match(COLON_SELECTOR_REGEX)
         }
         if (tag.includes('.')) {
             const classParts = tag.split('.')
@@ -501,8 +580,9 @@ class SelectorPart {
             } // TODO: determine if we need escapeSlashes in this port
             tag = classParts[0]
         }
-        if (tag) {
-            this.requirements.tag_name = tag
+        const finalTag = tag.match(FINAL_TAG_REGEX)
+        if (finalTag) {
+            this.requirements.tag_name = finalTag[1]
         }
     }
 

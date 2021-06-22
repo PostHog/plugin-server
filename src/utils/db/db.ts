@@ -11,6 +11,7 @@ import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_PLUGIN_LOG_ENTRIES } from '../../config/kafka-topics'
 import {
     Action,
+    ActionEventPair,
     ActionStep,
     ClickHouseEvent,
     ClickHousePerson,
@@ -22,6 +23,7 @@ import {
     ElementGroup,
     Event,
     EventDefinitionType,
+    Hook,
     Person,
     PersonDistinctId,
     PluginConfig,
@@ -330,7 +332,10 @@ export class DB {
                         {
                             value: Buffer.from(
                                 JSON.stringify({
-                                    created_at: castTimestampOrNow(createdAt, TimestampFormat.ClickHouse),
+                                    created_at: castTimestampOrNow(
+                                        createdAt,
+                                        TimestampFormat.ClickHouseSecondPrecision
+                                    ),
                                     properties: JSON.stringify(properties),
                                     team_id: teamId,
                                     is_identified: isIdentified,
@@ -441,7 +446,10 @@ export class DB {
                         {
                             value: Buffer.from(
                                 JSON.stringify({
-                                    created_at: castTimestampOrNow(person.created_at, TimestampFormat.ClickHouse),
+                                    created_at: castTimestampOrNow(
+                                        person.created_at,
+                                        TimestampFormat.ClickHouseSecondPrecision
+                                    ),
                                     properties: JSON.stringify(person.properties),
                                     team_id: person.team_id,
                                     is_identified: person.is_identified,
@@ -574,18 +582,6 @@ export class DB {
             'addPersonToCohort'
         )
         return insertResult.rows[0]
-    }
-
-    // Organization
-
-    public async fetchOrganization(organizationId: string): Promise<RawOrganization | undefined> {
-        const selectResult = await this.postgresQuery(
-            `SELECT * FROM posthog_organization WHERE id $1`,
-            [organizationId],
-            'fetchOrganization'
-        )
-        const rawOrganization: RawOrganization = selectResult.rows[0]
-        return rawOrganization
     }
 
     // Event
@@ -813,29 +809,80 @@ export class DB {
         return action
     }
 
-    public async registerEventActionOccurrences(eventId: Event['id'], actions: Action[]): Promise<void> {
+    public async fetchActionMatches(): Promise<ActionEventPair[]> {
+        const result = await this.postgresQuery<ActionEventPair>(
+            'SELECT * FROM posthog_action_events',
+            undefined,
+            'fetchActionMatches'
+        )
+        return result.rows
+    }
+
+    public async registerActionMatch(eventId: Event['id'], actions: Action[]): Promise<void> {
         const valuesClause = actions.map((action, index) => `($1, $${index + 2})`).join(', ')
         await this.postgresQuery(
             `INSERT INTO posthog_action_events (event_id, action_id) VALUES ${valuesClause}`,
             [eventId, ...actions.map((action) => action.id)],
-            'registerEventActionOccurrences'
+            'registerActionMatch'
         )
     }
 
-    // Team Internal Metrics
+    // Organization
 
+    public async fetchOrganization(organizationId: string): Promise<RawOrganization | undefined> {
+        const selectResult = await this.postgresQuery<RawOrganization>(
+            `SELECT * FROM posthog_organization WHERE id = $1`,
+            [organizationId],
+            'fetchOrganization'
+        )
+        return selectResult.rows[0]
+    }
+
+    // Team
+
+    public async fetchTeam(teamId: Team['id']): Promise<Team> {
+        const selectResult = await this.postgresQuery<Team>(
+            `SELECT * FROM posthog_team WHERE id = $1`,
+            [teamId],
+            'fetchTeam'
+        )
+        return selectResult.rows[0]
+    }
+
+    /** Return the ID of the team that is used exclusively internally by the instance for storing metrics data. */
     public async fetchInternalMetricsTeam(): Promise<Team['id'] | null> {
         const { rows } = await this.postgresQuery(
             `
-            SELECT posthog_team.id as team_id
+            SELECT posthog_team.id AS team_id
             FROM posthog_team
             INNER JOIN posthog_organization ON posthog_organization.id = posthog_team.organization_id
-            WHERE for_internal_metrics
-        `,
+            WHERE for_internal_metrics`,
             undefined,
             'fetchInternalMetricsTeam'
         )
 
-        return rows.length > 0 ? rows[0].team_id : null
+        return rows[0]?.team_id || null
+    }
+
+    // Hook (EE)
+
+    public async fetchRelevantRestHooks(
+        teamId: Hook['team_id'],
+        event: Hook['event'],
+        resourceId: Hook['resource_id']
+    ): Promise<Hook[]> {
+        const filterByResource = resourceId !== null
+        const { rows } = await this.postgresQuery<Hook>(
+            `
+            SELECT * FROM ee_hook
+            WHERE team_id = $1 AND event = $2 ${filterByResource ? 'AND resource_id = $3' : ''}`,
+            filterByResource ? [teamId, event, resourceId] : [teamId, event],
+            'fetchRelevantRestHooks'
+        )
+        return rows
+    }
+
+    public async deleteRestHook(hookId: Hook['id']): Promise<void> {
+        await this.postgresQuery(`DELETE FROM ee_hook WHERE id = $1`, [hookId], 'deleteRestHook')
     }
 }
