@@ -36,9 +36,6 @@ export class PluginMetricsManager {
     }
 
     setupMetricsObjectIfNeeded(pluginConfig: PluginConfig): void {
-        if (!pluginConfig.plugin) {
-            return
-        }
         if (!this.metricsPerPlugin[pluginConfig.id]) {
             this.metricsPerPlugin[pluginConfig.id] = {
                 pluginConfig,
@@ -48,6 +45,9 @@ export class PluginMetricsManager {
     }
 
     updateMetric({ metricOperation, pluginConfig, metricName, value }: UpdateMetricPayload) {
+        if (!pluginConfig.plugin) {
+            return
+        }
         if (typeof value !== 'number') {
             throw new IllegalOperationError('Only numbers are allowed for operations on metrics')
         }
