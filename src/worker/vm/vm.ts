@@ -2,13 +2,13 @@ import { RetryError } from '@posthog/plugin-scaffold'
 import { randomBytes } from 'crypto'
 import { VM } from 'vm2'
 
-import { Hub, PluginConfig, PluginConfigVMResponse } from '../../types'
+import { Hub, PluginConfig, PluginConfigVMResponse, PluginMetricsVmResponse } from '../../types'
 import { createCache } from './extensions/cache'
 import { createConsole } from './extensions/console'
 import { createGeoIp } from './extensions/geoip'
 import { createGoogle } from './extensions/google'
 import { createJobs } from './extensions/jobs'
-import { createMetrics } from './extensions/metrics'
+import { createMetrics, setupMetrics } from './extensions/metrics'
 import { createPosthog } from './extensions/posthog'
 import { createStorage } from './extensions/storage'
 import { imports } from './imports'
@@ -212,14 +212,21 @@ export async function createPluginConfigVM(
         })
     `)(asyncGuard)
 
-    upgradeExportEvents(hub, pluginConfig, vm.run(responseVar))
+    const vmResponse = vm.run(responseVar)
+    const { methods, tasks, metrics } = vmResponse
+    const exportEventsExists = !!methods.exportEvents
+
+    if (exportEventsExists) {
+        upgradeExportEvents(hub, pluginConfig, vmResponse)
+    }
+
+    setupMetrics(hub, pluginConfig, metrics, exportEventsExists)
 
     await vm.run(`${responseVar}.methods.setupPlugin?.()`)
 
     return {
         vm,
-        methods: vm.run(`${responseVar}.methods`),
-        tasks: vm.run(`${responseVar}.tasks`),
-        metrics: vm.run(`${responseVar}.metrics`),
+        methods,
+        tasks,
     }
 }

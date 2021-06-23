@@ -90,7 +90,6 @@ export class LazyPluginVM {
                     status.info('🔌', `Loaded ${logInfo}`)
                     void clearError(hub, pluginConfig)
                     await this.inferPluginCapabilities(hub, pluginConfig, vm)
-                    await this.inferPluginMetrics(hub, pluginConfig, vm)
                     resolve(vm)
                 } catch (error) {
                     const isRetryError = error instanceof RetryError
@@ -175,46 +174,6 @@ export class LazyPluginVM {
         if (!equal(prevCapabilities, capabilities)) {
             await setPluginCapabilities(hub, pluginConfig, capabilities)
             pluginConfig.plugin.capabilities = capabilities
-        }
-    }
-
-    private async inferPluginMetrics(hub: Hub, pluginConfig: PluginConfig, vm: PluginConfigVMResponse): Promise<void> {
-        if (!pluginConfig.plugin) {
-            throw new Error(`'PluginConfig missing plugin: ${pluginConfig}`)
-        }
-
-        let newMetrics = vm.metrics
-        if (!newMetrics) {
-            await setPluginMetrics(hub, pluginConfig, {})
-            return
-        }
-
-        const unsupportedMetrics = Object.values(newMetrics).filter(
-            (metric) => !['sum', 'max', 'min'].includes(metric.toLowerCase())
-        )
-        if (unsupportedMetrics.length > 0) {
-            throw new Error(
-                `Only 'sum', 'max', and 'min' are supported as metric types. Invalid types received: ${unsupportedMetrics.join(
-                    ', '
-                )}`
-            )
-        }
-
-        const oldMetrics = pluginConfig.plugin.metrics
-        if ((pluginConfig.plugin.capabilities?.methods || []).includes('exportEvents')) {
-            newMetrics = {
-                ...newMetrics,
-                events_seen: 'sum',
-                events_delivered_successfully: 'sum',
-                undelivered_events: 'sum',
-                retry_errors: 'sum',
-                other_errors: 'sum',
-            }
-        }
-
-        if (vm.metrics && !equal(oldMetrics, newMetrics)) {
-            await setPluginMetrics(hub, pluginConfig, newMetrics)
-            pluginConfig.plugin.metrics = newMetrics
         }
     }
 }

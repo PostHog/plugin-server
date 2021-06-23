@@ -47,10 +47,6 @@ export function upgradeExportEvents(
 ): void {
     const { methods, tasks, meta } = response
 
-    if (!methods.exportEvents) {
-        return
-    }
-
     const uploadBytes = stringClamp(
         meta.config.exportEventsBufferBytes,
         EXPORT_BUFFER_BYTES_DEFAULT,

@@ -1,4 +1,14 @@
-import { Hub, MetricMathOperations, PluginConfig } from '../../../types'
+import equal from 'fast-deep-equal'
+
+import {
+    Hub,
+    MetricMathOperations,
+    PluginConfig,
+    PluginConfigVMResponse,
+    PluginMetricsVmResponse,
+    StoredPluginMetrics,
+} from '../../../types'
+import { setPluginMetrics } from '../../../utils/db/sql'
 
 type MetricsOperations = {
     increment: (metricName: string, value: number) => Promise<void>
@@ -28,6 +38,7 @@ export function createMetrics(hub: Hub, pluginConfig: PluginConfig): Metrics {
                                 metricOperation: MetricMathOperations.Increment,
                                 ...defaultOptions,
                             })
+                            console.log(hub.pluginMetricsManager.metricsPerPlugin)
                         },
                     }
                 }
@@ -40,6 +51,7 @@ export function createMetrics(hub: Hub, pluginConfig: PluginConfig): Metrics {
                                 metricOperation: MetricMathOperations.Max,
                                 ...defaultOptions,
                             })
+                            console.log(hub.pluginMetricsManager.metricsPerPlugin)
                         },
                     }
                 }
@@ -52,6 +64,7 @@ export function createMetrics(hub: Hub, pluginConfig: PluginConfig): Metrics {
                                 metricOperation: MetricMathOperations.Min,
                                 ...defaultOptions,
                             })
+                            console.log(hub.pluginMetricsManager.metricsPerPlugin)
                         },
                     }
                 }
@@ -60,4 +73,64 @@ export function createMetrics(hub: Hub, pluginConfig: PluginConfig): Metrics {
             },
         }
     )
+}
+
+export function setupMetrics(
+    hub: Hub,
+    pluginConfig: PluginConfig,
+    metrics: PluginMetricsVmResponse,
+    exportEventsExists = false
+) {
+    if (!pluginConfig.plugin) {
+        throw new Error(`'PluginConfig missing plugin: ${pluginConfig}`)
+    }
+
+    let newMetrics: PluginMetricsVmResponse | StoredPluginMetrics = metrics
+    const oldMetrics = pluginConfig.plugin.metrics
+
+    if (!newMetrics) {
+        // if exportEvents exists, we'll automatically assingn metrics to it later
+        if (!exportEventsExists) {
+            // if there are old metrics set, we need to "erase" them as this
+            // new version doesn't have any
+            if (oldMetrics && Object.keys(oldMetrics).length > 0) {
+                void setPluginMetrics(hub, pluginConfig, {})
+            }
+
+            return
+        }
+
+        newMetrics = {}
+    }
+
+    for (const [metricName, metricType] of Object.entries(newMetrics)) {
+        newMetrics[metricName] = metricType.toLowerCase()
+    }
+
+    const unsupportedMetrics = Object.values(newMetrics).filter((metric) => !['sum', 'max', 'min'].includes(metric))
+
+    if (unsupportedMetrics.length > 0) {
+        throw new Error(
+            `Only 'sum', 'max', and 'min' are supported as metric types. Invalid types received: ${unsupportedMetrics.join(
+                ', '
+            )}`
+        )
+    }
+
+    if (exportEventsExists) {
+        newMetrics = {
+            ...newMetrics,
+            events_seen: 'sum',
+            events_delivered_successfully: 'sum',
+            undelivered_events: 'sum',
+            retry_errors: 'sum',
+            other_errors: 'sum',
+        }
+    }
+
+    if (!equal(oldMetrics, newMetrics)) {
+        // validation above ensures newMetrics follows the StoredPluginMetrics type here
+        void setPluginMetrics(hub, pluginConfig, newMetrics as StoredPluginMetrics)
+        pluginConfig.plugin.metrics = newMetrics as StoredPluginMetrics
+    }
 }

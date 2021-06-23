@@ -202,6 +202,7 @@ export enum MetricMathOperations {
 
 export type StoredMetricMathOperations = 'max' | 'min' | 'sum'
 export type StoredPluginMetrics = Record<string, StoredMetricMathOperations> | null
+export type PluginMetricsVmResponse = Record<string, string> | null
 
 export interface Plugin {
     id: number
@@ -331,7 +332,6 @@ export interface PluginConfigVMResponse {
     vm: VM
     methods: VMMethods
     tasks: Record<PluginTaskType, Record<string, PluginTask>>
-    metrics: StoredPluginMetrics
 }
 
 export interface PluginConfigVMInternalResponse<M extends Meta = Meta> {
