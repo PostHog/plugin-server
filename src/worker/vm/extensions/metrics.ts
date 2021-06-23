@@ -1,14 +1,8 @@
 import equal from 'fast-deep-equal'
 
-import {
-    Hub,
-    MetricMathOperations,
-    PluginConfig,
-    PluginConfigVMResponse,
-    PluginMetricsVmResponse,
-    StoredPluginMetrics,
-} from '../../../types'
+import { Hub, MetricMathOperations, PluginConfig, PluginMetricsVmResponse, StoredPluginMetrics } from '../../../types'
 import { setPluginMetrics } from '../../../utils/db/sql'
+import { IllegalOperationError } from '../../../utils/utils'
 
 type MetricsOperations = {
     increment: (metricName: string, value: number) => Promise<void>
@@ -23,7 +17,7 @@ export function createMetrics(hub: Hub, pluginConfig: PluginConfig): Metrics {
                 const availabeMetrics = pluginConfig.plugin?.metrics || {}
 
                 if (typeof key !== 'string' || !Object.keys(availabeMetrics).includes(key)) {
-                    throw new Error('Invalid metric name')
+                    throw new IllegalOperationError('Invalid metric name')
                 }
                 const defaultOptions = {
                     metricName: key,
@@ -91,8 +85,9 @@ export function setupMetrics(
     if (!newMetrics) {
         // if exportEvents exists, we'll automatically assingn metrics to it later
         if (!exportEventsExists) {
-            // if there are old metrics set, we need to "erase" them as this
-            // new version doesn't have any
+            // if there are old metrics set, we need to "erase" them
+            // as this new version doesn't have any
+            // if there are no metrics, no need for an update query
             if (oldMetrics && Object.keys(oldMetrics).length > 0) {
                 void setPluginMetrics(hub, pluginConfig, {})
             }
@@ -110,13 +105,14 @@ export function setupMetrics(
     const unsupportedMetrics = Object.values(newMetrics).filter((metric) => !['sum', 'max', 'min'].includes(metric))
 
     if (unsupportedMetrics.length > 0) {
-        throw new Error(
+        throw new IllegalOperationError(
             `Only 'sum', 'max', and 'min' are supported as metric types. Invalid types received: ${unsupportedMetrics.join(
                 ', '
             )}`
         )
     }
 
+    // add in the default exportEvents metrics
     if (exportEventsExists) {
         newMetrics = {
             ...newMetrics,

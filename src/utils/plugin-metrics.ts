@@ -1,8 +1,6 @@
-import Piscina from '@posthog/piscina'
-
+import { IllegalOperationError } from '../utils/utils'
 import { Hub, MetricMathOperations, PluginConfig, PluginConfigId } from './../types'
 import { createPosthog } from './../worker/vm/extensions/posthog'
-import { UUIDT } from './utils'
 
 interface PluginMetrics {
     pluginConfig: PluginConfig
@@ -51,7 +49,7 @@ export class PluginMetricsManager {
 
     updateMetric({ metricOperation, pluginConfig, metricName, value }: UpdateMetricPayload) {
         if (typeof value !== 'number') {
-            throw new Error('Only numbers are allowed for operations on metrics')
+            throw new IllegalOperationError('Only numbers are allowed for operations on metrics')
         }
         this.setupMetricsObjectIfNeeded(pluginConfig)
         const currentMetric = this.metricsPerPlugin[pluginConfig.id].metrics[metricName]
