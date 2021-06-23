@@ -76,7 +76,7 @@ export function setupMetrics(
     exportEventsExists = false
 ) {
     if (!pluginConfig.plugin) {
-        throw new Error(`'PluginConfig missing plugin: ${pluginConfig}`)
+        return
     }
 
     let newMetrics: PluginMetricsVmResponse | StoredPluginMetrics = metrics
