@@ -228,10 +228,8 @@ describe('queue logic', () => {
         expect(pluginsServer.queue.isPaused()).toBe(false)
         expect(pluginsServer.piscina.queueSize).toBe(0)
 
-        const pluginMetricsTask = 2 // 1 task per thread
-
         // tasksSentSoFar x (processEvent + onEvent + ingestEvent)
-        expect(pluginsServer.piscina.completed).toEqual(pluginMetricsTask + baseCompleted + tasksSentSoFar * 3)
+        expect(pluginsServer.piscina.completed).toEqual(baseCompleted + tasksSentSoFar * 3)
 
         const duration = pluginsServer.piscina.duration - startTime
         const expectedTimeMs = (50 / 4) * 1000
