@@ -32,7 +32,6 @@ export function createMetrics(hub: Hub, pluginConfig: PluginConfig): Metrics {
                                 metricOperation: MetricMathOperations.Increment,
                                 ...defaultOptions,
                             })
-                            console.log(hub.pluginMetricsManager.metricsPerPlugin)
                         },
                     }
                 }
@@ -45,7 +44,6 @@ export function createMetrics(hub: Hub, pluginConfig: PluginConfig): Metrics {
                                 metricOperation: MetricMathOperations.Max,
                                 ...defaultOptions,
                             })
-                            console.log(hub.pluginMetricsManager.metricsPerPlugin)
                         },
                     }
                 }
@@ -58,7 +56,6 @@ export function createMetrics(hub: Hub, pluginConfig: PluginConfig): Metrics {
                                 metricOperation: MetricMathOperations.Min,
                                 ...defaultOptions,
                             })
-                            console.log(hub.pluginMetricsManager.metricsPerPlugin)
                         },
                     }
                 }

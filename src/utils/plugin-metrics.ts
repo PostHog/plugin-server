@@ -37,7 +37,7 @@ export class PluginMetricsManager {
 
     setupMetricsObjectIfNeeded(pluginConfig: PluginConfig): void {
         if (!pluginConfig.plugin) {
-            throw new Error('no plugin for config')
+            return
         }
         if (!this.metricsPerPlugin[pluginConfig.id]) {
             this.metricsPerPlugin[pluginConfig.id] = {
