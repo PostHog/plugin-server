@@ -201,11 +201,6 @@ export async function createHub(
 
     hub.pluginMetricsManager = new PluginMetricsManager()
 
-    // every 30min send plugin metrics
-    hub.pluginMetricsJob = schedule.scheduleJob('30 * * * * *', () => {
-        hub!.pluginMetricsManager.sendPluginMetrics(hub)
-    })
-
     try {
         await hub.jobQueueManager.connectProducer()
     } catch (error) {
@@ -220,7 +215,6 @@ export async function createHub(
         if (eventLoopLagInterval) {
             clearInterval(eventLoopLagInterval)
         }
-        hub.pluginMetricsJob && schedule.cancelJob(hub.pluginMetricsJob)
         hub.mmdbUpdateJob?.cancel()
         await hub.jobQueueManager?.disconnectProducer()
         if (kafkaProducer) {

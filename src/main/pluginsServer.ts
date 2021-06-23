@@ -186,6 +186,10 @@ export async function startPluginsServer(
             })
         }
 
+        pluginMetricsJob = schedule.scheduleJob('30 * * * * *', async () => {
+            await piscina!.broadcastTask({ task: 'sendPluginMetrics' })
+        })
+
         if (serverConfig.STALENESS_RESTART_SECONDS > 0) {
             // check every 10 sec how long it has been since the last activity
             let lastFoundActivity: number
