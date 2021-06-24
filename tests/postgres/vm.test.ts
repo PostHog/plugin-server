@@ -597,17 +597,6 @@ test('console.log', async () => {
             type: 'LOG',
         },
     ])
-
-    /*     expect(hub.db.createPluginLogEntries).toHaveBeenCalledWith(
-        pluginConfig39,
-        [{
-            source: 'CONSOLE',
-            type: 'LOG',
-            message: 'logged event',
-            instanceId: expect.anything()
-
-        }]
-    ) */
 })
 
 test('fetch', async () => {
