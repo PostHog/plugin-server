@@ -26,7 +26,7 @@ describe('LazyPluginVM', () => {
     const createVM = () => new LazyPluginVM()
     const mockServer: any = {
         db: {
-            createPluginLogEntry: jest.fn(),
+            createPluginLogEntries: jest.fn(),
         },
     }
     const initializeVm = (vm: LazyPluginVM) => vm.initialize!(mockServer, mockConfig as any, '', 'some plugin')
@@ -65,13 +65,14 @@ describe('LazyPluginVM', () => {
 
             expect(status.info).toHaveBeenCalledWith('🔌', 'Loaded some plugin')
             expect(clearError).toHaveBeenCalledWith(mockServer, mockConfig)
-            expect(mockServer.db.createPluginLogEntry).toHaveBeenCalledWith(
-                mockConfig,
-                PluginLogEntrySource.System,
-                PluginLogEntryType.Info,
-                expect.stringContaining('Plugin loaded'),
-                undefined
-            )
+            expect(mockServer.db.createPluginLogEntries).toHaveBeenCalledWith(mockConfig, [
+                {
+                    source: PluginLogEntrySource.System,
+                    type: PluginLogEntryType.Info,
+                    message: expect.stringContaining('Plugin loaded'),
+                    instanceId: undefined,
+                },
+            ])
         })
     })
 

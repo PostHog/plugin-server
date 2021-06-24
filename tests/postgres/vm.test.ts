@@ -565,7 +565,7 @@ test('meta.cache incr', async () => {
 })
 
 test('console.log', async () => {
-    jest.spyOn(hub.db, 'createPluginLogEntry')
+    jest.spyOn(hub.db, 'createPluginLogEntries')
 
     const indexJs = `
         async function processEvent (event, meta) {
@@ -582,13 +582,32 @@ test('console.log', async () => {
 
     await vm.methods.processEvent!(event)
 
-    expect(hub.db.createPluginLogEntry).toHaveBeenCalledWith(
+    const entries = await hub.db.fetchPluginLogEntries()
+
+    expect(entries).toEqual([
+        {
+            id: expect.anything(),
+            instance_id: expect.anything(),
+            message: 'logged event',
+            plugin_config_id: 39,
+            plugin_id: 60,
+            source: 'CONSOLE',
+            team_id: 2,
+            timestamp: expect.anything(),
+            type: 'LOG',
+        },
+    ])
+
+    /*     expect(hub.db.createPluginLogEntries).toHaveBeenCalledWith(
         pluginConfig39,
-        'CONSOLE',
-        'LOG',
-        'logged event',
-        expect.anything()
-    )
+        [{
+            source: 'CONSOLE',
+            type: 'LOG',
+            message: 'logged event',
+            instanceId: expect.anything()
+
+        }]
+    ) */
 })
 
 test('fetch', async () => {

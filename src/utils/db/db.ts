@@ -52,6 +52,14 @@ import {
 import { KafkaProducerWrapper } from './kafka-producer-wrapper'
 import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './utils'
 
+export interface LogEntryPayload {
+    source: PluginLogEntrySource
+    type: PluginLogEntryType
+    message: string
+    instanceId: UUID
+    timestamp?: string | null
+}
+
 /** The recommended way of accessing the database. */
 export class DB {
     /** Postgres connection pool for primary database access. */
@@ -698,52 +706,73 @@ export class DB {
         }
     }
 
-    public async createPluginLogEntry(
-        pluginConfig: PluginConfig,
-        source: PluginLogEntrySource,
-        type: PluginLogEntryType,
-        message: string,
-        instanceId: UUID,
-        timestamp: string = new Date().toISOString()
-    ): Promise<PluginLogEntry> {
-        const entry: PluginLogEntry = {
-            id: new UUIDT().toString(),
-            team_id: pluginConfig.team_id,
-            plugin_id: pluginConfig.plugin_id,
-            plugin_config_id: pluginConfig.id,
-            timestamp: timestamp.replace('T', ' ').replace('Z', ''),
-            source,
-            type,
-            message,
-            instance_id: instanceId.toString(),
+    public async createPluginLogEntries(pluginConfig: PluginConfig, entries: LogEntryPayload[]): Promise<void> {
+        const parsedEntries: PluginLogEntry[] = entries.map((entry) => {
+            const { source, message, type, timestamp, instanceId } = entry
+            this.statsd?.increment(`logs.entries_created`, {
+                source,
+                team_id: pluginConfig.team_id.toString(),
+                plugin_id: pluginConfig.plugin_id.toString(),
+            })
+            return {
+                id: new UUIDT().toString(),
+                team_id: pluginConfig.team_id,
+                plugin_id: pluginConfig.plugin_id,
+                plugin_config_id: pluginConfig.id,
+                timestamp: (timestamp || new Date().toISOString()).replace('T', ' ').replace('Z', ''),
+                source,
+                type,
+                message,
+                instance_id: instanceId.toString(),
+            }
+        })
+
+        if (this.kafkaProducer) {
+            for (const parsedEntry of parsedEntries) {
+                try {
+                    await this.kafkaProducer.queueMessage({
+                        topic: KAFKA_PLUGIN_LOG_ENTRIES,
+                        messages: [{ key: parsedEntry.id, value: Buffer.from(JSON.stringify(parsedEntry)) }],
+                    })
+                } catch (e) {
+                    captureException(e)
+                    console.error(parsedEntry)
+                    console.error(e)
+                }
+            }
+            return
         }
 
         try {
-            if (this.kafkaProducer) {
-                await this.kafkaProducer.queueMessage({
-                    topic: KAFKA_PLUGIN_LOG_ENTRIES,
-                    messages: [{ key: entry.id, value: Buffer.from(JSON.stringify(entry)) }],
-                })
-            } else {
-                await this.postgresQuery(
-                    'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, plugin_config_id, timestamp, source,type, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-                    Object.values(entry),
-                    'insertPluginLogEntry'
-                )
+            let values: any[] = []
+            let valuesString = ''
+            for (let i = 0; i < parsedEntries.length; ++i) {
+                const { id, team_id, plugin_id, plugin_config_id, timestamp, source, type, message, instance_id } =
+                    parsedEntries[i]
+
+                // Creates format: ($1, $2, $3, $4, $5, $6, $7, $8, $9), ($10, $11, $12, $13, $14, $15, $16, $17, $18)
+                valuesString += ' ('
+                for (let j = 1; j <= 9; ++j) {
+                    valuesString += `$${9 * i + j}${j === 9 ? '' : ', '}`
+                }
+                valuesString += `)${i === parsedEntries.length - 1 ? '' : ','}`
+
+                values = [
+                    ...values,
+                    ...[id, team_id, plugin_id, plugin_config_id, timestamp, source, type, message, instance_id],
+                ]
             }
+
+            await this.postgresQuery(
+                `INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, plugin_config_id, timestamp, source,type, message, instance_id) 
+                VALUES ${valuesString}`,
+                values,
+                'insertPluginLogEntries'
+            )
         } catch (e) {
             captureException(e)
-            console.error(entry)
             console.error(e)
         }
-
-        this.statsd?.increment(`logs.entries_created`, {
-            source,
-            team_id: pluginConfig.team_id.toString(),
-            plugin_id: pluginConfig.plugin_id.toString(),
-        })
-
-        return entry
     }
 
     // EventDefinition
