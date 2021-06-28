@@ -80,7 +80,7 @@ export function setupMetrics(
     const oldMetrics = pluginConfig.plugin.metrics
 
     if (!newMetrics) {
-        // if exportEvents exists, we'll automatically assingn metrics to it later
+        // if exportEvents exists, we'll automatically assign metrics to it later
         if (!exportEventsExists) {
             // if there are old metrics set, we need to "erase" them
             // as this new version doesn't have any
