@@ -6,8 +6,10 @@ import { IllegalOperationError } from '../../../utils/utils'
 
 type MetricsOperations = {
     increment: (metricName: string, value: number) => Promise<void>
+    max: (metricName: string, value: number) => Promise<void>
+    min: (metricName: string, value: number) => Promise<void>
 }
-type Metrics = Record<string, MetricsOperations>
+type Metrics = Record<string, Partial<MetricsOperations>>
 
 export function createMetrics(hub: Hub, pluginConfig: PluginConfig): Metrics {
     return new Proxy(
