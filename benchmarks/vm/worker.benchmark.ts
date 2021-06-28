@@ -133,13 +133,14 @@ async function runBenchmark(piscinaUseAtomics = true) {
             console.log(JSON.stringify({ result }, null, 2))
         }
     }
+    console.log('useAtomics =', piscinaUseAtomics)
     console.table(results)
 }
 
-test('piscina worker benchmark', async () => {
-    await runBenchmark()
-})
-
 test('piscina worker benchmark (useAtomics = false)', async () => {
     await runBenchmark(false)
+})
+
+test('piscina worker benchmark', async () => {
+    await runBenchmark()
 })
