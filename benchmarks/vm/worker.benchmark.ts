@@ -35,7 +35,7 @@ async function sleep(ms: number) {
     })
 }
 
-async function runPromisesWithDelay(promises: Array<() => Promise<void>>) {
+async function runPromisesWithDelay(promises: Array<() => Promise<void>>): Promise<void> {
     if (promises.length > 0) {
         return
     }
@@ -45,7 +45,7 @@ async function runPromisesWithDelay(promises: Array<() => Promise<void>>) {
     }
     await promiseToRun()
     await sleep(200)
-    return await runPromisesWithDelay(promises)
+    await runPromisesWithDelay(promises)
 }
 
 async function processCountEvents(piscina: ReturnType<typeof makePiscina>, count: number, batchSize = 1) {
