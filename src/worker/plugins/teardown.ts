@@ -14,36 +14,33 @@ export async function teardownPlugins(server: Hub, pluginConfig?: PluginConfig):
                     (async () => {
                         try {
                             await teardownPlugin()
-                            await server.db.createPluginLogEntries(pluginConfig, [
-                                {
-                                    source: PluginLogEntrySource.System,
-                                    type: PluginLogEntryType.Info,
-                                    message: `Plugin unloaded (instance ID ${server.instanceId}).`,
-                                    instanceId: server.instanceId,
-                                },
-                            ])
+                            server.logsBuffer.addLog({
+                                pluginConfig,
+                                source: PluginLogEntrySource.System,
+                                type: PluginLogEntryType.Info,
+                                message: `Plugin unloaded (instance ID ${server.instanceId}).`,
+                                instanceId: server.instanceId,
+                            })
                         } catch (error) {
                             await processError(server, pluginConfig, error)
-                            await server.db.createPluginLogEntries(pluginConfig, [
-                                {
-                                    source: PluginLogEntrySource.System,
-                                    type: PluginLogEntryType.Info,
-                                    message: `Plugin failed to unload (instance ID ${server.instanceId}).`,
-                                    instanceId: server.instanceId,
-                                },
-                            ])
+                            server.logsBuffer.addLog({
+                                pluginConfig,
+                                source: PluginLogEntrySource.System,
+                                type: PluginLogEntryType.Info,
+                                message: `Plugin failed to unload (instance ID ${server.instanceId}).`,
+                                instanceId: server.instanceId,
+                            })
                         }
                     })()
                 )
             } else {
-                await server.db.createPluginLogEntries(pluginConfig, [
-                    {
-                        source: PluginLogEntrySource.System,
-                        type: PluginLogEntryType.Info,
-                        message: `Plugin unloaded (instance ID ${server.instanceId}).`,
-                        instanceId: server.instanceId,
-                    },
-                ])
+                await server.logsBuffer.addLog({
+                    pluginConfig,
+                    source: PluginLogEntrySource.System,
+                    type: PluginLogEntryType.Info,
+                    message: `Plugin unloaded (instance ID ${server.instanceId}).`,
+                    instanceId: server.instanceId,
+                })
             }
         }
     }

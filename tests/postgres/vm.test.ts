@@ -9,6 +9,7 @@ import { delay } from '../../src/utils/utils'
 import { createPluginConfigVM } from '../../src/worker/vm/vm'
 import { pluginConfig39 } from '../helpers/plugins'
 import { resetTestDatabase } from '../helpers/sql'
+import { plugin60 } from './../helpers/plugins'
 
 jest.mock('../../src/utils/celery/client')
 jest.mock('../../src/main/job-queues/job-queue-manager')
@@ -574,13 +575,14 @@ test('console.log', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, { ...pluginConfig39, plugin: plugin60 }, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'logged event',
     }
 
     await vm.methods.processEvent!(event)
+    await hub.logsBuffer.flushLogs()
 
     const entries = await hub.db.fetchPluginLogEntries()
 

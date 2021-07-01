@@ -2,7 +2,9 @@ import { RetryError } from '@posthog/plugin-scaffold'
 import { mocked } from 'ts-jest/utils'
 
 import { PluginLogEntrySource, PluginLogEntryType, PluginTaskType } from '../../src/types'
+import { DB } from '../../src/utils/db/db'
 import { clearError } from '../../src/utils/db/error'
+import { LogsBuffer } from '../../src/utils/logs-buffer'
 import { status } from '../../src/utils/status'
 import { LazyPluginVM } from '../../src/worker/vm/lazy'
 import { createPluginConfigVM } from '../../src/worker/vm/vm'
@@ -24,10 +26,12 @@ const mockConfig = {
 
 describe('LazyPluginVM', () => {
     const createVM = () => new LazyPluginVM()
+    const db = {
+        createPluginLogEntries: jest.fn(),
+    }
     const mockServer: any = {
-        db: {
-            createPluginLogEntries: jest.fn(),
-        },
+        db,
+        logsBuffer: new LogsBuffer(db as any),
     }
     const initializeVm = (vm: LazyPluginVM) => vm.initialize!(mockServer, mockConfig as any, '', 'some plugin')
 
@@ -65,14 +69,18 @@ describe('LazyPluginVM', () => {
 
             expect(status.info).toHaveBeenCalledWith('🔌', 'Loaded some plugin')
             expect(clearError).toHaveBeenCalledWith(mockServer, mockConfig)
-            expect(mockServer.db.createPluginLogEntries).toHaveBeenCalledWith(mockConfig, [
-                {
-                    source: PluginLogEntrySource.System,
-                    type: PluginLogEntryType.Info,
-                    message: expect.stringContaining('Plugin loaded'),
-                    instanceId: undefined,
-                },
-            ])
+            await mockServer.logsBuffer.flushLogs()
+            expect(mockServer.db.createPluginLogEntries).toHaveBeenCalledWith(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        instanceId: undefined,
+                        message: expect.stringContaining('Plugin loaded'),
+                        pluginConfig: expect.anything(),
+                        source: PluginLogEntrySource.System,
+                        type: PluginLogEntryType.Info,
+                    }),
+                ])
+            )
         })
     })
 

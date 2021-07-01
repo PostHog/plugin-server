@@ -53,6 +53,7 @@ import { KafkaProducerWrapper } from './kafka-producer-wrapper'
 import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './utils'
 
 export interface LogEntryPayload {
+    pluginConfig: PluginConfig
     source: PluginLogEntrySource
     type: PluginLogEntryType
     message: string
@@ -706,9 +707,9 @@ export class DB {
         }
     }
 
-    public async createPluginLogEntries(pluginConfig: PluginConfig, entries: LogEntryPayload[]): Promise<void> {
+    public async createPluginLogEntries(entries: LogEntryPayload[]): Promise<void> {
         const parsedEntries: PluginLogEntry[] = entries.map((entry) => {
-            const { source, message, type, timestamp, instanceId } = entry
+            const { pluginConfig, source, message, type, timestamp, instanceId } = entry
             this.statsd?.increment(`logs.entries_created`, {
                 source,
                 team_id: pluginConfig.team_id.toString(),
