@@ -1681,6 +1681,16 @@
   optionalDependencies:
     nice-napi "^1.0.2"
 
+"@posthog/piscina@https://github.com/PostHog/piscina#atomics-wait-async":
+  version "2.3.0-posthog"
+  resolved "https://github.com/PostHog/piscina#c97e179f880b89e91a7a205671efe69df751096d"
+  dependencies:
+    eventemitter-asyncresource "^1.0.0"
+    hdr-histogram-js "^2.0.1"
+    hdr-histogram-percentiles-obj "^3.0.0"
+  optionalDependencies:
+    nice-napi "^1.0.2"
+
 "@posthog/plugin-contrib@^0.0.5":
   version "0.0.5"
   resolved "https://registry.npmjs.org/@posthog/plugin-contrib/-/plugin-contrib-0.0.5.tgz"
