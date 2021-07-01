@@ -8,7 +8,7 @@ import { makePiscina } from '../../src/worker/piscina'
 import { resetTestDatabase } from '../../tests/helpers/sql'
 
 jest.mock('../../src/utils/db/sql')
-jest.setTimeout(600000) // 600 sec timeout
+jest.setTimeout(1200000) // 600 sec timeout
 
 function processOneEvent(
     processEvent: (event: PluginEvent) => Promise<PluginEvent>,
@@ -42,16 +42,17 @@ async function processCountEvents(piscina: ReturnType<typeof makePiscina>, count
     }
 }
 
-function setupPiscina(workers: number, tasksPerWorker: number) {
+function setupPiscina(workers: number, tasksPerWorker: number, atomicsTimeout: number) {
     return makePiscina({
         ...defaultConfig,
         WORKER_CONCURRENCY: workers,
         TASKS_PER_WORKER: tasksPerWorker,
         LOG_LEVEL: LogLevel.Log,
+        PISCINA_ATOMICS_TIMEOUT: atomicsTimeout,
     })
 }
 
-test('piscina worker benchmark', async () => {
+async function runBenchmark(atomicsTimeout = 30000) {
     // Uncomment this to become a 10x developer and make the test run just as fast!
     // Reduces events by 10x and limits threads to max 8 for quicker development
     const isLightDevRun = false
@@ -112,7 +113,7 @@ test('piscina worker benchmark', async () => {
                 batchSize,
             }
             for (const threads of workerThreads) {
-                const piscina = setupPiscina(threads, 100)
+                const piscina = setupPiscina(threads, 100, atomicsTimeout)
 
                 // warmup
                 await processCountEvents(piscina, threads * 4)
@@ -132,5 +133,14 @@ test('piscina worker benchmark', async () => {
             console.log(JSON.stringify({ result }, null, 2))
         }
     }
+    console.log('atomicsTimeout =', atomicsTimeout)
     console.table(results)
+}
+
+test('piscina worker benchmark (atomicsTimeout = 1000)', async () => {
+    await runBenchmark(1000)
+})
+
+test('piscina worker benchmark', async () => {
+    await runBenchmark()
 })
