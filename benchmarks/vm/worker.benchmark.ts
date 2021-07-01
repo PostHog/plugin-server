@@ -76,7 +76,7 @@ function setupPiscina(workers: number, tasksPerWorker: number, atomicsTimeout: n
 async function runBenchmark(atomicsTimeout = 30000) {
     // Uncomment this to become a 10x developer and make the test run just as fast!
     // Reduces events by 10x and limits threads to max 8 for quicker development
-    const isLightDevRun = true
+    const isLightDevRun = false
 
     const coreCount = os.cpus().length
     const workerThreads = [1, 2, 4, 8, 12, 16].filter((threads) =>
