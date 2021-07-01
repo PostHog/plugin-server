@@ -30,6 +30,7 @@ let closeHub: () => Promise<void>
 beforeEach(async () => {
     ;(Client as any).mockClear()
     ;[hub, closeHub] = await createHub()
+    // hub.db.createPluginLogEntries = jest.fn()
 })
 
 afterEach(async () => {
@@ -566,8 +567,6 @@ test('meta.cache incr', async () => {
 })
 
 test('console.log', async () => {
-    jest.spyOn(hub.db, 'createPluginLogEntries')
-
     const indexJs = `
         async function processEvent (event, meta) {
             console.log(event.event)

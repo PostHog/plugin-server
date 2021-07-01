@@ -214,6 +214,7 @@ export async function createHub(
             clearInterval(eventLoopLagInterval)
         }
         hub.mmdbUpdateJob?.cancel()
+        await hub.logsBuffer.flushLogs()
         await hub.jobQueueManager?.disconnectProducer()
         if (kafkaProducer) {
             clearInterval(kafkaProducer.flushInterval)
@@ -223,7 +224,6 @@ export async function createHub(
         await redisPool.drain()
         await redisPool.clear()
         await hub.postgres.end()
-        await hub.logsBuffer.flushLogs()
     }
 
     return [hub as Hub, closeHub]
