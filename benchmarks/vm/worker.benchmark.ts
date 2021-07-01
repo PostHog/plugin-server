@@ -27,6 +27,23 @@ function processOneEvent(
     return processEvent(defaultEvent)
 }
 
+async function sleep(ms: number) {
+    return await new Promise<void>((resolve) => {
+        setTimeout(() => {
+            resolve()
+        }, ms)
+    })
+}
+
+async function runPromisesWithDelay(promises: Array<() => Promise<void>>) {
+    const promiseToRun = promises.pop()
+    await promiseToRun()
+    await sleep(200)
+    if (promises.length > 0) {
+        await runPromisesWithDelay(promises)
+    }
+}
+
 async function processCountEvents(piscina: ReturnType<typeof makePiscina>, count: number, batchSize = 1) {
     const maxPromises = 1000
     const promises = Array(maxPromises)
@@ -36,9 +53,9 @@ async function processCountEvents(piscina: ReturnType<typeof makePiscina>, count
     for (let j = 0; j < groups; j++) {
         const groupCount = groups === 1 ? count : j === groups - 1 ? (count * batchSize) % maxPromises : maxPromises
         for (let i = 0; i < groupCount; i++) {
-            promises[i] = processOneEvent(processEvent, i)
+            promises[i] = () => processOneEvent(processEvent, i)
         }
-        await Promise.all(promises)
+        await runPromisesWithDelay(promises)
     }
 }
 
@@ -55,7 +72,7 @@ function setupPiscina(workers: number, tasksPerWorker: number, atomicsTimeout: n
 async function runBenchmark(atomicsTimeout = 30000) {
     // Uncomment this to become a 10x developer and make the test run just as fast!
     // Reduces events by 10x and limits threads to max 8 for quicker development
-    const isLightDevRun = false
+    const isLightDevRun = true
 
     const coreCount = os.cpus().length
     const workerThreads = [1, 2, 4, 8, 12, 16].filter((threads) =>
@@ -138,7 +155,7 @@ async function runBenchmark(atomicsTimeout = 30000) {
 }
 
 test('piscina worker benchmark (atomicsTimeout = 1000)', async () => {
-    await runBenchmark(1000)
+    await runBenchmark(100)
 })
 
 test('piscina worker benchmark', async () => {
