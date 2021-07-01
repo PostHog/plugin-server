@@ -40,6 +40,9 @@ async function runPromisesWithDelay(promises: Array<() => Promise<void>>) {
         return
     }
     const promiseToRun = promises.pop()
+    if (typeof promiseToRun === 'undefined') {
+        return
+    }
     await promiseToRun()
     await sleep(200)
     return await runPromisesWithDelay(promises)
