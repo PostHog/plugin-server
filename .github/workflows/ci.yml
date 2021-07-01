@@ -68,7 +68,7 @@ jobs:
               run: python posthog/manage.py setup_test_environment
 
             - name: Install package.json dependencies with Yarn
-              run: cd plugin-server && yarn
+              run: cd plugin-server && yarn &&  yarn add https://github.com/PostHog/piscina#atomics-wait-async
 
             - name: Run benchmarks
               env:
