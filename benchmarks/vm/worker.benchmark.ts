@@ -26,7 +26,7 @@ function processOneEvent(
 
     return processEvent(defaultEvent)
 }
-
+/* 
 async function sleep(ms: number) {
     return await new Promise<void>((resolve) => {
         setTimeout(() => {
@@ -46,7 +46,7 @@ async function runPromisesWithDelay(promises: Array<() => Promise<void>>): Promi
     await promiseToRun()
     await sleep(200)
     await runPromisesWithDelay(promises)
-}
+} */
 
 async function processCountEvents(piscina: ReturnType<typeof makePiscina>, count: number, batchSize = 1) {
     const maxPromises = 1000
@@ -57,9 +57,9 @@ async function processCountEvents(piscina: ReturnType<typeof makePiscina>, count
     for (let j = 0; j < groups; j++) {
         const groupCount = groups === 1 ? count : j === groups - 1 ? (count * batchSize) % maxPromises : maxPromises
         for (let i = 0; i < groupCount; i++) {
-            promises[i] = () => processOneEvent(processEvent, i)
+            promises[i] = processOneEvent(processEvent, i)
         }
-        await runPromisesWithDelay(promises)
+        await Promise.all(promises)
     }
 }
 
