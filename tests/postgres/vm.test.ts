@@ -585,19 +585,21 @@ test('console.log', async () => {
 
     const entries = await hub.db.fetchPluginLogEntries()
 
-    expect(entries).toEqual([
-        {
-            id: expect.anything(),
-            instance_id: expect.anything(),
-            message: 'logged event',
-            plugin_config_id: 39,
-            plugin_id: 60,
-            source: 'CONSOLE',
-            team_id: 2,
-            timestamp: expect.anything(),
-            type: 'LOG',
-        },
-    ])
+    expect(entries).toEqual(
+        expect.arrayContaining([
+            expect.objectContaining({
+                id: expect.anything(),
+                instance_id: expect.anything(),
+                message: 'logged event',
+                plugin_config_id: 39,
+                plugin_id: 60,
+                source: 'CONSOLE',
+                team_id: 2,
+                timestamp: expect.anything(),
+                type: 'LOG',
+            }),
+        ])
+    )
 })
 
 test('fetch', async () => {
