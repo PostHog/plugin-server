@@ -117,12 +117,11 @@ describe('e2e postgres ingestion', () => {
 
         posthog.capture('custom event', { name: 'hehe', uuid: new UUIDT().toString() })
 
-        await hub.logsBuffer.flushLogs()
-
+        // await delayUntilEventIngested(async () =>  )
         await delayUntilEventIngested(async () =>
             (await getLogsSinceStart()).filter(({ message }) => message.includes('amogus'))
         )
-
+        await hub.logsBuffer.flushLogs()
         const pluginLogEntries = await getLogsSinceStart()
         expect(
             pluginLogEntries.filter(({ message, type }) => message.includes('amogus') && type === 'INFO').length
