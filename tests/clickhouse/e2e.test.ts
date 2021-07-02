@@ -119,8 +119,6 @@ describe('e2e clickhouse ingestion', () => {
         await delayUntilEventIngested(() => hub.db.fetchEvents())
         await delayUntilEventIngested(() => hub.db.fetchPluginLogEntries())
 
-        await hub.logsBuffer.flushLogs()
-
         const pluginLogEntries = await getLogsSinceStart()
         expect(
             pluginLogEntries.filter(({ message, type }) => message.includes('amogus') && type === 'INFO').length

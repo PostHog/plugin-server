@@ -14,6 +14,11 @@ export class LogsBuffer {
 
     addLog(log: LogEntryPayload): void {
         this.logs.push(log)
+        // flush logs immediately on tests
+        if (determineNodeEnv() === NodeEnv.Test) {
+            void this.flushLogs()
+            return
+        }
         if (!this.flushTimeout) {
             this.flushTimeout = setTimeout(async () => {
                 await this.flushLogs()
