@@ -11,7 +11,7 @@ describe('console extension', () => {
     let closeHub: () => Promise<void>
 
     beforeEach(async () => {
-        ;[hub, closeHub] = await createHub()
+        [hub, closeHub] = await createHub()
         await resetTestDatabase()
     })
 
@@ -27,7 +27,7 @@ describe('console extension', () => {
 
                 const console = createConsole(hub, pluginConfig)
 
-                await (console[method]() as unknown as Promise<void>)
+                await ((console[method]() as unknown) as Promise<void>)
 
                 const pluginLogEntries = await hub.db.fetchPluginLogEntries()
 
@@ -41,7 +41,7 @@ describe('console extension', () => {
 
                 const console = createConsole(hub, pluginConfig)
 
-                await (console[method]('number =', 987) as unknown as Promise<void>)
+                await ((console[method]('number =', 987) as unknown) as Promise<void>)
 
                 const pluginLogEntries = await hub.db.fetchPluginLogEntries()
 
@@ -55,7 +55,7 @@ describe('console extension', () => {
 
                 const console = createConsole(hub, pluginConfig)
 
-                await (console[method](new Error('something')) as unknown as Promise<void>)
+                await ((console[method](new Error('something')) as unknown) as Promise<void>)
 
                 const pluginLogEntries = await hub.db.fetchPluginLogEntries()
 
@@ -69,7 +69,7 @@ describe('console extension', () => {
 
                 const console = createConsole(hub, pluginConfig)
 
-                await (console[method]({ 1: 'ein', 2: 'zwei' }) as unknown as Promise<void>)
+                await ((console[method]({ 1: 'ein', 2: 'zwei' }) as unknown) as Promise<void>)
 
                 const pluginLogEntries = await hub.db.fetchPluginLogEntries()
 
@@ -83,7 +83,7 @@ describe('console extension', () => {
 
                 const console = createConsole(hub, pluginConfig)
 
-                await (console[method]([99, 79]) as unknown as Promise<void>)
+                await ((console[method]([99, 79]) as unknown) as Promise<void>)
 
                 const pluginLogEntries = await hub.db.fetchPluginLogEntries()
 

@@ -244,7 +244,7 @@ describe('createTaskRunner()', () => {
     let closeHub: () => Promise<void>
 
     beforeEach(async () => {
-        ;[hub, closeHub] = await createHub()
+        [hub, closeHub] = await createHub()
         taskRunner = createTaskRunner(hub)
     })
     afterEach(async () => {
@@ -332,7 +332,7 @@ describe('createTaskRunner()', () => {
     })
 
     it('handles `flushKafkaMessages` task', async () => {
-        hub.kafkaProducer = { flush: jest.fn() } as unknown as KafkaProducerWrapper
+        hub.kafkaProducer = ({ flush: jest.fn() } as unknown) as KafkaProducerWrapper
 
         await taskRunner({ task: 'flushKafkaMessages' })
 
