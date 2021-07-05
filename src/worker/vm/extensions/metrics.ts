@@ -73,7 +73,7 @@ export function setupMetrics(
     pluginConfig: PluginConfig,
     metrics: PluginMetricsVmResponse,
     exportEventsExists = false
-) {
+): void {
     if (!pluginConfig.plugin) {
         return
     }

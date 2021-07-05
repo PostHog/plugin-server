@@ -44,7 +44,7 @@ export class PluginMetricsManager {
         }
     }
 
-    updateMetric({ metricOperation, pluginConfig, metricName, value }: UpdateMetricPayload) {
+    updateMetric({ metricOperation, pluginConfig, metricName, value }: UpdateMetricPayload): void {
         if (!pluginConfig.plugin) {
             return
         }
