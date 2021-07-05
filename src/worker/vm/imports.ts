@@ -8,6 +8,7 @@ import * as genericPool from 'generic-pool'
 import fetch from 'node-fetch'
 import * as pg from 'pg'
 import snowflake from 'snowflake-sdk'
+import { PassThrough } from 'stream'
 import * as url from 'url'
 import * as zlib from 'zlib'
 
@@ -25,6 +26,7 @@ export const imports = {
     '@posthog/plugin-scaffold': scaffold,
     '@posthog/plugin-contrib': contrib,
     'aws-sdk': AWS,
+    stream: { PassThrough },
     pg: pg,
     ...(process.env.NODE_ENV === 'test'
         ? {
