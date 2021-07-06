@@ -72,8 +72,8 @@ export class LazyPluginVM {
         this.totalInitAttemptsCounter++
         this.resolveInternalVm = new Promise((resolve) => {
             this.initialize = async (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo = '') => {
-                const createLogEntry = (message: string, logType = PluginLogEntryType.Info): void => {
-                    hub.logsBuffer.addLog({
+                const createLogEntry = async (message: string, logType = PluginLogEntryType.Info): Promise<void> => {
+                    await hub.logsBuffer.addLog({
                         pluginConfig,
                         message,
                         source: PluginLogEntrySource.System,
@@ -83,7 +83,7 @@ export class LazyPluginVM {
                 }
                 try {
                     const vm = await createPluginConfigVM(hub, pluginConfig, indexJs)
-                    createLogEntry(`Plugin loaded (instance ID ${hub.instanceId}).`)
+                    await createLogEntry(`Plugin loaded (instance ID ${hub.instanceId}).`)
                     status.info('🔌', `Loaded ${logInfo}`)
                     void clearError(hub, pluginConfig)
                     await this.inferPluginCapabilities(hub, pluginConfig, vm)
@@ -97,7 +97,7 @@ export class LazyPluginVM {
                             INITIALIZATION_RETRY_BASE_MS
                         const nextRetrySeconds = `${nextRetryMs / 1000} s`
                         status.warn('⚠️', `Failed to load ${logInfo}. Retrying in ${nextRetrySeconds}.`)
-                        createLogEntry(
+                        await createLogEntry(
                             `Plugin failed to load (instance ID ${hub.instanceId}). Retrying in ${nextRetrySeconds}.`,
                             PluginLogEntryType.Error
                         )
@@ -113,7 +113,7 @@ export class LazyPluginVM {
                               } time${this.totalInitAttemptsCounter > 1 ? 's' : ''} before giving up.`
                             : 'Disabled it.'
                         status.warn('⚠️', `Failed to load ${logInfo}. ${failureContextMessage}`)
-                        createLogEntry(
+                        await createLogEntry(
                             `Plugin failed to load (instance ID ${hub.instanceId}). ${failureContextMessage}`,
                             PluginLogEntryType.Error
                         )

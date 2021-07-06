@@ -18,12 +18,12 @@ function consoleFormat(...args: unknown[]): string {
 }
 
 export function createConsole(server: Hub, pluginConfig: PluginConfig): ConsoleExtension {
-    function consolePersist(type: PluginLogEntryType, ...args: unknown[]): void {
+    async function consolePersist(type: PluginLogEntryType, ...args: unknown[]): Promise<void> {
         if (determineNodeEnv() === NodeEnv.Development) {
             status.info('👉', `${type} in ${pluginDigest(pluginConfig.plugin!, pluginConfig.team_id)}:`, ...args)
         }
 
-        server.logsBuffer.addLog({
+        await server.logsBuffer.addLog({
             pluginConfig,
             type,
             source: PluginLogEntrySource.Console,

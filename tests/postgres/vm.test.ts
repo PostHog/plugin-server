@@ -30,7 +30,6 @@ let closeHub: () => Promise<void>
 beforeEach(async () => {
     ;(Client as any).mockClear()
     ;[hub, closeHub] = await createHub()
-    // hub.db.createPluginLogEntries = jest.fn()
 })
 
 afterEach(async () => {

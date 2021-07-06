@@ -12,11 +12,19 @@ export class LogsBuffer {
         this.flushTimeout = null
     }
 
-    addLog(log: LogEntryPayload): void {
+    async addLog(log: LogEntryPayload): Promise<void> {
+        // drop into kafka queue immediately as that's aready a buffer
+        if (this.db.kafkaProducer) {
+            await this.db.createPluginLogEntries([log])
+            return
+        }
+
+        // for postgres logs, buffer them
         this.logs.push(log)
+
         // flush logs immediately on tests
         if (determineNodeEnv() === NodeEnv.Test) {
-            void this.flushLogs()
+            await this.flushLogs()
             return
         }
         if (!this.flushTimeout) {

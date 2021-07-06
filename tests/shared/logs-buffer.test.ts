@@ -15,7 +15,7 @@ describe('LogsBuffer', () => {
 
     test('logsBuffer adds and flushes logs correctly', async () => {
         jest.useFakeTimers()
-        logsBuffer.addLog({
+        await logsBuffer.addLog({
             pluginConfig: { id: 39, team_id: 2, plugin: { id: 60, organization_id: 'bla' } } as PluginConfig,
             message: 'plugin loaded',
             source: PluginLogEntrySource.System,
