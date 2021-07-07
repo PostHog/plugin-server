@@ -571,7 +571,7 @@ export class DB {
             const chResult = await this.clickhouseQuery(
                 `SELECT 1 FROM person_static_cohort WHERE team_id = ${teamId} AND cohort_id = ${cohortId} AND person_id = '${escapeClickHouseString(
                     person.uuid
-                )}' LIMIT 1;`
+                )}'`
             )
 
             if (chResult.rows > 0) {
