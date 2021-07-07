@@ -9,7 +9,6 @@ import {
     Action,
     ActionStep,
     ActionStepUrlMatching,
-    ClickHousePerson,
     CohortPropertyFilter,
     Element,
     ElementPropertyFilter,
