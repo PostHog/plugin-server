@@ -7,7 +7,6 @@ import { Kafka } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { JobQueueManager } from 'main/job-queues/job-queue-manager'
 import { Pool } from 'pg'
-import { LogsBuffer } from 'utils/logs-buffer'
 import { VM } from 'vm2'
 
 import { DB } from './utils/db/db'
@@ -132,7 +131,6 @@ export interface Hub extends PluginsServerConfig {
     // diagnostics
     lastActivity: number
     lastActivityType: string
-    logsBuffer: LogsBuffer
 }
 
 export interface Pausable {

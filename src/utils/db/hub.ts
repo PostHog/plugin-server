@@ -21,7 +21,6 @@ import { EventsProcessor } from '../../worker/ingestion/process-event'
 import { TeamManager } from '../../worker/ingestion/team-manager'
 import { InternalMetrics } from '../internal-metrics'
 import { killProcess } from '../kill'
-import { LogsBuffer } from '../logs-buffer'
 import { status } from '../status'
 import { createPostgresPool, createRedis, logOrThrowJobQueueError, UUIDT } from '../utils'
 import { DB } from './db'
@@ -188,7 +187,6 @@ export async function createHub(
         actionManager,
         actionMatcher: new ActionMatcher(db, actionManager, statsd),
         hookCannon: new HookCommander(db, teamManager, organizationManager, statsd),
-        logsBuffer: new LogsBuffer(db),
     }
 
     // :TODO: This is only used on worker threads, not main
@@ -214,7 +212,7 @@ export async function createHub(
             clearInterval(eventLoopLagInterval)
         }
         hub.mmdbUpdateJob?.cancel()
-        await hub.logsBuffer.flushLogs()
+        await hub.db.postgresLogsWrapper.flushLogs()
         await hub.jobQueueManager?.disconnectProducer()
         if (kafkaProducer) {
             clearInterval(kafkaProducer.flushInterval)

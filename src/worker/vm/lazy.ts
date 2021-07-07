@@ -73,7 +73,7 @@ export class LazyPluginVM {
         this.resolveInternalVm = new Promise((resolve) => {
             this.initialize = async (hub: Hub, pluginConfig: PluginConfig, indexJs: string, logInfo = '') => {
                 const createLogEntry = async (message: string, logType = PluginLogEntryType.Info): Promise<void> => {
-                    await hub.logsBuffer.addLog({
+                    await hub.db.queuePluginLogEntry({
                         pluginConfig,
                         message,
                         source: PluginLogEntrySource.System,

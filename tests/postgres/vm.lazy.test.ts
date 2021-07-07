@@ -2,14 +2,13 @@ import { RetryError } from '@posthog/plugin-scaffold'
 import { mocked } from 'ts-jest/utils'
 
 import { PluginLogEntrySource, PluginLogEntryType, PluginTaskType } from '../../src/types'
-import { DB } from '../../src/utils/db/db'
 import { clearError } from '../../src/utils/db/error'
-import { LogsBuffer } from '../../src/utils/logs-buffer'
 import { status } from '../../src/utils/status'
 import { LazyPluginVM } from '../../src/worker/vm/lazy'
 import { createPluginConfigVM } from '../../src/worker/vm/vm'
 import { plugin60 } from '../helpers/plugins'
 import { disablePlugin } from '../helpers/sqlMock'
+import { PostgresLogsWrapper } from './../../src/utils/db/postgres-logs-wrapper'
 import { plugin70 } from './../helpers/plugins'
 
 jest.mock('../../src/worker/vm/vm')
@@ -26,13 +25,18 @@ const mockConfig = {
 
 describe('LazyPluginVM', () => {
     const createVM = () => new LazyPluginVM()
+    const baseDb = {
+        queuePluginLogEntry: jest.fn(),
+        batchInsertPostgresLogs: jest.fn(),
+    }
+    const postgresLogsWrapper = new PostgresLogsWrapper(baseDb as any)
+
     const db = {
-        createPluginLogEntries: jest.fn(),
+        ...baseDb,
+        postgresLogsWrapper,
     }
-    const mockServer: any = {
-        db,
-        logsBuffer: new LogsBuffer(db as any),
-    }
+
+    const mockServer: any = { db }
     const initializeVm = (vm: LazyPluginVM) => vm.initialize!(mockServer, mockConfig as any, '', 'some plugin')
 
     const mockVM = {
@@ -69,17 +73,14 @@ describe('LazyPluginVM', () => {
 
             expect(status.info).toHaveBeenCalledWith('🔌', 'Loaded some plugin')
             expect(clearError).toHaveBeenCalledWith(mockServer, mockConfig)
-            await mockServer.logsBuffer.flushLogs()
-            expect(mockServer.db.createPluginLogEntries).toHaveBeenCalledWith(
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        instanceId: undefined,
-                        message: expect.stringContaining('Plugin loaded'),
-                        pluginConfig: expect.anything(),
-                        source: PluginLogEntrySource.System,
-                        type: PluginLogEntryType.Info,
-                    }),
-                ])
+            expect(mockServer.db.queuePluginLogEntry).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    instanceId: undefined,
+                    message: expect.stringContaining('Plugin loaded'),
+                    pluginConfig: expect.anything(),
+                    source: PluginLogEntrySource.System,
+                    type: PluginLogEntryType.Info,
+                })
             )
         })
     })

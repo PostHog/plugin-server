@@ -1,8 +1,8 @@
-import { DB, LogEntryPayload } from './db/db'
-import { determineNodeEnv, NodeEnv } from './utils'
+import { determineNodeEnv, NodeEnv } from '../utils'
+import { DB, LogEntryPayload, ParsedLogEntry } from './db'
 
-export class LogsBuffer {
-    logs: LogEntryPayload[]
+export class PostgresLogsWrapper {
+    logs: ParsedLogEntry[]
     flushTimeout: NodeJS.Timeout | null
     db: DB
 
@@ -12,13 +12,7 @@ export class LogsBuffer {
         this.flushTimeout = null
     }
 
-    async addLog(log: LogEntryPayload): Promise<void> {
-        // drop into kafka queue immediately as that's aready a buffer
-        if (this.db.kafkaProducer) {
-            await this.db.createPluginLogEntries([log])
-            return
-        }
-
+    async addLog(log: ParsedLogEntry): Promise<void> {
         // for postgres logs, buffer them
         this.logs.push(log)
 
@@ -27,6 +21,7 @@ export class LogsBuffer {
             await this.flushLogs()
             return
         }
+
         if (!this.flushTimeout) {
             this.flushTimeout = setTimeout(async () => {
                 await this.flushLogs()
@@ -40,7 +35,7 @@ export class LogsBuffer {
             this.flushTimeout = null
         }
         if (this.logs.length > 0) {
-            await this.db.createPluginLogEntries(this.logs)
+            await this.db.batchInsertPostgresLogs(this.logs)
             this.logs = []
         }
     }

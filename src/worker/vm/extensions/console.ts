@@ -23,7 +23,7 @@ export function createConsole(server: Hub, pluginConfig: PluginConfig): ConsoleE
             status.info('👉', `${type} in ${pluginDigest(pluginConfig.plugin!, pluginConfig.team_id)}:`, ...args)
         }
 
-        await server.logsBuffer.addLog({
+        await server.db.queuePluginLogEntry({
             pluginConfig,
             type,
             source: PluginLogEntrySource.Console,

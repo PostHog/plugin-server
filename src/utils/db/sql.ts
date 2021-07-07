@@ -71,7 +71,7 @@ export async function setError(hub: Hub, pluginError: PluginError | null, plugin
         'updatePluginConfigError'
     )
     if (pluginError) {
-        await hub.logsBuffer.addLog({
+        await hub.db.queuePluginLogEntry({
             pluginConfig,
             source: PluginLogEntrySource.Plugin,
             type: PluginLogEntryType.Error,

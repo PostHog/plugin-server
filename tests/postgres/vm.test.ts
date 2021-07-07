@@ -580,8 +580,8 @@ test('console.log', async () => {
     }
 
     await vm.methods.processEvent!(event)
-    await hub.logsBuffer.flushLogs()
 
+    await hub.db.postgresLogsWrapper.flushLogs()
     const entries = await hub.db.fetchPluginLogEntries()
 
     expect(entries).toEqual(
