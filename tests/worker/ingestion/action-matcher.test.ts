@@ -771,10 +771,8 @@ describe('ActionMatcher', () => {
             ).toEqual([])
         })
 
-        // Postgres static cohort people are no different from other cohorts
-        // so the test before is enough
-        // Here we just test CH
         it('returns a match in case of a CH static cohort match', async () => {
+            // Static cohorts are stored in their own ClickHouse table, hence this path has its own test
             const testCohortStatic = await hub.db.createCohort({
                 name: 'Test',
                 created_by_id: commonUserId,

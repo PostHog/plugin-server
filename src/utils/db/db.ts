@@ -569,12 +569,16 @@ export class DB {
     public async doesPersonBelongToCohort(cohortId: number, person: Person, teamId: Team['id']): Promise<boolean> {
         if (this.kafkaProducer) {
             const chResult = await this.clickhouseQuery(
-                `SELECT 1 FROM person_static_cohort WHERE team_id = ${teamId} AND cohort_id = ${cohortId} AND person_id = '${escapeClickHouseString(
-                    person.uuid
-                )}'`
+                `SELECT 1 FROM person_static_cohort
+                WHERE
+                    team_id = ${teamId}
+                    AND cohort_id = ${cohortId}
+                    AND person_id = '${escapeClickHouseString(person.uuid)}'
+                LIMIT 1`
             )
 
             if (chResult.rows > 0) {
+                // Cohort is static and our person belongs to it
                 return true
             }
         }
