@@ -1,4 +1,5 @@
 import { CacheExtension } from '@posthog/plugin-scaffold'
+import { IllegalOperationError } from 'utils/utils'
 
 import { Hub } from '../../../types'
 
@@ -23,6 +24,9 @@ export function createCache(server: Hub, pluginId: number, teamId: number): Cach
                 throw new Error('cache.lpush expects a string value or an array of strings')
             }
             if (!isString) {
+                if (elementOrArray.length > 1000) {
+                    throw new IllegalOperationError('Too many elements in array for cache.lpush. Maximum: 1000')
+                }
                 elementOrArray = elementOrArray.map((el) => String(el))
             }
             return await server.db.redisLPush(getKey(key), elementOrArray, { jsonSerialize: false })
@@ -32,6 +36,9 @@ export function createCache(server: Hub, pluginId: number, teamId: number): Cach
                 throw new Error('cache.lrange expects a number for the start and end indexes')
             }
             return await server.db.redisLRange(getKey(key), startIndex, endIndex)
+        },
+        llen: async function (key) {
+            return await server.db.redisLLen(getKey(key))
         },
     }
 }

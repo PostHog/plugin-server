@@ -248,6 +248,21 @@ export class DB {
         })
     }
 
+    public redisLLen(key: string): Promise<number> {
+        return instrumentQuery(this.statsd, 'query.redisLLen', undefined, async () => {
+            const client = await this.redisPool.acquire()
+            const timeout = timeoutGuard('LLEN delayed. Waiting over 30 sec to perform LLEN', {
+                key,
+            })
+            try {
+                return await client.llen(key)
+            } finally {
+                clearTimeout(timeout)
+                await this.redisPool.release(client)
+            }
+        })
+    }
+
     public redisBRPop(key1: string, key2: string): Promise<[string, string]> {
         return instrumentQuery(this.statsd, 'query.redisBRPop', undefined, async () => {
             const client = await this.redisPool.acquire()

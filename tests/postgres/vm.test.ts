@@ -564,7 +564,7 @@ test('meta.cache incr', async () => {
     expect(event.properties!['counter']).toEqual(3)
 })
 
-test('meta.cache lpush/lrange', async () => {
+test('meta.cache lpush/lrange/llen', async () => {
     const indexJs = `
         async function setupPlugin (meta) {
             await meta.cache.lpush('mylist', 'a string')
@@ -573,7 +573,9 @@ test('meta.cache lpush/lrange', async () => {
         }
         async function processEvent (event, meta) {
             const mylistBefore = await meta.cache.lrange('mylist', 0, 3)
+            const mylistLen = await meta.cache.llen('mylist')
             event.properties['mylist_before'] = mylistBefore
+            event.properties['mylist_len'] = mylistLen
             await meta.cache.expire('mylist', 0)
             const mylistAfter = await meta.cache.lrange('mylist', 0, 3)
             event.properties['mylist_after'] = mylistAfter
@@ -591,6 +593,7 @@ test('meta.cache lpush/lrange', async () => {
 
     await vm.methods.processEvent!(event)
     expect(event.properties!['mylist_before']).toEqual(expect.arrayContaining(['a string', 'an', 'array']))
+    expect(event.properties!['mylist_len']).toEqual(3)
     expect(event.properties!['mylist_after']).toEqual([])
 })
 
