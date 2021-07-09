@@ -17,5 +17,21 @@ export function createCache(server: Hub, pluginId: number, teamId: number): Cach
         expire: async function (key, ttlSeconds) {
             return await server.db.redisExpire(getKey(key), ttlSeconds)
         },
+        lpush: async function (key, elementOrArray) {
+            const isString = typeof elementOrArray === 'string'
+            if (!Array.isArray(elementOrArray) && !isString) {
+                throw new Error('cache.lpush expects a string value or an array of strings')
+            }
+            if (!isString) {
+                elementOrArray = elementOrArray.map((el) => String(el))
+            }
+            return await server.db.redisLPush(getKey(key), elementOrArray, { jsonSerialize: false })
+        },
+        lrange: async function (key, startIndex, endIndex) {
+            if (typeof startIndex !== 'number' || typeof endIndex !== 'number') {
+                throw new Error('cache.lrange expects a number for the start and end indexes')
+            }
+            return await server.db.redisLRange(getKey(key), startIndex, endIndex)
+        },
     }
 }
