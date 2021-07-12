@@ -64,9 +64,9 @@ test('piscina worker test', async () => {
     await resetTestDatabase(testCode)
     const piscina = setupPiscina(workerThreads, 10)
 
-    const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
-    const runEveryDay = (pluginConfigId: number) => piscina.runTask({ task: 'runEveryDay', args: { pluginConfigId } })
-    const ingestEvent = (event: PluginEvent) => piscina.runTask({ task: 'ingestEvent', args: { event } })
+    const processEvent = (event: PluginEvent) => piscina.run({ task: 'processEvent', args: { event } })
+    const runEveryDay = (pluginConfigId: number) => piscina.run({ task: 'runEveryDay', args: { pluginConfigId } })
+    const ingestEvent = (event: PluginEvent) => piscina.run({ task: 'ingestEvent', args: { event } })
 
     const pluginSchedule = await loadPluginSchedule(piscina)
     expect(pluginSchedule).toEqual({ runEveryDay: [39], runEveryHour: [], runEveryMinute: [] })
@@ -98,7 +98,7 @@ test('assume that the workerThreads and tasksPerWorker values behave as expected
     `
     await resetTestDatabase(testCode)
     const piscina = setupPiscina(workerThreads, tasksPerWorker)
-    const processEvent = (event: PluginEvent) => piscina.runTask({ task: 'processEvent', args: { event } })
+    const processEvent = (event: PluginEvent) => piscina.run({ task: 'processEvent', args: { event } })
     const promises: Array<Promise<any>> = []
 
     // warmup 2x
@@ -227,6 +227,7 @@ describe('queue logic', () => {
         expect(pausedTimes).toBeGreaterThanOrEqual(10)
         expect(pluginsServer.queue.isPaused()).toBe(false)
         expect(pluginsServer.piscina.queueSize).toBe(0)
+
         // tasksSentSoFar x (processEvent + onEvent + ingestEvent)
         expect(pluginsServer.piscina.completed).toEqual(baseCompleted + tasksSentSoFar * 3)
 

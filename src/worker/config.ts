@@ -19,6 +19,7 @@ export interface PiscinaOptions {
     taskQueue?: TaskQueue
     niceIncrement?: number
     trackUnmanagedFds?: boolean
+    atomicsTimeout?: number
 }
 
 export function createConfig(serverConfig: PluginsServerConfig, filename: string): PiscinaOptions {
@@ -28,6 +29,8 @@ export function createConfig(serverConfig: PluginsServerConfig, filename: string
         resourceLimits: {
             stackSizeMb: 10,
         },
+        useAtomics: serverConfig.PISCINA_USE_ATOMICS,
+        atomicsTimeout: serverConfig.PISCINA_ATOMICS_TIMEOUT,
     }
 
     if (serverConfig.WORKER_CONCURRENCY && serverConfig.WORKER_CONCURRENCY > 0) {

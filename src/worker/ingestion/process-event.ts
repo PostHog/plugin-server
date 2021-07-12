@@ -35,6 +35,9 @@ import { TeamManager } from './team-manager'
 
 const MAX_FAILED_PERSON_MERGE_ATTEMPTS = 3
 
+// for e.g. internal events we don't want to be available for users in the UI
+const EVENTS_WITHOUT_EVENT_DEFINITION = ['$$plugin_metrics']
+
 export interface EventProcessingResult {
     event: IEvent | SessionRecordingEvent | PostgresSessionRecordingEvent
     eventId?: number
@@ -166,7 +169,7 @@ export class EventsProcessor {
                     return now.plus(DateTime.fromISO(data['timestamp']).diff(sentAt))
                 } catch (error) {
                     status.error('⚠️', 'Error when handling timestamp:', error)
-                    Sentry.captureException(error)
+                    Sentry.captureException(error, { extra: { data, now, sentAt } })
                 }
             }
             return DateTime.fromISO(data['timestamp'])
@@ -422,7 +425,9 @@ export class EventsProcessor {
             properties['$ip'] = ip
         }
 
-        await this.teamManager.updateEventNamesAndProperties(teamId, event, properties)
+        if (!EVENTS_WITHOUT_EVENT_DEFINITION.includes(event)) {
+            await this.teamManager.updateEventNamesAndProperties(teamId, event, properties)
+        }
 
         if (await this.personManager.isNewPerson(this.db, teamId, distinctId)) {
             // Catch race condition where in between getting and creating, another request already created this user
