@@ -772,37 +772,38 @@ export class DB {
                 console.error(parsedEntry)
                 console.error(e)
             }
-            return
+        } else {
+            await this.postgresLogsWrapper.addLog(parsedEntry)
         }
-
-        await this.postgresLogsWrapper.addLog(parsedEntry)
     }
 
     public async batchInsertPostgresLogs(entries: ParsedLogEntry[]): Promise<void> {
-        let values: any[] = []
-        let valuesString = ''
+        const LOG_ENTRY_COLUMN_COUNT = 9
 
-        for (let i = 0; i < entries.length; ++i) {
+        const rowStrings: string[] = []
+        const values: any[] = []
+
+        for (let rowIndex = 0; rowIndex < entries.length; ++rowIndex) {
             const { id, team_id, plugin_id, plugin_config_id, timestamp, source, type, message, instance_id } =
-                entries[i]
+                entries[rowIndex]
 
-            // Creates format: ($1, $2, $3, $4, $5, $6, $7, $8, $9), ($10, $11, $12, $13, $14, $15, $16, $17, $18)
-            valuesString += ' ('
+            // Creates format: ($1, $2, $3, $4, $5, $6, $7, $8, $9), ($10, $12, $13, $14, $15, $16, $17, $18, $19)
+            rowStrings.push(
+                '(' +
+                    Array.from(Array(LOG_ENTRY_COLUMN_COUNT).keys())
+                        .map((x) => `$${x + 1 + rowIndex * LOG_ENTRY_COLUMN_COUNT}`)
+                        .join(', ') +
+                    ')'
+            )
 
-            for (let j = 1; j <= 9; ++j) {
-                valuesString += `$${9 * i + j}${j === 9 ? '' : ', '}`
-            }
-            valuesString += `)${i === entries.length - 1 ? '' : ','}`
-
-            values = [
-                ...values,
-                ...[id, team_id, plugin_id, plugin_config_id, timestamp, source, type, message, instance_id],
-            ]
+            values.push(id, team_id, plugin_id, plugin_config_id, timestamp, source, type, message, instance_id)
         }
         try {
             await this.postgresQuery(
-                `INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, plugin_config_id, timestamp, source,type, message, instance_id) 
-                VALUES ${valuesString}`,
+                `INSERT INTO posthog_pluginlogentry
+                (id, team_id, plugin_id, plugin_config_id, timestamp, source, type, message, instance_id)
+                VALUES
+                ${rowStrings.join(', ')}`,
                 values,
                 'insertPluginLogEntries'
             )

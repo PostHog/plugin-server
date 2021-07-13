@@ -1,5 +1,7 @@
 import { determineNodeEnv, NodeEnv } from '../utils'
-import { DB, LogEntryPayload, ParsedLogEntry } from './db'
+import { DB, ParsedLogEntry } from './db'
+
+const POSTGRES_LOGS_FLUSH_TIMEOUT_MS = 1000
 
 export class PostgresLogsWrapper {
     logs: ParsedLogEntry[]
@@ -13,10 +15,9 @@ export class PostgresLogsWrapper {
     }
 
     async addLog(log: ParsedLogEntry): Promise<void> {
-        // for postgres logs, buffer them
         this.logs.push(log)
 
-        // flush logs immediately on tests
+        // Flush logs immediately on tests
         if (determineNodeEnv() === NodeEnv.Test) {
             await this.flushLogs()
             return
@@ -25,7 +26,7 @@ export class PostgresLogsWrapper {
         if (!this.flushTimeout) {
             this.flushTimeout = setTimeout(async () => {
                 await this.flushLogs()
-            }, 1000)
+            }, POSTGRES_LOGS_FLUSH_TIMEOUT_MS)
         }
     }
 
