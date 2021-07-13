@@ -13,6 +13,7 @@ export class GraphileQueue extends JobQueueBase {
     consumerPool: Pool | null
     producerPool: Pool | null
     workerUtilsPromise: Promise<WorkerUtils> | null
+    ending: boolean
 
     constructor(serverConfig: PluginsServerConfig) {
         super()
@@ -21,6 +22,7 @@ export class GraphileQueue extends JobQueueBase {
         this.consumerPool = null
         this.producerPool = null
         this.workerUtilsPromise = null
+        this.ending = false
     }
 
     // producer
@@ -86,11 +88,13 @@ export class GraphileQueue extends JobQueueBase {
                 })
             }
         } else {
-            if (this.runner) {
+            if (this.runner && !this.ending) {
+                this.ending = true
                 const oldRunner = this.runner
                 this.runner = null
                 await oldRunner?.stop()
                 await this.consumerPool?.end()
+                this.ending = false
             }
         }
     }
