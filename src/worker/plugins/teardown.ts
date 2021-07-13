@@ -26,7 +26,7 @@ export async function teardownPlugins(server: Hub, pluginConfig?: PluginConfig):
                             await server.db.queuePluginLogEntry({
                                 pluginConfig,
                                 source: PluginLogEntrySource.System,
-                                type: PluginLogEntryType.Info,
+                                type: PluginLogEntryType.Error,
                                 message: `Plugin failed to unload (instance ID ${server.instanceId}).`,
                                 instanceId: server.instanceId,
                             })
