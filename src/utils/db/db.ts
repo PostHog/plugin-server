@@ -298,10 +298,8 @@ export class DB {
                 return rest
             }) as ClickHousePerson[]
         } else if (database === Database.Postgres) {
-            return (
-                (await this.postgresQuery('SELECT * FROM posthog_person', undefined, 'fetchPersons'))
-                    .rows as RawPerson[]
-            ).map(
+            return ((await this.postgresQuery('SELECT * FROM posthog_person', undefined, 'fetchPersons'))
+                .rows as RawPerson[]).map(
                 (rawPerson: RawPerson) =>
                     ({
                         ...rawPerson,
@@ -561,18 +559,28 @@ export class DB {
         }
     }
 
-    public async moveDistinctId(personDistinctId: PersonDistinctId, moveToPerson: Person): Promise<void> {
-        await this.postgresQuery(
-            `UPDATE posthog_persondistinctid SET person_id = $1 WHERE id = $2`,
-            [moveToPerson.id, personDistinctId.id],
+    public async moveDistinctIds(source: Person, target: Person): Promise<void> {
+        const movedDistinctIdResult = await this.postgresQuery(
+            `
+                UPDATE posthog_persondistinctid
+                SET person_id = $1
+                WHERE person_id = $2
+                  AND team_id = $3
+                ON CONFLICT DO NOTHING
+                RETURNING *
+            `,
+            [target.id, source.id, target.team_id],
             'updateDistinctIdPerson'
         )
+
         if (this.kafkaProducer) {
-            const clickhouseModel: ClickHousePersonDistinctId = { ...personDistinctId, person_id: moveToPerson.uuid }
-            await this.kafkaProducer.queueMessage({
-                topic: KAFKA_PERSON_UNIQUE_ID,
-                messages: [{ value: Buffer.from(JSON.stringify(clickhouseModel)) }],
-            })
+            for (const row of movedDistinctIdResult.rows) {
+                const clickhouseModel: ClickHousePersonDistinctId = { ...row, person_id: target.uuid }
+                await this.kafkaProducer.queueMessage({
+                    topic: KAFKA_PERSON_UNIQUE_ID,
+                    messages: [{ value: Buffer.from(JSON.stringify(clickhouseModel)) }],
+                })
+            }
         }
     }
 
@@ -659,9 +667,8 @@ export class DB {
 
     public async fetchSessionRecordingEvents(): Promise<PostgresSessionRecordingEvent[] | SessionRecordingEvent[]> {
         if (this.kafkaProducer) {
-            const events = (
-                (await this.clickhouseQuery(`SELECT * FROM session_recording_events`)).data as SessionRecordingEvent[]
-            ).map((event) => {
+            const events = ((await this.clickhouseQuery(`SELECT * FROM session_recording_events`))
+                .data as SessionRecordingEvent[]).map((event) => {
                 return {
                     ...event,
                     snapshot_data: event.snapshot_data ? JSON.parse(event.snapshot_data) : null,

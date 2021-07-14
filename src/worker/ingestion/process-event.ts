@@ -364,16 +364,8 @@ export class EventsProcessor {
         // In the rare case of the person changing VERY often however, it may happen even a few times,
         // in which case we'll bail and rethrow the error.
         while (true) {
-            const otherPersonDistinctIds: PersonDistinctId[] = (
-                await this.db.postgresQuery(
-                    'SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2',
-                    [otherPerson.id, mergeInto.team_id],
-                    'otherPersonDistinctIds'
-                )
-            ).rows
-            for (const otherPersonDistinctId of otherPersonDistinctIds) {
-                await this.db.moveDistinctId(otherPersonDistinctId, mergeInto)
-            }
+            await this.db.moveDistinctIds(otherPerson, mergeInto)
+
             try {
                 await this.db.deletePerson(otherPerson)
                 break // All OK, exiting retry loop
