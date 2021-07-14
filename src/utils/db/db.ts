@@ -568,7 +568,6 @@ export class DB {
                 SET person_id = $1
                 WHERE person_id = $2
                   AND team_id = $3
-                ON CONFLICT DO NOTHING
                 RETURNING *
             `,
             [target.id, source.id, target.team_id],
