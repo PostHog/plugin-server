@@ -467,36 +467,29 @@ export class DB {
 
     public async deletePerson(person: Person): Promise<void> {
         await this.postgresTransaction(async (client) => {
-            await client.query('DELETE FROM posthog_persondistinctid WHERE person_id = $1', [person.id])
-            await client.query('DELETE FROM posthog_person WHERE id = $1', [person.id])
+            await client.query('DELETE FROM posthog_person WHERE team_id = $1 AND id = $1', [person.team_id, person.id])
         })
-        if (this.clickhouse) {
-            if (this.kafkaProducer) {
-                await this.kafkaProducer.queueMessage({
-                    topic: KAFKA_PERSON,
-                    messages: [
-                        {
-                            value: Buffer.from(
-                                JSON.stringify({
-                                    created_at: castTimestampOrNow(
-                                        person.created_at,
-                                        TimestampFormat.ClickHouseSecondPrecision
-                                    ),
-                                    properties: JSON.stringify(person.properties),
-                                    team_id: person.team_id,
-                                    is_identified: person.is_identified,
-                                    id: person.uuid,
-                                    is_deleted: 1,
-                                })
-                            ),
-                        },
-                    ],
-                })
-            }
-
-            await this.clickhouseQuery(
-                `ALTER TABLE person_distinct_id DELETE WHERE person_id = '${escapeClickHouseString(person.uuid)}'`
-            )
+        if (this.kafkaProducer) {
+            await this.kafkaProducer.queueMessage({
+                topic: KAFKA_PERSON,
+                messages: [
+                    {
+                        value: Buffer.from(
+                            JSON.stringify({
+                                created_at: castTimestampOrNow(
+                                    person.created_at,
+                                    TimestampFormat.ClickHouseSecondPrecision
+                                ),
+                                properties: JSON.stringify(person.properties),
+                                team_id: person.team_id,
+                                is_identified: person.is_identified,
+                                id: person.uuid,
+                                is_deleted: 1,
+                            })
+                        ),
+                    },
+                ],
+            })
         }
     }
 
@@ -555,7 +548,11 @@ export class DB {
             return {
                 topic: KAFKA_PERSON_UNIQUE_ID,
                 messages: [
-                    { value: Buffer.from(JSON.stringify({ ...personDistinctIdCreated, person_id: person.uuid })) },
+                    {
+                        value: Buffer.from(
+                            JSON.stringify({ ...personDistinctIdCreated, person_id: person.uuid, sign: 1 })
+                        ),
+                    },
                 ],
             }
         }
@@ -576,10 +573,13 @@ export class DB {
 
         if (this.kafkaProducer) {
             for (const row of movedDistinctIdResult.rows) {
-                const clickhouseModel: ClickHousePersonDistinctId = { ...row, person_id: target.uuid }
                 await this.kafkaProducer.queueMessage({
                     topic: KAFKA_PERSON_UNIQUE_ID,
-                    messages: [{ value: Buffer.from(JSON.stringify(clickhouseModel)) }],
+                    messages: [{ value: Buffer.from(JSON.stringify({ ...row, person_id: target.uuid, sign: 1 })) }],
+                })
+                await this.kafkaProducer.queueMessage({
+                    topic: KAFKA_PERSON_UNIQUE_ID,
+                    messages: [{ value: Buffer.from(JSON.stringify({ ...row, sign: -1 })) }],
                 })
             }
         }
