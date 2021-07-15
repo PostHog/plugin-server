@@ -168,6 +168,7 @@ export async function createPluginConfigVM(
                 onEvent: __asyncFunctionGuard(__bindMeta('onEvent'), 'onEvent'),
                 onSnapshot: __asyncFunctionGuard(__bindMeta('onSnapshot'), 'onSnapshot'),
                 processEvent: __asyncFunctionGuard(__bindMeta('processEvent'), 'processEvent'),
+                importEventsFromRedshift: __asyncFunctionGuard(__bindMeta('importEventsFromRedshift'), 'importEventsFromRedshift'),
             };
 
             const __tasks = {
@@ -222,7 +223,7 @@ export async function createPluginConfigVM(
     }
 
     if (!!methods.importEventsFromRedshift) {
-        upgradeRedshiftImport(vmResponse)
+        upgradeRedshiftImport(hub, pluginConfig, vmResponse)
     }
 
     setupMetrics(hub, pluginConfig, metrics, exportEventsExists)
