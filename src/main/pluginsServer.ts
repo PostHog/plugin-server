@@ -186,7 +186,7 @@ export async function startPluginsServer(
             })
         }
 
-        pluginMetricsJob = schedule.scheduleJob('*/1 * * * *', async () => {
+        pluginMetricsJob = schedule.scheduleJob('*/30 * * * *', async () => {
             await piscina!.broadcastTask({ task: 'sendPluginMetrics' })
         })
 
