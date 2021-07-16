@@ -550,7 +550,7 @@ export class DB {
                 messages: [
                     {
                         value: Buffer.from(
-                            JSON.stringify({ ...personDistinctIdCreated, person_id: person.uuid, sign: 1 })
+                            JSON.stringify({ ...personDistinctIdCreated, person_id: person.uuid, is_deleted: 0 })
                         ),
                     },
                 ],
@@ -575,11 +575,13 @@ export class DB {
             for (const row of movedDistinctIdResult.rows) {
                 await this.kafkaProducer.queueMessage({
                     topic: KAFKA_PERSON_UNIQUE_ID,
-                    messages: [{ value: Buffer.from(JSON.stringify({ ...row, person_id: target.uuid, sign: 1 })) }],
+                    messages: [
+                        { value: Buffer.from(JSON.stringify({ ...row, person_id: target.uuid, is_deleted: 0 })) },
+                    ],
                 })
                 await this.kafkaProducer.queueMessage({
                     topic: KAFKA_PERSON_UNIQUE_ID,
-                    messages: [{ value: Buffer.from(JSON.stringify({ ...row, sign: -1 })) }],
+                    messages: [{ value: Buffer.from(JSON.stringify({ ...row, is_deleted: 1 })) }],
                 })
             }
         }
