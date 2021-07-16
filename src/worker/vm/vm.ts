@@ -216,9 +216,8 @@ export async function createPluginConfigVM(
 
     const vmResponse = vm.run(responseVar)
     const { methods, tasks, metrics } = vmResponse
-    const exportEventsExists = !!methods.exportEvents
 
-    if (exportEventsExists) {
+    if (!!methods.exportEvents) {
         upgradeExportEvents(hub, pluginConfig, vmResponse)
     }
 
@@ -226,7 +225,7 @@ export async function createPluginConfigVM(
         upgradeRedshiftImport(hub, pluginConfig, vmResponse)
     }
 
-    setupMetrics(hub, pluginConfig, metrics, exportEventsExists)
+    setupMetrics(hub, pluginConfig, metrics, methods)
 
     await vm.run(`${responseVar}.methods.setupPlugin?.()`)
 

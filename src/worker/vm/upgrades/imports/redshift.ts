@@ -1,11 +1,17 @@
-import { Plugin, PluginEvent, PluginMeta, RetryError } from '@posthog/plugin-scaffold'
+import { Plugin, PluginMeta } from '@posthog/plugin-scaffold'
 import { Client, QueryResult } from 'pg'
 
-import { Hub, PluginConfig, PluginConfigVMInternalResponse, PluginTaskType } from '../../../../types'
+import {
+    Hub,
+    MetricMathOperations,
+    PluginConfig,
+    PluginConfigVMInternalResponse,
+    PluginLogEntrySource,
+    PluginLogEntryType,
+    PluginTaskType,
+} from '../../../../types'
 import { createPosthog } from './../../extensions/posthog'
 import { DummyPostHog } from './../../extensions/posthog'
-
-// TODO: Add automatic metrics
 
 type RedshiftImportUpgrade = Plugin<{
     global: {
@@ -100,10 +106,11 @@ export function upgradeRedshiftImport(
         meta: PluginMeta<RedshiftImportUpgrade>
     ) => {
         if (payload.offset && payload.retriesPerformedSoFar >= 15) {
-            console.error(
+            createLog(
                 `Import error: Unable to process rows ${payload.offset}-${
                     payload.offset + EVENTS_PER_BATCH
-                }. Skipped them.`
+                }. Skipped them.`,
+                PluginLogEntryType.Error
             )
             return
         }
@@ -117,12 +124,13 @@ export function upgradeRedshiftImport(
         }
 
         if (offset > meta.global.totalRows) {
-            console.log(`Done processing all rows in ${meta.config.tableName}`)
+            createLog(`Done processing all rows in ${meta.config.tableName}`)
             return
         }
 
-        const query = `SELECT * FROM ${sanitizeSqlIdentifier(meta.config.tableName)} ORDER BY ${sanitizeSqlIdentifier(
-            meta.config.orderByColumn
+        // ORDER BY ${sanitizeSqlIdentifier( meta.config.orderByColumn)}
+        const query = `SELECT * FROM ${sanitizeSqlIdentifier(
+            meta.config.tableName
         )} OFFSET $1 LIMIT ${EVENTS_PER_BATCH};`
         const values = [offset]
 
@@ -130,7 +138,7 @@ export function upgradeRedshiftImport(
 
         if (queryResponse.error || !queryResponse.queryResult) {
             const nextRetrySeconds = 2 ** payload.retriesPerformedSoFar * 3
-            console.log(
+            createLog(
                 `Unable to process rows ${offset}-${
                     offset + EVENTS_PER_BATCH
                 }. Retrying in ${nextRetrySeconds}. Error: ${queryResponse.error}`
@@ -147,12 +155,16 @@ export function upgradeRedshiftImport(
         }
 
         for (const event of eventsToIngest) {
-            console.log(event.event)
             meta.global.posthog.capture(event.event, event.properties)
         }
 
-        await meta.storage.set('import_offset', offset + EVENTS_PER_BATCH)
-        await meta.jobs.importAndIngestEvents({ offset: offset + EVENTS_PER_BATCH, retriesPerformedSoFar: 0 }).runNow()
+        createLog(
+            `Processed rows ${offset}-${offset + EVENTS_PER_BATCH} and ingested ${eventsToIngest.length} event${
+                eventsToIngest.length > 1 ? 's' : ''
+            } from them.`
+        )
+        incrementMetric('events_imported', eventsToIngest.length)
+        await meta.jobs.importAndIngestEvents({ retriesPerformedSoFar: 0 }).runNow()
     }
 
     methods.teardownPlugin = async () => {
@@ -194,5 +206,24 @@ export function upgradeRedshiftImport(
         name: 'importAndIngestEvents',
         type: PluginTaskType.Job,
         exec: (payload) => meta.global.importAndIngestEvents(payload as ImportEventsJobPayload, meta),
+    }
+
+    function incrementMetric(metricName: string, value: number) {
+        hub.pluginMetricsManager.updateMetric({
+            metricName,
+            value,
+            pluginConfig,
+            metricOperation: MetricMathOperations.Increment,
+        })
+    }
+
+    function createLog(message: string, type: PluginLogEntryType = PluginLogEntryType.Log) {
+        void hub.db.queuePluginLogEntry({
+            pluginConfig,
+            message: `(${hub.instanceId}) ${message}`,
+            source: PluginLogEntrySource.System,
+            type: type,
+            instanceId: hub.instanceId,
+        })
     }
 }
