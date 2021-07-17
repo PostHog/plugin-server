@@ -226,6 +226,7 @@ describe('postgres parity', () => {
                 distinct_id: 'distinct1',
                 person_id: person.uuid,
                 team_id: team.id,
+                is_deleted: 0,
                 _timestamp: expect.any(String),
                 _offset: expect.any(Number),
             },
