@@ -581,7 +581,9 @@ export class DB {
                 })
                 await this.kafkaProducer.queueMessage({
                     topic: KAFKA_PERSON_UNIQUE_ID,
-                    messages: [{ value: Buffer.from(JSON.stringify({ ...row, is_deleted: 1 })) }],
+                    messages: [
+                        { value: Buffer.from(JSON.stringify({ ...row, person_id: source.uuid, is_deleted: 1 })) },
+                    ],
                 })
             }
         }
