@@ -467,7 +467,7 @@ export class DB {
 
     public async deletePerson(person: Person): Promise<void> {
         await this.postgresTransaction(async (client) => {
-            await client.query('DELETE FROM posthog_person WHERE team_id = $1 AND id = $1', [person.team_id, person.id])
+            await client.query('DELETE FROM posthog_person WHERE team_id = $1 AND id = $2', [person.team_id, person.id])
         })
         if (this.kafkaProducer) {
             await this.kafkaProducer.queueMessage({
