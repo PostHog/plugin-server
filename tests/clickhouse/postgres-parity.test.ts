@@ -228,41 +228,6 @@ describe('postgres parity', () => {
         expect(postgresDistinctIdValuesOther).toEqual(['another_distinct_id'])
     })
 
-    // test('deletePerson', async () => {
-    //     const uuid = new UUIDT().toString()
-    //     const person = await hub.db.createPerson(
-    //         DateTime.utc(),
-    //         { userProp: 'propValue' },
-    //         team.id,
-    //         null,
-    //         false,
-    //         uuid,
-    //         ['distinct1', 'distinct2']
-    //     )
-    //     await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse))
-    //     await delayUntilEventIngested(() => hub.db.fetchDistinctIdValues(person, Database.ClickHouse), 2)
-
-    //     await hub.db.deletePerson(person)
-
-    //     await delayUntilEventIngested(async () =>
-    //         (await hub.db.fetchPersons(Database.ClickHouse)).length === 0 ? ['deleted!'] : []
-    //     )
-    //     await delayUntilEventIngested(async () =>
-    //         (await hub.db.fetchDistinctIdValues(person, Database.ClickHouse)).length === 0 ? ['deleted!'] : []
-    //     )
-
-    //     const clickHousePersons = await hub.db.fetchPersons(Database.ClickHouse)
-    //     const postgresPersons = await hub.db.fetchPersons(Database.Postgres)
-
-    //     expect(clickHousePersons.length).toEqual(0)
-    //     expect(postgresPersons.length).toEqual(0)
-
-    //     const clickHouseDistinctIdValues = await hub.db.fetchDistinctIdValues(person, Database.ClickHouse)
-    //     const postgresDistinctIdValues = await hub.db.fetchDistinctIdValues(person, Database.Postgres)
-    //     expect(clickHouseDistinctIdValues.length).toEqual(0)
-    //     expect(postgresDistinctIdValues.length).toEqual(0)
-    // })
-
     test('moveDistinctIds & deletePerson', async () => {
         const uuid = new UUIDT().toString()
         const uuid2 = new UUIDT().toString()
