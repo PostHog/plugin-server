@@ -57,7 +57,6 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
-                  ref: port-queries
 
             - name: Check out plugin server
               uses: actions/checkout@v2
@@ -178,7 +177,6 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
-                  ref: port-queries
 
             - name: Check out plugin server
               uses: actions/checkout@v2
@@ -254,7 +252,6 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
-                  ref: port-queries
 
             - name: Check out plugin server
               uses: actions/checkout@v2
@@ -334,7 +331,6 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
-                  ref: port-queries
 
             - name: Check out plugin server
               uses: actions/checkout@v2
@@ -426,7 +422,6 @@ jobs:
               with:
                   repository: 'PostHog/posthog'
                   path: 'posthog/'
-                  ref: port-queries
 
             - name: Check out plugin server
               uses: actions/checkout@v2
