@@ -11,6 +11,7 @@ import { delay, UUIDT } from '../../src/utils/utils'
 import { EventProcessingResult, EventsProcessor } from '../../src/worker/ingestion/process-event'
 import { createUserTeamAndOrganization, getFirstTeam, getTeams, onQuery, resetTestDatabase } from '../helpers/sql'
 
+jest.mock('../../src/utils/status')
 jest.setTimeout(600000) // 600 sec timeout.
 
 export async function delayUntilEventIngested(
