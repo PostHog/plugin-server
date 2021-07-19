@@ -504,14 +504,19 @@ export class DB {
         if (database === Database.ClickHouse) {
             return (
                 await this.clickhouseQuery(
-                    `SELECT * FROM person_distinct_id WHERE person_id='${escapeClickHouseString(
-                        person.uuid
-                    )}' and team_id='${person.team_id}' ORDER BY id`
+                    `
+                        SELECT *
+                        FROM person_distinct_id
+                        FINAL
+                        WHERE person_id='${escapeClickHouseString(person.uuid)}'
+                          AND team_id='${person.team_id}'
+                          AND is_deleted=0
+                        ORDER BY id`
                 )
             ).data as ClickHousePersonDistinctId[]
         } else if (database === Database.Postgres) {
             const result = await this.postgresQuery(
-                'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 and team_id=$2 ORDER BY id',
+                'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 AND team_id=$2 ORDER BY id',
                 [person.id, person.team_id],
                 'fetchDistinctIds'
             )
