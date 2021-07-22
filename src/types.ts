@@ -480,6 +480,7 @@ export interface ClickHousePerson {
     is_identified: number
     is_deleted: number
     timestamp: string
+    distinct_ids: string[]
 }
 
 /** Usable PersonDistinctId model. */
