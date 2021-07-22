@@ -442,7 +442,7 @@ export class DB {
 
     public async updatePerson(
         person: PersonWithDistinctIds,
-        update: Partial<Person>,
+        update: Partial<Person> | undefined,
         updatedDistinctIds?: string[]
     ): Promise<PersonWithDistinctIds> {
         const updatedPerson: PersonWithDistinctIds = { ...person, ...update }
@@ -607,7 +607,7 @@ export class DB {
                     },
                 ],
             })
-            await this.updatePerson(person, {}, [...person.distinct_ids, personDistinctIdCreated.distinct_id])
+            await this.updatePerson(person, undefined, [...person.distinct_ids, personDistinctIdCreated.distinct_id])
         }
     }
 
@@ -626,7 +626,7 @@ export class DB {
 
         if (this.kafkaProducer) {
             const distinctIds = [...source.distinct_ids, ...target.distinct_ids]
-            await this.updatePerson(target, {}, distinctIds)
+            await this.updatePerson(target, undefined, distinctIds)
             for (const row of movedDistinctIdResult.rows) {
                 await this.kafkaProducer.queueMessage({
                     topic: KAFKA_PERSON_UNIQUE_ID,

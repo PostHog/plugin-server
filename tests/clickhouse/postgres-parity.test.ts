@@ -51,6 +51,36 @@ describe('postgres parity', () => {
         await stopServer()
     })
 
+    test('fetchPerson', async () => {
+        const uuid = new UUIDT().toString()
+        const person = await hub.db.createPerson(
+            DateTime.utc(),
+            { userProp: 'propValue' },
+            team.id,
+            null,
+            false,
+            uuid,
+            ['distinct1', 'distinct2']
+        )
+        await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse))
+        await delayUntilEventIngested(() => hub.db.fetchDistinctIdValues(person, Database.ClickHouse), 2)
+
+        const fetchedPerson = await hub.db.fetchPerson(team.id, 'distinct2')
+
+        expect(fetchedPerson).toEqual({
+            id: expect.any(Number),
+            created_at: expect.any(DateTime),
+            properties: {
+                userProp: 'propValue',
+            },
+            team_id: 2,
+            is_user_id: null,
+            is_identified: false,
+            uuid: uuid,
+            distinct_ids: ['distinct1', 'distinct2'],
+        })
+    })
+
     test('createPerson', async () => {
         const uuid = new UUIDT().toString()
         const person = await hub.db.createPerson(DateTime.utc(), { userProp: 'propValue' }, team.id, null, true, uuid, [
@@ -172,7 +202,7 @@ describe('postgres parity', () => {
             ['another_distinct_id']
         )
         await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse))
-        const [postgresPerson] = await hub.db.fetchPersons(Database.Postgres)
+        const postgresPerson = (await hub.db.fetchPerson(team.id, 'distinct1'))!
 
         await delayUntilEventIngested(() => hub.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse), 1)
         const clickHouseDistinctIdValues = await hub.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse)
