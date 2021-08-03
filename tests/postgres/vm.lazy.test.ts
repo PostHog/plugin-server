@@ -88,6 +88,7 @@ describe('LazyPluginVM', () => {
     describe('VM creation fails', () => {
         const error = new Error()
         const retryError = new RetryError('I failed, please retry me!')
+        let vm = createVM()
         jest.useFakeTimers()
 
         const mockFailureConfig = {
@@ -97,10 +98,17 @@ describe('LazyPluginVM', () => {
             plugin: { ...plugin70 },
         }
 
+        beforeEach(() => {
+            vm = createVM()
+        })
+
+        afterEach(() => {
+            vm.clearRetryTimeoutIfExists()
+        })
+
         it('returns empty values for get methods', async () => {
             mocked(createPluginConfigVM).mockRejectedValue(error)
 
-            const vm = createVM()
             void initializeVm(vm)
 
             expect(await vm.getProcessEvent()).toEqual(null)
@@ -114,7 +122,6 @@ describe('LazyPluginVM', () => {
                 .mockRejectedValueOnce(new Error('I failed without retry, please retry me too!'))
                 .mockRejectedValue(retryError)
 
-            const vm = createVM()
             await vm.initialize!(mockServer, mockFailureConfig as any, 'some log info', 'failure plugin')
 
             // try to initialize the vm 11 times (1 try + 10 retries)
@@ -163,7 +170,6 @@ describe('LazyPluginVM', () => {
             // throw a RetryError setting up the vm
             mocked(createPluginConfigVM).mockRejectedValueOnce(retryError)
 
-            const vm = createVM()
             await vm.initialize!(mockServer, mockFailureConfig as any, 'some log info', 'failure plugin')
             await vm.resolveInternalVm
 

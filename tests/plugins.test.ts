@@ -806,7 +806,11 @@ test('metrics API works as expected', async () => {
     await pluginConfig.vm?.resolveInternalVm
     await runProcessEvent(hub, testEvent)
 
-    expect(hub.pluginMetricsManager.metricsPerPlugin[39].metrics).toEqual({ metric1: 100, metric2: 10, metric3: 1 })
+    expect(hub.pluginMetricsManager.metricsPerPluginConfig[39].metrics).toEqual({
+        metric1: 100,
+        metric2: 10,
+        metric3: 1,
+    })
 })
 
 test('metrics method will fail for wrongly specified metric type', async () => {
