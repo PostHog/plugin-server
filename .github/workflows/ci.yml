@@ -218,9 +218,7 @@ jobs:
                   # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
-              run: |
-                  cd plugin-server && yarn test:postgres:1
-                  echo $?
+              run: cd plugin-server && yarn test:postgres:1
 
     tests-postgres-2:
         name: Tests / Postgres + Redis (2)
