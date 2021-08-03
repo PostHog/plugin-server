@@ -293,7 +293,7 @@ jobs:
                   # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
-              run: cd plugin-server && && tsc --noEmit -p . && yarn test:postgres:2
+              run: cd plugin-server && tsc --noEmit -p . && yarn test:postgres:2
 
     tests-clickhouse-1:
         name: Tests / ClickHouse + Kafka (1)
