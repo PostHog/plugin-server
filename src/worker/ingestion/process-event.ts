@@ -101,7 +101,7 @@ export class EventsProcessor {
             try {
                 await this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
             } catch (e) {
-                Sentry.captureException(e)
+                Sentry.captureException(e, { extra: { event: data } })
             } finally {
                 clearTimeout(timeout1)
             }
