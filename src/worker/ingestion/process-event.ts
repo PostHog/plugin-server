@@ -330,11 +330,19 @@ export class EventsProcessor {
         }
 
         if (oldPerson && newPerson && oldPerson.id !== newPerson.id) {
-            await this.mergePeople(newPerson, oldPerson)
+            await this.mergePeople([newPerson, distinctId], [oldPerson, previousDistinctId])
         }
     }
 
-    public async mergePeople(mergeInto: Person, otherPerson: Person): Promise<void> {
+    public async mergePeople(mergeIntoPayload: [Person, string], otherPersonPayload: [Person, string]): Promise<void> {
+        let mergeInto = mergeIntoPayload[0]
+        let otherPerson = otherPersonPayload[0]
+
+        const mergeIntoDistinctId = mergeIntoPayload[1]
+        const otherPersonDistinctId = otherPersonPayload[1]
+
+        const teamId = mergeInto.team_id
+
         let firstSeen = mergeInto.created_at
 
         // Merge properties
@@ -364,7 +372,26 @@ export class EventsProcessor {
         // In the rare case of the person changing VERY often however, it may happen even a few times,
         // in which case we'll bail and rethrow the error.
         while (true) {
-            await this.db.moveDistinctIds(otherPerson, mergeInto)
+            try {
+                await this.db.moveDistinctIds(otherPerson, mergeInto)
+            } catch (error) {
+                Sentry.captureException(error, { extra: { mergeIntoPayload, otherPersonPayload } })
+
+                // If the a person was deleted in between fetching and moveDistinctId,
+                // try to fetch the person again as the distinct ID is likely to now point
+                // to another person
+                const otherPersonResult = await this.db.fetchPerson(teamId, mergeIntoDistinctId)
+                const mergeIntoResult = await this.db.fetchPerson(teamId, otherPersonDistinctId)
+
+                mergeInto = mergeIntoResult ?? mergeInto
+                otherPerson = otherPersonResult ?? otherPerson
+
+                failedAttempts++
+                if (failedAttempts === MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
+                    throw error
+                }
+                continue
+            }
 
             try {
                 await this.db.deletePerson(otherPerson)

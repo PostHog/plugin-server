@@ -602,6 +602,11 @@ export class DB {
             'updateDistinctIdPerson'
         )
 
+        // this is caused by a race condition and will trigger a retry
+        if (movedDistinctIdResult.rows.length === 0) {
+            throw new Error('Tried to move ditinct IDs from a non-existent person')
+        }
+
         if (this.kafkaProducer) {
             for (const row of movedDistinctIdResult.rows) {
                 await this.kafkaProducer.queueMessage({
