@@ -604,7 +604,7 @@ export class DB {
 
         // this is caused by a race condition and will trigger a retry
         if (movedDistinctIdResult.rows.length === 0) {
-            throw new Error('Tried to move ditinct IDs from a non-existent person')
+            throw new Error('Tried to move ditinct IDs from an unreferenced person')
         }
 
         if (this.kafkaProducer) {
