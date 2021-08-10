@@ -377,7 +377,7 @@ export class EventsProcessor {
             } catch (error) {
                 Sentry.captureException(error, { extra: { mergeIntoPayload, otherPersonPayload } })
 
-                // If the a person was deleted in between fetching and moveDistinctId,
+                // If a person was deleted in between fetching and moveDistinctId,
                 // try to fetch the person again as the distinct ID is likely to now point
                 // to another person
                 const otherPersonResult = await this.db.fetchPerson(teamId, mergeIntoDistinctId)
