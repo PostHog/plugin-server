@@ -44,6 +44,7 @@ import {
     castTimestampOrNow,
     clickHouseTimestampToISO,
     escapeClickHouseString,
+    RaceConditionError,
     sanitizeSqlIdentifier,
     tryTwice,
     UUID,
@@ -605,7 +606,7 @@ export class DB {
         // this is caused by a race condition and will trigger a retry with
         // updated persons
         if (movedDistinctIdResult.rows.length === 0) {
-            throw new Error(`Failed trying to move distinct IDs because otherPerson doesn't exist.`)
+            throw new RaceConditionError(`Failed trying to move distinct IDs because otherPerson doesn't exist.`)
         }
 
         if (this.kafkaProducer) {
