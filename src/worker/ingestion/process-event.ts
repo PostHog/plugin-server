@@ -279,7 +279,8 @@ export class EventsProcessor {
         previousDistinctId: string,
         distinctId: string,
         teamId: number,
-        retryIfFailed = true
+        retryIfFailed = true,
+        totalMergeAttempts = 0
     ): Promise<void> {
         const oldPerson = await this.db.fetchPerson(teamId, previousDistinctId)
         const newPerson = await this.db.fetchPerson(teamId, distinctId)
@@ -330,11 +331,15 @@ export class EventsProcessor {
         }
 
         if (oldPerson && newPerson && oldPerson.id !== newPerson.id) {
-            await this.mergePeople([newPerson, distinctId], [oldPerson, previousDistinctId])
+            await this.mergePeople([newPerson, distinctId], [oldPerson, previousDistinctId], totalMergeAttempts)
         }
     }
 
-    public async mergePeople(mergeIntoPayload: [Person, string], otherPersonPayload: [Person, string]): Promise<void> {
+    public async mergePeople(
+        mergeIntoPayload: [Person, string],
+        otherPersonPayload: [Person, string],
+        totalMergeAttempts = 0
+    ): Promise<void> {
         const [mergeInto, mergeIntoDistinctId] = mergeIntoPayload
         const [otherPerson, otherPersonDistinctId] = otherPersonPayload
         const teamId = mergeInto.team_id
@@ -356,7 +361,7 @@ export class EventsProcessor {
             [mergeInto.id, otherPerson.id],
             'updateCohortPeople'
         )
-        let failedAttempts = 0
+        let failedAttempts = totalMergeAttempts
         // Retrying merging up to `MAX_FAILED_PERSON_MERGE_ATTEMPTS` times, in case race conditions occur.
         // An example is a distinct ID being aliased in another plugin server instance,
         // between `moveDistinctId` and `deletePerson` being called here
@@ -373,10 +378,15 @@ export class EventsProcessor {
             } catch (error) {
                 Sentry.captureException(error, { extra: { mergeIntoPayload, otherPersonPayload } })
 
+                failedAttempts++
+                if (failedAttempts === MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
+                    throw error
+                }
+
                 // If a person was deleted in between fetching and moveDistinctId,
                 // re-run alias to ensure the updated persons are fetched and
                 // merged safely
-                return await this.alias(otherPersonDistinctId, mergeIntoDistinctId, teamId)
+                return await this.alias(otherPersonDistinctId, mergeIntoDistinctId, teamId, false, failedAttempts)
             }
 
             try {
