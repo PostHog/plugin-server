@@ -335,12 +335,8 @@ export class EventsProcessor {
     }
 
     public async mergePeople(mergeIntoPayload: [Person, string], otherPersonPayload: [Person, string]): Promise<void> {
-        let mergeInto = mergeIntoPayload[0]
-        let otherPerson = otherPersonPayload[0]
-
-        const mergeIntoDistinctId = mergeIntoPayload[1]
-        const otherPersonDistinctId = otherPersonPayload[1]
-
+        const [mergeInto, mergeIntoDistinctId] = mergeIntoPayload
+        const [otherPerson, otherPersonDistinctId] = otherPersonPayload
         const teamId = mergeInto.team_id
 
         let firstSeen = mergeInto.created_at
@@ -378,19 +374,9 @@ export class EventsProcessor {
                 Sentry.captureException(error, { extra: { mergeIntoPayload, otherPersonPayload } })
 
                 // If a person was deleted in between fetching and moveDistinctId,
-                // try to fetch the person again as the distinct ID is likely to now point
-                // to another person
-                const otherPersonResult = await this.db.fetchPerson(teamId, mergeIntoDistinctId)
-                const mergeIntoResult = await this.db.fetchPerson(teamId, otherPersonDistinctId)
-
-                mergeInto = mergeIntoResult ?? mergeInto
-                otherPerson = otherPersonResult ?? otherPerson
-
-                failedAttempts++
-                if (failedAttempts === MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
-                    throw error
-                }
-                continue
+                // re-run alias to ensure the updated persons are fetched and
+                // merged safely
+                return await this.alias(otherPersonDistinctId, mergeIntoDistinctId, teamId)
             }
 
             try {
