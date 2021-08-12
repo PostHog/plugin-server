@@ -708,6 +708,9 @@ test('posthog.api', async () => {
             await posthog.api.post('/api/event', { data: { a: 1 }})
             await posthog.api.put('/api/event', { data: { b: 2 } })
             await posthog.api.delete('/api/event')
+
+            // test auth defaults override
+            await posthog.api.get('/api/event', { projectApiKey: 'token', personalApiKey: 'secret' })
             return event
         }
     `
@@ -721,7 +724,7 @@ test('posthog.api', async () => {
     await vm.methods.processEvent!(event)
 
     expect(event.properties?.get).toEqual({ hello: 'world' })
-    expect((fetch as any).mock.calls.length).toEqual(5)
+    expect((fetch as any).mock.calls.length).toEqual(6)
     expect((fetch as any).mock.calls).toEqual([
         [
             'https://app.posthog.com/api/event?token=THIS+IS+NOT+A+TOKEN+FOR+TEAM+2',
@@ -758,6 +761,13 @@ test('posthog.api', async () => {
             {
                 headers: { Authorization: expect.stringContaining('Bearer phx_') },
                 method: 'DELETE',
+            },
+        ],
+        [
+            'https://app.posthog.com/api/event?token=token',
+            {
+                headers: { Authorization: 'Bearer secret' },
+                method: 'GET',
             },
         ],
     ])

@@ -700,3 +700,9 @@ export function intToBase(num: number, base: number): string {
 
     return value || '0'
 }
+
+// helps make certain conditionals cleaner and more readable, like:
+// !!maybeTruthy === !!alsoMaybeTruthy
+export function isTruthy(value: any): boolean {
+    return !!value
+}

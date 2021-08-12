@@ -16,7 +16,7 @@ export class PluginsApiKeyManager {
         this.pluginsApiKeyCache = new Map()
     }
 
-    public async fetchPluginsPersonalApiKey(organizationId: RawOrganization['id']): Promise<string | null> {
+    public async fetchPluginsPersonalApiKey(organizationId: RawOrganization['id']): Promise<string> {
         const createNewKey = async (userId: number) => {
             return (
                 await this.db.createPersonalApiKey({
@@ -77,7 +77,12 @@ export class PluginsApiKeyManager {
                 }
             }
 
+            if (!key) {
+                throw new Error('Unable to find or create a Personal API Key')
+            }
+
             this.pluginsApiKeyCache.set(organizationId, [key, Date.now()])
+
             return key
         } finally {
             clearTimeout(timeout)
