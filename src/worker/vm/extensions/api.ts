@@ -1,7 +1,6 @@
 import fetch, { Response } from 'node-fetch'
 
 import { Hub, PluginConfig } from '../../../types'
-import { isTruthy } from '../../../utils/utils'
 
 const DEFAULT_API_HOST = 'https://app.posthog.com'
 
@@ -32,7 +31,7 @@ export function createApi(server: Hub, pluginConfig: PluginConfig): ApiExtension
 
         // NOR operation: it's fine if personalApiKey and projectApiKey both are set or unset,
         // but it's not fine if one is set if the other isn't
-        if (isTruthy(options.personalApiKey) !== isTruthy(options.projectApiKey)) {
+        if (!!options.personalApiKey !== !!options.projectApiKey) {
             throw new Error('You must specify a personalApiKey if you specify a projectApiKey and vice-versa!')
         }
 
@@ -55,7 +54,7 @@ export function createApi(server: Hub, pluginConfig: PluginConfig): ApiExtension
             }
 
             tokenParam['token'] = team.api_token
-            apiKey = await server.pluginsApiKeyManager.fetchPluginsPersonalApiKey(team.organization_id)
+            apiKey = await server.pluginsApiKeyManager.fetchOrCreatePersonalApiKey(team.organization_id)
         }
 
         const urlParams = new URLSearchParams(
@@ -63,7 +62,7 @@ export function createApi(server: Hub, pluginConfig: PluginConfig): ApiExtension
                 ? { ...options.data, ...tokenParam }
                 : tokenParam
         )
-        const url = `${host}/${path}?${urlParams.toString()}`
+        const url = `${host}/${path}${path.includes('?') ? '&' : '?'}${urlParams.toString()}`
         const headers = { Authorization: `Bearer ${apiKey}` }
 
         if (method === ApiMethod.Delete || method === ApiMethod.Get) {

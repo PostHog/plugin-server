@@ -1040,7 +1040,7 @@ export class DB {
         date_joined,
         events_column_config,
         organization_id,
-    }: CreateUserPayload) {
+    }: CreateUserPayload): Promise<QueryResult> {
         const createUserResult = await this.postgresQuery(
             `INSERT INTO posthog_user (uuid, password, first_name, last_name, email, distinct_id, is_staff, is_active, date_joined, events_column_config)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)

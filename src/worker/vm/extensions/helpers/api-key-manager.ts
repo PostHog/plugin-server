@@ -16,8 +16,8 @@ export class PluginsApiKeyManager {
         this.pluginsApiKeyCache = new Map()
     }
 
-    public async fetchPluginsPersonalApiKey(organizationId: RawOrganization['id']): Promise<string> {
-        const createNewKey = async (userId: number) => {
+    public async fetchOrCreatePersonalApiKey(organizationId: RawOrganization['id']): Promise<string> {
+        const createNewKey = async (userId: number): Promise<string> => {
             return (
                 await this.db.createPersonalApiKey({
                     id: generateRandomToken(32),
@@ -34,12 +34,12 @@ export class PluginsApiKeyManager {
             return cachedKey
         }
 
-        const timeout = timeoutGuard(`Still running "fetchPluginsPersonalApiKey". Timeout warning after 30 sec!`)
+        const timeout = timeoutGuard(`Still running "fetchOrCreatePersonalApiKey". Timeout warning after 30 sec!`)
         try {
             let key: string | null = null
             const userResult = await this.db.postgresQuery(
-                `SELECT id FROM posthog_user WHERE email = '${PLUGINS_API_KEY_USER_EMAIL}'`,
-                [],
+                `SELECT id FROM posthog_user WHERE email = '$1'`,
+                [PLUGINS_API_KEY_USER_EMAIL],
                 'fetchPluginsUser'
             )
 
@@ -66,7 +66,7 @@ export class PluginsApiKeyManager {
                 const personalApiKeyResult = await this.db.postgresQuery(
                     'SELECT value FROM posthog_personalapikey WHERE user_id = $1',
                     [userId],
-                    'fetchPluginsPersonalApiKey'
+                    'fetchOrCreatePersonalApiKey'
                 )
 
                 // user remains but key was somehow deleted

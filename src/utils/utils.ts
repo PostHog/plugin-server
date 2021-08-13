@@ -661,7 +661,7 @@ export function getByAge<K, V>(cache: Map<K, [V, number]>, key: K, maxAgeMs = 30
 }
 
 // Equivalent of Python's string.ascii_letters
-export function getAsciiLetters() {
+export function getAsciiLetters(): string {
     const LOWERCASE_START_POINT = 97 // ASCII 'a'
     const UPPERCASE_START_POINT = 65 // ASCII 'A'
 
@@ -672,13 +672,13 @@ export function getAsciiLetters() {
 }
 
 // Equivalent of Python's string.digits
-export function getAllDigits() {
+export function getAllDigits(): string {
     return Array.from({ length: 10 })
         .map((_, i) => i)
         .join('')
 }
 
-export function generateRandomToken(nBytes: number) {
+export function generateRandomToken(nBytes: number): string {
     return intToBase(Number.parseInt(randomBytes(nBytes).toString('hex'), 16), 62)
 }
 
@@ -699,10 +699,4 @@ export function intToBase(num: number, base: number): string {
     }
 
     return value || '0'
-}
-
-// helps make certain conditionals cleaner and more readable, like:
-// !!maybeTruthy === !!alsoMaybeTruthy
-export function isTruthy(value: any): boolean {
-    return !!value
 }
