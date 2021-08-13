@@ -38,7 +38,7 @@ export class PluginsApiKeyManager {
         try {
             let key: string | null = null
             const userResult = await this.db.postgresQuery(
-                `SELECT id FROM posthog_user WHERE email = '$1'`,
+                `SELECT id FROM posthog_user WHERE email = $1`,
                 [PLUGINS_API_KEY_USER_EMAIL],
                 'fetchPluginsUser'
             )
