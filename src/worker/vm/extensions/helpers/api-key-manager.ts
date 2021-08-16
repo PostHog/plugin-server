@@ -5,7 +5,7 @@ import { RawOrganization } from './../../../../types'
 
 type PluginsApiKeyCache<T> = Map<RawOrganization['id'], [T, number]>
 
-const PLUGINS_API_KEY_USER_EMAIL = '$plugins_personal_api_key'
+const POSTHOG_BOT_USER_EMAIL_DOMAIN = 'posthogbot.user'
 
 export class PluginsApiKeyManager {
     db: DB
@@ -38,19 +38,22 @@ export class PluginsApiKeyManager {
         try {
             let key: string | null = null
             const userResult = await this.db.postgresQuery(
-                `SELECT id FROM posthog_user WHERE email = $1`,
-                [PLUGINS_API_KEY_USER_EMAIL],
+                `SELECT id FROM posthog_user WHERE email LIKE $1`,
+                [`%@${POSTHOG_BOT_USER_EMAIL_DOMAIN}`],
                 'fetchPluginsUser'
             )
 
             if (userResult.rowCount < 1) {
+                const botUserEmailId = Math.round(Math.random() * 100000000)
+                const botUserEmail = `${botUserEmailId}@${POSTHOG_BOT_USER_EMAIL_DOMAIN}`
+
                 // No user yet, provision a user and a key
                 const newUserResult = await this.db.createUser({
                     uuid: new UUIDT(),
                     password: generateRandomToken(32),
                     first_name: 'Plugins API User [Bot]',
                     last_name: '',
-                    email: PLUGINS_API_KEY_USER_EMAIL,
+                    email: botUserEmail,
                     distinct_id: generateRandomToken(32),
                     is_staff: false,
                     is_active: true,
