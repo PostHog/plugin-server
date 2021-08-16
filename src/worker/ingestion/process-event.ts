@@ -29,7 +29,7 @@ import {
     timeoutGuard,
 } from '../../utils/db/utils'
 import { status } from '../../utils/status'
-import { castTimestampOrNow, filterIncrementProperties, UUID, UUIDT } from '../../utils/utils'
+import { castTimestampOrNow, filterIncrementProperties, RaceConditionError, UUID, UUIDT } from '../../utils/utils'
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
@@ -331,17 +331,29 @@ export class EventsProcessor {
         }
 
         if (oldPerson && newPerson && oldPerson.id !== newPerson.id) {
-            await this.mergePeople([newPerson, distinctId], [oldPerson, previousDistinctId], totalMergeAttempts)
+            await this.mergePeople({
+                totalMergeAttempts,
+                mergeInto: newPerson,
+                mergeIntoDistinctId: distinctId,
+                otherPerson: oldPerson,
+                otherPersonDistinctId: previousDistinctId,
+            })
         }
     }
 
-    public async mergePeople(
-        mergeIntoPayload: [Person, string],
-        otherPersonPayload: [Person, string],
-        totalMergeAttempts = 0
-    ): Promise<void> {
-        const [mergeInto, mergeIntoDistinctId] = mergeIntoPayload
-        const [otherPerson, otherPersonDistinctId] = otherPersonPayload
+    public async mergePeople({
+        mergeInto,
+        mergeIntoDistinctId,
+        otherPerson,
+        otherPersonDistinctId,
+        totalMergeAttempts = 0,
+    }: {
+        mergeInto: Person
+        mergeIntoDistinctId: string
+        otherPerson: Person
+        otherPersonDistinctId: string
+        totalMergeAttempts: number
+    }): Promise<void> {
         const teamId = mergeInto.team_id
 
         let firstSeen = mergeInto.created_at
@@ -362,6 +374,8 @@ export class EventsProcessor {
             'updateCohortPeople'
         )
         let failedAttempts = totalMergeAttempts
+        let shouldRetryAliasOperation = false
+
         // Retrying merging up to `MAX_FAILED_PERSON_MERGE_ATTEMPTS` times, in case race conditions occur.
         // An example is a distinct ID being aliased in another plugin server instance,
         // between `moveDistinctId` and `deletePerson` being called here
@@ -376,17 +390,19 @@ export class EventsProcessor {
             try {
                 await this.db.moveDistinctIds(otherPerson, mergeInto)
             } catch (error) {
-                Sentry.captureException(error, { extra: { mergeIntoPayload, otherPersonPayload } })
-
+                Sentry.captureException(error, {
+                    extra: { mergeInto, mergeIntoDistinctId, otherPerson, otherPersonDistinctId },
+                })
                 failedAttempts++
-                if (failedAttempts === MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
-                    throw error
+
+                // If a person was deleted in between fetching and moveDistinctId, re-run alias to ensure
+                // the updated persons are fetched and merged safely
+                if (error instanceof RaceConditionError && failedAttempts < MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
+                    shouldRetryAliasOperation = true
+                    break
                 }
 
-                // If a person was deleted in between fetching and moveDistinctId,
-                // re-run alias to ensure the updated persons are fetched and
-                // merged safely
-                return await this.alias(otherPersonDistinctId, mergeIntoDistinctId, teamId, false, failedAttempts)
+                throw error
             }
 
             try {
@@ -402,6 +418,10 @@ export class EventsProcessor {
                 }
                 continue // Not OK, trying again to make sure that ALL distinct IDs are merged
             }
+        }
+
+        if (shouldRetryAliasOperation) {
+            await this.alias(otherPersonDistinctId, mergeIntoDistinctId, teamId, false, failedAttempts)
         }
     }
 
