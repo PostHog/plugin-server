@@ -700,3 +700,9 @@ export function intToBase(num: number, base: number): string {
 
     return value || '0'
 }
+
+// For errors we want to explicitly throw
+// concerning race conditions across threads
+export class RaceConditionError extends Error {
+    name = 'RaceConditionError'
+}
