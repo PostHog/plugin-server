@@ -208,8 +208,8 @@ export function personInitialAndUTMProperties(properties: Properties): Propertie
     return propertiesCopy
 }
 
-// Returns string in format: ($1, $2, $3, $4, $5, $6, $7, $8, ..., $N)
-export function generatePostgresValuesString(numberOfColumns: number, rowNumber: number) {
+/** Returns string in format: ($1, $2, $3, $4, $5, $6, $7, $8, ..., $N) */
+export function generatePostgresValuesString(numberOfColumns: number, rowNumber: number): string {
     return (
         '(' +
         Array.from(Array(numberOfColumns).keys())
