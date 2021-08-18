@@ -330,6 +330,7 @@ export type VMMethods = {
     onSnapshot?: (event: PluginEvent) => Promise<void>
     exportEvents?: (events: PluginEvent[]) => Promise<void>
     processEvent?: (event: PluginEvent) => Promise<PluginEvent>
+    exportEventsFromTheBeginning?: (events: Event[]) => Promise<void>
 }
 
 export interface PluginConfigVMResponse {
