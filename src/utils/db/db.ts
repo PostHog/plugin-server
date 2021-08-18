@@ -44,6 +44,7 @@ import {
     castTimestampOrNow,
     clickHouseTimestampToISO,
     escapeClickHouseString,
+    RaceConditionError,
     sanitizeSqlIdentifier,
     tryTwice,
     UUID,
@@ -78,6 +79,28 @@ export interface ParsedLogEntry {
     type: PluginLogEntryType
     message: string
     instance_id: string
+}
+
+export interface CreateUserPayload {
+    uuid: UUIDT
+    password: string
+    first_name: string
+    last_name: string
+    email: string
+    distinct_id: string
+    is_staff: boolean
+    is_active: boolean
+    date_joined: Date
+    events_column_config: Record<string, string> | null
+    organization_id?: RawOrganization['id']
+}
+
+export interface CreatePersonalApiKeyPayload {
+    id: string
+    user_id: number
+    label: string
+    value: string
+    created_at: Date
 }
 
 /** The recommended way of accessing the database. */
@@ -576,9 +599,14 @@ export class DB {
         distinctId: string
     ): Promise<ProducerRecord | void> {
         const insertResult = await client.query(
-            'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3) RETURNING *',
+            'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING *',
             [distinctId, person.id, person.team_id]
         )
+
+        // some other thread already added this ID
+        if (insertResult.rows.length === 0) {
+            return
+        }
 
         const personDistinctIdCreated = insertResult.rows[0] as PersonDistinctId
         if (this.kafkaProducer) {
@@ -596,17 +624,42 @@ export class DB {
     }
 
     public async moveDistinctIds(source: Person, target: Person): Promise<void> {
-        const movedDistinctIdResult = await this.postgresQuery(
-            `
-                UPDATE posthog_persondistinctid
-                SET person_id = $1
-                WHERE person_id = $2
-                  AND team_id = $3
-                RETURNING *
-            `,
-            [target.id, source.id, target.team_id],
-            'updateDistinctIdPerson'
-        )
+        let movedDistinctIdResult: QueryResult<any> | null = null
+        try {
+            movedDistinctIdResult = await this.postgresQuery(
+                `
+                    UPDATE posthog_persondistinctid
+                    SET person_id = $1
+                    WHERE person_id = $2
+                      AND team_id = $3
+                    RETURNING *
+                `,
+                [target.id, source.id, target.team_id],
+                'updateDistinctIdPerson'
+            )
+        } catch (error) {
+            if (
+                error.message.includes(
+                    'insert or update on table "posthog_persondistinctid" violates foreign key constraint'
+                )
+            ) {
+                // this is caused by a race condition where the _target_ person was deleted after fetching but
+                // before the update query ran and will trigger a retry with updated persons
+                throw new RaceConditionError(
+                    'Failed trying to move distinct IDs because target person no longer exists.'
+                )
+            }
+
+            throw error
+        }
+
+        // this is caused by a race condition where the _source_ person was deleted after fetching but
+        // before the update query ran and will trigger a retry with updated persons
+        if (movedDistinctIdResult.rows.length === 0) {
+            throw new RaceConditionError(
+                `Failed trying to move distinct IDs because the source person no longer exists.`
+            )
+        }
 
         if (this.kafkaProducer) {
             for (const row of movedDistinctIdResult.rows) {
@@ -1026,5 +1079,60 @@ export class DB {
 
     public async deleteRestHook(hookId: Hook['id']): Promise<void> {
         await this.postgresQuery(`DELETE FROM ee_hook WHERE id = $1`, [hookId], 'deleteRestHook')
+    }
+
+    public async createUser({
+        uuid,
+        password,
+        first_name,
+        last_name,
+        email,
+        distinct_id,
+        is_staff,
+        is_active,
+        date_joined,
+        events_column_config,
+        organization_id,
+    }: CreateUserPayload): Promise<QueryResult> {
+        const createUserResult = await this.postgresQuery(
+            `INSERT INTO posthog_user (uuid, password, first_name, last_name, email, distinct_id, is_staff, is_active, date_joined, events_column_config)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id`,
+            [
+                uuid.toString(),
+                password,
+                first_name,
+                last_name,
+                email,
+                distinct_id,
+                is_staff,
+                is_active,
+                date_joined.toISOString(),
+                events_column_config,
+            ],
+            'createUser'
+        )
+
+        if (organization_id) {
+            const now = new Date().toISOString()
+            await this.postgresQuery(
+                `INSERT INTO posthog_organizationmembership (id, organization_id, user_id, level, joined_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6)`,
+                [new UUIDT().toString(), organization_id, createUserResult.rows[0].id, 1, now, now],
+                'createOrganizationMembership'
+            )
+        }
+
+        return createUserResult
+    }
+
+    public async createPersonalApiKey({ id, user_id, label, value, created_at }: CreatePersonalApiKeyPayload) {
+        return await this.postgresQuery(
+            `INSERT INTO posthog_personalapikey (id, user_id, label, value, created_at)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING value`,
+            [id, user_id, label, value, created_at.toISOString()],
+            'createPersonalApiKey'
+        )
     }
 }
