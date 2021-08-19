@@ -2,7 +2,7 @@ import { RetryError } from '@posthog/plugin-scaffold'
 import { randomBytes } from 'crypto'
 import { VM } from 'vm2'
 
-import { Hub, PluginConfig, PluginConfigVMResponse, PluginMetricsVmResponse } from '../../types'
+import { Hub, PluginConfig, PluginConfigVMResponse } from '../../types'
 import { createCache } from './extensions/cache'
 import { createConsole } from './extensions/console'
 import { createGeoIp } from './extensions/geoip'
@@ -14,6 +14,7 @@ import { createStorage } from './extensions/storage'
 import { imports } from './imports'
 import { transformCode } from './transforms'
 import { upgradeExportEvents } from './upgrades/export-events'
+import { upgradeExportEventsFromTheBeginning } from './upgrades/historical-export/export-historical-events'
 
 export class TimeoutError extends Error {
     name = 'TimeoutError'
@@ -167,6 +168,8 @@ export async function createPluginConfigVM(
                 onEvent: __asyncFunctionGuard(__bindMeta('onEvent'), 'onEvent'),
                 onSnapshot: __asyncFunctionGuard(__bindMeta('onSnapshot'), 'onSnapshot'),
                 processEvent: __asyncFunctionGuard(__bindMeta('processEvent'), 'processEvent'),
+                exportEventsFromTheBeginning: __asyncFunctionGuard(__bindMeta('exportEventsFromTheBeginning'), 'exportEventsFromTheBeginning'),
+
             };
 
             const __tasks = {
@@ -218,6 +221,10 @@ export async function createPluginConfigVM(
 
     if (exportEventsExists) {
         upgradeExportEvents(hub, pluginConfig, vmResponse)
+    }
+
+    if (!!methods.exportEventsFromTheBeginning) {
+        upgradeExportEventsFromTheBeginning(hub, pluginConfig, vmResponse)
     }
 
     setupMetrics(hub, pluginConfig, metrics, exportEventsExists)
