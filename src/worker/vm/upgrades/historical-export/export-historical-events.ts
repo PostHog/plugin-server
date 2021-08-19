@@ -15,16 +15,12 @@ import {
     ExportEventsJobPayload,
     fetchEventsForInterval,
     fetchTimestampBoundariesForTeam,
-    getRedisListForKey,
 } from './utils'
 
 const EVENTS_TIME_INTERVAL = 10 * 60 * 1000 // 10 minutes
 const EVENTS_PER_RUN = 100
 const TIMESTAMP_CURSOR_KEY = 'timestamp_cursor'
-const UNFINISHED_INTERVALS_LIST_KEY = 'unfinished_intervals'
-const RUNNING_INTERVALS_LIST_KEY = 'running_intervals'
 const MAX_TIMESTAMP_KEY = 'max_timestamp'
-const UNFINISHED_INTERVAL_OFFSET_KEY = 'interval_offset'
 
 export function upgradeExportEventsFromTheBeginning(
     hub: Hub,
@@ -34,7 +30,6 @@ export function upgradeExportEventsFromTheBeginning(
     const { methods, tasks, meta } = response
 
     const oldSetupPlugin = methods.setupPlugin
-    const oldTeardownPlugin = methods.teardownPlugin
 
     methods.setupPlugin = async () => {
         // Fetch the max and min timestamps for a team's events
@@ -62,14 +57,6 @@ export function upgradeExportEventsFromTheBeginning(
             await meta.cache.set(TIMESTAMP_CURSOR_KEY, Number(lastStoredTimestampCursor) / EVENTS_TIME_INTERVAL)
         }
 
-        // Fill a Redis list with intervals we didn't finish before ta server restart, if any
-        const storedPendingIntervals = await meta.storage.get(UNFINISHED_INTERVALS_LIST_KEY, null)
-        const cachedPendingIntervalsLength = await meta.cache.llen(UNFINISHED_INTERVALS_LIST_KEY)
-        if (storedPendingIntervals && !cachedPendingIntervalsLength) {
-            await meta.cache.lpush(UNFINISHED_INTERVALS_LIST_KEY, String(storedPendingIntervals).split(','))
-            await meta.storage.del(UNFINISHED_INTERVALS_LIST_KEY)
-        }
-
         await oldSetupPlugin?.()
 
         // This will become an interface trigger
@@ -95,37 +82,12 @@ export function upgradeExportEventsFromTheBeginning(
             // Done with a timestamp interval, reset offset
             intraIntervalOffset = 0
 
-            // We're done with this interval, so don't need to store its offset anymore
-            // The stored offset is for events we didn't *get to*, not those that failed
-            // Retries handle failures
-            await meta.storage.del(`${UNFINISHED_INTERVAL_OFFSET_KEY}_${timestampCursor}`)
+            // This ensures we never process an interval twice
+            const redisIncrementedCursor = await meta.cache.incr(TIMESTAMP_CURSOR_KEY)
+            timestampCursor = meta.global.initialTimestampCursor + (redisIncrementedCursor - 1) * EVENTS_TIME_INTERVAL
 
-            // Done with an interval, remove interval from pending list
-            if (timestampCursor) {
-                await meta.cache.lrem(RUNNING_INTERVALS_LIST_KEY, 1, timestampCursor.toString())
-            }
-
-            // Always check for any pending intervals before picking up a completely new one
-            const nextPendingInterval = await meta.cache.lpop(UNFINISHED_INTERVALS_LIST_KEY, 1)
-            if (nextPendingInterval && nextPendingInterval.length > 0) {
-                timestampCursor = Number(nextPendingInterval[0])
-                const storedOffsetForInterval = await meta.storage.get(
-                    `${UNFINISHED_INTERVAL_OFFSET_KEY}_${timestampCursor}`,
-                    0
-                )
-                intraIntervalOffset = Number(storedOffsetForInterval)
-            } else {
-                // This ensures we never process an interval twice
-                const redisIncrementedCursor = await meta.cache.incr(TIMESTAMP_CURSOR_KEY)
-                timestampCursor =
-                    meta.global.initialTimestampCursor + (redisIncrementedCursor - 1) * EVENTS_TIME_INTERVAL
-
-                // keep storage up-to-date with up to where we've processed so far
-                await meta.storage.set(TIMESTAMP_CURSOR_KEY, timestampCursor)
-            }
-
-            // We use this to pick up from where we left off if the server restarts - see teardownPlugin
-            await meta.cache.lpush(RUNNING_INTERVALS_LIST_KEY, [timestampCursor.toString()])
+            // keep storage up-to-date with up to where we've processed so far
+            await meta.storage.set(TIMESTAMP_CURSOR_KEY, timestampCursor)
         }
 
         if (timestampCursor > meta.global.timestampLimit.getTime()) {
@@ -193,12 +155,6 @@ export function upgradeExportEventsFromTheBeginning(
 
         incrementMetric('events_exported', events.length)
 
-        // Update the first offset we should handle for an interval if the server restarts
-        await meta.storage.set(
-            `${UNFINISHED_INTERVAL_OFFSET_KEY}_${timestampCursor}`,
-            intraIntervalOffset + EVENTS_PER_RUN
-        )
-
         await meta.jobs
             .exportEventsFromTheBeginning({
                 timestampCursor,
@@ -207,26 +163,6 @@ export function upgradeExportEventsFromTheBeginning(
                 intraIntervalOffset: intraIntervalOffset + EVENTS_PER_RUN,
             })
             .runNow()
-    }
-
-    methods.teardownPlugin = async () => {
-        // Check if there are any intervals we didn't finish processing
-        const runningIntervals = await getRedisListForKey(meta.cache, RUNNING_INTERVALS_LIST_KEY)
-
-        // Check if there are any intervals that failed before and we still didn't get to
-        const rolledOverIntervals = await getRedisListForKey(meta.cache, UNFINISHED_INTERVALS_LIST_KEY)
-
-        // All intervals we still didn't process
-        const allPendingIntervals = [...runningIntervals, ...rolledOverIntervals]
-
-        if (allPendingIntervals.length > 0) {
-            await meta.storage.set(UNFINISHED_INTERVALS_LIST_KEY, allPendingIntervals.join(','))
-        }
-
-        await meta.cache.expire(UNFINISHED_INTERVALS_LIST_KEY, 0)
-        await meta.cache.expire(RUNNING_INTERVALS_LIST_KEY, 0)
-
-        await oldTeardownPlugin?.()
     }
 
     tasks.job['exportEventsFromTheBeginning'] = {

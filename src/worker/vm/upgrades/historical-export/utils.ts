@@ -122,9 +122,3 @@ export const fetchEventsForInterval = async (
         return postgresFetchEventsResult.rows
     }
 }
-
-export const getRedisListForKey = async (cache: CacheExtension, key: string): Promise<string[]> => {
-    const listLength = await cache.llen(key)
-    const listResult = await cache.lrange(key, 0, listLength)
-    return listResult
-}
