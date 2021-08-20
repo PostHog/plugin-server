@@ -1,9 +1,9 @@
-import { CacheExtension } from '@posthog/plugin-scaffold'
+import { CacheExtension, PluginEvent } from '@posthog/plugin-scaffold'
 import { Plugin, PluginMeta } from '@posthog/plugin-scaffold'
 import { DateTime } from 'luxon'
 import { Client } from 'pg'
 
-import { Event, TimestampFormat } from '../../../../types'
+import { ClickHouseEvent, Event, PluginConfig, TimestampFormat } from '../../../../types'
 import { DB } from '../../../../utils/db/db'
 import { castTimestampToClickhouseFormat } from '../../../../utils/utils'
 export interface TimestampBoundaries {
@@ -76,7 +76,7 @@ export const fetchEventsForInterval = async (
     offset: number,
     eventsTimeInterval: number,
     eventsPerRun: number
-): Promise<Event[]> => {
+): Promise<PluginEvent[]> => {
     const timestampUpperBound = new Date(timestampLowerBound.getTime() + eventsTimeInterval)
 
     if (db.kafkaProducer) {
@@ -100,16 +100,10 @@ export const fetchEventsForInterval = async (
 
         const clickhouseFetchEventsResult = await db.clickhouseQuery(fetchEventsQuery)
 
-        return clickhouseFetchEventsResult.data.map(
-            ({ event, uuid, properties, team_id, distinct_id, elements_hash, timestamp, created_at }) => ({
-                event,
-                team_id,
-                distinct_id,
-                elements_hash,
-                timestamp,
-                created_at,
-                properties: JSON.parse(properties),
-                id: uuid,
+        return clickhouseFetchEventsResult.data.map((event) =>
+            convertDatabaseEventToPluginEvent({
+                ...(event as ClickHouseEvent),
+                properties: JSON.parse(event.properties || '{}'),
             })
         )
     } else {
@@ -119,6 +113,62 @@ export const fetchEventsForInterval = async (
             'fetchEventsForInterval'
         )
 
-        return postgresFetchEventsResult.rows
+        return postgresFetchEventsResult.rows.map(convertDatabaseEventToPluginEvent)
+    }
+}
+
+// This assumes the value stored at `key` can be cast to a Postgres numeric type
+export const postgresIncrement = async (
+    db: DB,
+    pluginConfigId: PluginConfig['id'],
+    key: string,
+    incrementBy = 1
+): Promise<number> => {
+    const incrementResult = await db.postgresQuery(
+        `
+                INSERT INTO posthog_pluginstorage (plugin_config_id, key, value)
+                VALUES ($1, $2, $3)
+                ON CONFLICT ("plugin_config_id", "key")
+                DO UPDATE posthog_pluginstorage
+                SET value = posthog_pluginstorage.value::numeric + $3
+                RETURNING value
+            `,
+        [pluginConfigId, key, incrementBy],
+        'postgresIncrement'
+    )
+
+    return incrementResult.rows[0].value
+}
+
+export const postgresSetOnce = async (
+    db: DB,
+    pluginConfigId: PluginConfig['id'],
+    key: string,
+    value: number
+): Promise<void> => {
+    const se = await db.postgresQuery(
+        `
+             INSERT INTO posthog_pluginstorage (plugin_config_id, key, value)
+             VALUES ($1, $2, $3)
+             ON CONFLICT DO NOTHING
+         `,
+        [pluginConfigId, key, value],
+        'postgresSetOnce'
+    )
+}
+
+export const convertDatabaseEventToPluginEvent = (
+    event: Omit<Event, 'id' | 'elements' | 'elements_hash'>
+): PluginEvent => {
+    const { event: eventName, properties, timestamp, team_id, distinct_id, created_at } = event
+    return {
+        team_id,
+        distinct_id,
+        properties,
+        now: timestamp,
+        event: eventName || '',
+        ip: properties?.['$ip'] || '',
+        site_url: '',
+        sent_at: created_at,
     }
 }

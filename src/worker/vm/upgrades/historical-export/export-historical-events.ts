@@ -1,4 +1,4 @@
-import { PluginMeta, RetryError } from '@posthog/plugin-scaffold'
+import { PluginEvent, PluginMeta, RetryError } from '@posthog/plugin-scaffold'
 
 import {
     Event,
@@ -15,6 +15,8 @@ import {
     ExportEventsJobPayload,
     fetchEventsForInterval,
     fetchTimestampBoundariesForTeam,
+    postgresIncrement,
+    postgresSetOnce,
 } from './utils'
 
 const EVENTS_TIME_INTERVAL = 10 * 60 * 1000 // 10 minutes
@@ -22,7 +24,7 @@ const EVENTS_PER_RUN = 100
 const TIMESTAMP_CURSOR_KEY = 'timestamp_cursor'
 const MAX_TIMESTAMP_KEY = 'max_timestamp'
 
-export function upgradeExportEventsFromTheBeginning(
+export function addHistoricalEventsExportCapability(
     hub: Hub,
     pluginConfig: PluginConfig,
     response: PluginConfigVMInternalResponse<PluginMeta<ExportEventsFromTheBeginningUpgrade>>
@@ -47,15 +49,10 @@ export function upgradeExportEventsFromTheBeginning(
         }
 
         // Set the lower timestamp boundary to start from.
-        // This will be 0 on the first run, but can be > 0 on a server restart
-        // We also set this is Redis so we can leverage INCR to allocate work to threads
-        // without duplication
-        meta.global.initialTimestampCursor = timestampBoundaries.min.getTime()
-        const lastStoredTimestampCursor = await meta.storage.get(TIMESTAMP_CURSOR_KEY, 0)
-        const redisTimestampCursor = await meta.cache.get(TIMESTAMP_CURSOR_KEY, null)
-        if (!redisTimestampCursor) {
-            await meta.cache.set(TIMESTAMP_CURSOR_KEY, Number(lastStoredTimestampCursor) / EVENTS_TIME_INTERVAL)
-        }
+        // We set it to an interval lower than the start point so the
+        // first postgresIncrement call works correctly.
+        const startCursor = timestampBoundaries.min.getTime() - EVENTS_TIME_INTERVAL
+        await postgresSetOnce(hub.db, pluginConfig.id, TIMESTAMP_CURSOR_KEY, startCursor)
 
         await oldSetupPlugin?.()
 
@@ -83,11 +80,12 @@ export function upgradeExportEventsFromTheBeginning(
             intraIntervalOffset = 0
 
             // This ensures we never process an interval twice
-            const redisIncrementedCursor = await meta.cache.incr(TIMESTAMP_CURSOR_KEY)
-            timestampCursor = meta.global.initialTimestampCursor + (redisIncrementedCursor - 1) * EVENTS_TIME_INTERVAL
-
-            // keep storage up-to-date with up to where we've processed so far
-            await meta.storage.set(TIMESTAMP_CURSOR_KEY, timestampCursor)
+            timestampCursor = await postgresIncrement(
+                hub.db,
+                pluginConfig.id,
+                TIMESTAMP_CURSOR_KEY,
+                EVENTS_TIME_INTERVAL
+            )
         }
 
         if (timestampCursor > meta.global.timestampLimit.getTime()) {
@@ -95,7 +93,7 @@ export function upgradeExportEventsFromTheBeginning(
             return
         }
 
-        let events: Event[] = []
+        let events: PluginEvent[] = []
 
         let fetchEventsError: Error | null = null
         try {
@@ -115,7 +113,7 @@ export function upgradeExportEventsFromTheBeginning(
 
         if (!fetchEventsError) {
             try {
-                await methods.exportEventsFromTheBeginning!(events)
+                await methods.exportEvents!(events)
             } catch (error) {
                 exportEventsError = error
             }

@@ -14,7 +14,7 @@ import { createStorage } from './extensions/storage'
 import { imports } from './imports'
 import { transformCode } from './transforms'
 import { upgradeExportEvents } from './upgrades/export-events'
-import { upgradeExportEventsFromTheBeginning } from './upgrades/historical-export/export-historical-events'
+import { addHistoricalEventsExportCapability } from './upgrades/historical-export/export-historical-events'
 
 export class TimeoutError extends Error {
     name = 'TimeoutError'
@@ -221,10 +221,7 @@ export async function createPluginConfigVM(
 
     if (exportEventsExists) {
         upgradeExportEvents(hub, pluginConfig, vmResponse)
-    }
-
-    if (!!methods.exportEventsFromTheBeginning) {
-        upgradeExportEventsFromTheBeginning(hub, pluginConfig, vmResponse)
+        addHistoricalEventsExportCapability(hub, pluginConfig, vmResponse)
     }
 
     setupMetrics(hub, pluginConfig, metrics, exportEventsExists)
