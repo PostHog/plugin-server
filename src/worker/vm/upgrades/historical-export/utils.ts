@@ -126,13 +126,13 @@ export const postgresIncrement = async (
 ): Promise<number> => {
     const incrementResult = await db.postgresQuery(
         `
-                INSERT INTO posthog_pluginstorage (plugin_config_id, key, value)
-                VALUES ($1, $2, $3)
-                ON CONFLICT ("plugin_config_id", "key")
-                DO UPDATE posthog_pluginstorage
-                SET value = posthog_pluginstorage.value::numeric + $3
-                RETURNING value
-            `,
+        INSERT INTO posthog_pluginstorage (plugin_config_id, key, value)
+        VALUES ($1, $2, $3)
+        ON CONFLICT ("plugin_config_id", "key")
+        DO UPDATE
+        SET value = posthog_pluginstorage.value::numeric + $3
+        RETURNING value
+        `,
         [pluginConfigId, key, incrementBy],
         'postgresIncrement'
     )
@@ -148,9 +148,9 @@ export const postgresSetOnce = async (
 ): Promise<void> => {
     const se = await db.postgresQuery(
         `
-             INSERT INTO posthog_pluginstorage (plugin_config_id, key, value)
-             VALUES ($1, $2, $3)
-             ON CONFLICT DO NOTHING
+        INSERT INTO posthog_pluginstorage (plugin_config_id, key, value)
+        VALUES ($1, $2, $3)
+        ON CONFLICT DO NOTHING
          `,
         [pluginConfigId, key, value],
         'postgresSetOnce'
