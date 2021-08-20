@@ -1,7 +1,6 @@
 import { PluginEvent, PluginMeta, RetryError } from '@posthog/plugin-scaffold'
 
 import {
-    Event,
     Hub,
     MetricMathOperations,
     PluginConfig,
@@ -80,16 +79,17 @@ export function addHistoricalEventsExportCapability(
             intraIntervalOffset = 0
 
             // This ensures we never process an interval twice
-            timestampCursor = await postgresIncrement(
+            const incrementedCursor = await postgresIncrement(
                 hub.db,
                 pluginConfig.id,
                 TIMESTAMP_CURSOR_KEY,
                 EVENTS_TIME_INTERVAL
             )
+
+            timestampCursor = Number(incrementedCursor)
         }
 
         if (timestampCursor > meta.global.timestampLimit.getTime()) {
-            createLog(`Done exporting all events`)
             return
         }
 
