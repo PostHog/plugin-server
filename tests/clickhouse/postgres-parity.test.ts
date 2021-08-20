@@ -188,7 +188,6 @@ describe('postgres parity', () => {
 
         expect(clickHouseDistinctIds).toEqual([
             {
-                id: expect.any(Number),
                 distinct_id: 'distinct1',
                 person_id: person.uuid,
                 team_id: team.id,
@@ -199,7 +198,6 @@ describe('postgres parity', () => {
         ])
         expect(postgresDistinctIds).toEqual([
             {
-                id: expect.any(Number),
                 distinct_id: 'distinct1',
                 person_id: person.id,
                 team_id: team.id,

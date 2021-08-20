@@ -560,7 +560,7 @@ export class DB {
                         WHERE person_id='${escapeClickHouseString(person.uuid)}'
                           AND team_id='${person.team_id}'
                           AND is_deleted=0
-                        ORDER BY id`
+                        ORDER BY _offset`
                 )
             ).data as ClickHousePersonDistinctId[]
         } else if (database === Database.Postgres) {
