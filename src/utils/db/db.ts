@@ -657,16 +657,20 @@ export class DB {
 
         if (this.kafkaProducer) {
             for (const row of movedDistinctIdResult.rows) {
+                const { id, ...usefulColumns } = row
                 await this.kafkaProducer.queueMessage({
                     topic: KAFKA_PERSON_UNIQUE_ID,
                     messages: [
-                        { value: Buffer.from(JSON.stringify({ ...row, person_id: target.uuid, is_deleted: 0 })) },
-                    ],
-                })
-                await this.kafkaProducer.queueMessage({
-                    topic: KAFKA_PERSON_UNIQUE_ID,
-                    messages: [
-                        { value: Buffer.from(JSON.stringify({ ...row, person_id: source.uuid, is_deleted: 1 })) },
+                        {
+                            value: Buffer.from(
+                                JSON.stringify({ ...usefulColumns, person_id: target.uuid, is_deleted: 0 })
+                            ),
+                        },
+                        {
+                            value: Buffer.from(
+                                JSON.stringify({ ...usefulColumns, person_id: source.uuid, is_deleted: 1 })
+                            ),
+                        },
                     ],
                 })
             }
