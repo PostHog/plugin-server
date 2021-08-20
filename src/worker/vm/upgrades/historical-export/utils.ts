@@ -93,7 +93,7 @@ export const fetchEventsForInterval = async (
         SELECT * FROM events 
         WHERE team_id = ${teamId} 
         AND _timestamp >= '${chTimestampLower}' 
-        AND _timestamp <= '${chTimestampHigher}'
+        AND _timestamp < '${chTimestampHigher}'
         ORDER BY _offset 
         LIMIT ${eventsPerRun} 
         OFFSET ${offset}`
@@ -108,7 +108,7 @@ export const fetchEventsForInterval = async (
         )
     } else {
         const postgresFetchEventsResult = await db.postgresQuery(
-            `SELECT * FROM posthog_event WHERE team_id = $1 AND timestamp >= $2 AND timestamp <= $3 ORDER BY id LIMIT $4 OFFSET $5`,
+            `SELECT * FROM posthog_event WHERE team_id = $1 AND timestamp >= $2 AND timestamp < $3 ORDER BY id LIMIT $4 OFFSET $5`,
             [teamId, timestampLowerBound.toISOString(), timestampUpperBound.toISOString(), eventsPerRun, offset],
             'fetchEventsForInterval'
         )
@@ -149,7 +149,8 @@ export const postgresSetOnce = async (
         `
         INSERT INTO posthog_pluginstorage (plugin_config_id, key, value)
         VALUES ($1, $2, $3)
-        ON CONFLICT DO NOTHING
+        ON CONFLICT ("plugin_config_id", "key")
+        DO NOTHING
          `,
         [pluginConfigId, key, value],
         'postgresSetOnce'
