@@ -52,7 +52,13 @@ import {
 } from '../utils'
 import { KafkaProducerWrapper } from './kafka-producer-wrapper'
 import { PostgresLogsWrapper } from './postgres-logs-wrapper'
-import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './utils'
+import {
+    chainToElements,
+    generatePostgresValuesString,
+    hashElements,
+    timeoutGuard,
+    unparsePersonPartial,
+} from './utils'
 
 export interface LogEntryPayload {
     pluginConfig: PluginConfig
@@ -73,6 +79,28 @@ export interface ParsedLogEntry {
     type: PluginLogEntryType
     message: string
     instance_id: string
+}
+
+export interface CreateUserPayload {
+    uuid: UUIDT
+    password: string
+    first_name: string
+    last_name: string
+    email: string
+    distinct_id: string
+    is_staff: boolean
+    is_active: boolean
+    date_joined: Date
+    events_column_config: Record<string, string> | null
+    organization_id?: RawOrganization['id']
+}
+
+export interface CreatePersonalApiKeyPayload {
+    id: string
+    user_id: number
+    label: string
+    value: string
+    created_at: Date
 }
 
 /** The recommended way of accessing the database. */
@@ -781,25 +809,48 @@ export class DB {
                 )
 
                 if (insertResult.rows.length > 0) {
+                    const ELEMENTS_TABLE_COLUMN_COUNT = 11
                     const elementGroup = insertResult.rows[0] as ElementGroup
-                    for (const element of cleanedElements) {
-                        await client.query(
-                            'INSERT INTO posthog_element (text, tag_name, href, attr_id, nth_child, nth_of_type, attributes, "order", event_id, attr_class, group_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-                            [
-                                element.text,
-                                element.tag_name,
-                                element.href,
-                                element.attr_id,
-                                element.nth_child,
-                                element.nth_of_type,
-                                element.attributes || '{}',
-                                element.order,
-                                element.event_id,
-                                element.attr_class,
-                                elementGroup.id,
-                            ]
+                    const values = []
+                    const rowStrings = []
+
+                    for (let rowIndex = 0; rowIndex < cleanedElements.length; ++rowIndex) {
+                        const {
+                            text,
+                            tag_name,
+                            href,
+                            attr_id,
+                            nth_child,
+                            nth_of_type,
+                            attributes,
+                            order,
+                            event_id,
+                            attr_class,
+                        } = cleanedElements[rowIndex]
+
+                        rowStrings.push(generatePostgresValuesString(ELEMENTS_TABLE_COLUMN_COUNT, rowIndex))
+
+                        values.push(
+                            text,
+                            tag_name,
+                            href,
+                            attr_id,
+                            nth_child,
+                            nth_of_type,
+                            attributes || {},
+                            order,
+                            event_id,
+                            attr_class,
+                            elementGroup.id
                         )
                     }
+
+                    await client.query(
+                        `INSERT INTO posthog_element (text, tag_name, href, attr_id, nth_child, nth_of_type, attributes, "order", event_id, attr_class, group_id) VALUES ${rowStrings.join(
+                            ', '
+                        )}`,
+                        values
+                    )
                 }
             })
         } catch (error) {
@@ -871,14 +922,7 @@ export class DB {
             const { id, team_id, plugin_id, plugin_config_id, timestamp, source, type, message, instance_id } =
                 entries[rowIndex]
 
-            // Creates format: ($1, $2, $3, $4, $5, $6, $7, $8, $9), ($10, $12, $13, $14, $15, $16, $17, $18, $19)
-            rowStrings.push(
-                '(' +
-                    Array.from(Array(LOG_ENTRY_COLUMN_COUNT).keys())
-                        .map((x) => `$${x + 1 + rowIndex * LOG_ENTRY_COLUMN_COUNT}`)
-                        .join(', ') +
-                    ')'
-            )
+            rowStrings.push(generatePostgresValuesString(LOG_ENTRY_COLUMN_COUNT, rowIndex))
 
             values.push(id, team_id, plugin_id, plugin_config_id, timestamp, source, type, message, instance_id)
         }
@@ -1035,5 +1079,60 @@ export class DB {
 
     public async deleteRestHook(hookId: Hook['id']): Promise<void> {
         await this.postgresQuery(`DELETE FROM ee_hook WHERE id = $1`, [hookId], 'deleteRestHook')
+    }
+
+    public async createUser({
+        uuid,
+        password,
+        first_name,
+        last_name,
+        email,
+        distinct_id,
+        is_staff,
+        is_active,
+        date_joined,
+        events_column_config,
+        organization_id,
+    }: CreateUserPayload): Promise<QueryResult> {
+        const createUserResult = await this.postgresQuery(
+            `INSERT INTO posthog_user (uuid, password, first_name, last_name, email, distinct_id, is_staff, is_active, date_joined, events_column_config)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id`,
+            [
+                uuid.toString(),
+                password,
+                first_name,
+                last_name,
+                email,
+                distinct_id,
+                is_staff,
+                is_active,
+                date_joined.toISOString(),
+                events_column_config,
+            ],
+            'createUser'
+        )
+
+        if (organization_id) {
+            const now = new Date().toISOString()
+            await this.postgresQuery(
+                `INSERT INTO posthog_organizationmembership (id, organization_id, user_id, level, joined_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6)`,
+                [new UUIDT().toString(), organization_id, createUserResult.rows[0].id, 1, now, now],
+                'createOrganizationMembership'
+            )
+        }
+
+        return createUserResult
+    }
+
+    public async createPersonalApiKey({ id, user_id, label, value, created_at }: CreatePersonalApiKeyPayload) {
+        return await this.postgresQuery(
+            `INSERT INTO posthog_personalapikey (id, user_id, label, value, created_at)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING value`,
+            [id, user_id, label, value, created_at.toISOString()],
+            'createPersonalApiKey'
+        )
     }
 }
