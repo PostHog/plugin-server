@@ -129,8 +129,7 @@ export const postgresIncrement = async (
         INSERT INTO posthog_pluginstorage (plugin_config_id, key, value)
         VALUES ($1, $2, $3)
         ON CONFLICT ("plugin_config_id", "key")
-        DO UPDATE
-        SET value = posthog_pluginstorage.value::numeric + $3
+        DO UPDATE SET value = posthog_pluginstorage.value::numeric + ${incrementBy}
         RETURNING value
         `,
         [pluginConfigId, key, incrementBy],
