@@ -191,7 +191,7 @@ describe('postgres parity', () => {
                 distinct_id: 'distinct1',
                 person_id: person.uuid,
                 team_id: team.id,
-                is_deleted: 0,
+                _sign: 1,
                 _timestamp: expect.any(String),
                 _offset: expect.any(Number),
             },
@@ -258,8 +258,8 @@ describe('postgres parity', () => {
         const clickHouseDistinctIdValuesMoved = await hub.db.fetchDistinctIdValues(anotherPerson, Database.ClickHouse)
         const postgresDistinctIdValuesMoved = await hub.db.fetchDistinctIdValues(anotherPerson, Database.Postgres)
 
-        expect(clickHouseDistinctIdValuesMoved).toEqual(['distinct1', 'another_distinct_id'])
-        expect(postgresDistinctIdValuesMoved).toEqual(['distinct1', 'another_distinct_id'])
+        expect(clickHouseDistinctIdValuesMoved).toEqual(expect.arrayContaining(['distinct1', 'another_distinct_id']))
+        expect(postgresDistinctIdValuesMoved).toEqual(expect.arrayContaining(['distinct1', 'another_distinct_id']))
 
         // it got removed
 
