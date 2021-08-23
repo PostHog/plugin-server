@@ -197,11 +197,11 @@ describe('postgres parity', () => {
             },
         ])
         expect(postgresDistinctIds).toEqual([
-            {
+            expect.objectContaining({
                 distinct_id: 'distinct1',
                 person_id: person.id,
                 team_id: team.id,
-            },
+            }),
         ])
         expect(clickHouseDistinctIds[0].id).toEqual(postgresDistinctIds[0].id)
 
