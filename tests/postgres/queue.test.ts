@@ -94,3 +94,56 @@ test('pause and resume queue', async () => {
     await closeHub()
     await piscina.destroy()
 })
+
+test('plugin jobs queue', async () => {
+    const [hub, closeHub] = await createTestHub()
+    const redis = await hub.redisPool.acquire()
+
+    // Nothing in the redis queue
+    const queue1 = await redis.llen(hub.PLUGINS_CELERY_QUEUE)
+    expect(queue1).toBe(0)
+
+    const kwargs = {
+        pluginConfigTeam: 2,
+        pluginConfigId: 39,
+        type: 'someJobName',
+        jobOp: 'start',
+        payload: { a: 1 },
+    }
+    const args = Object.values(kwargs)
+
+    const client = new Client(hub.db, hub.PLUGINS_CELERY_QUEUE)
+    for (let i = 0; i < 6; i++) {
+        client.sendTask('posthog.tasks.plugins.plugin_job', args, {})
+    }
+
+    await delay(1000)
+
+    expect(await redis.llen(hub.PLUGINS_CELERY_QUEUE)).toBe(6)
+    const fakePiscina = { run: jest.fn() } as any
+    const queue = await startQueue(hub, fakePiscina, {})
+    await advanceOneTick()
+
+    expect(await redis.llen(hub.PLUGINS_CELERY_QUEUE)).not.toBe(6)
+
+    await queue.pause()
+
+    expect(fakePiscina.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+            task: 'enqueueJob',
+            args: {
+                job: {
+                    pluginConfigTeam: 2,
+                    pluginConfigId: 39,
+                    type: 'someJobName',
+                    payload: { a: 1, $operation: 'start' },
+                    timestamp: expect.any(Number),
+                },
+            },
+        })
+    )
+
+    await queue.stop()
+    await hub.redisPool.release(redis)
+    await closeHub()
+})

@@ -2,7 +2,7 @@ import Piscina from '@posthog/piscina'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 
-import { Hub, Queue, WorkerMethods } from '../../types'
+import { CeleryTriggeredJobOperation, Hub, PluginConfig, Queue, Team, WorkerMethods } from '../../types'
 import { status } from '../../utils/status'
 import { sanitizeEvent, UUIDT } from '../../utils/utils'
 import { CeleryQueue } from './celery-queue'
@@ -51,47 +51,75 @@ export async function startQueue(
     try {
         if (server.KAFKA_ENABLED) {
             return await startQueueKafka(server, piscina, mergedWorkerMethods)
-        } else {
-            return startQueueRedis(server, piscina, mergedWorkerMethods)
         }
+        return startQueueRedis(server, piscina, mergedWorkerMethods)
     } catch (error) {
         status.error('💥', 'Failed to start event queue:\n', error)
         throw error
     }
 }
 
-function startQueueRedis(server: Hub, piscina: Piscina | undefined, workerMethods: WorkerMethods): Queue {
+function startQueueRedis(server: Hub, piscina: Piscina, workerMethods: WorkerMethods): Queue {
     const celeryQueue = new CeleryQueue(server.db, server.PLUGINS_CELERY_QUEUE)
 
+    // this queue is for triggering plugin jobs from the PostHog UI
     celeryQueue.register(
-        'posthog.tasks.process_event.process_event_with_plugins',
+        'posthog.tasks.plugins.plugin_job',
         async (
-            distinct_id: string,
-            ip: string | null,
-            site_url: string,
-            data: Record<string, unknown>,
-            team_id: number,
-            now: string,
-            sent_at?: string
+            pluginConfigTeam: Team['id'],
+            pluginConfigId: PluginConfig['id'],
+            type: string,
+            jobOp: CeleryTriggeredJobOperation,
+            payload: Record<string, any>
         ) => {
-            const event = sanitizeEvent({
-                distinct_id,
-                ip,
-                site_url,
-                team_id,
-                now,
-                sent_at,
-                uuid: new UUIDT().toString(),
-                ...data,
-            } as PluginEvent)
             try {
-                const checkAndPause = () => pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
-                await ingestEvent(server, workerMethods, event, checkAndPause)
+                payload['$operation'] = jobOp
+                const job = {
+                    type,
+                    payload,
+                    pluginConfigId,
+                    pluginConfigTeam,
+                    timestamp: new Date().getTime(),
+                }
+                await piscina?.run({ task: 'enqueueJob', args: { job } })
             } catch (e) {
                 Sentry.captureException(e)
             }
         }
     )
+
+    // if kafka is enabled, we'll process events from there
+    if (!server.KAFKA_ENABLED) {
+        celeryQueue.register(
+            'posthog.tasks.process_event.process_event_with_plugins',
+            async (
+                distinct_id: string,
+                ip: string | null,
+                site_url: string,
+                data: Record<string, unknown>,
+                team_id: number,
+                now: string,
+                sent_at?: string
+            ) => {
+                const event = sanitizeEvent({
+                    distinct_id,
+                    ip,
+                    site_url,
+                    team_id,
+                    now,
+                    sent_at,
+                    uuid: new UUIDT().toString(),
+                    ...data,
+                } as PluginEvent)
+                try {
+                    const checkAndPause = () => pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
+                    await ingestEvent(server, workerMethods, event, checkAndPause)
+                } catch (e) {
+                    Sentry.captureException(e)
+                }
+            }
+        )
+    }
 
     // run in the background
     void celeryQueue.start()

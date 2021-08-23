@@ -686,3 +686,5 @@ export interface PropertyDefinitionType {
 }
 
 export type PluginFunction = 'onEvent' | 'processEvent' | 'onSnapshot' | 'pluginTask'
+
+export type CeleryTriggeredJobOperation = 'start' // new ops go here
