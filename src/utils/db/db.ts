@@ -148,9 +148,17 @@ export class DB {
     }
 
     public postgresTransaction<ReturnType extends any>(
+        transaction: (client: PoolClient) => Promise<ReturnType>,
+        throwErrors: boolean
+    ): Promise<ReturnType | void>
+    public postgresTransaction<ReturnType extends any>(
         transaction: (client: PoolClient) => Promise<ReturnType>
-    ): Promise<ReturnType> {
-        return instrumentQuery(this.statsd, 'query.postgres_transation', undefined, async () => {
+    ): Promise<ReturnType>
+    public postgresTransaction<ReturnType extends any>(
+        transaction: (client: PoolClient) => Promise<ReturnType>,
+        throwErrors?: boolean
+    ): Promise<ReturnType | void> {
+        const queryFunction = async () => {
             const timeout = timeoutGuard(`Postgres slow transaction warning after 30 sec!`)
             const client = await this.postgres.connect()
             try {
@@ -165,7 +173,12 @@ export class DB {
                 client.release()
                 clearTimeout(timeout)
             }
-        })
+        }
+
+        if (throwErrors) {
+            return instrumentQuery(this.statsd, 'query.postgres_transation', undefined, queryFunction, true)
+        }
+        return instrumentQuery(this.statsd, 'query.postgres_transation', undefined, queryFunction)
     }
 
     // ClickHouse
@@ -517,7 +530,7 @@ export class DB {
     public async deletePerson(person: Person): Promise<void> {
         await this.postgresTransaction(async (client) => {
             await client.query('DELETE FROM posthog_person WHERE team_id = $1 AND id = $2', [person.team_id, person.id])
-        })
+        }, true)
         if (this.kafkaProducer) {
             await this.kafkaProducer.queueMessage({
                 topic: KAFKA_PERSON,
