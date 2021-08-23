@@ -49,10 +49,11 @@ export async function startQueue(
     }
 
     try {
+        const redisQueue = startQueueRedis(server, piscina, mergedWorkerMethods)
         if (server.KAFKA_ENABLED) {
             return await startQueueKafka(server, piscina, mergedWorkerMethods)
         }
-        return startQueueRedis(server, piscina, mergedWorkerMethods)
+        return redisQueue
     } catch (error) {
         status.error('💥', 'Failed to start event queue:\n', error)
         throw error
