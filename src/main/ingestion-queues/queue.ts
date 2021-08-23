@@ -80,7 +80,7 @@ function startQueueRedis(server: Hub, piscina: Piscina, workerMethods: WorkerMet
                     payload,
                     pluginConfigId,
                     pluginConfigTeam,
-                    timestamp: new Date().getTime(),
+                    timestamp: Date.now(),
                 }
                 await piscina?.run({ task: 'enqueueJob', args: { job } })
             } catch (e) {
