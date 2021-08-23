@@ -203,15 +203,6 @@ describe('postgres parity', () => {
                 team_id: team.id,
             }),
         ])
-        expect([
-            clickHouseDistinctIds[0].team_id,
-            clickHouseDistinctIds[0].person_id,
-            clickHouseDistinctIds[0].distinct_id,
-        ]).toEqual([
-            postgresDistinctIds[0].team_id,
-            postgresDistinctIds[0].person_id,
-            postgresDistinctIds[0].distinct_id,
-        ])
 
         // add 'anotherOne' to person
 
