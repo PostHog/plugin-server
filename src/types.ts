@@ -481,7 +481,6 @@ export interface ClickHousePerson {
 
 /** Usable PersonDistinctId model. */
 export interface PersonDistinctId {
-    id: number
     team_id: number
     person_id: number
     distinct_id: string
