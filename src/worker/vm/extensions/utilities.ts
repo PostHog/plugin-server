@@ -31,7 +31,8 @@ export function createUtils(server: Hub, pluginConfigId: number): UtilsExtension
             if (typeof incrementBy !== 'number') {
                 throw new Error(`The incrementBy value must be a number!`)
             }
-            return await postgresIncrement(server.db, pluginConfigId, key, incrementBy)
+            const cursor = await postgresIncrement(server.db, pluginConfigId, key, incrementBy)
+            return Number(cursor)
         },
     }
 

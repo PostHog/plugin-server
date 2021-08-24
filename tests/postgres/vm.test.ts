@@ -598,6 +598,32 @@ test('meta.cache lpush/lrange/llen', async () => {
     expect(event.properties!['mylist_after']).toEqual([])
 })
 
+test('meta.utils.cursor init/increment', async () => {
+    const indexJs = `
+        async function setupPlugin ({ utils }) {
+            await utils.cursor.init('my_cursor', 10)
+        }
+        async function processEvent (event, { utils }) {
+            const counter = await utils.cursor.increment('my_cursor', 10)
+            event.properties['counter'] = counter
+            return event
+        }
+    `
+    await resetTestDatabase(indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'original event',
+        properties: {},
+    }
+
+    await vm.methods.processEvent!(event)
+    expect(event.properties!['counter']).toEqual(20)
+
+    await vm.methods.processEvent!(event)
+    expect(event.properties!['counter']).toEqual(30)
+})
+
 test('console.log', async () => {
     const indexJs = `
         async function processEvent (event, meta) {
