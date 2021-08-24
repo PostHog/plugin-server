@@ -8,6 +8,7 @@ import { createHub } from '../../src/utils/db/hub'
 import { delay } from '../../src/utils/utils'
 import { createPluginConfigVM } from '../../src/worker/vm/vm'
 import { pluginConfig39 } from '../helpers/plugins'
+import { resetRedis } from '../helpers/redis'
 import { resetTestDatabase } from '../helpers/sql'
 import { plugin60 } from './../helpers/plugins'
 
@@ -415,6 +416,7 @@ test('meta.cache set/get', async () => {
             return event
         }
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
@@ -433,7 +435,7 @@ test('meta.cache set/get', async () => {
     expect(event.properties!['counter']).toEqual(3)
 })
 
-test('meta.storage set/get', async () => {
+test('meta.storage set/get/del', async () => {
     const indexJs = `
         async function setupPlugin (meta) {
             await meta.storage.set('counter', -1)
@@ -450,9 +452,16 @@ test('meta.storage set/get', async () => {
             const counter = await meta.storage.get('counter', 999)
             await meta.storage.set('counter', counter + 1)
             event.properties['counter'] = counter + 1
+
+            await meta.storage.set('deleteme', 10)
+            await meta.storage.del('deleteme')
+            const deleteMeResult = await meta.storage.get('deleteme', null)
+            event.properties['deleteme'] = deleteMeResult
+
             return event
         }
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
@@ -463,6 +472,7 @@ test('meta.storage set/get', async () => {
 
     await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
+    expect(event.properties!['deleteme']).toEqual(null)
 
     await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
@@ -484,6 +494,7 @@ test('meta.cache expire', async () => {
             return event
         }
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
@@ -516,6 +527,7 @@ test('meta.cache set ttl', async () => {
             return event
         }
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
@@ -547,6 +559,7 @@ test('meta.cache incr', async () => {
             return event
         }
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
@@ -584,6 +597,7 @@ test('meta.cache lpush/lrange/llen', async () => {
         }
 
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
@@ -626,6 +640,7 @@ test('meta.cache lrem/lpop/lpush/lrange', async () => {
         }
 
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
