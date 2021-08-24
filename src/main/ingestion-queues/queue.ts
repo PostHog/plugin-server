@@ -91,6 +91,7 @@ function startQueueRedis(server: Hub, piscina: Piscina, workerMethods: WorkerMet
                     pluginConfigTeam,
                     timestamp: Date.now(),
                 }
+                pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
                 await piscina?.run({ task: 'enqueueJob', args: { job } })
             } catch (e) {
                 Sentry.captureException(e)
