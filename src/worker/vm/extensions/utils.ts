@@ -40,3 +40,11 @@ export const postgresSetOnce = async (
         'postgresSetOnce'
     )
 }
+
+export const postgresGet = async (db: DB, pluginConfigId: PluginConfig['id'], key: string) => {
+    return await db.postgresQuery(
+        'SELECT * FROM posthog_pluginstorage WHERE "plugin_config_id"=$1 AND "key"=$2 LIMIT 1',
+        [pluginConfigId, key],
+        'storageGet'
+    )
+}
