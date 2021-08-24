@@ -8,7 +8,6 @@ import { createHub } from '../../src/utils/db/hub'
 import { delay } from '../../src/utils/utils'
 import { createPluginConfigVM } from '../../src/worker/vm/vm'
 import { pluginConfig39 } from '../helpers/plugins'
-import { resetRedis } from '../helpers/redis'
 import { resetTestDatabase } from '../helpers/sql'
 import { plugin60 } from './../helpers/plugins'
 
