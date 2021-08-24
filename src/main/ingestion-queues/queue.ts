@@ -11,7 +11,7 @@ import { KafkaQueue } from './kafka-queue'
 
 interface Queues {
     ingestion: Queue
-    redis: Queue
+    auxiliary: Queue
 }
 
 export function pauseQueueIfWorkerFull(
@@ -57,7 +57,7 @@ export async function startQueues(
         const redisQueue = startQueueRedis(server, piscina, mergedWorkerMethods)
         const queues = {
             ingestion: redisQueue,
-            redis: redisQueue,
+            auxiliary: redisQueue,
         }
         if (server.KAFKA_ENABLED) {
             queues.ingestion = await startQueueKafka(server, piscina, mergedWorkerMethods)
