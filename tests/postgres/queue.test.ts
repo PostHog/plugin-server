@@ -1,5 +1,5 @@
 import { setupPiscina } from '../../benchmarks/postgres/helpers/piscina'
-import { startQueue } from '../../src/main/ingestion-queues/queue'
+import { startQueues } from '../../src/main/ingestion-queues/queue'
 import { Hub, LogLevel } from '../../src/types'
 import { Client } from '../../src/utils/celery/client'
 import { createHub } from '../../src/utils/db/hub'
@@ -61,10 +61,12 @@ test('pause and resume queue', async () => {
     // There'll be a "tick lag" with the events moving from one queue to the next. :this_is_fine:
     expect(await redis.llen(hub.PLUGINS_CELERY_QUEUE)).toBe(6)
     const piscina = setupPiscina(2, 2)
-    const queue = await startQueue(hub, piscina, {
-        processEvent: (event) => runProcessEvent(hub, event),
-        ingestEvent: () => Promise.resolve({ success: true }),
-    })
+    const queue = (
+        await startQueues(hub, piscina, {
+            processEvent: (event) => runProcessEvent(hub, event),
+            ingestEvent: () => Promise.resolve({ success: true }),
+        })
+    ).ingestion
     await advanceOneTick()
 
     expect(await redis.llen(hub.PLUGINS_CELERY_QUEUE)).not.toBe(6)
@@ -121,7 +123,7 @@ test('plugin jobs queue', async () => {
 
     expect(await redis.llen(hub.PLUGINS_CELERY_QUEUE)).toBe(6)
     const fakePiscina = { run: jest.fn() } as any
-    const queue = await startQueue(hub, fakePiscina, {})
+    const queue = (await startQueues(hub, fakePiscina, {})).ingestion
     await advanceOneTick()
 
     expect(await redis.llen(hub.PLUGINS_CELERY_QUEUE)).not.toBe(6)

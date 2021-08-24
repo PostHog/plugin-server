@@ -9,6 +9,11 @@ import { CeleryQueue } from './celery-queue'
 import { ingestEvent } from './ingest-event'
 import { KafkaQueue } from './kafka-queue'
 
+interface Queues {
+    ingestion: Queue
+    redis: Queue
+}
+
 export function pauseQueueIfWorkerFull(
     pause: undefined | (() => void | Promise<void>),
     server: Hub,
@@ -19,11 +24,11 @@ export function pauseQueueIfWorkerFull(
     }
 }
 
-export async function startQueue(
+export async function startQueues(
     server: Hub,
     piscina: Piscina,
     workerMethods: Partial<WorkerMethods> = {}
-): Promise<Queue> {
+): Promise<Queues> {
     const mergedWorkerMethods = {
         onEvent: (event: PluginEvent) => {
             server.lastActivity = new Date().valueOf()
@@ -50,10 +55,14 @@ export async function startQueue(
 
     try {
         const redisQueue = startQueueRedis(server, piscina, mergedWorkerMethods)
-        if (server.KAFKA_ENABLED) {
-            return await startQueueKafka(server, piscina, mergedWorkerMethods)
+        const queues = {
+            ingestion: redisQueue,
+            redis: redisQueue,
         }
-        return redisQueue
+        if (server.KAFKA_ENABLED) {
+            queues.ingestion = await startQueueKafka(server, piscina, mergedWorkerMethods)
+        }
+        return queues
     } catch (error) {
         status.error('💥', 'Failed to start event queue:\n', error)
         throw error

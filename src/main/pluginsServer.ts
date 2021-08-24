@@ -12,7 +12,7 @@ import { PubSub } from '../utils/pubsub'
 import { status } from '../utils/status'
 import { statusReport } from '../utils/status-report'
 import { delay, getPiscinaStats } from '../utils/utils'
-import { startQueue } from './ingestion-queues/queue'
+import { startQueues } from './ingestion-queues/queue'
 import { startJobQueueConsumer } from './job-queues/job-queue-consumer'
 import { createMmdbServer, performMmdbStalenessCheck, prepareMmdb } from './services/mmdb'
 import { startSchedule } from './services/schedule'
@@ -134,9 +134,18 @@ export async function startPluginsServer(
         scheduleControl = await startSchedule(hub, piscina)
         jobQueueConsumer = await startJobQueueConsumer(hub, piscina)
 
-        queue = await startQueue(hub, piscina)
+        const queues = await startQueues(hub, piscina)
+        queue = queues.ingestion
         piscina.on('drain', () => {
+            // resume ingestion queue
             void queue?.resume()
+
+            // if kafka is enabled the ingestion queue
+            // is not the redis queue, so resume that too
+            if (config.KAFKA_ENABLED) {
+                void queues.redis.resume()
+            }
+
             void jobQueueConsumer?.resume()
         })
 
