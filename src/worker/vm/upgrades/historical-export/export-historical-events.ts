@@ -30,6 +30,8 @@ export function addHistoricalEventsExportCapability(
 ): void {
     const { methods, tasks, meta } = response
 
+    
+
     const oldSetupPlugin = methods.setupPlugin
 
     methods.setupPlugin = async () => {
@@ -54,11 +56,6 @@ export function addHistoricalEventsExportCapability(
         await postgresSetOnce(hub.db, pluginConfig.id, TIMESTAMP_CURSOR_KEY, startCursor)
 
         await oldSetupPlugin?.()
-
-        // This will become an interface trigger
-        await meta.jobs
-            .exportEventsFromTheBeginning({ retriesPerformedSoFar: 0, incrementTimestampCursor: true })
-            .runIn(10, 'seconds')
     }
 
     meta.global.exportEventsFromTheBeginning = async (
@@ -167,6 +164,17 @@ export function addHistoricalEventsExportCapability(
         name: 'exportEventsFromTheBeginning',
         type: PluginTaskType.Job,
         exec: (payload) => meta.global.exportEventsFromTheBeginning(payload as ExportEventsJobPayload, meta),
+    }
+
+    tasks.job['Export events from the beginning'] = {
+        name: 'Export events from the beginning',
+        type: PluginTaskType.Job,
+        // TODO: Accept timestamp as payload
+        exec: async (_) => {
+            await meta.jobs
+                .exportEventsFromTheBeginning({ retriesPerformedSoFar: 0, incrementTimestampCursor: true })
+                .runNow()
+        },
     }
 
     function incrementMetric(metricName: string, value: number) {

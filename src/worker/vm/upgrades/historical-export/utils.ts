@@ -145,7 +145,7 @@ export const postgresSetOnce = async (
     key: string,
     value: number
 ): Promise<void> => {
-    const se = await db.postgresQuery(
+    await db.postgresQuery(
         `
         INSERT INTO posthog_pluginstorage (plugin_config_id, key, value)
         VALUES ($1, $2, $3)
@@ -171,4 +171,8 @@ export const convertDatabaseEventToPluginEvent = (
         site_url: '',
         sent_at: created_at,
     }
+}
+
+export const addPublicJobIfNotExists = async (db: DB, pluginId: number, jobName: string, jobPayloadJson: Record<string,any>) => {
+    return
 }
