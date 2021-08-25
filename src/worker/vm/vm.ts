@@ -168,8 +168,6 @@ export async function createPluginConfigVM(
                 onEvent: __asyncFunctionGuard(__bindMeta('onEvent'), 'onEvent'),
                 onSnapshot: __asyncFunctionGuard(__bindMeta('onSnapshot'), 'onSnapshot'),
                 processEvent: __asyncFunctionGuard(__bindMeta('processEvent'), 'processEvent'),
-                exportEventsFromTheBeginning: __asyncFunctionGuard(__bindMeta('exportEventsFromTheBeginning'), 'exportEventsFromTheBeginning'),
-
             };
 
             const __tasks = {
