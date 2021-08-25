@@ -241,7 +241,7 @@ export const createProcessEventTests = (
         if (database === 'clickhouse') {
             expect(queryCounter).toBe(10 + 14 /* event & prop definitions */)
         } else if (database === 'postgresql') {
-            expect(queryCounter).toBe(14 + 14 /* event & prop definitions */)
+            expect(queryCounter).toBe(13 + 14 /* event & prop definitions */)
         }
 
         let persons = await hub.db.fetchPersons()
@@ -945,6 +945,27 @@ export const createProcessEventTests = (
         expect(event.session_id).toEqual('abcf-efg')
         expect(event.distinct_id).toEqual('some-id')
         expect(event.snapshot_data).toEqual({ timestamp: 123 })
+    })
+
+    test('$snapshot event creates new person if needed', async () => {
+        await eventsProcessor.processEvent(
+            'some_new_id',
+            '',
+            '',
+            {
+                event: '$snapshot',
+                properties: { $session_id: 'abcf-efg', $snapshot_data: { timestamp: 123 } },
+            } as any as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+        await delayUntilEventIngested(() => hub.db.fetchPersons())
+
+        const persons = await hub.db.fetchPersons()
+
+        expect(persons.length).toEqual(1)
     })
 
     test('identify set', async () => {

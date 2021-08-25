@@ -37,6 +37,7 @@ export type ExportEventsFromTheBeginningUpgrade = Plugin<{
         initialTimestampCursor: number
         killSwitchOn: boolean
         timestampLimit: Date
+        minTimestamp: number
     }
 }>
 
@@ -173,6 +174,20 @@ export const convertDatabaseEventToPluginEvent = (
     }
 }
 
-export const addPublicJobIfNotExists = async (db: DB, pluginId: number, jobName: string, jobPayloadJson: Record<string,any>) => {
-    return
+export const addPublicJobIfNotExists = async (
+    db: DB,
+    pluginId: number,
+    jobName: string,
+    jobPayloadJson: Record<string, any>
+): Promise<void> => {
+    await db.postgresQuery(
+        `
+        UPDATE posthog_plugin
+        SET public_jobs = public_jobs || $1::jsonb
+        WHERE id = $2
+        AND (SELECT (public_jobs->$3) IS NULL)
+         `,
+        [JSON.stringify({ [jobName]: jobPayloadJson }), pluginId, jobName],
+        'addPublicJobIfNotExists'
+    )
 }
