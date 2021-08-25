@@ -13,7 +13,11 @@ export function createStorage(server: Hub, pluginConfig: PluginConfig): StorageE
     }
     const set = async function (key: string, value: unknown): Promise<void> {
         if (typeof value === 'undefined') {
-            await del(key)
+            await server.db.postgresQuery(
+                'DELETE FROM posthog_pluginstorage WHERE "plugin_config_id"=$1 AND "key"=$2',
+                [pluginConfig.id, key],
+                'storageDelete'
+            )
         } else {
             await server.db.postgresQuery(
                 `
@@ -28,17 +32,8 @@ export function createStorage(server: Hub, pluginConfig: PluginConfig): StorageE
         }
     }
 
-    const del = async function (key: string): Promise<void> {
-        await server.db.postgresQuery(
-            'DELETE FROM posthog_pluginstorage WHERE "plugin_config_id"=$1 AND "key"=$2',
-            [pluginConfig.id, key],
-            'storageDelete'
-        )
-    }
-
     return {
         get,
         set,
-        del,
     }
 }
