@@ -10,6 +10,7 @@ import {
     PluginTaskType,
 } from '../../../../types'
 import {
+    addPublicJobIfNotExists,
     ExportEventsFromTheBeginningUpgrade,
     ExportEventsJobPayload,
     fetchEventsForInterval,
@@ -20,8 +21,10 @@ import {
 
 const EVENTS_TIME_INTERVAL = 10 * 60 * 1000 // 10 minutes
 const EVENTS_PER_RUN = 100
-const TIMESTAMP_CURSOR_KEY = 'timestamp_cursor'
+const TIMESTAMP_CURSOR_KEY = 'timestamp_cursor1'
 const MAX_TIMESTAMP_KEY = 'max_timestamp'
+
+const INTERFACE_JOB_NAME = 'Export events from the beginning'
 
 export function addHistoricalEventsExportCapability(
     hub: Hub,
@@ -29,6 +32,9 @@ export function addHistoricalEventsExportCapability(
     response: PluginConfigVMInternalResponse<PluginMeta<ExportEventsFromTheBeginningUpgrade>>
 ): void {
     const { methods, tasks, meta } = response
+
+    // we can void this as the job appearing on the interface is not time-sensitive
+    void addPublicJobIfNotExists(hub.db, pluginConfig.plugin_id, INTERFACE_JOB_NAME, {})
 
     const oldSetupPlugin = methods.setupPlugin
 
@@ -53,12 +59,9 @@ export function addHistoricalEventsExportCapability(
         const startCursor = timestampBoundaries.min.getTime() - EVENTS_TIME_INTERVAL
         await postgresSetOnce(hub.db, pluginConfig.id, TIMESTAMP_CURSOR_KEY, startCursor)
 
-        await oldSetupPlugin?.()
+        meta.global.minTimestamp = timestampBoundaries.min.getTime()
 
-        // This will become an interface trigger
-        await meta.jobs
-            .exportEventsFromTheBeginning({ retriesPerformedSoFar: 0, incrementTimestampCursor: true })
-            .runIn(10, 'seconds')
+        await oldSetupPlugin?.()
     }
 
     meta.global.exportEventsFromTheBeginning = async (
@@ -86,6 +89,18 @@ export function addHistoricalEventsExportCapability(
                 EVENTS_TIME_INTERVAL
             )
 
+            const progress = Math.round(
+                ((incrementedCursor - meta.global.minTimestamp) /
+                    (meta.global.timestampLimit.getTime() - meta.global.minTimestamp)) *
+                    20
+            )
+            const progressBarCompleted = Array.from({ length: progress })
+                .map((_) => '■')
+                .join('')
+            const progressBarRemaining = Array.from({ length: 20 - progress })
+                .map((_) => '□')
+                .join('')
+            createLog(`Export progress: ${progressBarCompleted}${progressBarRemaining}`)
             timestampCursor = Number(incrementedCursor)
         }
 
@@ -113,6 +128,7 @@ export function addHistoricalEventsExportCapability(
 
         if (!fetchEventsError) {
             try {
+                console.log(events)
                 await methods.exportEvents!(events)
             } catch (error) {
                 exportEventsError = error
@@ -167,6 +183,17 @@ export function addHistoricalEventsExportCapability(
         name: 'exportEventsFromTheBeginning',
         type: PluginTaskType.Job,
         exec: (payload) => meta.global.exportEventsFromTheBeginning(payload as ExportEventsJobPayload, meta),
+    }
+
+    tasks.job[INTERFACE_JOB_NAME] = {
+        name: INTERFACE_JOB_NAME,
+        type: PluginTaskType.Job,
+        // TODO: Accept timestamp as payload
+        exec: async (_) => {
+            await meta.jobs
+                .exportEventsFromTheBeginning({ retriesPerformedSoFar: 0, incrementTimestampCursor: true })
+                .runNow()
+        },
     }
 
     function incrementMetric(metricName: string, value: number) {
