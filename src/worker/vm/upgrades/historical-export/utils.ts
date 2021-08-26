@@ -35,7 +35,6 @@ export type ExportEventsFromTheBeginningUpgrade = Plugin<{
             meta: PluginMeta<ExportEventsFromTheBeginningUpgrade>
         ) => Promise<void>
         initialTimestampCursor: number
-        killSwitchOn: boolean
         timestampLimit: Date
         minTimestamp: number
     }
