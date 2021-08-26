@@ -21,6 +21,7 @@ const EVENTS_TIME_INTERVAL = 10 * 60 * 1000 // 10 minutes
 const EVENTS_PER_RUN = 100
 const TIMESTAMP_CURSOR_KEY = 'timestamp_cursor1'
 const MAX_TIMESTAMP_KEY = 'max_timestamp'
+const EXPORT_RUNNING_KEY = 'is_export_running'
 
 const INTERFACE_JOB_NAME = 'Export events from the beginning'
 
@@ -98,6 +99,8 @@ export function addHistoricalEventsExportCapability(
         }
 
         if (timestampCursor > meta.global.timestampLimit.getTime()) {
+            await meta.storage.del(EXPORT_RUNNING_KEY)
+            createLog(`Done exporting all events`)
             return
         }
 
@@ -183,6 +186,14 @@ export function addHistoricalEventsExportCapability(
         type: PluginTaskType.Job,
         // TODO: Accept timestamp as payload
         exec: async (_) => {
+            const exportAlreadyRunning = await meta.storage.get(EXPORT_RUNNING_KEY, false)
+
+            // only let one export run at a time
+            if (exportAlreadyRunning) {
+                return
+            }
+
+            await meta.storage.set(EXPORT_RUNNING_KEY, true)
             await meta.jobs
                 .exportEventsFromTheBeginning({ retriesPerformedSoFar: 0, incrementTimestampCursor: true })
                 .runNow()
