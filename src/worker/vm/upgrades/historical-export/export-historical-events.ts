@@ -9,14 +9,12 @@ import {
     PluginLogEntryType,
     PluginTaskType,
 } from '../../../../types'
+import { addPublicJobIfNotExists } from '../../utils'
 import {
-    addPublicJobIfNotExists,
     ExportEventsFromTheBeginningUpgrade,
     ExportEventsJobPayload,
     fetchEventsForInterval,
     fetchTimestampBoundariesForTeam,
-    postgresIncrement,
-    postgresSetOnce,
 } from './utils'
 
 const EVENTS_TIME_INTERVAL = 10 * 60 * 1000 // 10 minutes
@@ -57,7 +55,7 @@ export function addHistoricalEventsExportCapability(
         // We set it to an interval lower than the start point so the
         // first postgresIncrement call works correctly.
         const startCursor = timestampBoundaries.min.getTime() - EVENTS_TIME_INTERVAL
-        await postgresSetOnce(hub.db, pluginConfig.id, TIMESTAMP_CURSOR_KEY, startCursor)
+        await meta.utils.cursor.init(TIMESTAMP_CURSOR_KEY, startCursor)
 
         meta.global.minTimestamp = timestampBoundaries.min.getTime()
 
@@ -82,12 +80,7 @@ export function addHistoricalEventsExportCapability(
             intraIntervalOffset = 0
 
             // This ensures we never process an interval twice
-            const incrementedCursor = await postgresIncrement(
-                hub.db,
-                pluginConfig.id,
-                TIMESTAMP_CURSOR_KEY,
-                EVENTS_TIME_INTERVAL
-            )
+            const incrementedCursor = await meta.utils.cursor.increment(TIMESTAMP_CURSOR_KEY, EVENTS_TIME_INTERVAL)
 
             const progress = Math.round(
                 ((incrementedCursor - meta.global.minTimestamp) /
