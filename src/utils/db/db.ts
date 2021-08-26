@@ -354,7 +354,7 @@ export class DB {
     public redisLPop(key: string, count: number): Promise<string[]> {
         return instrumentQuery(this.statsd, 'query.redisLPop', undefined, async () => {
             const client = await this.redisPool.acquire()
-            const timeout = timeoutGuard('LRANGE delayed. Waiting over 30 sec to perform LRANGE', {
+            const timeout = timeoutGuard('LPOP delayed. Waiting over 30 sec to perform LRANGE', {
                 key,
                 count,
             })
