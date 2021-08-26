@@ -1,3 +1,5 @@
+import { QueryResult } from 'pg'
+
 import { PluginConfig } from '../../../types'
 import { DB } from '../../../utils/db/db'
 
@@ -41,7 +43,11 @@ export const postgresSetOnce = async (
     )
 }
 
-export const postgresGet = async (db: DB, pluginConfigId: PluginConfig['id'], key: string) => {
+export const postgresGet = async (
+    db: DB,
+    pluginConfigId: PluginConfig['id'],
+    key: string
+): Promise<QueryResult<any>> => {
     return await db.postgresQuery(
         'SELECT * FROM posthog_pluginstorage WHERE "plugin_config_id"=$1 AND "key"=$2 LIMIT 1',
         [pluginConfigId, key],
