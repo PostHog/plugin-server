@@ -1,6 +1,6 @@
 {
     "name": "@posthog/plugin-server",
-    "version": "1.4.0",
+    "version": "1.4.2",
     "description": "PostHog Plugin Server",
     "types": "dist/index.d.ts",
     "main": "dist/index.js",
@@ -57,7 +57,7 @@
         "@posthog/clickhouse": "^1.7.0",
         "@posthog/piscina": "^3.2.0-posthog",
         "@posthog/plugin-contrib": "^0.0.5",
-        "@posthog/plugin-scaffold": "0.12.5",
+        "@posthog/plugin-scaffold": "0.12.9",
         "@sentry/node": "^6.7.0",
         "@sentry/tracing": "^6.7.0",
         "@types/lru-cache": "^5.1.0",
