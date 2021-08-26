@@ -1100,7 +1100,7 @@ describe('exportEvents', () => {
             Object.keys(vm.methods)
                 .filter((m) => !!vm.methods[m as keyof typeof vm.methods])
                 .sort()
-        ).toEqual(['exportEvents', 'onEvent', 'teardownPlugin'])
+        ).toEqual(expect.arrayContaining(['exportEvents', 'onEvent', 'teardownPlugin', 'setupPlugin']))
     })
 
     test('retries', async () => {
