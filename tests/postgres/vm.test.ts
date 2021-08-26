@@ -604,10 +604,8 @@ test('meta.utils.cursor init/increment', async () => {
             await utils.cursor.init('my_cursor', 10)
         }
         async function processEvent (event, { utils }) {
-            const before = await utils.cursor.get('my_cursor')
             const after = await utils.cursor.increment('my_cursor', 10)
-            event.properties['before'] = before
-            event.properties['after'] = after
+            event.properties['after_increment'] = after
             return event
         }
     `
@@ -620,12 +618,10 @@ test('meta.utils.cursor init/increment', async () => {
     }
 
     await vm.methods.processEvent!(event)
-    expect(event.properties!['before']).toEqual(10)
-    expect(event.properties!['after']).toEqual(20)
+    expect(event.properties!['after_increment']).toEqual(20)
 
     await vm.methods.processEvent!(event)
-    expect(event.properties!['before']).toEqual(20)
-    expect(event.properties!['after']).toEqual(30)
+    expect(event.properties!['after_increment']).toEqual(30)
 })
 
 test('console.log', async () => {

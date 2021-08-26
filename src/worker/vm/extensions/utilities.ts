@@ -4,7 +4,6 @@ import { postgresGet, postgresIncrement, postgresSetOnce } from './utils'
 interface CursorUtils {
     init: (key: string, initialValue?: number) => Promise<void>
     increment: (key: string, incrementBy?: number) => Promise<number>
-    get: (key: string) => Promise<number | null>
 }
 
 interface UtilsExtension {
@@ -34,14 +33,6 @@ export function createUtils(server: Hub, pluginConfigId: number): UtilsExtension
             }
             const cursor = await postgresIncrement(server.db, pluginConfigId, key, incrementBy)
             return Number(cursor)
-        },
-        get: async function (key) {
-            try {
-                const cursor = (await postgresGet(server.db, pluginConfigId, key)).rows[0].value
-                return Number(cursor)
-            } catch {
-                return null
-            }
         },
     }
 
