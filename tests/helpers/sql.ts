@@ -40,6 +40,11 @@ export async function resetTestDatabase(
     } catch {}
 
     await db.query(`
+        DELETE FROM posthog_personalapikey;
+        DELETE FROM posthog_featureflag;
+        DELETE FROM posthog_annotation;
+        DELETE FROM posthog_dashboarditem;
+        DELETE FROM posthog_dashboard;
         DELETE FROM posthog_cohortpeople;
         DELETE FROM posthog_cohort;
         DELETE FROM posthog_actionstep;
@@ -160,6 +165,8 @@ export async function createUserTeamAndOrganization(
         setup_section_2_completed: true,
         for_internal_metrics: false,
         available_features: [],
+        domain_whitelist: [],
+        is_member_join_email_enabled: false,
     } as RawOrganization)
     await insertRow(db, 'posthog_organizationmembership', {
         id: organizationMembershipId,

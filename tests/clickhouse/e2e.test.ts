@@ -14,6 +14,7 @@ import { delayUntilEventIngested } from '../shared/process-event'
 
 const { console: testConsole } = writeToFile
 
+jest.mock('../../src/utils/status')
 jest.setTimeout(60000) // 60 sec timeout
 
 const extraServerConfig: Partial<PluginsServerConfig> = {
@@ -118,6 +119,8 @@ describe('e2e clickhouse ingestion', () => {
         await hub.kafkaProducer?.flush()
         await delayUntilEventIngested(() => hub.db.fetchEvents())
         await delayUntilEventIngested(() => hub.db.fetchPluginLogEntries())
+
+        await delay(2000)
 
         const pluginLogEntries = await getLogsSinceStart()
         expect(

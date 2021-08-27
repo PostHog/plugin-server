@@ -51,7 +51,6 @@ describe('e2e postgres ingestion', () => {
                 CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
                 LOG_LEVEL: LogLevel.Log,
                 KAFKA_ENABLED: false,
-                PLUGIN_SERVER_ACTION_MATCHING: 2,
             },
             makePiscina
         )
@@ -120,7 +119,6 @@ describe('e2e postgres ingestion', () => {
         await delayUntilEventIngested(async () =>
             (await getLogsSinceStart()).filter(({ message }) => message.includes('amogus'))
         )
-
         const pluginLogEntries = await getLogsSinceStart()
         expect(
             pluginLogEntries.filter(({ message, type }) => message.includes('amogus') && type === 'INFO').length

@@ -44,13 +44,64 @@ import {
     castTimestampOrNow,
     clickHouseTimestampToISO,
     escapeClickHouseString,
+    RaceConditionError,
     sanitizeSqlIdentifier,
     tryTwice,
     UUID,
     UUIDT,
 } from '../utils'
 import { KafkaProducerWrapper } from './kafka-producer-wrapper'
-import { chainToElements, hashElements, timeoutGuard, unparsePersonPartial } from './utils'
+import { PostgresLogsWrapper } from './postgres-logs-wrapper'
+import {
+    chainToElements,
+    generatePostgresValuesString,
+    hashElements,
+    timeoutGuard,
+    unparsePersonPartial,
+} from './utils'
+
+export interface LogEntryPayload {
+    pluginConfig: PluginConfig
+    source: PluginLogEntrySource
+    type: PluginLogEntryType
+    message: string
+    instanceId: UUID
+    timestamp?: string | null
+}
+
+export interface ParsedLogEntry {
+    id: string
+    team_id: number
+    plugin_id: number
+    plugin_config_id: number
+    timestamp: string
+    source: PluginLogEntrySource
+    type: PluginLogEntryType
+    message: string
+    instance_id: string
+}
+
+export interface CreateUserPayload {
+    uuid: UUIDT
+    password: string
+    first_name: string
+    last_name: string
+    email: string
+    distinct_id: string
+    is_staff: boolean
+    is_active: boolean
+    date_joined: Date
+    events_column_config: Record<string, string> | null
+    organization_id?: RawOrganization['id']
+}
+
+export interface CreatePersonalApiKeyPayload {
+    id: string
+    user_id: number
+    label: string
+    value: string
+    created_at: Date
+}
 
 /** The recommended way of accessing the database. */
 export class DB {
@@ -67,6 +118,9 @@ export class DB {
     /** StatsD instance used to do instrumentation */
     statsd: StatsD | undefined
 
+    /** A buffer for Postgres logs to prevent too many log insert ueries */
+    postgresLogsWrapper: PostgresLogsWrapper
+
     constructor(
         postgres: Pool,
         redisPool: GenericPool<Redis.Redis>,
@@ -79,6 +133,7 @@ export class DB {
         this.kafkaProducer = kafkaProducer
         this.clickhouse = clickhouse
         this.statsd = statsd
+        this.postgresLogsWrapper = new PostgresLogsWrapper(this)
     }
 
     // Postgres
@@ -222,8 +277,40 @@ export class DB {
             const client = await this.redisPool.acquire()
             const timeout = timeoutGuard('LPushing redis key delayed. Waiting over 30 sec to lpush key', { key })
             try {
-                const serializedValue = jsonSerialize ? JSON.stringify(value) : (value as string)
+                const serializedValue = jsonSerialize ? JSON.stringify(value) : (value as string | string[])
                 return await client.lpush(key, serializedValue)
+            } finally {
+                clearTimeout(timeout)
+                await this.redisPool.release(client)
+            }
+        })
+    }
+
+    public redisLRange(key: string, startIndex: number, endIndex: number): Promise<string[]> {
+        return instrumentQuery(this.statsd, 'query.redisLRange', undefined, async () => {
+            const client = await this.redisPool.acquire()
+            const timeout = timeoutGuard('LRANGE delayed. Waiting over 30 sec to perform LRANGE', {
+                key,
+                startIndex,
+                endIndex,
+            })
+            try {
+                return await client.lrange(key, startIndex, endIndex)
+            } finally {
+                clearTimeout(timeout)
+                await this.redisPool.release(client)
+            }
+        })
+    }
+
+    public redisLLen(key: string): Promise<number> {
+        return instrumentQuery(this.statsd, 'query.redisLLen', undefined, async () => {
+            const client = await this.redisPool.acquire()
+            const timeout = timeoutGuard('LLEN delayed. Waiting over 30 sec to perform LLEN', {
+                key,
+            })
+            try {
+                return await client.llen(key)
             } finally {
                 clearTimeout(timeout)
                 await this.redisPool.release(client)
@@ -240,6 +327,39 @@ export class DB {
             })
             try {
                 return await client.brpop(key1, key2)
+            } finally {
+                clearTimeout(timeout)
+                await this.redisPool.release(client)
+            }
+        })
+    }
+
+    public redisLRem(key: string, count: number, elementKey: string): Promise<number> {
+        return instrumentQuery(this.statsd, 'query.redisLRem', undefined, async () => {
+            const client = await this.redisPool.acquire()
+            const timeout = timeoutGuard('LREM delayed. Waiting over 30 sec to perform LRANGE', {
+                key,
+                count,
+                elementKey,
+            })
+            try {
+                return await client.lrem(key, count, elementKey)
+            } finally {
+                clearTimeout(timeout)
+                await this.redisPool.release(client)
+            }
+        })
+    }
+
+    public redisLPop(key: string, count: number): Promise<string[]> {
+        return instrumentQuery(this.statsd, 'query.redisLPop', undefined, async () => {
+            const client = await this.redisPool.acquire()
+            const timeout = timeoutGuard('LPOP delayed. Waiting over 30 sec to perform LRANGE', {
+                key,
+                count,
+            })
+            try {
+                return await client.lpop(key, count)
             } finally {
                 clearTimeout(timeout)
                 await this.redisPool.release(client)
@@ -435,36 +555,29 @@ export class DB {
 
     public async deletePerson(person: Person): Promise<void> {
         await this.postgresTransaction(async (client) => {
-            await client.query('DELETE FROM posthog_persondistinctid WHERE person_id = $1', [person.id])
-            await client.query('DELETE FROM posthog_person WHERE id = $1', [person.id])
+            await client.query('DELETE FROM posthog_person WHERE team_id = $1 AND id = $2', [person.team_id, person.id])
         })
-        if (this.clickhouse) {
-            if (this.kafkaProducer) {
-                await this.kafkaProducer.queueMessage({
-                    topic: KAFKA_PERSON,
-                    messages: [
-                        {
-                            value: Buffer.from(
-                                JSON.stringify({
-                                    created_at: castTimestampOrNow(
-                                        person.created_at,
-                                        TimestampFormat.ClickHouseSecondPrecision
-                                    ),
-                                    properties: JSON.stringify(person.properties),
-                                    team_id: person.team_id,
-                                    is_identified: person.is_identified,
-                                    id: person.uuid,
-                                    is_deleted: 1,
-                                })
-                            ),
-                        },
-                    ],
-                })
-            }
-
-            await this.clickhouseQuery(
-                `ALTER TABLE person_distinct_id DELETE WHERE person_id = '${escapeClickHouseString(person.uuid)}'`
-            )
+        if (this.kafkaProducer) {
+            await this.kafkaProducer.queueMessage({
+                topic: KAFKA_PERSON,
+                messages: [
+                    {
+                        value: Buffer.from(
+                            JSON.stringify({
+                                created_at: castTimestampOrNow(
+                                    person.created_at,
+                                    TimestampFormat.ClickHouseSecondPrecision
+                                ),
+                                properties: JSON.stringify(person.properties),
+                                team_id: person.team_id,
+                                is_identified: person.is_identified,
+                                id: person.uuid,
+                                is_deleted: 1,
+                            })
+                        ),
+                    },
+                ],
+            })
         }
     }
 
@@ -479,14 +592,19 @@ export class DB {
         if (database === Database.ClickHouse) {
             return (
                 await this.clickhouseQuery(
-                    `SELECT * FROM person_distinct_id WHERE person_id='${escapeClickHouseString(
-                        person.uuid
-                    )}' and team_id='${person.team_id}' ORDER BY id`
+                    `
+                        SELECT *
+                        FROM person_distinct_id
+                        FINAL
+                        WHERE person_id='${escapeClickHouseString(person.uuid)}'
+                          AND team_id='${person.team_id}'
+                          AND is_deleted=0
+                        ORDER BY _offset`
                 )
             ).data as ClickHousePersonDistinctId[]
         } else if (database === Database.Postgres) {
             const result = await this.postgresQuery(
-                'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 and team_id=$2 ORDER BY id',
+                'SELECT * FROM posthog_persondistinctid WHERE person_id=$1 AND team_id=$2 ORDER BY id',
                 [person.id, person.team_id],
                 'fetchDistinctIds'
             )
@@ -514,33 +632,87 @@ export class DB {
         distinctId: string
     ): Promise<ProducerRecord | void> {
         const insertResult = await client.query(
-            'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3) RETURNING *',
+            'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING *',
             [distinctId, person.id, person.team_id]
         )
+
+        // some other thread already added this ID
+        if (insertResult.rows.length === 0) {
+            return
+        }
 
         const personDistinctIdCreated = insertResult.rows[0] as PersonDistinctId
         if (this.kafkaProducer) {
             return {
                 topic: KAFKA_PERSON_UNIQUE_ID,
                 messages: [
-                    { value: Buffer.from(JSON.stringify({ ...personDistinctIdCreated, person_id: person.uuid })) },
+                    {
+                        value: Buffer.from(
+                            JSON.stringify({ ...personDistinctIdCreated, person_id: person.uuid, is_deleted: 0 })
+                        ),
+                    },
                 ],
             }
         }
     }
 
-    public async moveDistinctId(personDistinctId: PersonDistinctId, moveToPerson: Person): Promise<void> {
-        await this.postgresQuery(
-            `UPDATE posthog_persondistinctid SET person_id = $1 WHERE id = $2`,
-            [moveToPerson.id, personDistinctId.id],
-            'updateDistinctIdPerson'
-        )
+    public async moveDistinctIds(source: Person, target: Person): Promise<void> {
+        let movedDistinctIdResult: QueryResult<any> | null = null
+        try {
+            movedDistinctIdResult = await this.postgresQuery(
+                `
+                    UPDATE posthog_persondistinctid
+                    SET person_id = $1
+                    WHERE person_id = $2
+                      AND team_id = $3
+                    RETURNING *
+                `,
+                [target.id, source.id, target.team_id],
+                'updateDistinctIdPerson'
+            )
+        } catch (error) {
+            if (
+                error.message.includes(
+                    'insert or update on table "posthog_persondistinctid" violates foreign key constraint'
+                )
+            ) {
+                // this is caused by a race condition where the _target_ person was deleted after fetching but
+                // before the update query ran and will trigger a retry with updated persons
+                throw new RaceConditionError(
+                    'Failed trying to move distinct IDs because target person no longer exists.'
+                )
+            }
+
+            throw error
+        }
+
+        // this is caused by a race condition where the _source_ person was deleted after fetching but
+        // before the update query ran and will trigger a retry with updated persons
+        if (movedDistinctIdResult.rows.length === 0) {
+            throw new RaceConditionError(
+                `Failed trying to move distinct IDs because the source person no longer exists.`
+            )
+        }
+
         if (this.kafkaProducer) {
-            const clickhouseModel: ClickHousePersonDistinctId = { ...personDistinctId, person_id: moveToPerson.uuid }
-            await this.kafkaProducer.queueMessage({
-                topic: KAFKA_PERSON_UNIQUE_ID,
-                messages: [{ value: Buffer.from(JSON.stringify(clickhouseModel)) }],
-            })
+            for (const row of movedDistinctIdResult.rows) {
+                const { id, ...usefulColumns } = row
+                await this.kafkaProducer.queueMessage({
+                    topic: KAFKA_PERSON_UNIQUE_ID,
+                    messages: [
+                        {
+                            value: Buffer.from(
+                                JSON.stringify({ ...usefulColumns, person_id: target.uuid, is_deleted: 0 })
+                            ),
+                        },
+                        {
+                            value: Buffer.from(
+                                JSON.stringify({ ...usefulColumns, person_id: source.uuid, is_deleted: 1 })
+                            ),
+                        },
+                    ],
+                })
+            }
         }
     }
 
@@ -669,26 +841,52 @@ export class DB {
         try {
             await this.postgresTransaction(async (client) => {
                 const insertResult = await client.query(
-                    'INSERT INTO posthog_elementgroup (hash, team_id) VALUES ($1, $2) RETURNING *',
+                    'INSERT INTO posthog_elementgroup (hash, team_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING *',
                     [hash, teamId]
                 )
-                const elementGroup = insertResult.rows[0] as ElementGroup
-                for (const element of cleanedElements) {
+
+                if (insertResult.rows.length > 0) {
+                    const ELEMENTS_TABLE_COLUMN_COUNT = 11
+                    const elementGroup = insertResult.rows[0] as ElementGroup
+                    const values = []
+                    const rowStrings = []
+
+                    for (let rowIndex = 0; rowIndex < cleanedElements.length; ++rowIndex) {
+                        const {
+                            text,
+                            tag_name,
+                            href,
+                            attr_id,
+                            nth_child,
+                            nth_of_type,
+                            attributes,
+                            order,
+                            event_id,
+                            attr_class,
+                        } = cleanedElements[rowIndex]
+
+                        rowStrings.push(generatePostgresValuesString(ELEMENTS_TABLE_COLUMN_COUNT, rowIndex))
+
+                        values.push(
+                            text,
+                            tag_name,
+                            href,
+                            attr_id,
+                            nth_child,
+                            nth_of_type,
+                            attributes || {},
+                            order,
+                            event_id,
+                            attr_class,
+                            elementGroup.id
+                        )
+                    }
+
                     await client.query(
-                        'INSERT INTO posthog_element (text, tag_name, href, attr_id, nth_child, nth_of_type, attributes, "order", event_id, attr_class, group_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-                        [
-                            element.text,
-                            element.tag_name,
-                            element.href,
-                            element.attr_id,
-                            element.nth_child,
-                            element.nth_of_type,
-                            element.attributes || '{}',
-                            element.order,
-                            element.event_id,
-                            element.attr_class,
-                            elementGroup.id,
-                        ]
+                        `INSERT INTO posthog_element (text, tag_name, href, attr_id, nth_child, nth_of_type, attributes, "order", event_id, attr_class, group_id) VALUES ${rowStrings.join(
+                            ', '
+                        )}`,
+                        values
                     )
                 }
             })
@@ -714,43 +912,19 @@ export class DB {
         }
     }
 
-    public async createPluginLogEntry(
-        pluginConfig: PluginConfig,
-        source: PluginLogEntrySource,
-        type: PluginLogEntryType,
-        message: string,
-        instanceId: UUID,
-        timestamp: string = new Date().toISOString()
-    ): Promise<PluginLogEntry> {
-        const entry: PluginLogEntry = {
+    public async queuePluginLogEntry(entry: LogEntryPayload): Promise<void> {
+        const { pluginConfig, source, message, type, timestamp, instanceId } = entry
+
+        const parsedEntry = {
             id: new UUIDT().toString(),
             team_id: pluginConfig.team_id,
             plugin_id: pluginConfig.plugin_id,
             plugin_config_id: pluginConfig.id,
-            timestamp: timestamp.replace('T', ' ').replace('Z', ''),
+            timestamp: (timestamp || new Date().toISOString()).replace('T', ' ').replace('Z', ''),
             source,
             type,
             message,
             instance_id: instanceId.toString(),
-        }
-
-        try {
-            if (this.kafkaProducer) {
-                await this.kafkaProducer.queueMessage({
-                    topic: KAFKA_PLUGIN_LOG_ENTRIES,
-                    messages: [{ key: entry.id, value: Buffer.from(JSON.stringify(entry)) }],
-                })
-            } else {
-                await this.postgresQuery(
-                    'INSERT INTO posthog_pluginlogentry (id, team_id, plugin_id, plugin_config_id, timestamp, source,type, message, instance_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-                    Object.values(entry),
-                    'insertPluginLogEntry'
-                )
-            }
-        } catch (e) {
-            captureException(e)
-            console.error(entry)
-            console.error(e)
         }
 
         this.statsd?.increment(`logs.entries_created`, {
@@ -759,7 +933,49 @@ export class DB {
             plugin_id: pluginConfig.plugin_id.toString(),
         })
 
-        return entry
+        if (this.kafkaProducer) {
+            try {
+                await this.kafkaProducer.queueMessage({
+                    topic: KAFKA_PLUGIN_LOG_ENTRIES,
+                    messages: [{ key: parsedEntry.id, value: Buffer.from(JSON.stringify(parsedEntry)) }],
+                })
+            } catch (e) {
+                captureException(e)
+                console.error(parsedEntry)
+                console.error(e)
+            }
+        } else {
+            await this.postgresLogsWrapper.addLog(parsedEntry)
+        }
+    }
+
+    public async batchInsertPostgresLogs(entries: ParsedLogEntry[]): Promise<void> {
+        const LOG_ENTRY_COLUMN_COUNT = 9
+
+        const rowStrings: string[] = []
+        const values: any[] = []
+
+        for (let rowIndex = 0; rowIndex < entries.length; ++rowIndex) {
+            const { id, team_id, plugin_id, plugin_config_id, timestamp, source, type, message, instance_id } =
+                entries[rowIndex]
+
+            rowStrings.push(generatePostgresValuesString(LOG_ENTRY_COLUMN_COUNT, rowIndex))
+
+            values.push(id, team_id, plugin_id, plugin_config_id, timestamp, source, type, message, instance_id)
+        }
+        try {
+            await this.postgresQuery(
+                `INSERT INTO posthog_pluginlogentry
+                (id, team_id, plugin_id, plugin_config_id, timestamp, source, type, message, instance_id)
+                VALUES
+                ${rowStrings.join(', ')}`,
+                values,
+                'insertPluginLogEntries'
+            )
+        } catch (e) {
+            captureException(e)
+            console.error(e)
+        }
     }
 
     // EventDefinition
@@ -900,5 +1116,60 @@ export class DB {
 
     public async deleteRestHook(hookId: Hook['id']): Promise<void> {
         await this.postgresQuery(`DELETE FROM ee_hook WHERE id = $1`, [hookId], 'deleteRestHook')
+    }
+
+    public async createUser({
+        uuid,
+        password,
+        first_name,
+        last_name,
+        email,
+        distinct_id,
+        is_staff,
+        is_active,
+        date_joined,
+        events_column_config,
+        organization_id,
+    }: CreateUserPayload): Promise<QueryResult> {
+        const createUserResult = await this.postgresQuery(
+            `INSERT INTO posthog_user (uuid, password, first_name, last_name, email, distinct_id, is_staff, is_active, date_joined, events_column_config)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id`,
+            [
+                uuid.toString(),
+                password,
+                first_name,
+                last_name,
+                email,
+                distinct_id,
+                is_staff,
+                is_active,
+                date_joined.toISOString(),
+                events_column_config,
+            ],
+            'createUser'
+        )
+
+        if (organization_id) {
+            const now = new Date().toISOString()
+            await this.postgresQuery(
+                `INSERT INTO posthog_organizationmembership (id, organization_id, user_id, level, joined_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6)`,
+                [new UUIDT().toString(), organization_id, createUserResult.rows[0].id, 1, now, now],
+                'createOrganizationMembership'
+            )
+        }
+
+        return createUserResult
+    }
+
+    public async createPersonalApiKey({ id, user_id, label, value, created_at }: CreatePersonalApiKeyPayload) {
+        return await this.postgresQuery(
+            `INSERT INTO posthog_personalapikey (id, user_id, label, value, created_at)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING value`,
+            [id, user_id, label, value, created_at.toISOString()],
+            'createPersonalApiKey'
+        )
     }
 }

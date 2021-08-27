@@ -9,6 +9,7 @@ import { delay } from '../../src/utils/utils'
 import { createPluginConfigVM } from '../../src/worker/vm/vm'
 import { pluginConfig39 } from '../helpers/plugins'
 import { resetTestDatabase } from '../helpers/sql'
+import { plugin60 } from './../helpers/plugins'
 
 jest.mock('../../src/utils/celery/client')
 jest.mock('../../src/main/job-queues/job-queue-manager')
@@ -414,6 +415,7 @@ test('meta.cache set/get', async () => {
             return event
         }
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
@@ -432,7 +434,7 @@ test('meta.cache set/get', async () => {
     expect(event.properties!['counter']).toEqual(3)
 })
 
-test('meta.storage set/get', async () => {
+test('meta.storage set/get/del', async () => {
     const indexJs = `
         async function setupPlugin (meta) {
             await meta.storage.set('counter', -1)
@@ -449,9 +451,16 @@ test('meta.storage set/get', async () => {
             const counter = await meta.storage.get('counter', 999)
             await meta.storage.set('counter', counter + 1)
             event.properties['counter'] = counter + 1
+
+            await meta.storage.set('deleteme', 10)
+            await meta.storage.del('deleteme')
+            const deleteMeResult = await meta.storage.get('deleteme', null)
+            event.properties['deleteme'] = deleteMeResult
+
             return event
         }
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
@@ -462,6 +471,7 @@ test('meta.storage set/get', async () => {
 
     await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(1)
+    expect(event.properties!['deleteme']).toEqual(null)
 
     await vm.methods.processEvent!(event)
     expect(event.properties!['counter']).toEqual(2)
@@ -483,6 +493,7 @@ test('meta.cache expire', async () => {
             return event
         }
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
@@ -515,6 +526,7 @@ test('meta.cache set ttl', async () => {
             return event
         }
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
@@ -546,6 +558,7 @@ test('meta.cache incr', async () => {
             return event
         }
     `
+
     await resetTestDatabase(indexJs)
     const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
     const event: PluginEvent = {
@@ -564,9 +577,86 @@ test('meta.cache incr', async () => {
     expect(event.properties!['counter']).toEqual(3)
 })
 
-test('console.log', async () => {
-    jest.spyOn(hub.db, 'createPluginLogEntry')
+test('meta.cache lpush/lrange/llen', async () => {
+    const indexJs = `
+        async function setupPlugin (meta) {
+            await meta.cache.lpush('mylist', 'a string')
+            await meta.cache.lpush('mylist', ['an', 'array'])
 
+        }
+        async function processEvent (event, meta) {
+            const mylistBefore = await meta.cache.lrange('mylist', 0, 3)
+            const mylistLen = await meta.cache.llen('mylist')
+            event.properties['mylist_before'] = mylistBefore
+            event.properties['mylist_len'] = mylistLen
+            await meta.cache.expire('mylist', 0)
+            const mylistAfter = await meta.cache.lrange('mylist', 0, 3)
+            event.properties['mylist_after'] = mylistAfter
+            return event
+        }
+
+    `
+
+    await resetTestDatabase(indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'original event',
+        properties: {},
+    }
+
+    await vm.methods.processEvent!(event)
+    expect(event.properties!['mylist_before']).toEqual(expect.arrayContaining(['a string', 'an', 'array']))
+    expect(event.properties!['mylist_len']).toEqual(3)
+    expect(event.properties!['mylist_after']).toEqual([])
+})
+
+test('meta.cache lrem/lpop/lpush/lrange', async () => {
+    const indexJs = `
+        async function setupPlugin (meta) {
+            await meta.cache.lpush('mylist2', ['1', '2', '3'])
+
+        }
+        async function processEvent (event, meta) {
+            const mylistBefore = await meta.cache.lrange('mylist2', 0, 3)
+            event.properties['mylist_before'] = mylistBefore
+
+            const poppedElements = await meta.cache.lpop('mylist2', 1)
+            event.properties['popped_elements'] = poppedElements
+
+            const myListAfterLpop = await meta.cache.lrange('mylist2', 0, 3)
+            event.properties['mylist_after_lpop'] = myListAfterLpop
+
+            const removedElementsCount = await meta.cache.lrem('mylist2', 1, '2')
+            event.properties['removed_elements_count'] = removedElementsCount
+
+            const myListAfterLrem = await meta.cache.lrange('mylist2', 0, 3)
+            event.properties['mylist_after_lrem'] = myListAfterLrem
+
+            await meta.cache.expire('mylist2', 0)
+
+            return event
+        }
+
+    `
+
+    await resetTestDatabase(indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'original event',
+        properties: {},
+    }
+
+    await vm.methods.processEvent!(event)
+    expect(event.properties!['mylist_before']).toEqual(expect.arrayContaining(['1', '2', '3']))
+    expect(event.properties!['popped_elements']).toEqual(['3'])
+    expect(event.properties!['mylist_after_lpop']).toEqual(expect.arrayContaining(['1', '2']))
+    expect(event.properties!['removed_elements_count']).toEqual(1)
+    expect(event.properties!['mylist_after_lrem']).toEqual(['1'])
+})
+
+test('console.log', async () => {
     const indexJs = `
         async function processEvent (event, meta) {
             console.log(event.event)
@@ -574,7 +664,7 @@ test('console.log', async () => {
         }
     `
     await resetTestDatabase(indexJs)
-    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+    const vm = await createPluginConfigVM(hub, { ...pluginConfig39, plugin: plugin60 }, indexJs)
     const event: PluginEvent = {
         ...defaultEvent,
         event: 'logged event',
@@ -582,12 +672,23 @@ test('console.log', async () => {
 
     await vm.methods.processEvent!(event)
 
-    expect(hub.db.createPluginLogEntry).toHaveBeenCalledWith(
-        pluginConfig39,
-        'CONSOLE',
-        'LOG',
-        'logged event',
-        expect.anything()
+    await hub.db.postgresLogsWrapper.flushLogs()
+    const entries = await hub.db.fetchPluginLogEntries()
+
+    expect(entries).toEqual(
+        expect.arrayContaining([
+            expect.objectContaining({
+                id: expect.anything(),
+                instance_id: expect.anything(),
+                message: 'logged event',
+                plugin_config_id: 39,
+                plugin_id: 60,
+                source: 'CONSOLE',
+                team_id: 2,
+                timestamp: expect.anything(),
+                type: 'LOG',
+            }),
+        ])
     )
 })
 
@@ -653,6 +754,81 @@ test('fetch via require', async () => {
     expect(fetch).toHaveBeenCalledWith('https://google.com/results.json?query=fetched')
 
     expect(event.properties).toEqual({ count: 2, query: 'bla', results: [true, true] })
+})
+
+test('posthog.api', async () => {
+    const indexJs = `
+        async function processEvent (event, meta) {
+            event.properties = {}
+            const getResponse = await posthog.api.get('/api/event')
+            event.properties.get = await getResponse.json()
+            await posthog.api.get('/api/event', { data: { url: 'param' } })
+            await posthog.api.post('/api/event', { data: { a: 1 }})
+            await posthog.api.put('/api/event', { data: { b: 2 } })
+            await posthog.api.delete('/api/event')
+
+            // test auth defaults override
+            await posthog.api.get('/api/event', { projectApiKey: 'token', personalApiKey: 'secret' })
+            return event
+        }
+    `
+    await resetTestDatabase(indexJs)
+    const vm = await createPluginConfigVM(hub, pluginConfig39, indexJs)
+    const event: PluginEvent = {
+        ...defaultEvent,
+        event: 'fetched',
+    }
+
+    await vm.methods.processEvent!(event)
+
+    expect(event.properties?.get).toEqual({ hello: 'world' })
+    expect((fetch as any).mock.calls.length).toEqual(6)
+    expect((fetch as any).mock.calls).toEqual([
+        [
+            'https://app.posthog.com/api/event?token=THIS+IS+NOT+A+TOKEN+FOR+TEAM+2',
+            {
+                headers: { Authorization: expect.stringContaining('Bearer phx_') },
+                method: 'GET',
+            },
+        ],
+        [
+            'https://app.posthog.com/api/event?url=param&token=THIS+IS+NOT+A+TOKEN+FOR+TEAM+2',
+            {
+                headers: { Authorization: expect.stringContaining('Bearer phx_') },
+                method: 'GET',
+            },
+        ],
+        [
+            'https://app.posthog.com/api/event?token=THIS+IS+NOT+A+TOKEN+FOR+TEAM+2',
+            {
+                headers: { Authorization: expect.stringContaining('Bearer phx_') },
+                method: 'POST',
+                body: JSON.stringify({ a: 1 }),
+            },
+        ],
+        [
+            'https://app.posthog.com/api/event?token=THIS+IS+NOT+A+TOKEN+FOR+TEAM+2',
+            {
+                headers: { Authorization: expect.stringContaining('Bearer phx_') },
+                method: 'PUT',
+                body: JSON.stringify({ b: 2 }),
+            },
+        ],
+        [
+            'https://app.posthog.com/api/event?token=THIS+IS+NOT+A+TOKEN+FOR+TEAM+2',
+            {
+                headers: { Authorization: expect.stringContaining('Bearer phx_') },
+                method: 'DELETE',
+            },
+        ],
+        [
+            'https://app.posthog.com/api/event?token=token',
+            {
+                headers: { Authorization: 'Bearer secret' },
+                method: 'GET',
+            },
+        ],
+    ])
 })
 
 test('attachments', async () => {

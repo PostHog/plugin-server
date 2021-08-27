@@ -8,6 +8,7 @@ import { LazyPluginVM } from '../../src/worker/vm/lazy'
 import { createPluginConfigVM } from '../../src/worker/vm/vm'
 import { plugin60 } from '../helpers/plugins'
 import { disablePlugin } from '../helpers/sqlMock'
+import { PostgresLogsWrapper } from './../../src/utils/db/postgres-logs-wrapper'
 import { plugin70 } from './../helpers/plugins'
 
 jest.mock('../../src/worker/vm/vm')
@@ -24,11 +25,18 @@ const mockConfig = {
 
 describe('LazyPluginVM', () => {
     const createVM = () => new LazyPluginVM()
-    const mockServer: any = {
-        db: {
-            createPluginLogEntry: jest.fn(),
-        },
+    const baseDb = {
+        queuePluginLogEntry: jest.fn(),
+        batchInsertPostgresLogs: jest.fn(),
     }
+    const postgresLogsWrapper = new PostgresLogsWrapper(baseDb as any)
+
+    const db = {
+        ...baseDb,
+        postgresLogsWrapper,
+    }
+
+    const mockServer: any = { db }
     const initializeVm = (vm: LazyPluginVM) => vm.initialize!(mockServer, mockConfig as any, '', 'some plugin')
 
     const mockVM = {
@@ -65,12 +73,14 @@ describe('LazyPluginVM', () => {
 
             expect(status.info).toHaveBeenCalledWith('🔌', 'Loaded some plugin')
             expect(clearError).toHaveBeenCalledWith(mockServer, mockConfig)
-            expect(mockServer.db.createPluginLogEntry).toHaveBeenCalledWith(
-                mockConfig,
-                PluginLogEntrySource.System,
-                PluginLogEntryType.Info,
-                expect.stringContaining('Plugin loaded'),
-                undefined
+            expect(mockServer.db.queuePluginLogEntry).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    instanceId: undefined,
+                    message: expect.stringContaining('Plugin loaded'),
+                    pluginConfig: expect.anything(),
+                    source: PluginLogEntrySource.System,
+                    type: PluginLogEntryType.Info,
+                })
             )
         })
     })
@@ -78,6 +88,7 @@ describe('LazyPluginVM', () => {
     describe('VM creation fails', () => {
         const error = new Error()
         const retryError = new RetryError('I failed, please retry me!')
+        let vm = createVM()
         jest.useFakeTimers()
 
         const mockFailureConfig = {
@@ -87,10 +98,17 @@ describe('LazyPluginVM', () => {
             plugin: { ...plugin70 },
         }
 
+        beforeEach(() => {
+            vm = createVM()
+        })
+
+        afterEach(() => {
+            vm.clearRetryTimeoutIfExists()
+        })
+
         it('returns empty values for get methods', async () => {
             mocked(createPluginConfigVM).mockRejectedValue(error)
 
-            const vm = createVM()
             void initializeVm(vm)
 
             expect(await vm.getProcessEvent()).toEqual(null)
@@ -98,16 +116,17 @@ describe('LazyPluginVM', () => {
             expect(await vm.getTasks(PluginTaskType.Schedule)).toEqual({})
         })
 
-        it('vm init retries 15x with exponential backoff before disabling plugin', async () => {
+        it('vm init retries 10x with exponential backoff before disabling plugin', async () => {
             // throw a RetryError setting up the vm
-            mocked(createPluginConfigVM).mockRejectedValue(retryError)
+            mocked(createPluginConfigVM)
+                .mockRejectedValueOnce(new Error('I failed without retry, please retry me too!'))
+                .mockRejectedValue(retryError)
 
-            const vm = createVM()
             await vm.initialize!(mockServer, mockFailureConfig as any, 'some log info', 'failure plugin')
 
-            // try to initialize the vm 16 times (1 try + 15 retries)
+            // try to initialize the vm 11 times (1 try + 10 retries)
             await vm.resolveInternalVm
-            for (let i = 0; i < 16; ++i) {
+            for (let i = 0; i < 10; ++i) {
                 jest.runOnlyPendingTimers()
                 await vm.resolveInternalVm
 
@@ -117,7 +136,7 @@ describe('LazyPluginVM', () => {
 
             // plugin setup is retried 15 times with exponential backoff
             expect((status.warn as any).mock.calls).toEqual([
-                ['⚠️', 'I failed, please retry me!'],
+                ['⚠️', 'I failed without retry, please retry me too!'],
                 ['⚠️', 'Failed to load failure plugin. Retrying in 3 s.'],
                 ['⚠️', 'I failed, please retry me!'],
                 ['⚠️', 'Failed to load failure plugin. Retrying in 6 s.'],
@@ -151,7 +170,6 @@ describe('LazyPluginVM', () => {
             // throw a RetryError setting up the vm
             mocked(createPluginConfigVM).mockRejectedValueOnce(retryError)
 
-            const vm = createVM()
             await vm.initialize!(mockServer, mockFailureConfig as any, 'some log info', 'failure plugin')
             await vm.resolveInternalVm
 

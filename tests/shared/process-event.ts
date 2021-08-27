@@ -11,6 +11,7 @@ import { delay, UUIDT } from '../../src/utils/utils'
 import { EventProcessingResult, EventsProcessor } from '../../src/worker/ingestion/process-event'
 import { createUserTeamAndOrganization, getFirstTeam, getTeams, onQuery, resetTestDatabase } from '../helpers/sql'
 
+jest.mock('../../src/utils/status')
 jest.setTimeout(600000) // 600 sec timeout.
 
 export async function delayUntilEventIngested(
@@ -144,7 +145,7 @@ export const createProcessEventTests = (
 
         await hub.db.updatePerson(p0, { created_at: DateTime.fromISO('2020-01-01T00:00:00Z') })
 
-        const p1 = await createPerson(hub, team, ['person_1'], { $os: 'Chrome' })
+        const p1 = await createPerson(hub, team, ['person_1'], { $os: 'Chrome', $browser: 'Chrome' })
         if (database === 'clickhouse') {
             await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse), 2)
         }
@@ -164,18 +165,21 @@ export const createProcessEventTests = (
             new UUIDT().toString()
         )
 
-        await createPerson(hub, team, ['person_2'], { $os: 'Apple', $browser: 'MS Edge' })
-        await createPerson(hub, team, ['person_3'], { $os: 'PlayStation' })
-
         if (database === 'clickhouse') {
-            await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse), 4)
-            expect((await hub.db.fetchPersons(Database.ClickHouse)).length).toEqual(4)
+            await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse), 2)
+            expect((await hub.db.fetchPersons(Database.ClickHouse)).length).toEqual(2)
         }
 
-        expect((await hub.db.fetchPersons()).length).toEqual(4)
-        const [person0, person1, person2, person3] = await hub.db.fetchPersons()
+        expect((await hub.db.fetchPersons()).length).toEqual(2)
+        const [person0, person1] = await hub.db.fetchPersons()
 
-        await eventsProcessor.mergePeople(person0, [person1, person2, person3])
+        await eventsProcessor.mergePeople({
+            mergeInto: person0,
+            mergeIntoDistinctId: 'person_0',
+            otherPerson: person1,
+            otherPersonDistinctId: 'person_1',
+            totalMergeAttempts: 0,
+        })
 
         if (database === 'clickhouse') {
             await delayUntilEventIngested(async () =>
@@ -188,8 +192,8 @@ export const createProcessEventTests = (
 
         const [person] = await hub.db.fetchPersons()
 
-        expect(person.properties).toEqual({ $os: 'Microsoft', $browser: 'MS Edge' })
-        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['person_0', 'person_1', 'person_2', 'person_3'])
+        expect(person.properties).toEqual({ $os: 'Microsoft', $browser: 'Chrome' })
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['person_0', 'person_1'])
         expect(person.created_at.toISO()).toEqual(DateTime.fromISO('2019-07-01T00:00:00Z').setZone('UTC').toISO())
     })
 
@@ -237,7 +241,7 @@ export const createProcessEventTests = (
         if (database === 'clickhouse') {
             expect(queryCounter).toBe(10 + 14 /* event & prop definitions */)
         } else if (database === 'postgresql') {
-            expect(queryCounter).toBe(14 + 14 /* event & prop definitions */)
+            expect(queryCounter).toBe(13 + 14 /* event & prop definitions */)
         }
 
         let persons = await hub.db.fetchPersons()
@@ -941,6 +945,27 @@ export const createProcessEventTests = (
         expect(event.session_id).toEqual('abcf-efg')
         expect(event.distinct_id).toEqual('some-id')
         expect(event.snapshot_data).toEqual({ timestamp: 123 })
+    })
+
+    test('$snapshot event creates new person if needed', async () => {
+        await eventsProcessor.processEvent(
+            'some_new_id',
+            '',
+            '',
+            {
+                event: '$snapshot',
+                properties: { $session_id: 'abcf-efg', $snapshot_data: { timestamp: 123 } },
+            } as any as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+        await delayUntilEventIngested(() => hub.db.fetchPersons())
+
+        const persons = await hub.db.fetchPersons()
+
+        expect(persons.length).toEqual(1)
     })
 
     test('identify set', async () => {

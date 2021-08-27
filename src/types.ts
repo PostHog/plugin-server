@@ -21,6 +21,7 @@ import { HookCommander } from './worker/ingestion/hooks'
 import { OrganizationManager } from './worker/ingestion/organization-manager'
 import { EventsProcessor } from './worker/ingestion/process-event'
 import { TeamManager } from './worker/ingestion/team-manager'
+import { PluginsApiKeyManager } from './worker/vm/extensions/helpers/api-key-manager'
 import { LazyPluginVM } from './worker/vm/lazy'
 
 export enum LogLevel {
@@ -98,7 +99,6 @@ export interface PluginsServerConfig extends Record<string, any> {
     CRASH_IF_NO_PERSISTENT_JOB_QUEUE: boolean
     STALENESS_RESTART_SECONDS: number
     CAPTURE_INTERNAL_METRICS: boolean
-    PLUGIN_SERVER_ACTION_MATCHING: 0 | 1 | 2
     PISCINA_USE_ATOMICS: boolean
     PISCINA_ATOMICS_TIMEOUT: number
 }
@@ -129,6 +129,7 @@ export interface Hub extends PluginsServerConfig {
     // tools
     teamManager: TeamManager
     organizationManager: OrganizationManager
+    pluginsApiKeyManager: PluginsApiKeyManager
     actionManager: ActionManager
     actionMatcher: ActionMatcher
     hookCannon: HookCommander
@@ -487,10 +488,10 @@ export interface PersonDistinctId {
 
 /** ClickHouse PersonDistinctId model. */
 export interface ClickHousePersonDistinctId {
-    id: number
     team_id: number
     person_id: string
     distinct_id: string
+    is_deleted: 0 | 1
 }
 
 /** Usable Cohort model. */
@@ -683,3 +684,7 @@ export interface PropertyDefinitionType {
 }
 
 export type PluginFunction = 'onEvent' | 'processEvent' | 'onSnapshot' | 'pluginTask'
+
+export enum CeleryTriggeredJobOperation {
+    Start = 'start',
+}

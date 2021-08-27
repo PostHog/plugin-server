@@ -12,7 +12,6 @@ import {
     Event,
     Hub,
     Person,
-    PersonDistinctId,
     PostgresSessionRecordingEvent,
     SessionRecordingEvent,
     TeamId,
@@ -29,7 +28,7 @@ import {
     timeoutGuard,
 } from '../../utils/db/utils'
 import { status } from '../../utils/status'
-import { castTimestampOrNow, filterIncrementProperties, UUID, UUIDT } from '../../utils/utils'
+import { castTimestampOrNow, filterIncrementProperties, RaceConditionError, UUID, UUIDT } from '../../utils/utils'
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
@@ -100,6 +99,9 @@ export class EventsProcessor {
             })
             try {
                 await this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
+            } catch (e) {
+                console.error('handleIdentifyOrAlias failed', e, data)
+                Sentry.captureException(e, { extra: { event: data } })
             } finally {
                 clearTimeout(timeout1)
             }
@@ -116,7 +118,8 @@ export class EventsProcessor {
                         distinctId,
                         properties['$session_id'],
                         ts,
-                        properties['$snapshot_data']
+                        properties['$snapshot_data'],
+                        personUuid
                     )
                     this.pluginsServer.statsd?.timing('kafka_queue.single_save.snapshot', singleSaveTimer, {
                         team_id: teamId.toString(),
@@ -166,7 +169,7 @@ export class EventsProcessor {
                 try {
                     // timestamp and sent_at must both be in the same format: either both with or both without timezones
                     // otherwise we can't get a diff to add to now
-                    return now.plus(DateTime.fromISO(data['timestamp']).diff(sentAt))
+                    return now.plus(DateTime.fromJSDate(new Date(data['timestamp'])).diff(sentAt))
                 } catch (error) {
                     status.error('⚠️', 'Error when handling timestamp:', error)
                     Sentry.captureException(error, { extra: { data, now, sentAt } })
@@ -279,7 +282,8 @@ export class EventsProcessor {
         previousDistinctId: string,
         distinctId: string,
         teamId: number,
-        retryIfFailed = true
+        retryIfFailed = true,
+        totalMergeAttempts = 0
     ): Promise<void> {
         const oldPerson = await this.db.fetchPerson(teamId, previousDistinctId)
         const newPerson = await this.db.fetchPerson(teamId, distinctId)
@@ -288,7 +292,8 @@ export class EventsProcessor {
             try {
                 await this.db.addDistinctId(oldPerson, distinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
-            } catch {
+            } catch (error) {
+                Sentry.captureException(error)
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
@@ -302,7 +307,8 @@ export class EventsProcessor {
             try {
                 await this.db.addDistinctId(newPerson, previousDistinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
-            } catch {
+            } catch (error) {
+                Sentry.captureException(error)
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
@@ -318,7 +324,8 @@ export class EventsProcessor {
                     distinctId,
                     previousDistinctId,
                 ])
-            } catch {
+            } catch (error) {
+                Sentry.captureException(error)
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
                 if (retryIfFailed) {
@@ -330,67 +337,97 @@ export class EventsProcessor {
         }
 
         if (oldPerson && newPerson && oldPerson.id !== newPerson.id) {
-            await this.mergePeople(newPerson, [oldPerson])
+            await this.mergePeople({
+                totalMergeAttempts,
+                mergeInto: newPerson,
+                mergeIntoDistinctId: distinctId,
+                otherPerson: oldPerson,
+                otherPersonDistinctId: previousDistinctId,
+            })
         }
     }
 
-    public async mergePeople(mergeInto: Person, peopleToMerge: Person[]): Promise<void> {
+    public async mergePeople({
+        mergeInto,
+        mergeIntoDistinctId,
+        otherPerson,
+        otherPersonDistinctId,
+        totalMergeAttempts = 0,
+    }: {
+        mergeInto: Person
+        mergeIntoDistinctId: string
+        otherPerson: Person
+        otherPersonDistinctId: string
+        totalMergeAttempts: number
+    }): Promise<void> {
+        const teamId = mergeInto.team_id
+
         let firstSeen = mergeInto.created_at
 
         // Merge properties
-        for (const otherPerson of peopleToMerge) {
-            mergeInto.properties = { ...otherPerson.properties, ...mergeInto.properties }
-            if (otherPerson.created_at < firstSeen) {
-                // Keep the oldest created_at (i.e. the first time we've seen this person)
-                firstSeen = otherPerson.created_at
-            }
+        mergeInto.properties = { ...otherPerson.properties, ...mergeInto.properties }
+        if (otherPerson.created_at < firstSeen) {
+            // Keep the oldest created_at (i.e. the first time we've seen this person)
+            firstSeen = otherPerson.created_at
         }
 
         await this.db.updatePerson(mergeInto, { created_at: firstSeen, properties: mergeInto.properties })
 
         // Merge the distinct IDs
-        for (const otherPerson of peopleToMerge) {
-            await this.db.postgresQuery(
-                'UPDATE posthog_cohortpeople SET person_id = $1 WHERE person_id = $2',
-                [mergeInto.id, otherPerson.id],
-                'updateCohortPeople'
-            )
-            let failedAttempts = 0
-            // Retrying merging up to `MAX_FAILED_PERSON_MERGE_ATTEMPTS` times, in case race conditions occur.
-            // An example is a distinct ID being aliased in another plugin server instance,
-            // between `moveDistinctId` and `deletePerson` being called here
-            // – in such a case a distinct ID may be assigned to the person in the database
-            // AFTER `otherPersonDistinctIds` was fetched, so this function is not aware of it and doesn't merge it.
-            // That then causeds `deletePerson` to fail, because of foreign key constraints –
-            // the dangling distinct ID added elsewhere prevents the person from being deleted!
-            // This is low-probability so likely won't occur on second retry of this block.
-            // In the rare case of the person changing VERY often however, it may happen even a few times,
-            // in which case we'll bail and rethrow the error.
-            while (true) {
-                const otherPersonDistinctIds: PersonDistinctId[] = (
-                    await this.db.postgresQuery(
-                        'SELECT * FROM posthog_persondistinctid WHERE person_id = $1 AND team_id = $2',
-                        [otherPerson.id, mergeInto.team_id],
-                        'otherPersonDistinctIds'
-                    )
-                ).rows
-                for (const otherPersonDistinctId of otherPersonDistinctIds) {
-                    await this.db.moveDistinctId(otherPersonDistinctId, mergeInto)
+        await this.db.postgresQuery(
+            'UPDATE posthog_cohortpeople SET person_id = $1 WHERE person_id = $2',
+            [mergeInto.id, otherPerson.id],
+            'updateCohortPeople'
+        )
+        let failedAttempts = totalMergeAttempts
+        let shouldRetryAliasOperation = false
+
+        // Retrying merging up to `MAX_FAILED_PERSON_MERGE_ATTEMPTS` times, in case race conditions occur.
+        // An example is a distinct ID being aliased in another plugin server instance,
+        // between `moveDistinctId` and `deletePerson` being called here
+        // – in such a case a distinct ID may be assigned to the person in the database
+        // AFTER `otherPersonDistinctIds` was fetched, so this function is not aware of it and doesn't merge it.
+        // That then causeds `deletePerson` to fail, because of foreign key constraints –
+        // the dangling distinct ID added elsewhere prevents the person from being deleted!
+        // This is low-probability so likely won't occur on second retry of this block.
+        // In the rare case of the person changing VERY often however, it may happen even a few times,
+        // in which case we'll bail and rethrow the error.
+        while (true) {
+            try {
+                await this.db.moveDistinctIds(otherPerson, mergeInto)
+            } catch (error) {
+                Sentry.captureException(error, {
+                    extra: { mergeInto, mergeIntoDistinctId, otherPerson, otherPersonDistinctId },
+                })
+                failedAttempts++
+
+                // If a person was deleted in between fetching and moveDistinctId, re-run alias to ensure
+                // the updated persons are fetched and merged safely
+                if (error instanceof RaceConditionError && failedAttempts < MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
+                    shouldRetryAliasOperation = true
+                    break
                 }
-                try {
-                    await this.db.deletePerson(otherPerson)
-                    break // All OK, exiting retry loop
-                } catch (error) {
-                    if (!(error instanceof DatabaseError)) {
-                        throw error // Very much not OK, this is some completely unexpected error
-                    }
-                    failedAttempts++
-                    if (failedAttempts === MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
-                        throw error // Very much not OK, failed repeatedly so rethrowing the error
-                    }
-                    continue // Not OK, trying again to make sure that ALL distinct IDs are merged
-                }
+
+                throw error
             }
+
+            try {
+                await this.db.deletePerson(otherPerson)
+                break // All OK, exiting retry loop
+            } catch (error) {
+                if (!(error instanceof DatabaseError)) {
+                    throw error // Very much not OK, this is some completely unexpected error
+                }
+                failedAttempts++
+                if (failedAttempts === MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
+                    throw error // Very much not OK, failed repeatedly so rethrowing the error
+                }
+                continue // Not OK, trying again to make sure that ALL distinct IDs are merged
+            }
+        }
+
+        if (shouldRetryAliasOperation) {
+            await this.alias(otherPersonDistinctId, mergeIntoDistinctId, teamId, false, failedAttempts)
         }
     }
 
@@ -429,14 +466,7 @@ export class EventsProcessor {
             await this.teamManager.updateEventNamesAndProperties(teamId, event, properties)
         }
 
-        if (await this.personManager.isNewPerson(this.db, teamId, distinctId)) {
-            // Catch race condition where in between getting and creating, another request already created this user
-            try {
-                await this.db.createPerson(sentAt || DateTime.utc(), {}, teamId, null, false, personUuid.toString(), [
-                    distinctId,
-                ])
-            } catch {}
-        }
+        await this.createPersonIfDistinctIdIsNew(teamId, distinctId, sentAt || DateTime.utc(), personUuid)
 
         properties = personInitialAndUTMProperties(properties)
 
@@ -536,12 +566,15 @@ export class EventsProcessor {
         distinct_id: string,
         session_id: string,
         timestamp: DateTime | string,
-        snapshot_data: Record<any, any>
+        snapshot_data: Record<any, any>,
+        personUuid: string
     ): Promise<SessionRecordingEvent | PostgresSessionRecordingEvent> {
         const timestampString = castTimestampOrNow(
             timestamp,
             this.kafkaProducer ? TimestampFormat.ClickHouse : TimestampFormat.ISO
         )
+
+        await this.createPersonIfDistinctIdIsNew(team_id, distinct_id, DateTime.utc(), personUuid.toString())
 
         const data: SessionRecordingEvent = {
             uuid,
@@ -569,5 +602,22 @@ export class EventsProcessor {
             return eventCreated as PostgresSessionRecordingEvent
         }
         return data
+    }
+
+    private async createPersonIfDistinctIdIsNew(
+        teamId: number,
+        distinctId: string,
+        sentAt: DateTime,
+        personUuid: string
+    ): Promise<void> {
+        const isNewPerson = await this.personManager.isNewPerson(this.db, teamId, distinctId)
+        if (isNewPerson) {
+            // Catch race condition where in between getting and creating, another request already created this user
+            try {
+                await this.db.createPerson(sentAt, {}, teamId, null, false, personUuid.toString(), [distinctId])
+            } catch (error) {
+                Sentry.captureException(error, { extra: { teamId, distinctId, sentAt, personUuid } })
+            }
+        }
     }
 }
