@@ -93,6 +93,14 @@ export class EventsProcessor {
             if (data['$set_once']) {
                 properties['$set_once'] = { ...properties['$set_once'], ...data['$set_once'] }
             }
+            if (properties['$groups']) {
+                for (const [groupType, groupKey] of Object.entries(properties['$groups'])) {
+                    const groupTypeResult = await this.db.fetchGroupType(teamId, groupType)
+                    if (groupTypeResult) {
+                        properties[`$group_${groupTypeResult.type_id}`] = groupKey
+                    }
+                }
+            }
 
             const personUuid = new UUIDT().toString()
 
