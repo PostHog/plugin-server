@@ -8,7 +8,7 @@ import { ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 
-import { KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_PLUGIN_LOG_ENTRIES } from '../../config/kafka-topics'
+import { KAFKA_GROUPS, KAFKA_PERSON, KAFKA_PERSON_UNIQUE_ID, KAFKA_PLUGIN_LOG_ENTRIES } from '../../config/kafka-topics'
 import {
     Action,
     ActionEventPair,
@@ -23,6 +23,8 @@ import {
     ElementGroup,
     Event,
     EventDefinitionType,
+    GroupProperties,
+    GroupType,
     Hook,
     Person,
     PersonDistinctId,
@@ -1177,5 +1179,69 @@ export class DB {
             [id, user_id, label, value, created_at.toISOString()],
             'createPersonalApiKey'
         )
+    }
+
+    public async insertGroupType(teamId: number, groupType: string): Promise<number> {
+        const MAX_GROUP_TYPES_PER_TEAM = 5
+        const insertGroupResult = await this.postgresQuery(
+            `INSERT INTO posthog_grouptypemapping (type_id, type_key, team_id)
+                SELECT count(1) as type_id, $1 as type_key, $2 as team_id
+                FROM posthog_grouptypemapping 
+                WHERE team_id = $2
+                HAVING COALESCE(max(type_id) < ${MAX_GROUP_TYPES_PER_TEAM}, TRUE)
+            RETURNING type_id`,
+            [groupType, teamId],
+            'insertGroupType'
+        )
+
+        if (insertGroupResult.rows.length === 0) {
+            throw new Error('Tried to insert a group type but the limit has been reached')
+        }
+
+        return Number(insertGroupResult.rows[0].type_id)
+    }
+
+    public async fetchGroupType(teamId: number, groupTypeKey: string): Promise<GroupType | null> {
+        const fetchGroupTypeResult = await this.postgresQuery(
+            `SELECT * FROM posthog_grouptypemapping 
+            WHERE team_id = $1
+            AND type_key = $2`,
+            [teamId, groupTypeKey],
+            'fetchGroupType'
+        )
+
+        if (fetchGroupTypeResult.rows.length === 0) {
+            return null
+        }
+
+        return fetchGroupTypeResult.rows[0]
+    }
+
+    public async insertGroup(
+        teamId: number,
+        key: string,
+        typeId: number,
+        properties: Record<string, any>
+    ): Promise<void> {
+        if (!this.kafkaProducer) {
+            return
+        }
+
+        await this.kafkaProducer.queueMessage({
+            topic: KAFKA_GROUPS,
+            messages: [
+                {
+                    value: Buffer.from(
+                        JSON.stringify({
+                            id: key,
+                            type_id: typeId,
+                            team_id: teamId,
+                            properties: JSON.stringify(properties),
+                            created_at: castTimestampOrNow(DateTime.utc(), TimestampFormat.ClickHouseSecondPrecision),
+                        })
+                    ),
+                },
+            ],
+        })
     }
 }

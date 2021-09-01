@@ -10,6 +10,7 @@ import { KAFKA_EVENTS, KAFKA_SESSION_RECORDING_EVENTS } from '../../config/kafka
 import {
     Element,
     Event,
+    GroupProperties,
     Hub,
     Person,
     PostgresSessionRecordingEvent,
@@ -82,6 +83,8 @@ export class EventsProcessor {
 
         let result: EventProcessingResult | void
         try {
+            const eventName = data['event']
+
             // Sanitize values, even though `sanitizeEvent` should have gotten to them
             const properties: Properties = data.properties ?? {}
             if (data['$set']) {
@@ -98,7 +101,7 @@ export class EventsProcessor {
                 eventUuid,
             })
             try {
-                await this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
+                await this.handleIdentifyOrAlias(eventName, properties, distinctId, teamId)
             } catch (e) {
                 console.error('handleIdentifyOrAlias failed', e, data)
                 Sentry.captureException(e, { extra: { event: data } })
@@ -106,7 +109,11 @@ export class EventsProcessor {
                 clearTimeout(timeout1)
             }
 
-            if (data['event'] === '$snapshot') {
+            if (this.kafkaProducer && eventName === '$group') {
+                await this.group(teamId, properties['$group'])
+            }
+
+            if (eventName === '$snapshot') {
                 const timeout2 = timeoutGuard(
                     'Still running "createSessionRecordingEvent". Timeout warning after 30 sec!',
                     { eventUuid }
@@ -137,7 +144,7 @@ export class EventsProcessor {
                         ip,
                         siteUrl,
                         teamId,
-                        data['event'],
+                        eventName,
                         distinctId,
                         properties,
                         ts,
@@ -345,6 +352,22 @@ export class EventsProcessor {
                 otherPersonDistinctId: previousDistinctId,
             })
         }
+    }
+
+    private async group(teamId: number, groupProperties: GroupProperties): Promise<void> {
+        const { key: groupKey, type: groupType, $set: groupPropertiesToSet } = groupProperties
+
+        const existingGroupType = await this.db.fetchGroupType(teamId, groupType)
+
+        if (!existingGroupType) {
+            try {
+                await this.db.insertGroupType(teamId, groupType)
+            } catch (e) {
+                // expected, just log
+            }
+        }
+
+        await this.db.insertGroup(teamId, groupKey, existingGroupType!.type_id, groupPropertiesToSet || {})
     }
 
     public async mergePeople({

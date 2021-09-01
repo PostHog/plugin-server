@@ -688,3 +688,16 @@ export type PluginFunction = 'onEvent' | 'processEvent' | 'onSnapshot' | 'plugin
 export enum CeleryTriggeredJobOperation {
     Start = 'start',
 }
+
+export interface GroupType {
+    team_id: number
+    type_id: number
+    type_key: string
+}
+
+export interface GroupProperties {
+    type: string
+    key: string
+    $set?: Record<string, any>
+    $set_once?: Record<string, any>
+}
