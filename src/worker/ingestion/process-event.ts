@@ -362,20 +362,34 @@ export class EventsProcessor {
         }
     }
 
-    private async group(teamId: number, groupProperties: GroupProperties): Promise<void> {
+    private async group(teamId: number, groupProperties: GroupProperties, retry = true): Promise<void> {
         const { key: groupKey, type: groupType, $set: groupPropertiesToSet } = groupProperties
 
-        const existingGroupType = await this.db.fetchGroupType(teamId, groupType)
+        let groupTypeId = null
+        const groupTypeDetails = await this.db.fetchGroupType(teamId, groupType)
 
-        if (!existingGroupType) {
+        if (groupTypeDetails) {
+            groupTypeId = groupTypeDetails.type_id
+        } else {
             try {
-                await this.db.insertGroupType(teamId, groupType)
+                groupTypeId = await this.db.insertGroupType(teamId, groupType)
             } catch (e) {
-                // expected, just log
+                // race condition, group was created in between fetch and insert
+                if (!retry) {
+                    return
+                }
+                return await this.group(teamId, groupProperties, false)
             }
         }
 
-        await this.db.insertGroup(teamId, groupKey, existingGroupType!.type_id, groupPropertiesToSet || {})
+        try {
+            await this.db.insertGroup(teamId, groupKey, groupTypeId, groupPropertiesToSet || {})
+        } catch (e) {
+            if (!retry) {
+                return
+            }
+            return await this.group(teamId, groupProperties, false)
+        }
     }
 
     public async mergePeople({
