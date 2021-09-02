@@ -1725,7 +1725,7 @@ export const createProcessEventTests = (
         expect((await hub.db.fetchEvents()).length).toBe(1)
 
         const [event] = await hub.db.fetchEvents()
-        expect(event.properties['$groups']).toEqual({ type: 'company', key: 'Acme' })
+        expect(event.properties['$group']).toEqual({ type: 'company', key: 'Acme' })
 
         const [person] = await hub.db.fetchPersons()
         expect(person.properties).toEqual({ $active_company_0: 'Acme' })
