@@ -63,6 +63,7 @@ export async function resetTestDatabase(
         DELETE FROM posthog_plugin;
         DELETE FROM posthog_eventdefinition;
         DELETE FROM posthog_propertydefinition;
+        DELETE FROM posthog_grouptypemapping;
         DELETE FROM posthog_team;
         DELETE FROM posthog_organizationmembership;
         DELETE FROM posthog_organization;

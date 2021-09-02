@@ -96,8 +96,13 @@ export class EventsProcessor {
             if (properties['$groups']) {
                 for (const [groupType, groupKey] of Object.entries(properties['$groups'])) {
                     const groupTypeResult = await this.db.fetchGroupType(teamId, groupType)
+                    const groupsSet: Properties = {}
                     if (groupTypeResult) {
                         properties[`$group_${groupTypeResult.type_id}`] = groupKey
+                        groupsSet[`$active_group_${groupTypeResult.type_id}`] = groupKey
+                    }
+                    if (Object.keys(groupsSet).length) {
+                        properties['$set'] = { ...properties['$set'], ...groupsSet }
                     }
                 }
             }

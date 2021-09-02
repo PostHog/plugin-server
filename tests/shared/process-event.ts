@@ -1701,5 +1701,56 @@ export const createProcessEventTests = (
         expect(person.properties).toEqual({ a: 1, b: 2, c: 3, d: 4 })
     })
 
+    test('any event can do $set_once on props', async () => {
+        await createPerson(hub, team, ['distinct_id'])
+
+        await processEvent(
+            'distinct_id',
+            '',
+            '',
+            {
+                event: '$group',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $groups: { company: 'Acme' },
+                },
+            } as any as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect((await hub.db.fetchEvents()).length).toBe(1)
+
+        const [event] = await hub.db.fetchEvents()
+        expect(event.properties['$group']).toEqual({ company: 'Acme' })
+
+        const [person] = await hub.db.fetchPersons()
+        expect(person.properties).toEqual({ $active_company_0: 'Acme' })
+
+        await processEvent(
+            'distinct_id',
+            '',
+            '',
+            {
+                event: '$group',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id',
+                    $groups: { company: 'PostHog' },
+                },
+            } as any as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const [person2] = await hub.db.fetchPersons()
+        expect(person2.properties).toEqual({ $active_company_0: 'PostHog' })
+    })
+
     return returned
 }
