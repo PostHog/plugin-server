@@ -1226,7 +1226,6 @@ export class DB {
         if (!this.kafkaProducer) {
             return
         }
-
         await this.kafkaProducer.queueMessage({
             topic: KAFKA_GROUPS,
             messages: [
