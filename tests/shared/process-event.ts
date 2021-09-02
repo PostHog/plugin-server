@@ -1713,7 +1713,7 @@ export const createProcessEventTests = (
                 properties: {
                     token: team.api_token,
                     distinct_id: 'distinct_id',
-                    $groups: { company: 'Acme' },
+                    $groups: { type: 'company', key: 'Acme' },
                 },
             } as any as PluginEvent,
             team.id,
@@ -1725,7 +1725,7 @@ export const createProcessEventTests = (
         expect((await hub.db.fetchEvents()).length).toBe(1)
 
         const [event] = await hub.db.fetchEvents()
-        expect(event.properties['$group']).toEqual({ company: 'Acme' })
+        expect(event.properties['$group']).toEqual({ type: 'company', key: 'Acme' })
 
         const [person] = await hub.db.fetchPersons()
         expect(person.properties).toEqual({ $active_company_0: 'Acme' })
@@ -1739,7 +1739,7 @@ export const createProcessEventTests = (
                 properties: {
                     token: team.api_token,
                     distinct_id: 'distinct_id',
-                    $groups: { company: 'PostHog' },
+                    $groups: { type: 'company', key: 'PostHog' },
                 },
             } as any as PluginEvent,
             team.id,
