@@ -123,7 +123,7 @@ export class EventsProcessor {
             }
 
             if (this.kafkaProducer && eventName === '$group') {
-                await this.group(teamId, properties['$group'])
+                await this.group(teamId, properties['$groups'])
             }
 
             if (eventName === '$snapshot') {
