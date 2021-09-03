@@ -226,6 +226,7 @@ export const createProcessEventTests = (
                     $initial_referring_domain: 'https://google.com',
                     $initial_referrer_url: 'https://google.com/?q=posthog',
                     utm_medium: 'twitter',
+                    gclid: 'GOOGLE ADS ID',
                     $elements: [
                         { tag_name: 'a', nth_child: 1, nth_of_type: 2, attr__class: 'btn btn-sm' },
                         { tag_name: 'div', nth_child: 1, nth_of_type: 2, $el_text: '💻' },
@@ -252,6 +253,8 @@ export const createProcessEventTests = (
             $initial_current_url: 'https://test.com',
             $initial_os: 'Mac OS X',
             utm_medium: 'twitter',
+            $initial_gclid: 'GOOGLE ADS ID',
+            gclid: 'GOOGLE ADS ID',
         })
 
         // capture a second time to verify e.g. event_names is not ['$autocapture', '$autocapture']
