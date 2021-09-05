@@ -266,7 +266,6 @@ export class EventsProcessor {
                 updatedProperties[key] = value
             }
         })
-        updatedProperties = { ...updatedProperties, ...personFound.properties }
         Object.entries(properties).map(([key, value]) => {
             if (personFound?.properties[key] !== value) {
                 if (!returnedProps['$set']) {
