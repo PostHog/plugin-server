@@ -245,6 +245,7 @@ export const createProcessEventTests = (
         }
 
         let persons = await hub.db.fetchPersons()
+        let events = await hub.db.fetchEvents()
         expect(persons[0].properties).toEqual({
             $initial_browser: 'Chrome',
             $initial_browser_version: 80,
@@ -252,6 +253,26 @@ export const createProcessEventTests = (
             $initial_current_url: 'https://test.com',
             $initial_os: 'Mac OS X',
             utm_medium: 'twitter',
+        })
+        expect(events[0].properties).toEqual({
+            $ip: '127.0.0.1',
+            $os: 'Mac OS X',
+            $set: { utm_medium: 'twitter' },
+            token: 'THIS IS NOT A TOKEN FOR TEAM 2',
+            $browser: 'Chrome',
+            $set_once: {
+                $initial_os: 'Mac OS X',
+                $initial_browser: 'Chrome',
+                $initial_utm_medium: 'twitter',
+                $initial_current_url: 'https://test.com',
+                $initial_browser_version: 80,
+            },
+            utm_medium: 'twitter',
+            distinct_id: 2,
+            $current_url: 'https://test.com',
+            $browser_version: 80,
+            $initial_referrer_url: 'https://google.com/?q=posthog',
+            $initial_referring_domain: 'https://google.com',
         })
 
         // capture a second time to verify e.g. event_names is not ['$autocapture', '$autocapture']
@@ -266,6 +287,8 @@ export const createProcessEventTests = (
                     distinct_id: 2,
                     token: team.api_token,
                     utm_medium: 'instagram',
+                    $current_url: 'https://test.com/pricing',
+                    $browser: 'Firefox',
                     $elements: [
                         { tag_name: 'a', nth_child: 1, nth_of_type: 2, attr__class: 'btn btn-sm' },
                         { tag_name: 'div', nth_child: 1, nth_of_type: 2, $el_text: '💻' },
@@ -278,7 +301,7 @@ export const createProcessEventTests = (
             new UUIDT().toString()
         )
 
-        const events = await hub.db.fetchEvents()
+        events = await hub.db.fetchEvents()
         persons = await hub.db.fetchPersons()
         expect(events.length).toEqual(2)
         expect(persons.length).toEqual(1)
@@ -290,6 +313,10 @@ export const createProcessEventTests = (
             $initial_os: 'Mac OS X',
             utm_medium: 'instagram',
         })
+        expect(events[1].properties.$set).toEqual({
+            utm_medium: 'instagram',
+        })
+        expect(events[1].properties.$set_once).toBeUndefined()
 
         const [person] = persons
         const distinctIds = await hub.db.fetchDistinctIdValues(person)
@@ -310,6 +337,36 @@ export const createProcessEventTests = (
         } else if (database === 'postgresql') {
             expect(event.elements_hash).toEqual('0679137c0cd2408a2906839143e7a71f')
         }
+
+        // Don't update any props, set and set_once should be undefined
+        await processEvent(
+            '2',
+            '127.0.0.1',
+            '',
+            {
+                event: '$autocapture',
+                properties: {
+                    distinct_id: 2,
+                    token: team.api_token,
+                    utm_medium: 'instagram',
+                    $current_url: 'https://test.com/pricing',
+                    $browser: 'Firefox',
+                    $elements: [
+                        { tag_name: 'a', nth_child: 1, nth_of_type: 2, attr__class: 'btn btn-sm' },
+                        { tag_name: 'div', nth_child: 1, nth_of_type: 2, $el_text: '💻' },
+                    ],
+                },
+            } as any as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        events = await hub.db.fetchEvents()
+
+        expect(events[2].properties.$set).toBeUndefined()
+        expect(events[2].properties.$set_once).toBeUndefined()
 
         team = await getFirstTeam(hub)
 
@@ -404,6 +461,32 @@ export const createProcessEventTests = (
                 volume_30_day: null,
             },
         ])
+    })
+
+    test('initial current domain regression test', async () => {
+        // we weren't capturing $initial_current_url if no utm tags were set
+        await processEvent(
+            '2',
+            '127.0.0.1',
+            '',
+            {
+                event: '$pageview',
+                properties: {
+                    distinct_id: 2,
+                    token: team.api_token,
+                    $current_url: 'https://test.com',
+                },
+            } as any as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const persons = await hub.db.fetchPersons()
+        expect(persons[0].properties).toEqual({
+            $initial_current_url: 'https://test.com',
+        })
     })
 
     test('capture bad team', async () => {
