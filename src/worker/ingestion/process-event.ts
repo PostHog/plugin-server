@@ -297,7 +297,7 @@ export class EventsProcessor {
         }
 
         await this.db.updatePerson(personFound, { properties: updatedProperties })
-        return Promise.resolve(returnedProps)
+        return returnedProps
     }
 
     private async alias(
