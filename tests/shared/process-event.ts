@@ -233,8 +233,8 @@ export const createProcessEventTests = (
                 },
             } as any as PluginEvent,
             team.id,
-            now,
-            now,
+            DateTime.now(),
+            DateTime.now(),
             new UUIDT().toString()
         )
 
@@ -297,8 +297,8 @@ export const createProcessEventTests = (
                 },
             } as any as PluginEvent,
             team.id,
-            now,
-            now,
+            DateTime.now(),
+            DateTime.now(),
             new UUIDT().toString()
         )
 
@@ -352,6 +352,7 @@ export const createProcessEventTests = (
                     utm_medium: 'instagram',
                     $current_url: 'https://test.com/pricing',
                     $browser: 'Firefox',
+
                     $elements: [
                         { tag_name: 'a', nth_child: 1, nth_of_type: 2, attr__class: 'btn btn-sm' },
                         { tag_name: 'div', nth_child: 1, nth_of_type: 2, $el_text: '💻' },
@@ -359,8 +360,8 @@ export const createProcessEventTests = (
                 },
             } as any as PluginEvent,
             team.id,
-            now,
-            now,
+            DateTime.now(),
+            DateTime.now(),
             new UUIDT().toString()
         )
 
