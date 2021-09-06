@@ -222,7 +222,7 @@ export const createProcessEventTests = (
                     $browser: 'Chrome',
                     $current_url: 'https://test.com',
                     $os: 'Mac OS X',
-                    $browser_version: 80,
+                    $browser_version: false,
                     $initial_referring_domain: 'https://google.com',
                     $initial_referrer_url: 'https://google.com/?q=posthog',
                     utm_medium: 'twitter',
@@ -248,7 +248,7 @@ export const createProcessEventTests = (
         let events = await hub.db.fetchEvents()
         expect(persons[0].properties).toEqual({
             $initial_browser: 'Chrome',
-            $initial_browser_version: 80,
+            $initial_browser_version: false,
             $initial_utm_medium: 'twitter',
             $initial_current_url: 'https://test.com',
             $initial_os: 'Mac OS X',
@@ -265,12 +265,12 @@ export const createProcessEventTests = (
                 $initial_browser: 'Chrome',
                 $initial_utm_medium: 'twitter',
                 $initial_current_url: 'https://test.com',
-                $initial_browser_version: 80,
+                $initial_browser_version: false,
             },
             utm_medium: 'twitter',
             distinct_id: 2,
             $current_url: 'https://test.com',
-            $browser_version: 80,
+            $browser_version: false,
             $initial_referrer_url: 'https://google.com/?q=posthog',
             $initial_referring_domain: 'https://google.com',
         })
@@ -288,6 +288,7 @@ export const createProcessEventTests = (
                     token: team.api_token,
                     utm_medium: 'instagram',
                     $current_url: 'https://test.com/pricing',
+                    $browser_version: 80,
                     $browser: 'Firefox',
                     $elements: [
                         { tag_name: 'a', nth_child: 1, nth_of_type: 2, attr__class: 'btn btn-sm' },
@@ -307,7 +308,7 @@ export const createProcessEventTests = (
         expect(persons.length).toEqual(1)
         expect(persons[0].properties).toEqual({
             $initial_browser: 'Chrome',
-            $initial_browser_version: 80,
+            $initial_browser_version: false,
             $initial_utm_medium: 'twitter',
             $initial_current_url: 'https://test.com',
             $initial_os: 'Mac OS X',

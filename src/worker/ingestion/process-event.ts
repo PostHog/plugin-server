@@ -258,7 +258,7 @@ export class EventsProcessor {
         const returnedProps: Properties = {}
         let updatedProperties: Properties = {}
         Object.entries(propertiesOnce).map(([key, value]) => {
-            if (!personFound?.properties[key]) {
+            if (typeof personFound?.properties[key] === 'undefined') {
                 if (!returnedProps['$set_once']) {
                     returnedProps['$set_once'] = {}
                 }
@@ -266,6 +266,7 @@ export class EventsProcessor {
                 updatedProperties[key] = value
             }
         })
+        updatedProperties = { ...personFound.properties, ...updatedProperties }
         Object.entries(properties).map(([key, value]) => {
             if (personFound?.properties[key] !== value) {
                 if (!returnedProps['$set']) {
@@ -493,7 +494,7 @@ export class EventsProcessor {
 
         if (properties['$set'] || properties['$set_once'] || properties['$increment']) {
             const filteredIncrementProperties = filterIncrementProperties(properties['$increment'])
-            const updatedProperties = await this.updatePersonProperties(
+            const updatedSetAndSetOnce = await this.updatePersonProperties(
                 teamId,
                 distinctId,
                 properties['$set'] || {},
@@ -503,7 +504,7 @@ export class EventsProcessor {
 
             delete properties['$set']
             delete properties['$set_once']
-            properties = { ...properties, ...updatedProperties }
+            properties = { ...properties, ...updatedSetAndSetOnce }
         }
 
         return await this.createEvent(
