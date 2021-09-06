@@ -256,7 +256,7 @@ export class EventsProcessor {
 
         // Figure out which properties we are actually setting
         const returnedProps: Properties = {}
-        let updatedProperties: Properties = {}
+        let updatedProperties: Properties = { ...personFound.properties }
         Object.entries(propertiesOnce).map(([key, value]) => {
             if (typeof personFound?.properties[key] === 'undefined') {
                 if (!returnedProps['$set_once']) {
@@ -266,7 +266,6 @@ export class EventsProcessor {
                 updatedProperties[key] = value
             }
         })
-        updatedProperties = { ...personFound.properties, ...updatedProperties }
         Object.entries(properties).map(([key, value]) => {
             if (personFound?.properties[key] !== value) {
                 if (!returnedProps['$set']) {
