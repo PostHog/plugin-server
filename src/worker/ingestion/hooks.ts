@@ -133,7 +133,7 @@ export function getFormattedMessage(
         }
         messageText = format(tokenizedMessage, ...values)
         messageMarkdown = format(tokenizedMessage, ...markdownValues)
-    } catch (error) {
+    } catch (error: any) {
         const [actionName, actionMarkdown] = getActionDetails(action, siteUrl, webhookType)
         messageText = `⚠ Error: There are one or more formatting errors in the message template for action "${actionName}".`
         messageMarkdown = `*⚠ Error: There are one or more formatting errors in the message template for action "${actionMarkdown}".*`

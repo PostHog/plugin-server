@@ -172,7 +172,7 @@ export class Broker implements Pausable {
             } else {
                 this.receiveSlow(resolve, queue, callback)
             }
-        } catch (error) {
+        } catch (error: any) {
             status.error('⚠️', 'An error occured in Celery broker:\n', error)
         }
     }

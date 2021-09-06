@@ -128,7 +128,7 @@ export async function insertRow(db: Pool, table: string, object: Record<string, 
 
     try {
         await db.query(`INSERT INTO ${table} (${keys}) VALUES (${params})`, values)
-    } catch (error) {
+    } catch (error: any) {
         console.error(`Error on table ${table} when inserting object:\n`, object, '\n', error)
         throw error
     }

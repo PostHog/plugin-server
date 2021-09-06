@@ -20,7 +20,7 @@ export const writeToFile = {
                     .split('\n')
                     .filter((str) => !!str)
                     .map((part) => JSON.parse(part))
-            } catch (error) {
+            } catch (error: any) {
                 if (error.code === 'ENOENT') {
                     return []
                 }

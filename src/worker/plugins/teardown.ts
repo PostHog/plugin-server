@@ -21,7 +21,7 @@ export async function teardownPlugins(server: Hub, pluginConfig?: PluginConfig):
                                 message: `Plugin unloaded (instance ID ${server.instanceId}).`,
                                 instanceId: server.instanceId,
                             })
-                        } catch (error) {
+                        } catch (error: any) {
                             await processError(server, pluginConfig, error)
                             await server.db.queuePluginLogEntry({
                                 pluginConfig,

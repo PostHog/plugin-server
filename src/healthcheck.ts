@@ -13,7 +13,7 @@ export async function healthcheck(): Promise<boolean> {
             status.error('💔', 'Redis key @posthog-plugin-server/ping not found! Plugin server seems to be offline')
             return false
         }
-    } catch (error) {
+    } catch (error: any) {
         status.error('💥', 'An unexpected error occurred:', error)
         return false
     } finally {

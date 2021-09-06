@@ -34,7 +34,7 @@ export class JobQueueManager implements JobQueue {
                 try {
                     await jobQueue.connectProducer()
                     status.info('🚶', `Connected to job queue producer "${jobQueueType}"`)
-                } catch (error) {
+                } catch (error: any) {
                     toRemove.add(jobQueue)
                     logOrThrowJobQueueError(
                         this.pluginsServer,
@@ -54,7 +54,7 @@ export class JobQueueManager implements JobQueue {
             try {
                 await jobQueue.enqueue(job)
                 return
-            } catch (error) {
+            } catch (error: any) {
                 // if one fails, take the next queue
                 Sentry.captureException(error, {
                     extra: {

@@ -104,7 +104,7 @@ export function upgradeExportEvents(
                 teamId: pluginConfig.team_id.toString(),
             })
             incrementMetric('events_delivered_successfully', payload.batch.length)
-        } catch (err) {
+        } catch (err: any) {
             if (err instanceof RetryError) {
                 incrementMetric('retry_errors', payload.batch.length)
                 if (payload.retriesPerformedSoFar < MAXIMUM_RETRIES) {

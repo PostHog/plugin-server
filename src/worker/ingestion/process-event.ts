@@ -99,7 +99,7 @@ export class EventsProcessor {
             })
             try {
                 await this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
-            } catch (e) {
+            } catch (e: any) {
                 console.error('handleIdentifyOrAlias failed', e, data)
                 Sentry.captureException(e, { extra: { event: data } })
             } finally {
@@ -170,7 +170,7 @@ export class EventsProcessor {
                     // timestamp and sent_at must both be in the same format: either both with or both without timezones
                     // otherwise we can't get a diff to add to now
                     return now.plus(DateTime.fromJSDate(new Date(data['timestamp'])).diff(sentAt))
-                } catch (error) {
+                } catch (error: any) {
                     status.error('⚠️', 'Error when handling timestamp:', error)
                     Sentry.captureException(error, { extra: { data, now, sentAt } })
                 }
@@ -292,7 +292,7 @@ export class EventsProcessor {
             try {
                 await this.db.addDistinctId(oldPerson, distinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
-            } catch (error) {
+            } catch (error: any) {
                 Sentry.captureException(error)
                 // integrity error
                 if (retryIfFailed) {
@@ -307,7 +307,7 @@ export class EventsProcessor {
             try {
                 await this.db.addDistinctId(newPerson, previousDistinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
-            } catch (error) {
+            } catch (error: any) {
                 Sentry.captureException(error)
                 // integrity error
                 if (retryIfFailed) {
@@ -324,7 +324,7 @@ export class EventsProcessor {
                     distinctId,
                     previousDistinctId,
                 ])
-            } catch (error) {
+            } catch (error: any) {
                 Sentry.captureException(error)
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
@@ -395,7 +395,7 @@ export class EventsProcessor {
         while (true) {
             try {
                 await this.db.moveDistinctIds(otherPerson, mergeInto)
-            } catch (error) {
+            } catch (error: any) {
                 Sentry.captureException(error, {
                     extra: { mergeInto, mergeIntoDistinctId, otherPerson, otherPersonDistinctId },
                 })
@@ -414,7 +414,7 @@ export class EventsProcessor {
             try {
                 await this.db.deletePerson(otherPerson)
                 break // All OK, exiting retry loop
-            } catch (error) {
+            } catch (error: any) {
                 if (!(error instanceof DatabaseError)) {
                     throw error // Very much not OK, this is some completely unexpected error
                 }
@@ -615,7 +615,7 @@ export class EventsProcessor {
             // Catch race condition where in between getting and creating, another request already created this user
             try {
                 await this.db.createPerson(sentAt, {}, teamId, null, false, personUuid.toString(), [distinctId])
-            } catch (error) {
+            } catch (error: any) {
                 Sentry.captureException(error, { extra: { teamId, distinctId, sentAt, personUuid } })
             }
         }

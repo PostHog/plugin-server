@@ -40,7 +40,7 @@ export const createTaskRunner =
             try {
                 // must clone the object, as we may get from VM2 something like { ..., properties: Proxy {} }
                 response = cloneObject(await workerTasks[task](hub, args))
-            } catch (e) {
+            } catch (e: any) {
                 status.info('🔔', e)
                 Sentry.captureException(e)
                 response = { error: e.message }

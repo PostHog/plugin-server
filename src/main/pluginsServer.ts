@@ -245,7 +245,7 @@ export async function startPluginsServer(
         hub.lastActivityType = 'serverStart'
 
         return serverInstance as ServerInstance
-    } catch (error) {
+    } catch (error: any) {
         Sentry.captureException(error)
         status.error('💥', 'Launchpad failure!', error)
         void Sentry.flush().catch(() => null) // Flush Sentry in the background

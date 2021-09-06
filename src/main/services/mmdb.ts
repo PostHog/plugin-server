@@ -49,7 +49,7 @@ async function decompressAndOpenMmdb(brotliContents: Buffer, filename: string): 
                 )
                 try {
                     resolve(Reader.openBuffer(result))
-                } catch (e) {
+                } catch (e: any) {
                     reject(e)
                 }
             }
@@ -119,7 +119,7 @@ async function distributableFetchAndInsertFreshMmdb(
         const mmdb = await fetchAndInsertFreshMmdb(hub)
         await hub.db.redisSet(MMDB_STATUS_REDIS_KEY, MMDBFileStatus.Idle)
         return mmdb
-    } catch (e) {
+    } catch (e: any) {
         // In case of an error mark the MMDB feature unavailable for an hour
         await hub.db.redisSet(MMDB_STATUS_REDIS_KEY, MMDBFileStatus.Unavailable, 120)
         status.error('❌', 'An error occurred during MMDB fetch and insert:', e)
@@ -230,7 +230,7 @@ export async function createMmdbServer(serverInstance: MMDBPrepServerInstance): 
                 if (serverInstance.mmdb) {
                     try {
                         responseData = serverInstance.mmdb.city(partialData.toString().trim())
-                    } catch (e) {
+                    } catch (e: any) {
                         responseData = null
                     }
                 } else {

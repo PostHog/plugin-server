@@ -34,7 +34,7 @@ export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestE
         // We don't want to return the inserted DB entry that `processEvent` returns.
         // This response is passed to piscina and would be discarded anyway.
         return { success: true }
-    } catch (e) {
+    } catch (e: any) {
         status.info('🔔', e)
         Sentry.captureException(e)
         return { error: e.message }

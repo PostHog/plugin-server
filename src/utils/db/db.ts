@@ -164,7 +164,7 @@ export class DB {
                 const response = await transaction(client)
                 await client.query('COMMIT')
                 return response
-            } catch (e) {
+            } catch (e: any) {
                 await client.query('ROLLBACK')
                 throw e
             } finally {
@@ -210,7 +210,7 @@ export class DB {
                     return defaultValue
                 }
                 return value ? (jsonSerialize ? JSON.parse(value) : value) : null
-            } catch (error) {
+            } catch (error: any) {
                 if (error instanceof SyntaxError) {
                     // invalid JSON
                     return null
@@ -670,7 +670,7 @@ export class DB {
                 [target.id, source.id, target.team_id],
                 'updateDistinctIdPerson'
             )
-        } catch (error) {
+        } catch (error: any) {
             if (
                 error.message.includes(
                     'insert or update on table "posthog_persondistinctid" violates foreign key constraint'
@@ -890,7 +890,7 @@ export class DB {
                     )
                 }
             })
-        } catch (error) {
+        } catch (error: any) {
             // Throw further if not postgres error nr "23505" == "unique_violation"
             // https://www.postgresql.org/docs/12/errcodes-appendix.html
             if (error.code !== '23505') {
@@ -939,7 +939,7 @@ export class DB {
                     topic: KAFKA_PLUGIN_LOG_ENTRIES,
                     messages: [{ key: parsedEntry.id, value: Buffer.from(JSON.stringify(parsedEntry)) }],
                 })
-            } catch (e) {
+            } catch (e: any) {
                 captureException(e)
                 console.error(parsedEntry)
                 console.error(e)
@@ -972,7 +972,7 @@ export class DB {
                 values,
                 'insertPluginLogEntries'
             )
-        } catch (e) {
+        } catch (e: any) {
             captureException(e)
             console.error(e)
         }

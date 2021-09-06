@@ -63,7 +63,7 @@ export async function startQueues(
             queues.ingestion = await startQueueKafka(server, piscina, mergedWorkerMethods)
         }
         return queues
-    } catch (error) {
+    } catch (error: any) {
         status.error('💥', 'Failed to start event queue:\n', error)
         throw error
     }
@@ -93,7 +93,7 @@ function startQueueRedis(server: Hub, piscina: Piscina, workerMethods: WorkerMet
                 }
                 pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
                 await piscina?.run({ task: 'enqueueJob', args: { job } })
-            } catch (e) {
+            } catch (e: any) {
                 Sentry.captureException(e)
             }
         }
@@ -125,7 +125,7 @@ function startQueueRedis(server: Hub, piscina: Piscina, workerMethods: WorkerMet
                 try {
                     const checkAndPause = () => pauseQueueIfWorkerFull(() => celeryQueue.pause(), server, piscina)
                     await ingestEvent(server, workerMethods, event, checkAndPause)
-                } catch (e) {
+                } catch (e: any) {
                     Sentry.captureException(e)
                 }
             }

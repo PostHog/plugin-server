@@ -45,10 +45,10 @@ export function bufferToStream(binary: Buffer): Readable {
 export async function getFileFromArchive(archive: Buffer, file: string): Promise<string | null> {
     try {
         return getFileFromZip(archive, file)
-    } catch (e) {
+    } catch (e: any) {
         try {
             return await getFileFromTGZ(archive, file)
-        } catch (e) {
+        } catch (e: any) {
             throw new Error(`Could not read archive as .zip or .tgz`)
         }
     }
@@ -370,7 +370,7 @@ export async function tryTwice<T extends any>(
     try {
         const response = await Promise.race([timeout, callback()])
         return response as T
-    } catch (error) {
+    } catch (error: any) {
         Sentry.captureMessage(`Had to run twice: ${errorMessage}`)
         // try one more time
         return await callback()

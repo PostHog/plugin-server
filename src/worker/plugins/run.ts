@@ -20,7 +20,7 @@ export async function runOnEvent(server: Hub, event: PluginEvent): Promise<void>
                 const timer = new Date()
                 try {
                     await onEvent(event)
-                } catch (error) {
+                } catch (error: any) {
                     await processError(server, pluginConfig, error, event)
                     server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.on_event.ERROR`)
                 }
@@ -41,7 +41,7 @@ export async function runOnSnapshot(server: Hub, event: PluginEvent): Promise<vo
                 const timer = new Date()
                 try {
                     await onSnapshot(event)
-                } catch (error) {
+                } catch (error: any) {
                     await processError(server, pluginConfig, error, event)
                     server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.on_event.ERROR`)
                 }
@@ -73,7 +73,7 @@ export async function runProcessEvent(server: Hub, event: PluginEvent): Promise<
                     throw new IllegalOperationError('Plugin tried to change event.team_id')
                 }
                 pluginsSucceeded.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
-            } catch (error) {
+            } catch (error: any) {
                 await processError(server, pluginConfig, error, returnedEvent)
                 server.statsd?.increment(`plugin.${pluginConfig.plugin?.name}.process_event.ERROR`)
                 pluginsFailed.push(`${pluginConfig.plugin?.name} (${pluginConfig.id})`)
@@ -126,7 +126,7 @@ export async function runPluginTask(
             )
         }
         response = await (payload ? task?.exec(payload) : task?.exec())
-    } catch (error) {
+    } catch (error: any) {
         await processError(server, pluginConfig || null, error)
         server.statsd?.increment(`plugin.task.${taskType}.${taskName}.${pluginConfigId}.ERROR`)
     }

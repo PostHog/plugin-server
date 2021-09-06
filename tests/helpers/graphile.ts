@@ -9,7 +9,7 @@ export async function resetGraphileSchema(serverConfig: PluginsServerConfig): Pr
 
     try {
         await db.query('DROP SCHEMA graphile_worker CASCADE')
-    } catch (error) {
+    } catch (error: any) {
         if (error.message !== 'schema "graphile_worker" does not exist') {
             throw error
         }

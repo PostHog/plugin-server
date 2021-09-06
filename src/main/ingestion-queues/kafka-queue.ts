@@ -99,7 +99,7 @@ export class KafkaQueue implements Queue {
                 eachBatch: async (payload) => {
                     try {
                         await this.eachBatch(payload)
-                    } catch (error) {
+                    } catch (error: any) {
                         status.info('💀', `Kafka batch of ${payload.batch.messages.length} events failed!`)
                         if (error.type === 'UNKNOWN_MEMBER_ID') {
                             status.info(
@@ -142,7 +142,7 @@ export class KafkaQueue implements Queue {
         try {
             await this.consumer.stop()
             status.info('⏹', 'Kafka consumer stopped!')
-        } catch (error) {
+        } catch (error: any) {
             status.error('⚠️', 'An error occurred while stopping Kafka queue:\n', error)
         }
         try {

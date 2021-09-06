@@ -118,7 +118,7 @@ export class GraphileQueue extends JobQueueBase {
             const pool = createPostgresPool(configOrDatabaseUrl, onError)
             try {
                 await pool.query('select 1')
-            } catch (error) {
+            } catch (error: any) {
                 reject(error)
             }
             resolved = true

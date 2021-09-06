@@ -43,7 +43,7 @@ describe('vm timeout tests', () => {
         let errorMessage = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             errorMessage = e.message
         }
         expect(new Date().valueOf() - date.valueOf()).toBeGreaterThanOrEqual(1000)
@@ -64,7 +64,7 @@ describe('vm timeout tests', () => {
         let errorMessage = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             errorMessage = e.message
         }
         expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 4:16')
@@ -83,7 +83,7 @@ describe('vm timeout tests', () => {
         let errorMessage = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             errorMessage = e.message
         }
         expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:53')
@@ -102,7 +102,7 @@ describe('vm timeout tests', () => {
         let errorMessage = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             errorMessage = e.message
         }
         expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:16')
@@ -122,7 +122,7 @@ describe('vm timeout tests', () => {
         let errorMessage = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             errorMessage = e.message
         }
         expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 4:16')
@@ -141,7 +141,7 @@ describe('vm timeout tests', () => {
         let errorMessage = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             errorMessage = e.message
         }
         expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:53')
@@ -160,7 +160,7 @@ describe('vm timeout tests', () => {
         let errorMessage = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             errorMessage = e.message
         }
         expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:16')
@@ -180,7 +180,7 @@ describe('vm timeout tests', () => {
         let errorMessage = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             errorMessage = e.message
         }
         expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 4:16')
@@ -199,7 +199,7 @@ describe('vm timeout tests', () => {
         let errorMessage = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             errorMessage = e.message
         }
         expect(errorMessage!).toEqual('Script execution timed out after looping for 1 second on line 3:53')
@@ -228,7 +228,7 @@ describe('vm timeout tests', () => {
         let caller = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             expect(e).toBeInstanceOf(TimeoutError)
             errorMessage = e.message
             caller = e.caller
@@ -263,7 +263,7 @@ describe('vm timeout tests', () => {
         let errorMessage = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             errorMessage = e.message
         }
         expect(new Date().valueOf() - date.valueOf()).toBeGreaterThanOrEqual(1000)
@@ -284,7 +284,7 @@ describe('vm timeout tests', () => {
         let errorMessage = undefined
         try {
             await vm.methods.processEvent!({ ...defaultEvent })
-        } catch (e) {
+        } catch (e: any) {
             errorMessage = e.message
         }
         expect(errorMessage!).toEqual('Script execution timed out after promise waited for 1 second')

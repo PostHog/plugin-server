@@ -69,7 +69,7 @@ switch (alternativeMode) {
                 status.info(`✅`, `Graphile migrations are now up to date!`)
                 await graphile.disconnectProducer()
                 process.exit(0)
-            } catch (error) {
+            } catch (error: any) {
                 status.error('🔴', 'Error running migrations for Graphile Worker!\n', error)
                 process.exit(1)
             }

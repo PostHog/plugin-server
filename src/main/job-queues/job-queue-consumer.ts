@@ -27,7 +27,7 @@ export async function startJobQueueConsumer(server: Hub, piscina: Piscina): Prom
             status.info('🔄', 'Job queue consumer lock acquired')
             try {
                 await server.jobQueueManager.startConsumer(onJob)
-            } catch (error) {
+            } catch (error: any) {
                 try {
                     logOrThrowJobQueueError(server, error, `Can not start job queue consumer!`)
                 } catch {

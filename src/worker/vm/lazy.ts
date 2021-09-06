@@ -87,7 +87,7 @@ export class LazyPluginVM {
                     void clearError(hub, pluginConfig)
                     await this.inferPluginCapabilities(hub, pluginConfig, vm)
                     resolve(vm)
-                } catch (error) {
+                } catch (error: any) {
                     status.warn('⚠️', error.message)
                     if (this.totalInitAttemptsCounter < MAX_SETUP_RETRIES) {
                         const nextRetryMs =

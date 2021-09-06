@@ -75,7 +75,7 @@ async function runInstrumentedFunction({
     const timer = new Date()
     try {
         return await func(event)
-    } catch (error) {
+    } catch (error: any) {
         status.info('🔔', error)
         Sentry.captureException(error)
         throw error

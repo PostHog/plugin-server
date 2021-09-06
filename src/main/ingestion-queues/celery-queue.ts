@@ -30,7 +30,7 @@ export class CeleryQueue extends Base implements Queue {
         this.handlers[name] = function registHandler(...args: any[]): Promise<any> {
             try {
                 return Promise.resolve(handler(...args))
-            } catch (err) {
+            } catch (err: any) {
                 return Promise.reject(err)
             }
         }

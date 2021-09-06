@@ -62,7 +62,7 @@ export async function startRedlock({
                 try {
                     lock = await lock.extend(lockTTL)
                     lockTimeout = setTimeout(extendLock, extendDelay)
-                } catch (error) {
+                } catch (error: any) {
                     status.error('🔴', `Redlock cannot extend lock "${resource}":\n`, error)
                     Sentry.captureException(error, { extra: { resource } })
                     weHaveTheLock = false
@@ -73,7 +73,7 @@ export async function startRedlock({
             lockTimeout = setTimeout(extendLock, extendDelay)
 
             await onLock?.()
-        } catch (error) {
+        } catch (error: any) {
             if (stopped) {
                 return
             }

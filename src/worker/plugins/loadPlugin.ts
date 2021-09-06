@@ -23,7 +23,7 @@ export async function loadPlugin(server: Hub, pluginConfig: PluginConfig): Promi
                 try {
                     const jsonBuffer = fs.readFileSync(configPath)
                     config = JSON.parse(jsonBuffer.toString())
-                } catch (e) {
+                } catch (e: any) {
                     pluginConfig.vm?.failInitialization!()
                     await processError(
                         server,
@@ -61,7 +61,7 @@ export async function loadPlugin(server: Hub, pluginConfig: PluginConfig): Promi
             if (json) {
                 try {
                     config = JSON.parse(json)
-                } catch (error) {
+                } catch (error: any) {
                     pluginConfig.vm?.failInitialization!()
                     await processError(server, pluginConfig, `Can not load plugin.json for ${pluginDigest(plugin)}`)
                     return false
@@ -88,7 +88,7 @@ export async function loadPlugin(server: Hub, pluginConfig: PluginConfig): Promi
                 `Tried using undownloaded remote ${pluginDigest(plugin)}, which is not supported!`
             )
         }
-    } catch (error) {
+    } catch (error: any) {
         pluginConfig.vm?.failInitialization!()
         await processError(server, pluginConfig, error)
     }

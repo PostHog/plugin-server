@@ -205,7 +205,7 @@ export async function createHub(
 
     try {
         await hub.jobQueueManager.connectProducer()
-    } catch (error) {
+    } catch (error: any) {
         try {
             logOrThrowJobQueueError(hub as Hub, error, `Can not start job queue producer!`)
         } catch {
