@@ -8,6 +8,7 @@ import { createHub } from '../../src/utils/db/hub'
 import { hashElements } from '../../src/utils/db/utils'
 import { posthog } from '../../src/utils/posthog'
 import { delay, UUIDT } from '../../src/utils/utils'
+import { ingestEvent } from '../../src/worker/ingestion/ingest-event'
 import { EventProcessingResult, EventsProcessor } from '../../src/worker/ingestion/process-event'
 import { createUserTeamAndOrganization, getFirstTeam, getTeams, onQuery, resetTestDatabase } from '../helpers/sql'
 
@@ -45,6 +46,26 @@ async function createPerson(
     properties: Record<string, any> = {}
 ): Promise<Person> {
     return server.db.createPerson(DateTime.utc(), properties, team.id, null, false, new UUIDT().toString(), distinctIds)
+}
+
+const getEventsByPerson = async (hub: Hub) => {
+    // Helper function to retrieve events paired with their associated distinct
+    // ids
+    const persons = await hub.db.fetchPersons()
+    const events = await hub.db.fetchEvents()
+
+    return await Promise.all(
+        persons.map(async (person) => {
+            const distinctIds = await hub.db.fetchDistinctIdValues(person)
+
+            return [
+                distinctIds,
+                (events as Event[])
+                    .filter((event) => distinctIds.includes(event.distinct_id))
+                    .map((event) => event.event),
+            ] as const
+        })
+    )
 }
 
 type ReturnWithHub = { hub?: Hub; closeHub?: () => Promise<void> }
@@ -1367,69 +1388,59 @@ export const createProcessEventTests = (
         // special as we want to alias to a known user, but otherwise we
         // shouldn't be doing so.
 
-        // When we get an anonymous event, then an $identify event, we should
-        // end up with 1 identified user
+        const anonymousId = 'anonymous_id'
         const initialDistinctId = 'initial_distinct_id'
-
-        await processEvent(
-            initialDistinctId,
-            '',
-            '',
-            {
-                event: '$identify',
-                properties: {
-                    $anon_distinct_id: 'anonymous_id',
-                    token: team.api_token,
-                    distinct_id: initialDistinctId,
-                },
-            } as any as PluginEvent,
-            team.id,
-            now,
-            now,
-            new UUIDT().toString()
-        )
-
-        // Person should be identified
-        const initialIdentifiedPerson = await hub.db.fetchPerson(team.id, initialDistinctId)
-        expect(initialIdentifiedPerson?.is_identified).toBe(true)
-
-        // The identified person should also be associated with the
-        // anonymous_id, so that any previous events are equated with the
-        // initial identified person
-        const anonymousPerson = await hub.db.fetchPerson(team.id, 'anonymous_id')
-        expect(initialIdentifiedPerson?.id).toBe(anonymousPerson?.id)
-
-        // If we receive another $identify event, we should create a new
-        // independent person.
         const newDistinctId = 'new_distinct_id'
-        await processEvent(
-            newDistinctId,
-            '',
-            '',
-            {
-                event: '$identify',
-                properties: {
-                    // Note we use the same anonymous_id here, as we want to
-                    // ensure that even though this is the same as the original
-                    // identify, we do not create an alias to the
-                    // `"new_distinct_id"`.
-                    $anon_distinct_id: 'anonymous_id',
-                    token: team.api_token,
-                    distinct_id: newDistinctId,
-                },
-            } as any as PluginEvent,
-            team.id,
-            now,
-            now,
-            new UUIDT().toString()
-        )
 
-        const newIdentifiedPerson = await hub.db.fetchPerson(team.id, newDistinctId)
-        expect(newIdentifiedPerson?.is_identified).toBe(true)
+        // Use state object to simulate stateful clients that keep track of old
+        // distinct id, starting with an anonymous one. I've taken posthog-js as
+        // the reference implementation.
+        const state = { currentDistinctId: anonymousId }
 
-        // The two persons should not be the same person. For this we check that
-        // the `Person.id` is not the same.
-        expect(initialIdentifiedPerson?.id).not.toBe(newIdentifiedPerson?.id)
+        const capture = async (hub: Hub, eventName: string, properties: any = {}) => {
+            await ingestEvent(hub, {
+                event: eventName,
+                distinct_id: properties.distinct_id ?? state.currentDistinctId,
+                properties: properties,
+                now: now.toJSON(),
+                sent_at: now.toJSON(),
+                ip: '127.0.0.1',
+                site_url: 'https://posthog.com',
+                team_id: team.id,
+                uuid: new UUIDT().toString(),
+            })
+        }
+
+        const identify = async (hub: Hub, distinctId: string) => {
+            await capture(hub, '$identify', {
+                // posthog-js will send the previous distinct id as
+                // $anon_distinct_id
+                $anon_distinct_id: state.currentDistinctId,
+                token: team.api_token,
+                distinct_id: distinctId,
+            })
+            state.currentDistinctId = distinctId
+        }
+
+        // Play out a sequence of events that should result in two users being
+        // identified, with the first to events associated with one user, and
+        // the third with another.
+        await capture(hub, 'event 1')
+        await identify(hub, initialDistinctId)
+        await capture(hub, 'event 2')
+        await identify(hub, newDistinctId)
+        await capture(hub, 'event 3')
+
+        // Get pairins of person distinctIds and the events associated with them
+        const eventsByPerson = await getEventsByPerson(hub)
+
+        expect(eventsByPerson).toEqual([
+            [
+                [anonymousId, initialDistinctId],
+                ['event 1', '$identify', 'event 2'],
+            ],
+            [[newDistinctId], ['$identify', 'event 3']],
+        ])
     })
 
     test('team event_properties', async () => {
