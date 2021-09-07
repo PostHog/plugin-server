@@ -1358,6 +1358,80 @@ export const createProcessEventTests = (
         expect(person2.is_identified).toBe(true)
     })
 
+    test('we do not alias users if distinct id changes but we are already identified', async () => {
+        // This test is in reference to
+        // https://github.com/PostHog/posthog/issues/5527 , where we were
+        // correctly identifying that an anonymous user before login should be
+        // aliased to the user they subsequently login as, but incorrectly
+        // aliasing on subsequent $identify events. The anonymous case is
+        // special as we want to alias to a known user, but otherwise we
+        // shouldn't be doing so.
+
+        // When we get an anonymous event, then an $identify event, we should
+        // end up with 1 identified user
+        const initialDistinctId = 'initial_distinct_id'
+
+        await processEvent(
+            initialDistinctId,
+            '',
+            '',
+            {
+                event: '$identify',
+                properties: {
+                    $anon_distinct_id: 'anonymous_id',
+                    token: team.api_token,
+                    distinct_id: initialDistinctId,
+                },
+            } as any as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        // Person should be identified
+        const initialIdentifiedPerson = await hub.db.fetchPerson(team.id, initialDistinctId)
+        expect(initialIdentifiedPerson?.is_identified).toBe(true)
+
+        // The identified person should also be associated with the
+        // anonymous_id, so that any previous events are equated with the
+        // initial identified person
+        const anonymousPerson = await hub.db.fetchPerson(team.id, 'anonymous_id')
+        expect(initialIdentifiedPerson?.id).toBe(anonymousPerson?.id)
+
+        // If we receive another $identify event, we should create a new
+        // independent person.
+        const newDistinctId = 'new_distinct_id'
+        await processEvent(
+            newDistinctId,
+            '',
+            '',
+            {
+                event: '$identify',
+                properties: {
+                    // Note we use the same anonymous_id here, as we want to
+                    // ensure that even though this is the same as the original
+                    // identify, we do not create an alias to the
+                    // `"new_distinct_id"`.
+                    $anon_distinct_id: 'anonymous_id',
+                    token: team.api_token,
+                    distinct_id: newDistinctId,
+                },
+            } as any as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const newIdentifiedPerson = await hub.db.fetchPerson(team.id, newDistinctId)
+        expect(newIdentifiedPerson?.is_identified).toBe(true)
+
+        // The two persons should not be the same person. For this we check that
+        // the `Person.id` is not the same.
+        expect(initialIdentifiedPerson?.id).not.toBe(newIdentifiedPerson?.id)
+    })
+
     test('team event_properties', async () => {
         expect(await hub.db.fetchEventDefinitions()).toEqual([])
         expect(await hub.db.fetchPropertyDefinitions()).toEqual([])

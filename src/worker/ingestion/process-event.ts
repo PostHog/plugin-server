@@ -192,8 +192,15 @@ export class EventsProcessor {
         if (event === '$create_alias') {
             await this.alias(properties['alias'], distinctId, teamId)
         } else if (event === '$identify') {
-            if (properties['$anon_distinct_id']) {
-                await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
+            // If we are passed an anonymous id that isn't already identified,
+            // then alias it to the passed distinct id and mark it as identified.
+            // Otherwise, we just mark the `distinctId` as identified.
+            const anonymousDistinctId = properties['$anon_distinct_id']
+            if (anonymousDistinctId) {
+                const personForAnonymousId = await this.db.fetchPerson(teamId, anonymousDistinctId)
+                if (!personForAnonymousId?.is_identified) {
+                    await this.alias(anonymousDistinctId, distinctId, teamId)
+                }
             }
             await this.setIsIdentified(teamId, distinctId)
         }
