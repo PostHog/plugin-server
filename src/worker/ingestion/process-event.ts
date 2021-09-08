@@ -310,7 +310,10 @@ export class EventsProcessor {
         const newPerson = await this.db.fetchPerson(teamId, distinctId)
 
         if (oldPerson?.is_identified) {
-            console.log('Person associated with previousDistinctId is identified, refusing to alias new distinctId')
+            console.log('Person associated with previousDistinctId is identified, refusing to alias new distinctId', {
+                distinctId,
+                previousDistinctId,
+            })
             return
         }
 
