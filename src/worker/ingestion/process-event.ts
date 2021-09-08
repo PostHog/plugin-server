@@ -192,9 +192,8 @@ export class EventsProcessor {
         if (event === '$create_alias') {
             await this.alias(properties['alias'], distinctId, teamId)
         } else if (event === '$identify') {
-            const anonymousDistinctId = properties['$anon_distinct_id']
-            if (anonymousDistinctId) {
-                await this.alias(anonymousDistinctId, distinctId, teamId)
+            if (properties['$anon_distinct_id']) {
+                await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
             }
             await this.setIsIdentified(teamId, distinctId)
         }
