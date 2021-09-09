@@ -191,6 +191,10 @@ export const createProcessEventTests = (
         state.currentDistinctId = distinctId
     }
 
+    const alias = async (hub: Hub, alias: string, distinctId: string) => {
+        await capture(hub, '$create_alias', { alias, disinct_id: distinctId })
+    }
+
     createTests?.(returned)
 
     test('merge people', async () => {
@@ -1414,142 +1418,191 @@ export const createProcessEventTests = (
         expect(person2.is_identified).toBe(true)
     })
 
-    test('we do not alias users if distinct id changes but we are already identified', async () => {
-        // This test is in reference to
-        // https://github.com/PostHog/posthog/issues/5527 , where we were
-        // correctly identifying that an anonymous user before login should be
-        // aliased to the user they subsequently login as, but incorrectly
-        // aliasing on subsequent $identify events. The anonymous case is
-        // special as we want to alias to a known user, but otherwise we
-        // shouldn't be doing so.
+    describe('when handling $identify', () => {
+        test('we do not alias users if distinct id changes but we are already identified', async () => {
+            // This test is in reference to
+            // https://github.com/PostHog/posthog/issues/5527 , where we were
+            // correctly identifying that an anonymous user before login should be
+            // aliased to the user they subsequently login as, but incorrectly
+            // aliasing on subsequent $identify events. The anonymous case is
+            // special as we want to alias to a known user, but otherwise we
+            // shouldn't be doing so.
 
-        const anonymousId = 'anonymous_id'
-        const initialDistinctId = 'initial_distinct_id'
-        const newDistinctId = 'new_distinct_id'
+            const anonymousId = 'anonymous_id'
+            const initialDistinctId = 'initial_distinct_id'
+            const newDistinctId = 'new_distinct_id'
 
-        // Play out a sequence of events that should result in two users being
-        // identified, with the first to events associated with one user, and
-        // the third with another.
-        await capture(hub, 'event 1')
-        await identify(hub, initialDistinctId)
-        await capture(hub, 'event 2')
-        await identify(hub, newDistinctId)
-        await capture(hub, 'event 3')
+            // Play out a sequence of events that should result in two users being
+            // identified, with the first to events associated with one user, and
+            // the third with another.
+            await capture(hub, 'event 1')
+            await identify(hub, initialDistinctId)
+            await capture(hub, 'event 2')
+            await identify(hub, newDistinctId)
+            await capture(hub, 'event 3')
 
-        // Get pairins of person distinctIds and the events associated with them
-        const eventsByPerson = await getEventsByPerson(hub)
+            // Let's also make sure that we do not alias when switching back to
+            // initialDistictId
+            await identify(hub, initialDistinctId)
 
-        expect(eventsByPerson).toEqual([
-            [
-                [anonymousId, initialDistinctId],
-                ['event 1', '$identify', 'event 2'],
-            ],
-            [[newDistinctId], ['$identify', 'event 3']],
-        ])
+            // Get pairins of person distinctIds and the events associated with them
+            const eventsByPerson = await getEventsByPerson(hub)
 
-        // Make sure the persons are identified
-        const persons = await hub.db.fetchPersons()
-        expect(persons.map((person) => person.is_identified)).toEqual([true, true])
-    })
+            expect(eventsByPerson).toEqual([
+                [
+                    [anonymousId, initialDistinctId],
+                    ['event 1', '$identify', 'event 2', '$identify'],
+                ],
+                [[newDistinctId], ['$identify', 'event 3']],
+            ])
 
-    test('we do not alias users if distinct id changes but we are already identified, with no anonymous event', async () => {
-        // This test is in reference to
-        // https://github.com/PostHog/posthog/issues/5527 , where we were
-        // correctly identifying that an anonymous user before login should be
-        // aliased to the user they subsequently login as, but incorrectly
-        // aliasing on subsequent $identify events. The anonymous case is
-        // special as we want to alias to a known user, but otherwise we
-        // shouldn't be doing so.
-
-        const anonymousId = 'anonymous_id'
-        const initialDistinctId = 'initial_distinct_id'
-        const newDistinctId = 'new_distinct_id'
-
-        // Play out a sequence of events that should result in two users being
-        // identified, with the first to events associated with one user, and
-        // the third with another.
-        await identify(hub, initialDistinctId)
-        await capture(hub, 'event 2')
-        await identify(hub, newDistinctId)
-        await capture(hub, 'event 3')
-
-        // Get pairins of person distinctIds and the events associated with them
-        const eventsByPerson = await getEventsByPerson(hub)
-
-        expect(eventsByPerson).toEqual([
-            [
-                [initialDistinctId, anonymousId],
-                ['$identify', 'event 2'],
-            ],
-            [[newDistinctId], ['$identify', 'event 3']],
-        ])
-
-        // Make sure the persons are identified
-        const persons = await hub.db.fetchPersons()
-        expect(persons.map((person) => person.is_identified)).toEqual([true, true])
-    })
-
-    test('we do not leave things in inconsistent state if $identify is run concurrenctly', async () => {
-        // There are a few places where we have the pattern of:
-        //
-        //  1. fetch from postgres
-        //  2. check rows match condition
-        //  3. perform update
-
-        // Check the db is empty to start with
-        expect(await hub.db.fetchPersons()).toEqual([])
-
-        const initialDistinctId = 'distinct-id'
-
-        // Hook into updatePerson, which is as of writing called from
-        // setIsIdentified. Here we simply call identify again and wait on it
-        // completing before continuing with the first identify. This is
-        // depending on specific internals, it would be ideal if we could avoid
-        // this.
-        const originalUpdatePerson = hub.db.updatePerson.bind(hub.db)
-        const updatePersonMock = jest.fn(async (person, update) => {
-            if (updatePersonMock.mock.calls.length === 0) {
-                // On first invocation, make another identify call
-                await identify(hub, initialDistinctId)
-            }
-            return await originalUpdatePerson(person, update)
-        })
-        hub.db.updatePerson = updatePersonMock
-
-        // set the first identify going
-        await identify(hub, initialDistinctId)
-
-        // Let's first just make sure `updatePerson` was called, as a way of
-        // checking that our mocking was actually invoked
-        expect(hub.db.updatePerson).toHaveBeenCalled()
-
-        // Now make sure that we have one person in the db that has been
-        // identified
-        expect((await hub.db.fetchPersons())?.length).toEqual(1)
-        expect((await hub.db.fetchPerson(team.id, initialDistinctId))?.is_identified).toBe(true)
-    })
-
-    test('we do not leave things partially updated if something goes wrong in identify', async () => {
-        // We want to make sure that handling of identify is atomic, otherwise
-        // we could end up with inconsistent person state
-        // To do this we simulate a failure in `hub.db.updatePerson` which is as
-        // of this comment being called from `setIsIdentified`. This might not
-        // always be the case, so we need to make sure that we
-        expect(await hub.db.fetchPersons()).toEqual([])
-
-        hub.db.updatePerson = jest.fn(() => {
-            throw Error('Failed to update person')
+            // Make sure the persons are identified
+            const persons = await hub.db.fetchPersons()
+            expect(persons.map((person) => person.is_identified)).toEqual([true, true])
         })
 
-        await identify(hub, 'distinct-id')
+        test('we do not alias users if distinct id changes but we are already identified, with no anonymous event', async () => {
+            // This test is in reference to
+            // https://github.com/PostHog/posthog/issues/5527 , where we were
+            // correctly identifying that an anonymous user before login should be
+            // aliased to the user they subsequently login as, but incorrectly
+            // aliasing on subsequent $identify events. The anonymous case is
+            // special as we want to alias to a known user, but otherwise we
+            // shouldn't be doing so. This test is similar to the previous one,
+            // except it does not include an initial anonymous event.
 
-        // Let's first just make sure `updatePerson` was called
-        expect(hub.db.updatePerson).toHaveBeenCalled()
+            const anonymousId = 'anonymous_id'
+            const initialDistinctId = 'initial_distinct_id'
+            const newDistinctId = 'new_distinct_id'
 
-        // Now let's make sure there are no persons. In a production environment
-        // these identify tasks should be retried, or send to a "dead letter
-        // queue" or similar for inspection.
-        expect(await hub.db.fetchPersons()).toEqual([])
+            // Play out a sequence of events that should result in two users being
+            // identified, with the first to events associated with one user, and
+            // the third with another.
+            await identify(hub, initialDistinctId)
+            await capture(hub, 'event 2')
+            await identify(hub, newDistinctId)
+            await capture(hub, 'event 3')
+
+            // Let's also make sure that we do not alias when switching back to
+            // initialDistictId
+            await identify(hub, initialDistinctId)
+
+            // Get pairins of person distinctIds and the events associated with them
+            const eventsByPerson = await getEventsByPerson(hub)
+
+            expect(eventsByPerson).toEqual([
+                [
+                    [initialDistinctId, anonymousId],
+                    ['$identify', 'event 2', '$identify'],
+                ],
+                [[newDistinctId], ['$identify', 'event 3']],
+            ])
+
+            // Make sure the persons are identified
+            const persons = await hub.db.fetchPersons()
+            expect(persons.map((person) => person.is_identified)).toEqual([true, true])
+        })
+
+        test('we do not leave things in inconsistent state if $identify is run concurrenctly', async () => {
+            // There are a few places where we have the pattern of:
+            //
+            //  1. fetch from postgres
+            //  2. check rows match condition
+            //  3. perform update
+
+            // Check the db is empty to start with
+            expect(await hub.db.fetchPersons()).toEqual([])
+
+            const initialDistinctId = 'distinct-id'
+
+            // Hook into updatePerson, which is as of writing called from
+            // setIsIdentified. Here we simply call identify again and wait on it
+            // completing before continuing with the first identify. This is
+            // depending on specific internals, it would be ideal if we could avoid
+            // this.
+            const originalUpdatePerson = hub.db.updatePerson.bind(hub.db)
+            const updatePersonMock = jest.fn(async (person, update) => {
+                if (updatePersonMock.mock.calls.length === 0) {
+                    // On first invocation, make another identify call
+                    await identify(hub, initialDistinctId)
+                }
+                return await originalUpdatePerson(person, update)
+            })
+            hub.db.updatePerson = updatePersonMock
+
+            // set the first identify going
+            await identify(hub, initialDistinctId)
+
+            // Let's first just make sure `updatePerson` was called, as a way of
+            // checking that our mocking was actually invoked
+            expect(hub.db.updatePerson).toHaveBeenCalled()
+
+            // Now make sure that we have one person in the db that has been
+            // identified
+            expect((await hub.db.fetchPersons())?.length).toEqual(1)
+            expect((await hub.db.fetchPerson(team.id, initialDistinctId))?.is_identified).toBe(true)
+        })
+
+        test('we do not leave things partially updated if something goes wrong in identify', async () => {
+            // We want to make sure that handling of identify is atomic, otherwise
+            // we could end up with inconsistent person state
+            // To do this we simulate a failure in `hub.db.updatePerson` which is as
+            // of this comment being called from `setIsIdentified`. This might not
+            // always be the case, so we need to make sure that we
+            expect(await hub.db.fetchPersons()).toEqual([])
+
+            hub.db.updatePerson = jest.fn(() => {
+                throw Error('Failed to update person')
+            })
+
+            await identify(hub, 'distinct-id')
+
+            // Let's first just make sure `updatePerson` was called
+            expect(hub.db.updatePerson).toHaveBeenCalled()
+
+            // Now let's make sure there are no persons. In a production environment
+            // these identify tasks should be retried, or send to a "dead letter
+            // queue" or similar for inspection.
+            expect(await hub.db.fetchPersons()).toEqual([])
+        })
+    })
+
+    describe('when handling $create_alias', () => {
+        test('we can alias two existing identified users', async () => {
+            // Check that we can alias two existing users. Adding this to ensure
+            // that the fix for https://github.com/PostHog/posthog/issues/5527
+            // doesn't change existing behaviour.
+
+            const anonymousId = 'anonymous_id'
+            const initialDistinctId = 'initial_distinct_id'
+            const newDistinctId = 'new_distinct_id'
+
+            // First identify a couple of users
+            await identify(hub, initialDistinctId)
+            await identify(hub, newDistinctId)
+
+            // We should now have two identified persons
+            let persons = await hub.db.fetchPersons()
+            expect(persons.map((person) => person.is_identified)).toEqual([true, true])
+
+            // Then request them to be aliased
+            await alias(hub, initialDistinctId, newDistinctId)
+
+            // Get pairings of person distinctIds and the events associated with them
+            const eventsByPerson = await getEventsByPerson(hub)
+
+            // There should just be one person, to which all events are associated
+            expect(eventsByPerson).toEqual([
+                [
+                    [initialDistinctId, anonymousId, newDistinctId],
+                    ['$identify', '$identify', '$create_alias'],
+                ],
+            ])
+
+            // Make sure there is one identified person
+            persons = await hub.db.fetchPersons()
+            expect(persons.map((person) => person.is_identified)).toEqual([true])
+        })
     })
 
     test('team event_properties', async () => {
