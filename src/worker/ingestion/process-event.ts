@@ -192,46 +192,11 @@ export class EventsProcessor {
         if (event === '$create_alias') {
             await this.alias(properties['alias'], distinctId, teamId)
         } else if (event === '$identify') {
-            await this.handleIdentify(event, properties, distinctId, teamId)
-        }
-    }
-
-    private async handleIdentify(
-        event: string,
-        properties: Properties,
-        distinctId: string,
-        teamId: number
-    ): Promise<void> {
-        // Ensure that if the person identified by "$anon_distinct_id" is
-        // identified, that we do not alias to `distinctId`, as this would
-        // be merging two distinct identified persons. See
-        // https://github.com/PostHog/posthog/issues/5527 for discussion on
-        // the details of this guard is protecting against
-        const previousDistinctId = properties['$anon_distinct_id']
-        if (previousDistinctId) {
-            const previousPerson = await this.db.fetchPerson(teamId, previousDistinctId)
-            if (previousPerson?.is_identified) {
-                console.log(
-                    'Person associated with $anon_distinct_id is identified, refusing to alias new distinctId',
-                    {
-                        distinctId,
-                        previousDistinctId,
-                    }
-                )
-            } else {
-                await this.alias(
-                    previousDistinctId,
-                    distinctId,
-                    teamId,
-                    true,
-                    0,
-                    // Ensure that any persons created by alias are created as
-                    // identified, after all, this is the identify event handling
-                    true
-                )
+            if (properties['$anon_distinct_id']) {
+                await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
             }
+            await this.setIsIdentified(teamId, distinctId)
         }
-        await this.setIsIdentified(teamId, distinctId)
     }
 
     private async setIsIdentified(teamId: number, distinctId: string, isIdentified = true): Promise<void> {
@@ -339,11 +304,19 @@ export class EventsProcessor {
         distinctId: string,
         teamId: number,
         retryIfFailed = true,
-        totalMergeAttempts = 0,
-        isIdentified = false
+        totalMergeAttempts = 0
     ): Promise<void> {
         const oldPerson = await this.db.fetchPerson(teamId, previousDistinctId)
         const newPerson = await this.db.fetchPerson(teamId, distinctId)
+
+        if (oldPerson?.is_identified) {
+            console.log('Person associated with `previousDistinctId` is identified, refusing to alias new distinctId', {
+                distinctId,
+                previousDistinctId,
+            })
+
+            return
+        }
 
         if (oldPerson && !newPerson) {
             try {
@@ -354,7 +327,7 @@ export class EventsProcessor {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
-                    await this.alias(previousDistinctId, distinctId, teamId, false, 0, isIdentified)
+                    await this.alias(previousDistinctId, distinctId, teamId, false)
                 }
             }
             return
@@ -369,7 +342,7 @@ export class EventsProcessor {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
-                    await this.alias(previousDistinctId, distinctId, teamId, false, 0, isIdentified)
+                    await this.alias(previousDistinctId, distinctId, teamId, false)
                 }
             }
             return
@@ -377,7 +350,7 @@ export class EventsProcessor {
 
         if (!oldPerson && !newPerson) {
             try {
-                await this.db.createPerson(DateTime.utc(), {}, teamId, null, isIdentified, new UUIDT().toString(), [
+                await this.db.createPerson(DateTime.utc(), {}, teamId, null, true, new UUIDT().toString(), [
                     distinctId,
                     previousDistinctId,
                 ])
@@ -387,7 +360,7 @@ export class EventsProcessor {
                 // another request already created this person
                 if (retryIfFailed) {
                     // Try once more, probably one of the two persons exists now
-                    await this.alias(previousDistinctId, distinctId, teamId, false, 0, isIdentified)
+                    await this.alias(previousDistinctId, distinctId, teamId, false)
                 }
             }
             return

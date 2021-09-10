@@ -1590,10 +1590,12 @@ export const createProcessEventTests = (
     })
 
     describe('when handling $create_alias', () => {
-        test('we can alias two existing identified users', async () => {
-            // Check that we can alias two existing users. Adding this to ensure
-            // that the fix for https://github.com/PostHog/posthog/issues/5527
-            // doesn't change existing behaviour.
+        test('we do not alias two existing identified persons', async () => {
+            // This is a change from previous functionality where we would
+            // happily merge the persons, but after discussion with Karl it
+            // looks like this isn't the functionality we want, as it is a
+            // mess database wise to merge two old persons and then potentially
+            // have to pick them apart.
 
             const anonymousId = 'anonymous_id'
             const initialDistinctId = 'initial_distinct_id'
@@ -1615,15 +1617,13 @@ export const createProcessEventTests = (
 
             // There should just be one person, to which all events are associated
             expect(eventsByPerson).toEqual([
-                [
-                    [initialDistinctId, anonymousId, newDistinctId],
-                    ['$identify', '$identify', '$create_alias'],
-                ],
+                [[initialDistinctId, anonymousId], ['$identify']],
+                [[newDistinctId], ['$identify', '$create_alias']],
             ])
 
             // Make sure there is one identified person
             persons = await hub.db.fetchPersons()
-            expect(persons.map((person) => person.is_identified)).toEqual([true])
+            expect(persons.map((person) => person.is_identified)).toEqual([true, true])
         })
     })
 
