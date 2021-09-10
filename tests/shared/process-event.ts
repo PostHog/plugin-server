@@ -1625,6 +1625,110 @@ export const createProcessEventTests = (
             persons = await hub.db.fetchPersons()
             expect(persons.map((person) => person.is_identified)).toEqual([true, true])
         })
+
+        test('we can alias an anonymous person to an identified person', async () => {
+            const anonymousId = 'anonymous_id'
+            const initialDistinctId = 'initial_distinct_id'
+
+            // Identify one person, then become anonymous
+            await identify(hub, initialDistinctId)
+            state.currentDistinctId = anonymousId
+            await capture(hub, 'anonymous event')
+
+            // Then try to alias them
+            await alias(hub, anonymousId, initialDistinctId)
+
+            // Get pairings of person distinctIds and the events associated with them
+            const eventsByPerson = await getEventsByPerson(hub)
+
+            // There should just be one person, to which all events are associated
+            expect(eventsByPerson).toEqual([
+                [
+                    [initialDistinctId, anonymousId],
+                    ['$identify', 'anonymous event', '$create_alias'],
+                ],
+            ])
+
+            // Make sure there is one identified person
+            const persons = await hub.db.fetchPersons()
+            expect(persons.map((person) => person.is_identified)).toEqual([true])
+        })
+
+        test('we can alias an identified person to an anonymous person', async () => {
+            const anonymousId = 'anonymous_id'
+            const initialDistinctId = 'initial_distinct_id'
+
+            // Identify one person, then become anonymous
+            await identify(hub, initialDistinctId)
+            state.currentDistinctId = anonymousId
+            await capture(hub, 'anonymous event')
+
+            // Then try to alias them
+            await alias(hub, initialDistinctId, anonymousId)
+
+            // Get pairings of person distinctIds and the events associated with them
+            const eventsByPerson = await getEventsByPerson(hub)
+
+            // There should just be one person, to which all events are associated
+            expect(eventsByPerson).toEqual([
+                [
+                    [initialDistinctId, anonymousId],
+                    ['$identify', 'anonymous event', '$create_alias'],
+                ],
+            ])
+
+            // Make sure there is one identified person
+            const persons = await hub.db.fetchPersons()
+            expect(persons.map((person) => person.is_identified)).toEqual([true])
+        })
+
+        test('we can alias an anonymous person to an anonymous person', async () => {
+            const anonymous1 = 'anonymous-1'
+            const anonymous2 = 'anonymous-2'
+
+            // Identify one person, then become anonymous
+            state.currentDistinctId = anonymous1
+            await capture(hub, 'anonymous event 1')
+            state.currentDistinctId = anonymous2
+            await capture(hub, 'anonymous event 2')
+
+            // Then try to alias them
+            await alias(hub, anonymous1, anonymous2)
+
+            // Get pairings of person distinctIds and the events associated with them
+            const eventsByPerson = await getEventsByPerson(hub)
+
+            // There should just be one person, to which all events are associated
+            expect(eventsByPerson).toEqual([
+                [
+                    [anonymous1, anonymous2],
+                    ['anonymous event 1', 'anonymous event 2', '$create_alias'],
+                ],
+            ])
+
+            // Make sure there is one identified person
+            const persons = await hub.db.fetchPersons()
+            expect(persons.map((person) => person.is_identified)).toEqual([false])
+        })
+
+        test('we can alias two non-existent persons', async () => {
+            const anonymous1 = 'anonymous-1'
+            const anonymous2 = 'anonymous-2'
+
+            // Then try to alias them
+            state.currentDistinctId = anonymous1
+            await alias(hub, anonymous2, anonymous1)
+
+            // Get pairings of person distinctIds and the events associated with them
+            const eventsByPerson = await getEventsByPerson(hub)
+
+            // There should just be one person, to which all events are associated
+            expect(eventsByPerson).toEqual([[[anonymous1, anonymous2], ['$create_alias']]])
+
+            // Make sure there is one non-identified person
+            const persons = await hub.db.fetchPersons()
+            expect(persons.map((person) => person.is_identified)).toEqual([false])
+        })
     })
 
     test('team event_properties', async () => {

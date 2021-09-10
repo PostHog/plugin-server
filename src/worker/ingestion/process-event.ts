@@ -193,7 +193,16 @@ export class EventsProcessor {
             await this.alias(properties['alias'], distinctId, teamId)
         } else if (event === '$identify') {
             if (properties['$anon_distinct_id']) {
-                await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
+                await this.alias(
+                    properties['$anon_distinct_id'],
+                    distinctId,
+                    teamId,
+                    true,
+                    0,
+                    // Make sure to identify that any persons created should be
+                    // marked as is_identified = true
+                    true
+                )
             }
             await this.setIsIdentified(teamId, distinctId)
         }
@@ -304,7 +313,8 @@ export class EventsProcessor {
         distinctId: string,
         teamId: number,
         retryIfFailed = true,
-        totalMergeAttempts = 0
+        totalMergeAttempts = 0,
+        isIdentified = false
     ): Promise<void> {
         const oldPerson = await this.db.fetchPerson(teamId, previousDistinctId)
         const newPerson = await this.db.fetchPerson(teamId, distinctId)
@@ -350,7 +360,7 @@ export class EventsProcessor {
 
         if (!oldPerson && !newPerson) {
             try {
-                await this.db.createPerson(DateTime.utc(), {}, teamId, null, true, new UUIDT().toString(), [
+                await this.db.createPerson(DateTime.utc(), {}, teamId, null, isIdentified, new UUIDT().toString(), [
                     distinctId,
                     previousDistinctId,
                 ])
