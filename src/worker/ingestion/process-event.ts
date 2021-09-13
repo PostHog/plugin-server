@@ -39,29 +39,24 @@ const EVENTS_WITHOUT_EVENT_DEFINITION = ['$$plugin_metrics']
 
 // used to prevent identify from being used with generic IDs
 // that we can safely assume stem from a bug or mistake
-const DISALLOWED_IDS = new Set([
+const CASE_INSENSITIVE_ILLEGAL_IDS = new Set([
     'anonymous',
     'guest',
-    'not_authenticated',
-    'distinctId',
+    'distinctid',
     'distinct_id',
     'id',
-    'ID',
-    '',
-    ' ',
-    0,
-    '[object Object]',
-    'Email',
+    'not_authenticated',
     'email',
     'undefined',
-    'null',
     'true',
     'false',
-    'NaN',
-    'Infinity',
-    'None',
-    'none',
 ])
+
+const CASE_SENSITIVE_ILLEGAL_IDS = new Set(['[object Object]', 'NaN', 'None', 'none', 'null', '0'])
+
+const isDistinctIdIllegal = (id: string): boolean => {
+    return id.trim() === '' || CASE_INSENSITIVE_ILLEGAL_IDS.has(id.toLowerCase()) || CASE_SENSITIVE_ILLEGAL_IDS.has(id)
+}
 
 export interface EventProcessingResult {
     event: IEvent | SessionRecordingEvent | PostgresSessionRecordingEvent
@@ -215,7 +210,7 @@ export class EventsProcessor {
         distinctId: string,
         teamId: number
     ): Promise<void> {
-        if (DISALLOWED_IDS.has(distinctId)) {
+        if (isDistinctIdIllegal(distinctId)) {
             return
         }
         if (event === '$create_alias') {
