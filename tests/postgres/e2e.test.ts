@@ -158,6 +158,8 @@ describe('e2e', () => {
             await posthog.capture('historicalEvent3')
             await posthog.capture('historicalEvent4')
 
+            await delayUntilEventIngested(() => hub.db.fetchEvents())
+
             const historicalEvents = await hub.db.fetchEvents()
 
             expect(historicalEvents.length).toBe(4)
