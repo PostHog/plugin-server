@@ -68,6 +68,9 @@ jobs:
               with:
                   python-version: 3.8
 
+            - name: Install SAML (python3-saml) dependencies
+              run: sudo apt-get install libxml2-dev libxmlsec1-dev libxmlsec1-openssl
+
             - name: Set up Node 14
               uses: actions/setup-node@v2
               with:
@@ -188,6 +191,9 @@ jobs:
               with:
                   python-version: 3.8
 
+            - name: Install SAML (python3-saml) dependencies
+              run: sudo apt-get install libxml2-dev libxmlsec1-dev libxmlsec1-openssl
+
             - name: Set up Node 14
               uses: actions/setup-node@v2
               with:
@@ -218,7 +224,7 @@ jobs:
                   # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
-              run: cd plugin-server && tsc --noEmit -p . && yarn test:postgres:1
+              run: cd plugin-server && yarn typescript:check && yarn test:postgres:1
 
     tests-postgres-2:
         name: Tests / Postgres + Redis (2)
@@ -263,6 +269,9 @@ jobs:
               with:
                   python-version: 3.8
 
+            - name: Install SAML (python3-saml) dependencies
+              run: sudo apt-get install libxml2-dev libxmlsec1-dev libxmlsec1-openssl
+
             - name: Set up Node 14
               uses: actions/setup-node@v2
               with:
@@ -293,7 +302,7 @@ jobs:
                   # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
-              run: cd plugin-server && tsc --noEmit -p . && yarn test:postgres:2
+              run: cd plugin-server && yarn typescript:check && yarn test:postgres:2
 
     tests-clickhouse-1:
         name: Tests / ClickHouse + Kafka (1)
@@ -353,6 +362,9 @@ jobs:
               with:
                   python-version: 3.8
 
+            - name: Install SAML (python3-saml) dependencies
+              run: sudo apt-get install libxml2-dev libxmlsec1-dev libxmlsec1-openssl
+
             - name: Set up Node 14
               uses: actions/setup-node@v2
               with:
@@ -384,7 +396,7 @@ jobs:
                   # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
-              run: cd plugin-server && tsc --noEmit -p . && yarn test:clickhouse:1
+              run: cd plugin-server && yarn typescript:check && yarn test:clickhouse:1
 
     tests-clickhouse-2:
         name: Tests / ClickHouse + Kafka (2)
@@ -444,6 +456,9 @@ jobs:
               with:
                   python-version: 3.8
 
+            - name: Install SAML (python3-saml) dependencies
+              run: sudo apt-get install libxml2-dev libxmlsec1-dev libxmlsec1-openssl
+
             - name: Set up Node 14
               uses: actions/setup-node@v2
               with:
@@ -475,4 +490,4 @@ jobs:
                   # Below DB name has `test_` prepended, as that's how Django (ran above) creates the test DB
                   DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/test_posthog'
                   REDIS_URL: 'redis://localhost'
-              run: cd plugin-server && tsc --noEmit -p . && yarn test:clickhouse:2
+              run: cd plugin-server && yarn typescript:check && yarn test:clickhouse:2
