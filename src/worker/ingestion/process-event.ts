@@ -37,6 +37,32 @@ const MAX_FAILED_PERSON_MERGE_ATTEMPTS = 3
 // for e.g. internal events we don't want to be available for users in the UI
 const EVENTS_WITHOUT_EVENT_DEFINITION = ['$$plugin_metrics']
 
+// used to prevent identify from being used with generic IDs
+// that we can safely assume stem from a bug or mistake
+const DISALLOWED_IDS = new Set([
+    'anonymous',
+    'guest',
+    'not_authenticated',
+    'distinctId',
+    'distinct_id',
+    'id',
+    'ID',
+    '',
+    ' ',
+    0,
+    '[object Object]',
+    'Email',
+    'email',
+    'undefined',
+    'null',
+    'true',
+    'false',
+    'NaN',
+    'Infinity',
+    'None',
+    'none',
+])
+
 export interface EventProcessingResult {
     event: IEvent | SessionRecordingEvent | PostgresSessionRecordingEvent
     eventId?: number
@@ -189,6 +215,9 @@ export class EventsProcessor {
         distinctId: string,
         teamId: number
     ): Promise<void> {
+        if (DISALLOWED_IDS.has(distinctId)) {
+            return
+        }
         if (event === '$create_alias') {
             await this.alias(properties['alias'], distinctId, teamId)
         } else if (event === '$identify') {
