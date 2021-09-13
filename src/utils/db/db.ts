@@ -776,7 +776,8 @@ export class DB {
 
     public async fetchEvents(): Promise<Event[] | ClickHouseEvent[]> {
         if (this.kafkaProducer) {
-            const events = (await this.clickhouseQuery(`SELECT * FROM events`)).data as ClickHouseEvent[]
+            const events = (await this.clickhouseQuery(`SELECT * FROM events ORDER BY timestamp ASC`))
+                .data as ClickHouseEvent[]
             return (
                 events?.map(
                     (event) =>
@@ -790,7 +791,11 @@ export class DB {
                 ) || []
             )
         } else {
-            const result = await this.postgresQuery('SELECT * FROM posthog_event', undefined, 'fetchAllEvents')
+            const result = await this.postgresQuery(
+                'SELECT * FROM posthog_event ORDER BY timestamp ASC',
+                undefined,
+                'fetchAllEvents'
+            )
             return result.rows as Event[]
         }
     }
@@ -1163,7 +1168,13 @@ export class DB {
         return createUserResult
     }
 
-    public async createPersonalApiKey({ id, user_id, label, value, created_at }: CreatePersonalApiKeyPayload) {
+    public async createPersonalApiKey({
+        id,
+        user_id,
+        label,
+        value,
+        created_at,
+    }: CreatePersonalApiKeyPayload): Promise<QueryResult> {
         return await this.postgresQuery(
             `INSERT INTO posthog_personalapikey (id, user_id, label, value, created_at)
             VALUES ($1, $2, $3, $4, $5)
