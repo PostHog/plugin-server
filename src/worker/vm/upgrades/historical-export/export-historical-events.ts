@@ -106,7 +106,7 @@ export function addHistoricalEventsExportCapability(
 
         let events: PluginEvent[] = []
 
-        let fetchEventsError: Error | null = null
+        let fetchEventsError: Error | unknown | null = null
         try {
             events = await fetchEventsForInterval(
                 hub.db,
@@ -120,11 +120,10 @@ export function addHistoricalEventsExportCapability(
             fetchEventsError = error
         }
 
-        let exportEventsError: Error | null = null
+        let exportEventsError: Error | unknown | null = null
 
         if (!fetchEventsError) {
             try {
-                console.log(events)
                 await methods.exportEvents!(events)
             } catch (error) {
                 exportEventsError = error
