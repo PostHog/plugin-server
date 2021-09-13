@@ -13,6 +13,7 @@ import { resetTestDatabase } from '../helpers/sql'
 import { delayUntilEventIngested } from '../shared/process-event'
 
 const { console: testConsole } = writeToFile
+const HISTORICAL_EVENTS_COUNTER_CACHE_KEY = '@plugin/60/2/historical_events_seen'
 
 jest.mock('../../src/utils/status')
 jest.setTimeout(60000) // 60 sec timeout
@@ -72,6 +73,7 @@ describe('e2e', () => {
 
         await redis.del(hub.PLUGINS_CELERY_QUEUE)
         await redis.del(hub.CELERY_DEFAULT_QUEUE)
+        await redis.del(HISTORICAL_EVENTS_COUNTER_CACHE_KEY)
 
         posthog = createPosthog(hub, pluginConfig39)
     })
@@ -178,7 +180,7 @@ describe('e2e', () => {
 
             await delay(5000)
 
-            const totalEvents = await redis.get('@plugin/60/2/historical_events_seen')
+            const totalEvents = await redis.get(HISTORICAL_EVENTS_COUNTER_CACHE_KEY)
 
             expect(Number(totalEvents)).toBe(4)
         })
