@@ -162,6 +162,8 @@ describe('e2e', () => {
 
             await delayUntilEventIngested(() => hub.db.fetchEvents())
 
+            await delay(2000)
+
             const historicalEvents = await hub.db.fetchEvents()
 
             expect(historicalEvents.length).toBe(4)
