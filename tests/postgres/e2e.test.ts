@@ -178,7 +178,7 @@ describe('e2e', () => {
             const client = new Client(hub.db, hub.PLUGINS_CELERY_QUEUE)
             client.sendTask('posthog.tasks.plugins.plugin_job', args, {})
 
-            await delay(5000)
+            await delay(10000)
 
             const totalEvents = await redis.get(HISTORICAL_EVENTS_COUNTER_CACHE_KEY)
 
