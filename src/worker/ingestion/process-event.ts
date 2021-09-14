@@ -211,6 +211,7 @@ export class EventsProcessor {
         teamId: number
     ): Promise<void> {
         if (isDistinctIdIllegal(distinctId)) {
+            this.pluginsServer.statsd?.increment(`illegal_distinct_ids.total`, { distinctId })
             return
         }
         if (event === '$create_alias') {
