@@ -337,7 +337,7 @@ export class DB {
     public redisLRem(key: string, count: number, elementKey: string): Promise<number> {
         return instrumentQuery(this.statsd, 'query.redisLRem', undefined, async () => {
             const client = await this.redisPool.acquire()
-            const timeout = timeoutGuard('LREM delayed. Waiting over 30 sec to perform LRANGE', {
+            const timeout = timeoutGuard('LREM delayed. Waiting over 30 sec to perform LREM', {
                 key,
                 count,
                 elementKey,
@@ -354,7 +354,7 @@ export class DB {
     public redisLPop(key: string, count: number): Promise<string[]> {
         return instrumentQuery(this.statsd, 'query.redisLPop', undefined, async () => {
             const client = await this.redisPool.acquire()
-            const timeout = timeoutGuard('LPOP delayed. Waiting over 30 sec to perform LRANGE', {
+            const timeout = timeoutGuard('LPOP delayed. Waiting over 30 sec to perform LPOP', {
                 key,
                 count,
             })
@@ -632,14 +632,9 @@ export class DB {
         distinctId: string
     ): Promise<ProducerRecord | void> {
         const insertResult = await client.query(
-            'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING *',
+            'INSERT INTO posthog_persondistinctid (distinct_id, person_id, team_id) VALUES ($1, $2, $3) RETURNING *',
             [distinctId, person.id, person.team_id]
         )
-
-        // some other thread already added this ID
-        if (insertResult.rows.length === 0) {
-            return
-        }
 
         const personDistinctIdCreated = insertResult.rows[0] as PersonDistinctId
         if (this.kafkaProducer) {
