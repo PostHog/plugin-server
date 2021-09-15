@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon'
+import { PoolClient } from 'pg'
 
 import { startPluginsServer } from '../../src/main/pluginsServer'
 import { Database, Hub, LogLevel, PluginsServerConfig, Team, TimestampFormat } from '../../src/types'
@@ -273,7 +274,9 @@ describe('postgres parity', () => {
 
         // delete person
 
-        await hub.db.deletePerson(person)
+        await hub.db.postgresTransaction(async (client) => {
+            await hub.db.deletePerson(person, client)
+        })
 
         // Check distinct ids
         await delayUntilEventIngested(async () =>

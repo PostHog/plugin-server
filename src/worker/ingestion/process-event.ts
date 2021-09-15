@@ -417,7 +417,7 @@ export class EventsProcessor {
         // between `moveDistinctId` and `deletePerson` being called here
         // – in such a case a distinct ID may be assigned to the person in the database
         // AFTER `otherPersonDistinctIds` was fetched, so this function is not aware of it and doesn't merge it.
-        // That then causeds `deletePerson` to fail, because of foreign key constraints –
+        // That then causes `deletePerson` to fail, because of foreign key constraints –
         // the dangling distinct ID added elsewhere prevents the person from being deleted!
         // This is low-probability so likely won't occur on second retry of this block.
         // In the rare case of the person changing VERY often however, it may happen even a few times,
