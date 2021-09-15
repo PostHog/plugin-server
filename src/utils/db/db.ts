@@ -156,7 +156,7 @@ export class DB {
     public postgresTransaction<ReturnType extends any>(
         transaction: (client: PoolClient) => Promise<ReturnType>
     ): Promise<ReturnType> {
-        return instrumentQuery(this.statsd, 'query.postgres_transaction', undefined, async () => {
+        return instrumentQuery(this.statsd, 'query.postgres_transation', undefined, async () => {
             const timeout = timeoutGuard(`Postgres slow transaction warning after 30 sec!`)
             const client = await this.postgres.connect()
             try {
