@@ -2,6 +2,7 @@ import ClickHouse from '@posthog/clickhouse'
 import { PluginEvent, Properties } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import equal from 'fast-deep-equal'
+import { ProducerRecord } from 'kafkajs'
 import { DateTime, Duration } from 'luxon'
 import { DatabaseError, QueryResult } from 'pg'
 
@@ -389,63 +390,51 @@ export class EventsProcessor {
             firstSeen = otherPerson.created_at
         }
 
-        await this.db.updatePerson(mergeInto, { created_at: firstSeen, properties: mergeInto.properties })
+        let kafkaMessages: ProducerRecord[] = []
 
-        // Merge the distinct IDs
-        await this.db.postgresQuery(
-            'UPDATE posthog_cohortpeople SET person_id = $1 WHERE person_id = $2',
-            [mergeInto.id, otherPerson.id],
-            'updateCohortPeople'
-        )
         let failedAttempts = totalMergeAttempts
-        let shouldRetryAliasOperation = false
 
-        // Retrying merging up to `MAX_FAILED_PERSON_MERGE_ATTEMPTS` times, in case race conditions occur.
-        // An example is a distinct ID being aliased in another plugin server instance,
-        // between `moveDistinctId` and `deletePerson` being called here
-        // – in such a case a distinct ID may be assigned to the person in the database
-        // AFTER `otherPersonDistinctIds` was fetched, so this function is not aware of it and doesn't merge it.
-        // That then causeds `deletePerson` to fail, because of foreign key constraints –
-        // the dangling distinct ID added elsewhere prevents the person from being deleted!
-        // This is low-probability so likely won't occur on second retry of this block.
-        // In the rare case of the person changing VERY often however, it may happen even a few times,
-        // in which case we'll bail and rethrow the error.
-        while (true) {
+        await this.db.postgresTransaction(async (client) => {
             try {
-                await this.db.moveDistinctIds(otherPerson, mergeInto)
+                const updatePersonMessages = await this.db.updatePerson(
+                    mergeInto,
+                    { created_at: firstSeen, properties: mergeInto.properties },
+                    client
+                )
+
+                // Merge the distinct IDs
+                await client.query('UPDATE posthog_cohortpeople SET person_id = $1 WHERE person_id = $2', [
+                    mergeInto.id,
+                    otherPerson.id,
+                ])
+
+                const distinctIdMessages = await this.db.moveDistinctIds(otherPerson, mergeInto)
+
+                const deletePersonMessages = await this.db.deletePerson(otherPerson, client)
+
+                kafkaMessages = [...updatePersonMessages, ...distinctIdMessages, ...deletePersonMessages]
             } catch (error) {
                 Sentry.captureException(error, {
                     extra: { mergeInto, mergeIntoDistinctId, otherPerson, otherPersonDistinctId },
                 })
-                failedAttempts++
 
-                // If a person was deleted in between fetching and moveDistinctId, re-run alias to ensure
-                // the updated persons are fetched and merged safely
-                if (error instanceof RaceConditionError && failedAttempts < MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
-                    shouldRetryAliasOperation = true
-                    break
-                }
-
-                throw error
-            }
-
-            try {
-                await this.db.deletePerson(otherPerson)
-                break // All OK, exiting retry loop
-            } catch (error) {
                 if (!(error instanceof DatabaseError)) {
                     throw error // Very much not OK, this is some completely unexpected error
                 }
+
                 failedAttempts++
                 if (failedAttempts === MAX_FAILED_PERSON_MERGE_ATTEMPTS) {
                     throw error // Very much not OK, failed repeatedly so rethrowing the error
                 }
-                continue // Not OK, trying again to make sure that ALL distinct IDs are merged
-            }
-        }
 
-        if (shouldRetryAliasOperation) {
-            await this.alias(otherPersonDistinctId, mergeIntoDistinctId, teamId, false, failedAttempts)
+                await this.alias(otherPersonDistinctId, mergeIntoDistinctId, teamId, false, failedAttempts)
+            }
+        })
+
+        if (this.kafkaProducer) {
+            for (const kafkaMessage of kafkaMessages) {
+                await this.kafkaProducer.queueMessage(kafkaMessage)
+            }
         }
     }
 
