@@ -1786,7 +1786,7 @@ export const createProcessEventTests = (
         expect(person.properties).toEqual({ a: 1, b: 2, c: 3, d: 4 })
     })
 
-    test('any event can do $set_once on props', async () => {
+    test('$group', async () => {
         await createPerson(hub, team, ['distinct_id'])
 
         await processEvent(
