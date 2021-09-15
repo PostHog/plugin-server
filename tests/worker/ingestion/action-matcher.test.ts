@@ -726,6 +726,11 @@ describe('ActionMatcher', () => {
                     properties: [{ type: 'cohort', key: 'id', value: testCohort.id }],
                 },
             ])
+            const actionDefinitionAllUsers: Action = await createTestAction([
+                {
+                    properties: [{ type: 'cohort', key: 'id', value: 'all' }],
+                },
+            ])
 
             const cohortPerson = await hub.db.createPerson(
                 DateTime.local(),
@@ -756,19 +761,19 @@ describe('ActionMatcher', () => {
                     eventExamplePersonOk,
                     await hub.db.fetchPerson(actionDefinition.team_id, eventExamplePersonOk.distinct_id)
                 )
-            ).toEqual([actionDefinition])
+            ).toEqual([actionDefinition, actionDefinitionAllUsers])
             expect(
                 await actionMatcher.match(
                     eventExamplePersonBad,
                     await hub.db.fetchPerson(actionDefinition.team_id, eventExamplePersonBad.distinct_id)
                 )
-            ).toEqual([])
+            ).toEqual([actionDefinitionAllUsers])
             expect(
                 await actionMatcher.match(
                     eventExamplePersonUnknown,
                     await hub.db.fetchPerson(actionDefinition.team_id, eventExamplePersonUnknown.distinct_id)
                 )
-            ).toEqual([])
+            ).toEqual([actionDefinitionAllUsers])
         })
 
         it('returns a match in case of a CH static cohort match', async () => {
@@ -910,6 +915,16 @@ describe('ActionMatcher', () => {
                     selector: 'main > a[href="https://example.com/"]',
                 },
             ])
+            const actionDefinitionEmptySelectorProp: Action = await createTestAction([
+                {
+                    properties: [{ type: 'element', key: 'selector', value: '' }],
+                },
+            ])
+            const actionDefinitionCompletelyInvalidSelectorProp: Action = await createTestAction([
+                {
+                    properties: [{ type: 'element', key: 'selector', value: null as unknown as string }],
+                },
+            ])
 
             const event = createTestEvent()
             const elementsHrefProperNondirect: Element[] = [
@@ -976,6 +991,26 @@ describe('ActionMatcher', () => {
     })
 
     describe('#checkElementsAgainstSelector()', () => {
+        it('handles selector with attribute', () => {
+            const elements: Element[] = [
+                { tag_name: 'h1', attr_class: ['headline'], attributes: { 'attr__data-attr': 'xyz' } },
+                { tag_name: 'div', attr_class: ['top'] },
+                { tag_name: 'div' },
+                { tag_name: 'main' },
+            ]
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, "[data-attr='xyz']")).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, "h1[data-attr='xyz']")).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, ".headline[data-attr='xyz']")).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, "main [data-attr='xyz']")).toBeTruthy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, ".top [data-attr='xyz']")).toBeTruthy()
+
+            expect(actionMatcher.checkElementsAgainstSelector(elements, "[data-attr='foo']")).toBeFalsy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, "main[data-attr='xyz']")).toBeFalsy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, "div[data-attr='xyz']")).toBeFalsy()
+            expect(actionMatcher.checkElementsAgainstSelector(elements, "div[data-attr='xyz']")).toBeFalsy()
+        })
+
         it('handles any descendant selector', () => {
             const elements: Element[] = [
                 { tag_name: 'h1', attr_class: ['headline'] },

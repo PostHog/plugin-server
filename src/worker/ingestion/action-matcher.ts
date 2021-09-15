@@ -1,5 +1,6 @@
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import { Properties } from '@posthog/plugin-scaffold/src/types'
+import { captureException } from '@sentry/node'
 import escapeStringRegexp from 'escape-string-regexp'
 import equal from 'fast-deep-equal'
 import { StatsD } from 'hot-shots'
@@ -140,8 +141,15 @@ export class ActionMatcher {
         action: Action
     ): Promise<boolean> {
         for (const step of action.steps) {
-            if (await this.checkStep(event, elements, person, step)) {
-                return true
+            try {
+                if (await this.checkStep(event, elements, person, step)) {
+                    return true
+                }
+            } catch (error) {
+                captureException(error, {
+                    tags: { team_id: action.team_id },
+                    extra: { event, elements, person, action, step },
+                })
             }
         }
         return false
@@ -327,7 +335,7 @@ export class ActionMatcher {
      */
     private checkEventAgainstElementFilter(elements: Element[], filter: ElementPropertyFilter): boolean {
         if (filter.key === 'selector') {
-            return this.checkElementsAgainstSelector(elements, filter.value)
+            return filter.value ? this.checkElementsAgainstSelector(elements, filter.value) : false
         } else {
             return elements.some((element) => this.checkPropertiesAgainstFilter(element, filter))
         }
@@ -340,10 +348,14 @@ export class ActionMatcher {
         person: Person | undefined,
         filter: CohortPropertyFilter
     ): Promise<boolean> {
+        let cohortId = filter.value
+        if (cohortId === 'all') {
+            // The "All users" cohort matches anyone
+            return true
+        }
         if (!person) {
             return false // NO PERSON TO MATCH AGAINST COHORT
         }
-        let cohortId = filter.value
         if (typeof cohortId !== 'number') {
             cohortId = parseInt(cohortId)
         }
@@ -507,7 +519,7 @@ export class ActionMatcher {
                 return false
             }
             for (const [key, value] of Object.entries(requirements.attributes)) {
-                if (attributes[key] !== value) {
+                if (attributes[`attr__${key}`] !== value) {
                     return false
                 }
             }

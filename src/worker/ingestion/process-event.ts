@@ -333,8 +333,7 @@ export class EventsProcessor {
             try {
                 await this.db.addDistinctId(oldPerson, distinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
-            } catch (error) {
-                Sentry.captureException(error)
+            } catch {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
@@ -348,8 +347,7 @@ export class EventsProcessor {
             try {
                 await this.db.addDistinctId(newPerson, previousDistinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
-            } catch (error) {
-                Sentry.captureException(error)
+            } catch {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
@@ -365,8 +363,7 @@ export class EventsProcessor {
                     distinctId,
                     previousDistinctId,
                 ])
-            } catch (error) {
-                Sentry.captureException(error)
+            } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
                 if (retryIfFailed) {
