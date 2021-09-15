@@ -394,6 +394,16 @@ export class EventsProcessor {
 
         let failedAttempts = totalMergeAttempts
 
+        // Retrying merging up to `MAX_FAILED_PERSON_MERGE_ATTEMPTS` times, in case race conditions occur.
+        // An example is a distinct ID being aliased in another plugin server instance,
+        // between `moveDistinctId` and `deletePerson` being called here
+        // – in such a case a distinct ID may be assigned to the person in the database
+        // AFTER `otherPersonDistinctIds` was fetched, so this function is not aware of it and doesn't merge it.
+        // That then causeds `deletePerson` to fail, because of foreign key constraints –
+        // the dangling distinct ID added elsewhere prevents the person from being deleted!
+        // This is low-probability so likely won't occur on second retry of this block.
+        // In the rare case of the person changing VERY often however, it may happen even a few times,
+        // in which case we'll bail and rethrow the error.
         await this.db.postgresTransaction(async (client) => {
             try {
                 const updatePersonMessages = await this.db.updatePerson(
