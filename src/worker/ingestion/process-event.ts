@@ -38,6 +38,10 @@ const MAX_FAILED_PERSON_MERGE_ATTEMPTS = 3
 // for e.g. internal events we don't want to be available for users in the UI
 const EVENTS_WITHOUT_EVENT_DEFINITION = ['$$plugin_metrics']
 
+export enum AliasTriggerEvent {
+    Identify = '$identify',
+    CreateAlias = '$create_alias',
+}
 export interface EventProcessingResult {
     event: IEvent | SessionRecordingEvent | PostgresSessionRecordingEvent
     eventId?: number
@@ -184,46 +188,6 @@ export class EventsProcessor {
         return now
     }
 
-    private async handleIdentifyOrAlias(
-        event: string,
-        properties: Properties,
-        distinctId: string,
-        teamId: number
-    ): Promise<void> {
-        if (event === '$create_alias') {
-            await this.alias(properties['alias'], distinctId, teamId)
-        } else if (event === '$identify') {
-            if (properties['$anon_distinct_id']) {
-                await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
-            }
-            await this.setIsIdentified(teamId, distinctId)
-        }
-    }
-
-    private async setIsIdentified(teamId: number, distinctId: string, isIdentified = true): Promise<void> {
-        let personFound = await this.db.fetchPerson(teamId, distinctId)
-        if (!personFound) {
-            try {
-                personFound = await this.db.createPerson(
-                    DateTime.utc(),
-                    {},
-                    teamId,
-                    null,
-                    true,
-                    new UUIDT().toString(),
-                    [distinctId]
-                )
-            } catch {
-                // Catch race condition where in between getting and creating,
-                // another request already created this person
-                personFound = await this.db.fetchPerson(teamId, distinctId)
-            }
-        }
-        if (personFound && !personFound.is_identified) {
-            await this.db.updatePerson(personFound, { is_identified: isIdentified })
-        }
-    }
-
     private async updatePersonProperties(
         teamId: number,
         distinctId: string,
@@ -300,10 +264,51 @@ export class EventsProcessor {
         return returnedProps
     }
 
+    private async setIsIdentified(teamId: number, distinctId: string, isIdentified = true): Promise<void> {
+        let personFound = await this.db.fetchPerson(teamId, distinctId)
+        if (!personFound) {
+            try {
+                personFound = await this.db.createPerson(
+                    DateTime.utc(),
+                    {},
+                    teamId,
+                    null,
+                    true,
+                    new UUIDT().toString(),
+                    [distinctId]
+                )
+            } catch {
+                // Catch race condition where in between getting and creating,
+                // another request already created this person
+                personFound = await this.db.fetchPerson(teamId, distinctId)
+            }
+        }
+        if (personFound && !personFound.is_identified) {
+            await this.db.updatePerson(personFound, { is_identified: isIdentified })
+        }
+    }
+
+    private async handleIdentifyOrAlias(
+        event: string,
+        properties: Properties,
+        distinctId: string,
+        teamId: number
+    ): Promise<void> {
+        if (event === '$create_alias') {
+            await this.alias(properties['alias'], distinctId, teamId, AliasTriggerEvent.CreateAlias)
+        } else if (event === '$identify') {
+            if (properties['$anon_distinct_id']) {
+                await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
+            }
+            await this.setIsIdentified(teamId, distinctId)
+        }
+    }
+
     private async alias(
         previousDistinctId: string,
         distinctId: string,
         teamId: number,
+        aliasTriggerEvent = AliasTriggerEvent.Identify,
         retryIfFailed = true,
         totalMergeAttempts = 0
     ): Promise<void> {
@@ -318,7 +323,7 @@ export class EventsProcessor {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
-                    await this.alias(previousDistinctId, distinctId, teamId, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, aliasTriggerEvent, false)
                 }
             }
             return
@@ -332,7 +337,7 @@ export class EventsProcessor {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
-                    await this.alias(previousDistinctId, distinctId, teamId, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, aliasTriggerEvent, false)
                 }
             }
             return
@@ -349,20 +354,31 @@ export class EventsProcessor {
                 // another request already created this person
                 if (retryIfFailed) {
                     // Try once more, probably one of the two persons exists now
-                    await this.alias(previousDistinctId, distinctId, teamId, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, aliasTriggerEvent, false)
                 }
             }
             return
         }
 
         if (oldPerson && newPerson && oldPerson.id !== newPerson.id) {
-            await this.mergePeople({
-                totalMergeAttempts,
-                mergeInto: newPerson,
-                mergeIntoDistinctId: distinctId,
-                otherPerson: oldPerson,
-                otherPersonDistinctId: previousDistinctId,
-            })
+            // $create_alias is an explicit call to merge 2 users, so we'll merge anything
+            // for $identify, we'll not merge 2 already identified users as this can lead to nasty
+            // issues with tangled up users
+            const isIdentifyCallWithTwoIdentifiedUsers =
+                aliasTriggerEvent === AliasTriggerEvent.Identify && oldPerson.is_identified && newPerson.is_identified
+
+            if (isIdentifyCallWithTwoIdentifiedUsers) {
+                status.warn('🤔', '$identify called with two already identified users')
+            } else {
+                await this.mergePeople({
+                    totalMergeAttempts,
+                    aliasTriggerEvent,
+                    mergeInto: newPerson,
+                    mergeIntoDistinctId: distinctId,
+                    otherPerson: oldPerson,
+                    otherPersonDistinctId: previousDistinctId,
+                })
+            }
         }
     }
 
@@ -372,12 +388,14 @@ export class EventsProcessor {
         otherPerson,
         otherPersonDistinctId,
         totalMergeAttempts = 0,
+        aliasTriggerEvent = AliasTriggerEvent.Identify,
     }: {
         mergeInto: Person
         mergeIntoDistinctId: string
         otherPerson: Person
         otherPersonDistinctId: string
         totalMergeAttempts: number
+        aliasTriggerEvent?: AliasTriggerEvent
     }): Promise<void> {
         const teamId = mergeInto.team_id
 
@@ -437,7 +455,14 @@ export class EventsProcessor {
                     throw error // Very much not OK, failed repeatedly so rethrowing the error
                 }
 
-                await this.alias(otherPersonDistinctId, mergeIntoDistinctId, teamId, false, failedAttempts)
+                await this.alias(
+                    otherPersonDistinctId,
+                    mergeIntoDistinctId,
+                    teamId,
+                    aliasTriggerEvent,
+                    false,
+                    failedAttempts
+                )
             }
         })
 
