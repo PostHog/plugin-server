@@ -24,9 +24,7 @@ describe('process event (clickhouse)', () => {
         await resetTestDatabaseClickhouse(extraServerConfig)
     })
 
-    createProcessEventTests(
-        'clickhouse',
-        extraServerConfig /* , (response) => {
+    createProcessEventTests('clickhouse', extraServerConfig, (response) => {
         test('mergePeople kafka messages are only enqueued after all postgres steps succeed', async () => {
             const { hub } = response
 
@@ -67,6 +65,5 @@ describe('process event (clickhouse)', () => {
             // updatePerson 1x, moveDistinctIds 2x, deletePerson 1x
             expect(hub!.db.kafkaProducer!.queueMessage).toHaveBeenCalledTimes(4)
         })
-    } */
-    )
+    })
 })

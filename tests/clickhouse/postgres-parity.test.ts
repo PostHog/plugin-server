@@ -3,7 +3,7 @@ import { PoolClient } from 'pg'
 
 import { startPluginsServer } from '../../src/main/pluginsServer'
 import { Database, Hub, LogLevel, PluginsServerConfig, Team, TimestampFormat } from '../../src/types'
-import { castTimestampOrNow, UUIDT } from '../../src/utils/utils'
+import { castTimestampOrNow, delay, UUIDT } from '../../src/utils/utils'
 import { makePiscina } from '../../src/worker/piscina'
 import { createPosthog, DummyPostHog } from '../../src/worker/vm/extensions/posthog'
 import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
@@ -253,7 +253,10 @@ describe('postgres parity', () => {
 
         // move distinct ids from person to to anotherPerson
 
-        await hub.db.moveDistinctIds(person, anotherPerson)
+        const kafkaMessages = await hub.db.moveDistinctIds(person, anotherPerson)
+        for (const kafkaMessage of kafkaMessages) {
+            await hub.db!.kafkaProducer!.queueMessage(kafkaMessage)
+        }
         await delayUntilEventIngested(() => hub.db.fetchDistinctIdValues(anotherPerson, Database.ClickHouse), 2)
 
         // it got added
@@ -278,7 +281,8 @@ describe('postgres parity', () => {
         // delete person
 
         await hub.db.postgresTransaction(async (client) => {
-            await hub.db.deletePerson(person, client)
+            const deletePersonMessage = await hub.db.deletePerson(person, client)
+            await hub.db!.kafkaProducer!.queueMessage(deletePersonMessage[0])
         })
 
         // Check distinct ids
