@@ -371,7 +371,7 @@ export class EventsProcessor {
                     {},
                     teamId,
                     null,
-                    aliasTriggerEvent === AliasTriggerEvent.Identify,
+                    shouldIdentifyPerson,
                     new UUIDT().toString(),
                     [distinctId, previousDistinctId]
                 )
