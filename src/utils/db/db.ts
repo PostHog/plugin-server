@@ -529,9 +529,9 @@ export class DB {
                 ],
             }
             if (client) {
-                await this.kafkaProducer.queueMessage(message)
-            } else {
                 kafkaMessages.push(message)
+            } else {
+                await this.kafkaProducer.queueMessage(message)
             }
         }
 
