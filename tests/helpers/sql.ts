@@ -36,7 +36,7 @@ export async function resetTestDatabase(
     const config = { ...defaultConfig, ...extraServerConfig }
     const db = new Pool({ connectionString: config.DATABASE_URL! })
     try {
-        await db.query('TRUNCATE ee_hook')
+        await db.query('TRUNCATE TABLE ee_hook')
     } catch {}
 
     await db.query(`
