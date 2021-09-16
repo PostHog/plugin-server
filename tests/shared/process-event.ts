@@ -918,10 +918,10 @@ export const createProcessEventTests = (
         now = DateTime.fromISO('2020-01-01T12:00:05.200Z')
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
-            { offset: 150, event: '$autocapture', distinct_id: 'distinct_id' } as any as PluginEvent,
+            { offset: 150, event: '$autocapture', distinct_id: 'distinct_id1' } as any as PluginEvent,
             team.id,
             now,
             now,
@@ -937,10 +937,10 @@ export const createProcessEventTests = (
         now = DateTime.fromISO('2020-01-01T12:00:05.200Z')
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
-            { offset: 150, event: '$autocapture', distinct_id: 'distinct_id' } as any as PluginEvent,
+            { offset: 150, event: '$autocapture', distinct_id: 'distinct_id1' } as any as PluginEvent,
             team.id,
             now,
             null,
@@ -1121,17 +1121,17 @@ export const createProcessEventTests = (
     })
 
     test('identify set', async () => {
-        await createPerson(hub, team, ['distinct_id'])
+        await createPerson(hub, team, ['distinct_id1'])
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: '$identify',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $set: { a_prop: 'test-1', c_prop: 'test-1' },
                 },
             } as any as PluginEvent,
@@ -1147,19 +1147,19 @@ export const createProcessEventTests = (
         expect(event.properties['$set']).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
 
         const [person] = await hub.db.fetchPersons()
-        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
         expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
         expect(person.is_identified).toEqual(true)
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: '$identify',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $set: { a_prop: 'test-2', b_prop: 'test-2b' },
                 },
             } as any as PluginEvent,
@@ -1174,17 +1174,17 @@ export const createProcessEventTests = (
     })
 
     test('identify set_once', async () => {
-        await createPerson(hub, team, ['distinct_id'])
+        await createPerson(hub, team, ['distinct_id1'])
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: '$identify',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $set_once: { a_prop: 'test-1', c_prop: 'test-1' },
                 },
             } as any as PluginEvent,
@@ -1200,19 +1200,19 @@ export const createProcessEventTests = (
         expect(event.properties['$set_once']).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
 
         const [person] = await hub.db.fetchPersons()
-        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
         expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
         expect(person.is_identified).toEqual(true)
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: '$identify',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $set_once: { a_prop: 'test-2', b_prop: 'test-2b' },
                 },
             } as any as PluginEvent,
@@ -1224,6 +1224,57 @@ export const createProcessEventTests = (
         expect((await hub.db.fetchEvents()).length).toBe(2)
         const [person2] = await hub.db.fetchPersons()
         expect(person2.properties).toEqual({ a_prop: 'test-1', b_prop: 'test-2b', c_prop: 'test-1' })
+    })
+
+    test('identify with illegal (generic) id', async () => {
+        await createPerson(hub, team, ['im an anonymous id'])
+        expect((await hub.db.fetchPersons()).length).toBe(1)
+
+        const createPersonAndSendIdentify = async (distinctId: string): Promise<void> => {
+            await createPerson(hub, team, [distinctId])
+
+            await processEvent(
+                distinctId,
+                '',
+                '',
+                {
+                    event: '$identify',
+                    properties: {
+                        token: team.api_token,
+                        distinct_id: distinctId,
+                        $anon_distinct_id: 'im an anonymous id',
+                    },
+                } as any as PluginEvent,
+                team.id,
+                now,
+                now,
+                new UUIDT().toString()
+            )
+        }
+
+        // try to merge, the merge should fail
+        await createPersonAndSendIdentify('distinctId')
+        expect((await hub.db.fetchPersons()).length).toBe(2)
+
+        await createPersonAndSendIdentify('  ')
+        expect((await hub.db.fetchPersons()).length).toBe(3)
+
+        await createPersonAndSendIdentify('NaN')
+        expect((await hub.db.fetchPersons()).length).toBe(4)
+
+        await createPersonAndSendIdentify('undefined')
+        expect((await hub.db.fetchPersons()).length).toBe(5)
+
+        await createPersonAndSendIdentify('None')
+        expect((await hub.db.fetchPersons()).length).toBe(6)
+
+        await createPersonAndSendIdentify('0')
+        expect((await hub.db.fetchPersons()).length).toBe(7)
+
+        // 'Nan' is an allowed id, so the merge should work
+        // as such, no extra person is created
+        await createPersonAndSendIdentify('Nan')
+        expect((await hub.db.fetchPersons()).length).toBe(7)
     })
 
     test('distinct with anonymous_id', async () => {
@@ -1396,7 +1447,7 @@ export const createProcessEventTests = (
             new UUIDT().toString()
         )
 
-        const people = await hub.db.fetchPersons()
+        const people = (await hub.db.fetchPersons()).sort((p1, p2) => p2.team_id - p1.team_id)
         expect(people.length).toEqual(2)
         expect(people[1].team_id).toEqual(team.id)
         expect(people[1].properties).toEqual({})
@@ -1838,17 +1889,17 @@ export const createProcessEventTests = (
     })
 
     test('any event can do $set on props (user exists)', async () => {
-        await createPerson(hub, team, ['distinct_id'])
+        await createPerson(hub, team, ['distinct_id1'])
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: 'some_event',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $set: { a_prop: 'test-1', c_prop: 'test-1' },
                 },
             } as any as PluginEvent,
@@ -1864,20 +1915,20 @@ export const createProcessEventTests = (
         expect(event.properties['$set']).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
 
         const [person] = await hub.db.fetchPersons()
-        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
         expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
     })
 
     test('any event can do $set on props (new user)', async () => {
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: 'some_event',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $set: { a_prop: 'test-1', c_prop: 'test-1' },
                 },
             } as any as PluginEvent,
@@ -1893,22 +1944,22 @@ export const createProcessEventTests = (
         expect(event.properties['$set']).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
 
         const [person] = await hub.db.fetchPersons()
-        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
         expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
     })
 
     test('any event can do $set_once on props', async () => {
-        await createPerson(hub, team, ['distinct_id'])
+        await createPerson(hub, team, ['distinct_id1'])
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: 'some_event',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $set_once: { a_prop: 'test-1', c_prop: 'test-1' },
                 },
             } as any as PluginEvent,
@@ -1924,18 +1975,18 @@ export const createProcessEventTests = (
         expect(event.properties['$set_once']).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
 
         const [person] = await hub.db.fetchPersons()
-        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
         expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: 'some_other_event',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $set_once: { a_prop: 'test-2', b_prop: 'test-2b' },
                 },
             } as any as PluginEvent,
@@ -1951,7 +2002,7 @@ export const createProcessEventTests = (
 
     test('$set and $set_once merge with properties', async () => {
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
@@ -1960,7 +2011,7 @@ export const createProcessEventTests = (
                 $set_once: { key1_once: 'value1', key2_once: 'value2' },
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $set: { key2: 'value3', key3: 'value4' },
                     $set_once: { key2_once: 'value3', key3_once: 'value4' },
                 },
@@ -1978,7 +2029,7 @@ export const createProcessEventTests = (
         expect(event.properties['$set_once']).toEqual({ key1_once: 'value1', key2_once: 'value2', key3_once: 'value4' })
 
         const [person] = await hub.db.fetchPersons()
-        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
         expect(person.properties).toEqual({
             key1: 'value1',
             key2: 'value2',
@@ -1990,17 +2041,17 @@ export const createProcessEventTests = (
     })
 
     test('$increment increments numerical user properties or creates a new one', async () => {
-        await createPerson(hub, team, ['distinct_id'])
+        await createPerson(hub, team, ['distinct_id1'])
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: 'some_event',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $increment: { a: 100, b: 200, c: -100, d: 2 ** 64, non_numerical: '1' },
                 },
             } as any as PluginEvent,
@@ -2016,20 +2067,20 @@ export const createProcessEventTests = (
         expect(event.properties['$increment']).toEqual({ a: 100, b: 200, c: -100, d: 2 ** 64, non_numerical: '1' })
 
         const [person] = await hub.db.fetchPersons()
-        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
 
         // creates numerical prop, ignores non-numerical values
         expect(person.properties).toEqual({ a: 100, b: 200, c: -100, d: 2 ** 64 })
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: 'some_other_event',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $increment: { a: 247, b: -100, c: -568 },
                 },
             } as any as PluginEvent,
@@ -2047,17 +2098,17 @@ export const createProcessEventTests = (
     })
 
     test('$increment does not increment non-numerical props', async () => {
-        await createPerson(hub, team, ['distinct_id'])
+        await createPerson(hub, team, ['distinct_id1'])
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: 'some_event',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $set: { hello: 'world' },
                 },
             } as any as PluginEvent,
@@ -2068,14 +2119,14 @@ export const createProcessEventTests = (
         )
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: 'some_other_event',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $increment: { hello: 10000 }, // try to increment a string
                 },
             } as any as PluginEvent,
@@ -2086,24 +2137,24 @@ export const createProcessEventTests = (
         )
 
         const [person] = await hub.db.fetchPersons()
-        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
 
         // $increment doesn't update a prop that is not an integer
         expect(person.properties).toEqual({ hello: 'world' })
     })
 
     test('$increment does not increment non-integer numeric values', async () => {
-        await createPerson(hub, team, ['distinct_id'])
+        await createPerson(hub, team, ['distinct_id1'])
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: 'some_other_event',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $increment: { a: 1, b: 2, c: 3 },
                 },
             } as any as PluginEvent,
@@ -2114,14 +2165,14 @@ export const createProcessEventTests = (
         )
 
         await processEvent(
-            'distinct_id',
+            'distinct_id1',
             '',
             '',
             {
                 event: 'some_other_event',
                 properties: {
                     token: team.api_token,
-                    distinct_id: 'distinct_id',
+                    distinct_id: 'distinct_id1',
                     $increment: { a: 1.2, b: NaN, c: Infinity, d: 4 },
                 },
             } as any as PluginEvent,
@@ -2132,7 +2183,7 @@ export const createProcessEventTests = (
         )
 
         const [person] = await hub.db.fetchPersons()
-        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id'])
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
 
         expect(person.properties).toEqual({ a: 1, b: 2, c: 3, d: 4 })
     })

@@ -42,6 +42,28 @@ export enum AliasTriggerEvent {
     Identify = '$identify',
     CreateAlias = '$create_alias',
 }
+
+// used to prevent identify from being used with generic IDs
+// that we can safely assume stem from a bug or mistake
+const CASE_INSENSITIVE_ILLEGAL_IDS = new Set([
+    'anonymous',
+    'guest',
+    'distinctid',
+    'distinct_id',
+    'id',
+    'not_authenticated',
+    'email',
+    'undefined',
+    'true',
+    'false',
+])
+
+const CASE_SENSITIVE_ILLEGAL_IDS = new Set(['[object Object]', 'NaN', 'None', 'none', 'null', '0'])
+
+const isDistinctIdIllegal = (id: string): boolean => {
+    return id.trim() === '' || CASE_INSENSITIVE_ILLEGAL_IDS.has(id.toLowerCase()) || CASE_SENSITIVE_ILLEGAL_IDS.has(id)
+}
+
 export interface EventProcessingResult {
     event: IEvent | SessionRecordingEvent | PostgresSessionRecordingEvent
     eventId?: number
@@ -294,8 +316,12 @@ export class EventsProcessor {
         distinctId: string,
         teamId: number
     ): Promise<void> {
+        if (isDistinctIdIllegal(distinctId)) {
+            this.pluginsServer.statsd?.increment(`illegal_distinct_ids.total`, { distinctId })
+            return
+        }
         if (event === '$create_alias') {
-            await this.alias(properties['alias'], distinctId, teamId, AliasTriggerEvent.CreateAlias)
+            await this.alias(properties['alias'], distinctId, teamId)
         } else if (event === '$identify') {
             if (properties['$anon_distinct_id']) {
                 await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
