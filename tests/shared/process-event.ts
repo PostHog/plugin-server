@@ -39,7 +39,7 @@ export async function delayUntilEventIngested(
     }
 }
 
-async function createPerson(
+export async function createPerson(
     server: Hub,
     team: Team,
     distinctIds: string[],
@@ -48,9 +48,9 @@ async function createPerson(
     return server.db.createPerson(DateTime.utc(), properties, team.id, null, false, new UUIDT().toString(), distinctIds)
 }
 
-type ReturnWithHub = { hub?: Hub; closeHub?: () => Promise<void> }
+export type ReturnWithHub = { hub?: Hub; closeHub?: () => Promise<void> }
 
-const getEventsByPerson = async (hub: Hub) => {
+export const getEventsByPerson = async (hub: Hub) => {
     // Helper function to retrieve events paired with their associated distinct
     // ids
     const persons = await hub.db.fetchPersons()
@@ -70,7 +70,7 @@ const getEventsByPerson = async (hub: Hub) => {
     )
 }
 
-const createIdentifiedPerson = async (hub: Hub, teamId: number, distinctId: string): Promise<void> => {
+export const createIdentifiedPerson = async (hub: Hub, teamId: number, distinctId: string): Promise<void> => {
     await hub.db.createPerson(DateTime.utc(), {}, teamId, null, true, new UUIDT().toString(), [distinctId])
 }
 
@@ -1565,7 +1565,6 @@ export const createProcessEventTests = (
             // checking that our mocking was actually invoked
             expect(hub.db.createPerson).toHaveBeenCalled()
 
-            await delay(5000)
             // Now make sure that we have one person in the db that has been
             // identified
             const persons = await hub.db.fetchPersons()

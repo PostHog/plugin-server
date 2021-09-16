@@ -1,8 +1,11 @@
+import { DateTime } from 'luxon'
+
 import { KAFKA_EVENTS_PLUGIN_INGESTION } from '../../src/config/kafka-topics'
 import { Event, PluginsServerConfig } from '../../src/types'
 import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
 import { resetKafka } from '../helpers/kafka'
-import { createProcessEventTests } from '../shared/process-event'
+import { getFirstTeam } from '../helpers/sql'
+import { createPerson, createProcessEventTests } from '../shared/process-event'
 
 jest.setTimeout(180_000) // 3 minute timeout
 
@@ -21,5 +24,48 @@ describe('process event (clickhouse)', () => {
         await resetTestDatabaseClickhouse(extraServerConfig)
     })
 
-    createProcessEventTests('clickhouse', extraServerConfig)
+    createProcessEventTests('clickhouse', extraServerConfig, (response) => {
+        test('mergePeople kafka messages are only enqueued after all postgres steps succeed', async () => {
+            const { hub } = response
+
+            const team = await getFirstTeam(hub!)
+            const p0 = await createPerson(hub!, team, ['person_0'], { $os: 'Microsoft' })
+
+            await hub!.db.updatePerson(p0, { created_at: DateTime.fromISO('2020-01-01T00:00:00Z') })
+
+            const p1 = await createPerson(hub!, team, ['person_1'], { $os: 'Chrome', $browser: 'Chrome' })
+
+            await hub!.db.updatePerson(p1, { created_at: DateTime.fromISO('2019-07-01T00:00:00Z') })
+
+            expect((await hub!.db.fetchPersons()).length).toEqual(2)
+            const [person0, person1] = await hub!.db.fetchPersons()
+
+            hub!.db.updatePerson = jest.fn(() => {
+                throw new Error()
+            })
+
+            await hub!.eventsProcessor!.mergePeople({
+                mergeInto: person0,
+                mergeIntoDistinctId: 'person_0',
+                otherPerson: person1,
+                otherPersonDistinctId: 'person_1',
+                totalMergeAttempts: 0,
+            })
+
+            expect(hub!.db.kafkaProducer!.queueMessage).not.toHaveBeenCalled()
+
+            hub!.db.updatePerson = jest.fn()
+
+            await hub!.eventsProcessor!.mergePeople({
+                mergeInto: person0,
+                mergeIntoDistinctId: 'person_0',
+                otherPerson: person1,
+                otherPersonDistinctId: 'person_1',
+                totalMergeAttempts: 0,
+            })
+
+            // updatePerson 1x, moveDistinctIds 2x, deletePerson 1x
+            expect(hub!.db.kafkaProducer!.queueMessage).toHaveBeenCalledTimes(4)
+        })
+    })
 })
