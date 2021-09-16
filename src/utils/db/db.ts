@@ -497,18 +497,15 @@ export class DB {
         const updatedPerson: Person = { ...person, ...update }
         const values = [...Object.values(unparsePersonPartial(update)), person.id]
 
-        const clientQuery = async (queryString: string, values: any[], _: any): Promise<void> => {
-            await client?.query(queryString, values)
-        }
+        const queryString = `UPDATE posthog_person SET ${Object.keys(update).map(
+            (field, index) => `"${sanitizeSqlIdentifier(field)}" = $${index + 1}`
+        )} WHERE id = $${Object.values(update).length + 1}`
 
-        const query = client ? clientQuery : this.postgresQuery
-        await query(
-            `UPDATE posthog_person SET ${Object.keys(update).map(
-                (field, index) => `"${sanitizeSqlIdentifier(field)}" = $${index + 1}`
-            )} WHERE id = $${Object.values(update).length + 1}`,
-            values,
-            'updatePerson'
-        )
+        if (client) {
+            await client.query(queryString, values)
+        } else {
+            await this.postgresQuery(queryString, values, 'updatePerson')
+        }
 
         const kafkaMessages = []
         if (this.kafkaProducer) {
