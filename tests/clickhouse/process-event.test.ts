@@ -40,7 +40,7 @@ describe('process event (clickhouse)', () => {
             expect((await hub!.db.fetchPersons()).length).toEqual(2)
             const [person0, person1] = await hub!.db.fetchPersons()
 
-            hub!.db.updatePerson = jest.fn(() => {
+            jest.spyOn(hub!.db, 'updatePerson').mockImplementationOnce(() => {
                 throw new Error()
             })
 
@@ -53,8 +53,6 @@ describe('process event (clickhouse)', () => {
             })
 
             expect(hub!.db.kafkaProducer!.queueMessage).not.toHaveBeenCalled()
-
-            hub!.db.updatePerson = jest.fn()
 
             await hub!.eventsProcessor!.mergePeople({
                 mergeInto: person0,
