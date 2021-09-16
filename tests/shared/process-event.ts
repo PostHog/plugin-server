@@ -77,6 +77,7 @@ export const createProcessEventTests = (
 ): ReturnWithHub => {
     let queryCounter = 0
     let processEventCounter = 0
+    let mockClientEventCounter = 0
     let team: Team
     let hub: Hub
     let closeHub: () => Promise<void>
@@ -143,6 +144,7 @@ export const createProcessEventTests = (
         eventsProcessor = new EventsProcessor(hub)
         queryCounter = 0
         processEventCounter = 0
+        mockClientEventCounter = 0
         team = await getFirstTeam(hub)
         now = DateTime.utc()
 
@@ -168,7 +170,6 @@ export const createProcessEventTests = (
     })
 
     const capture = async (hub: Hub, eventName: string, properties: any = {}) => {
-        const totalEvents = (await hub.db.fetchEvents()).length
         await ingestEvent(hub, {
             event: eventName,
             distinct_id: properties.distinct_id ?? state.currentDistinctId,
@@ -180,11 +181,12 @@ export const createProcessEventTests = (
             team_id: team.id,
             uuid: new UUIDT().toString(),
         })
-        await delayUntilEventIngested(() => hub.db.fetchEvents(), totalEvents + 1)
+        if (database === 'clickhouse') {
+            await delayUntilEventIngested(() => hub.db.fetchEvents(), ++mockClientEventCounter)
+        }
     }
 
     const identify = async (hub: Hub, distinctId: string) => {
-        const totalEvents = (await hub.db.fetchEvents()).length
         // Update currentDistinctId state immediately, as the event will be
         // dispatch asynchronously
         const currentDistinctId = state.currentDistinctId
@@ -195,7 +197,6 @@ export const createProcessEventTests = (
             $anon_distinct_id: currentDistinctId,
             distinct_id: distinctId,
         })
-        await delayUntilEventIngested(() => hub.db.fetchEvents(), totalEvents + 1)
     }
 
     const alias = async (hub: Hub, alias: string, distinctId: string) => {
