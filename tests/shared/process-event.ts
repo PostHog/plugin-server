@@ -70,6 +70,10 @@ const getEventsByPerson = async (hub: Hub) => {
     )
 }
 
+const createIdentifiedPerson = async (hub: Hub, teamId: number, distinctId: string): Promise<void> => {
+    await hub.db.createPerson(DateTime.utc(), {}, teamId, null, true, new UUIDT().toString(), [distinctId])
+}
+
 export const createProcessEventTests = (
     database: 'postgresql' | 'clickhouse',
     extraServerConfig?: Partial<PluginsServerConfig>,
@@ -1435,6 +1439,8 @@ export const createProcessEventTests = (
             const initialDistinctId = 'initial_distinct_id'
             const newDistinctId = 'new_distinct_id'
 
+            await createIdentifiedPerson(hub, team.id, newDistinctId)
+
             // Play out a sequence of events that should result in two users being
             // identified, with the first to events associated with one user, and
             // the third with another.
@@ -1452,11 +1458,11 @@ export const createProcessEventTests = (
             const eventsByPerson = await getEventsByPerson(hub)
 
             expect(eventsByPerson).toEqual([
+                [[newDistinctId], ['$identify', 'event 3']],
                 [
                     [anonymousId, initialDistinctId],
                     ['event 1', '$identify', 'event 2', '$identify'],
                 ],
-                [[newDistinctId], ['$identify', 'event 3']],
             ])
 
             // Make sure the persons are identified
@@ -1478,6 +1484,8 @@ export const createProcessEventTests = (
             const initialDistinctId = 'initial_distinct_id'
             const newDistinctId = 'new_distinct_id'
 
+            await createIdentifiedPerson(hub, team.id, newDistinctId)
+
             // Play out a sequence of events that should result in two users being
             // identified, with the first to events associated with one user, and
             // the third with another.
@@ -1494,11 +1502,11 @@ export const createProcessEventTests = (
             const eventsByPerson = await getEventsByPerson(hub)
 
             expect(eventsByPerson).toEqual([
+                [[newDistinctId], ['$identify', 'event 3']],
                 [
                     [initialDistinctId, anonymousId],
                     ['$identify', 'event 2', '$identify'],
                 ],
-                [[newDistinctId], ['$identify', 'event 3']],
             ])
 
             // Make sure the persons are identified
@@ -1506,14 +1514,14 @@ export const createProcessEventTests = (
             expect(persons.map((person) => person.is_identified)).toEqual([true, true])
         })
 
-        test('we do not leave things in inconsistent state if $identify is run concurrenctly', async () => {
+        test('we do not leave things in inconsistent state if $identify is run concurrently', async () => {
             // There are a few places where we have the pattern of:
             //
             //  1. fetch from postgres
             //  2. check rows match condition
             //  3. perform update
             //
-            // This test is desiged to check the specific case where, in
+            // This test is designed to check the specific case where, in
             // handling we are creating an unidentified user, then updating this
             // user to have is_identified = true. Since we are using the
             // is_identified to decide on if we will merge persons, we want to
@@ -1527,22 +1535,25 @@ export const createProcessEventTests = (
             // Check the db is empty to start with
             expect(await hub.db.fetchPersons()).toEqual([])
 
-            const initialDistinctId = 'distinct-id'
+            const initialDistinctId = 'initial-distinct-id'
+            const newDistinctId = 'new-distinct-id'
+
+            await createIdentifiedPerson(hub, team.id, newDistinctId)
 
             // Hook into createPerson, which is as of writing called from
             // alias. Here we simply call identify again and wait on it
-            // completing before continuing with the first identify. This is
-            // depending on specific internals, it would be ideal if we could avoid
-            // this but I'm not sure how right now.
+            // completing before continuing with the first identify.
             const originalCreatePerson = hub.db.createPerson.bind(hub.db)
             const createPersonMock = jest.fn(async (...args) => {
                 // eslint-disable-next-line
                 // @ts-ignore
                 const result = await originalCreatePerson(...args)
+
                 if (createPersonMock.mock.calls.length === 1) {
                     // On second invocation, make another identify call
-                    await identify(hub, initialDistinctId)
+                    await identify(hub, newDistinctId)
                 }
+
                 return result
             })
             hub.db.createPerson = createPersonMock
@@ -1554,6 +1565,7 @@ export const createProcessEventTests = (
             // checking that our mocking was actually invoked
             expect(hub.db.createPerson).toHaveBeenCalled()
 
+            await delay(5000)
             // Now make sure that we have one person in the db that has been
             // identified
             const persons = await hub.db.fetchPersons()
@@ -1567,6 +1579,7 @@ export const createProcessEventTests = (
             const identifiedId1 = 'identified_id1'
             const identifiedId2 = 'identified_id2'
 
+            // anonymous_id -> identified_id1
             await identify(hub, identifiedId1)
 
             state.currentDistinctId = identifiedId1
@@ -1582,8 +1595,8 @@ export const createProcessEventTests = (
             // There should just be one person, to which all events are associated
             expect(eventsByPerson).toEqual([
                 [
-                    [identifiedId1, identifiedId2],
-                    ['$identify', '$identify', 'some event', '$create_alias'],
+                    expect.arrayContaining(['anonymous_id', identifiedId1, identifiedId2]),
+                    ['$identify', 'some event', '$identify', '$create_alias'],
                 ],
             ])
 

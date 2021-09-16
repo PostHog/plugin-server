@@ -345,10 +345,15 @@ export class EventsProcessor {
 
         if (!oldPerson && !newPerson) {
             try {
-                await this.db.createPerson(DateTime.utc(), {}, teamId, null, false, new UUIDT().toString(), [
-                    distinctId,
-                    previousDistinctId,
-                ])
+                await this.db.createPerson(
+                    DateTime.utc(),
+                    {},
+                    teamId,
+                    null,
+                    aliasTriggerEvent === AliasTriggerEvent.Identify,
+                    new UUIDT().toString(),
+                    [distinctId, previousDistinctId]
+                )
             } catch {
                 // Catch race condition where in between getting and creating,
                 // another request already created this person
@@ -362,13 +367,12 @@ export class EventsProcessor {
 
         if (oldPerson && newPerson && oldPerson.id !== newPerson.id) {
             // $create_alias is an explicit call to merge 2 users, so we'll merge anything
-            // for $identify, we'll not merge 2 already identified users as this can lead to nasty
-            // issues with tangled up users
-            const isIdentifyCallWithTwoIdentifiedUsers =
-                aliasTriggerEvent === AliasTriggerEvent.Identify && oldPerson.is_identified && newPerson.is_identified
+            // for $identify, we'll not merge a user who's already identified into anyone else
+            const isIdentifyCallToMergeAnIdentifiedUser =
+                aliasTriggerEvent === AliasTriggerEvent.Identify && oldPerson.is_identified
 
-            if (isIdentifyCallWithTwoIdentifiedUsers) {
-                status.warn('🤔', '$identify called with two already identified users')
+            if (isIdentifyCallToMergeAnIdentifiedUser) {
+                status.warn('🤔', 'refused to merge an already identified user via an $identify call')
             } else {
                 await this.mergePeople({
                     totalMergeAttempts,
