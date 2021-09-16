@@ -41,26 +41,30 @@ describe('process event (clickhouse)', () => {
             const [person0, person1] = await hub!.db.fetchPersons()
 
             jest.spyOn(hub!.db, 'updatePerson').mockImplementationOnce(() => {
-                throw new Error()
+                throw new Error('updatePerson error')
             })
 
-            await hub!.eventsProcessor!.mergePeople({
-                mergeInto: person0,
-                mergeIntoDistinctId: 'person_0',
-                otherPerson: person1,
-                otherPersonDistinctId: 'person_1',
-                totalMergeAttempts: 0,
-            })
+            await expect(async () => {
+                await hub!.eventsProcessor!.mergePeople({
+                    mergeInto: person0,
+                    mergeIntoDistinctId: 'person_0',
+                    otherPerson: person1,
+                    otherPersonDistinctId: 'person_1',
+                    totalMergeAttempts: 0,
+                })
+            }).rejects.toThrow()
 
             expect(hub!.db.kafkaProducer!.queueMessage).not.toHaveBeenCalled()
 
-            await hub!.eventsProcessor!.mergePeople({
-                mergeInto: person0,
-                mergeIntoDistinctId: 'person_0',
-                otherPerson: person1,
-                otherPersonDistinctId: 'person_1',
-                totalMergeAttempts: 0,
-            })
+            await expect(async () => {
+                await hub!.eventsProcessor!.mergePeople({
+                    mergeInto: person0,
+                    mergeIntoDistinctId: 'person_0',
+                    otherPerson: person1,
+                    otherPersonDistinctId: 'person_1',
+                    totalMergeAttempts: 0,
+                })
+            }).rejects.not.toThrow()
 
             // updatePerson 1x, moveDistinctIds 2x, deletePerson 1x
             expect(hub!.db.kafkaProducer!.queueMessage).toHaveBeenCalledTimes(4)
