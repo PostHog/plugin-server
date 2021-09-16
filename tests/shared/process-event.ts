@@ -70,10 +70,6 @@ export const getEventsByPerson = async (hub: Hub) => {
     )
 }
 
-export const createIdentifiedPerson = async (hub: Hub, teamId: number, distinctId: string): Promise<void> => {
-    await hub.db.createPerson(DateTime.utc(), {}, teamId, null, true, new UUIDT().toString(), [distinctId])
-}
-
 export const createProcessEventTests = (
     database: 'postgresql' | 'clickhouse',
     extraServerConfig?: Partial<PluginsServerConfig>,
@@ -1490,16 +1486,17 @@ export const createProcessEventTests = (
             const initialDistinctId = 'initial_distinct_id'
             const newDistinctId = 'new_distinct_id'
 
-            await createIdentifiedPerson(hub, team.id, newDistinctId)
-
             // Play out a sequence of events that should result in two users being
             // identified, with the first to events associated with one user, and
             // the third with another.
             await capture(hub, 'event 1')
             await identify(hub, initialDistinctId)
             await capture(hub, 'event 2')
-            await identify(hub, newDistinctId)
+
+            state.currentDistinctId = newDistinctId
             await capture(hub, 'event 3')
+            await identify(hub, newDistinctId)
+            await capture(hub, 'event 4')
 
             // Let's also make sure that we do not alias when switching back to
             // initialDistictId
@@ -1509,11 +1506,11 @@ export const createProcessEventTests = (
             const eventsByPerson = await getEventsByPerson(hub)
 
             expect(eventsByPerson).toEqual([
-                [[newDistinctId], ['$identify', 'event 3']],
                 [
                     [anonymousId, initialDistinctId],
                     ['event 1', '$identify', 'event 2', '$identify'],
                 ],
+                [[newDistinctId], ['event 3', '$identify', 'event 4']],
             ])
 
             // Make sure the persons are identified
@@ -1535,15 +1532,16 @@ export const createProcessEventTests = (
             const initialDistinctId = 'initial_distinct_id'
             const newDistinctId = 'new_distinct_id'
 
-            await createIdentifiedPerson(hub, team.id, newDistinctId)
-
             // Play out a sequence of events that should result in two users being
             // identified, with the first to events associated with one user, and
             // the third with another.
             await identify(hub, initialDistinctId)
             await capture(hub, 'event 2')
-            await identify(hub, newDistinctId)
+
+            state.currentDistinctId = newDistinctId
             await capture(hub, 'event 3')
+            await identify(hub, newDistinctId)
+            await capture(hub, 'event 4')
 
             // Let's also make sure that we do not alias when switching back to
             // initialDistictId
@@ -1553,11 +1551,11 @@ export const createProcessEventTests = (
             const eventsByPerson = await getEventsByPerson(hub)
 
             expect(eventsByPerson).toEqual([
-                [[newDistinctId], ['$identify', 'event 3']],
                 [
                     [initialDistinctId, anonymousId],
                     ['$identify', 'event 2', '$identify'],
                 ],
+                [[newDistinctId], ['event 3', '$identify', 'event 4']],
             ])
 
             // Make sure the persons are identified
@@ -1586,10 +1584,13 @@ export const createProcessEventTests = (
             // Check the db is empty to start with
             expect(await hub.db.fetchPersons()).toEqual([])
 
+            const anonymousId = 'anonymous_id'
             const initialDistinctId = 'initial-distinct-id'
             const newDistinctId = 'new-distinct-id'
 
-            await createIdentifiedPerson(hub, team.id, newDistinctId)
+            state.currentDistinctId = newDistinctId
+            await capture(hub, 'some event')
+            state.currentDistinctId = anonymousId
 
             // Hook into createPerson, which is as of writing called from
             // alias. Here we simply call identify again and wait on it
@@ -1626,6 +1627,7 @@ export const createProcessEventTests = (
 
     describe('when handling $create_alias', () => {
         test('we can alias an identified person to an identified person', async () => {
+            const anonymousId = 'anonymous_id'
             const identifiedId1 = 'identified_id1'
             const identifiedId2 = 'identified_id2'
 
@@ -1645,7 +1647,7 @@ export const createProcessEventTests = (
             // There should just be one person, to which all events are associated
             expect(eventsByPerson).toEqual([
                 [
-                    expect.arrayContaining(['anonymous_id', identifiedId1, identifiedId2]),
+                    expect.arrayContaining([anonymousId, identifiedId1, identifiedId2]),
                     ['$identify', 'some event', '$identify', '$create_alias'],
                 ],
             ])
