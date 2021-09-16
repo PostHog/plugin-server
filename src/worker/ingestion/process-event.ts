@@ -38,11 +38,6 @@ const MAX_FAILED_PERSON_MERGE_ATTEMPTS = 3
 // for e.g. internal events we don't want to be available for users in the UI
 const EVENTS_WITHOUT_EVENT_DEFINITION = ['$$plugin_metrics']
 
-export enum AliasTriggerEvent {
-    Identify = '$identify',
-    CreateAlias = '$create_alias',
-}
-
 // used to prevent identify from being used with generic IDs
 // that we can safely assume stem from a bug or mistake
 const CASE_INSENSITIVE_ILLEGAL_IDS = new Set([
@@ -321,7 +316,7 @@ export class EventsProcessor {
             return
         }
         if (event === '$create_alias') {
-            await this.alias(properties['alias'], distinctId, teamId)
+            await this.alias(properties['alias'], distinctId, teamId, false)
         } else if (event === '$identify') {
             if (properties['$anon_distinct_id']) {
                 await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
@@ -334,7 +329,7 @@ export class EventsProcessor {
         previousDistinctId: string,
         distinctId: string,
         teamId: number,
-        aliasTriggerEvent = AliasTriggerEvent.Identify,
+        shouldIdentifyPerson = true,
         retryIfFailed = true,
         totalMergeAttempts = 0
     ): Promise<void> {
@@ -349,7 +344,7 @@ export class EventsProcessor {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
-                    await this.alias(previousDistinctId, distinctId, teamId, aliasTriggerEvent, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, shouldIdentifyPerson, false)
                 }
             }
             return
@@ -363,7 +358,7 @@ export class EventsProcessor {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
-                    await this.alias(previousDistinctId, distinctId, teamId, aliasTriggerEvent, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, shouldIdentifyPerson, false)
                 }
             }
             return
@@ -385,7 +380,7 @@ export class EventsProcessor {
                 // another request already created this person
                 if (retryIfFailed) {
                     // Try once more, probably one of the two persons exists now
-                    await this.alias(previousDistinctId, distinctId, teamId, aliasTriggerEvent, false)
+                    await this.alias(previousDistinctId, distinctId, teamId, shouldIdentifyPerson, false)
                 }
             }
             return
@@ -394,15 +389,14 @@ export class EventsProcessor {
         if (oldPerson && newPerson && oldPerson.id !== newPerson.id) {
             // $create_alias is an explicit call to merge 2 users, so we'll merge anything
             // for $identify, we'll not merge a user who's already identified into anyone else
-            const isIdentifyCallToMergeAnIdentifiedUser =
-                aliasTriggerEvent === AliasTriggerEvent.Identify && oldPerson.is_identified
+            const isIdentifyCallToMergeAnIdentifiedUser = shouldIdentifyPerson && oldPerson.is_identified
 
             if (isIdentifyCallToMergeAnIdentifiedUser) {
                 status.warn('🤔', 'refused to merge an already identified user via an $identify call')
             } else {
                 await this.mergePeople({
                     totalMergeAttempts,
-                    aliasTriggerEvent,
+                    shouldIdentifyPerson,
                     mergeInto: newPerson,
                     mergeIntoDistinctId: distinctId,
                     otherPerson: oldPerson,
@@ -418,14 +412,14 @@ export class EventsProcessor {
         otherPerson,
         otherPersonDistinctId,
         totalMergeAttempts = 0,
-        aliasTriggerEvent = AliasTriggerEvent.Identify,
+        shouldIdentifyPerson = true,
     }: {
         mergeInto: Person
         mergeIntoDistinctId: string
         otherPerson: Person
         otherPersonDistinctId: string
         totalMergeAttempts: number
-        aliasTriggerEvent?: AliasTriggerEvent
+        shouldIdentifyPerson?: boolean
     }): Promise<void> {
         const teamId = mergeInto.team_id
 
@@ -489,7 +483,7 @@ export class EventsProcessor {
                     otherPersonDistinctId,
                     mergeIntoDistinctId,
                     teamId,
-                    aliasTriggerEvent,
+                    shouldIdentifyPerson,
                     false,
                     failedAttempts
                 )
