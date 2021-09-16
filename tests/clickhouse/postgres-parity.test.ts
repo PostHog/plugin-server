@@ -111,8 +111,7 @@ describe('postgres parity', () => {
         await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse))
         await delayUntilEventIngested(() => hub.db.fetchDistinctIdValues(person, Database.ClickHouse), 2)
 
-        // update JSON and boolean to true
-
+        // update properties and set is_identified to true
         await hub.db.updatePerson(person, { properties: { replacedUserProp: 'propValue' }, is_identified: true })
 
         await delayUntilEventIngested(async () =>
@@ -229,9 +228,15 @@ describe('postgres parity', () => {
     test('moveDistinctIds & deletePerson', async () => {
         const uuid = new UUIDT().toString()
         const uuid2 = new UUIDT().toString()
-        const person = await hub.db.createPerson(DateTime.utc(), { userProp: 'propValue' }, team.id, null, true, uuid, [
-            'distinct1',
-        ])
+        const person = await hub.db.createPerson(
+            DateTime.utc(),
+            { userProp: 'propValue' },
+            team.id,
+            null,
+            false,
+            uuid,
+            ['distinct1']
+        )
         const anotherPerson = await hub.db.createPerson(
             DateTime.utc(),
             { userProp: 'propValue' },
@@ -245,8 +250,6 @@ describe('postgres parity', () => {
         const [postgresPerson] = await hub.db.fetchPersons(Database.Postgres)
 
         await delayUntilEventIngested(() => hub.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse), 1)
-        const clickHouseDistinctIdValues = await hub.db.fetchDistinctIdValues(postgresPerson, Database.ClickHouse)
-        const postgresDistinctIdValues = await hub.db.fetchDistinctIdValues(postgresPerson, Database.Postgres)
 
         // move distinct ids from person to to anotherPerson
 
