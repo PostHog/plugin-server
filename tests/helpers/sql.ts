@@ -36,37 +36,39 @@ export async function resetTestDatabase(
     const config = { ...defaultConfig, ...extraServerConfig }
     const db = new Pool({ connectionString: config.DATABASE_URL! })
     try {
-        await db.query('TRUNCATE TABLE ee_hook')
+        await db.query('TRUNCATE TABLE ee_hook CASCADE')
     } catch {}
 
     await db.query(`
-        TRUNCATE TABLE posthog_personalapikey;
-        TRUNCATE TABLE posthog_featureflag;
-        TRUNCATE TABLE posthog_annotation;
-        TRUNCATE TABLE posthog_dashboarditem;
-        TRUNCATE TABLE posthog_dashboard;
-        TRUNCATE TABLE posthog_cohortpeople;
-        TRUNCATE TABLE posthog_cohort;
-        TRUNCATE TABLE posthog_actionstep;
-        TRUNCATE TABLE posthog_action_events;
-        TRUNCATE TABLE posthog_action;
-        TRUNCATE TABLE posthog_element;
-        TRUNCATE TABLE posthog_elementgroup;
-        TRUNCATE TABLE posthog_sessionrecordingevent;
-        TRUNCATE TABLE posthog_persondistinctid;
-        TRUNCATE TABLE posthog_person;
-        TRUNCATE TABLE posthog_event;
-        TRUNCATE TABLE posthog_pluginstorage;
-        TRUNCATE TABLE posthog_pluginattachment;
-        TRUNCATE TABLE posthog_pluginlogentry;
-        TRUNCATE TABLE posthog_pluginconfig;
-        TRUNCATE TABLE posthog_plugin;
-        TRUNCATE TABLE posthog_eventdefinition;
-        TRUNCATE TABLE posthog_propertydefinition;
-        TRUNCATE TABLE posthog_team;
-        TRUNCATE TABLE posthog_organizationmembership;
-        TRUNCATE TABLE posthog_organization;
-        TRUNCATE TABLE posthog_user;
+        TRUNCATE TABLE 
+            posthog_personalapikey,
+            posthog_featureflag,
+            posthog_annotation,
+            posthog_dashboarditem,
+            posthog_dashboard,
+            posthog_cohortpeople,
+            posthog_cohort,
+            posthog_actionstep,
+            posthog_action_events,
+            posthog_action,
+            posthog_element,
+            posthog_elementgroup,
+            posthog_sessionrecordingevent,
+            posthog_persondistinctid,
+            posthog_person,
+            posthog_event,
+            posthog_pluginstorage,
+            posthog_pluginattachment,
+            posthog_pluginlogentry,
+            posthog_pluginconfig,
+            posthog_plugin,
+            posthog_eventdefinition,
+            posthog_propertydefinition,
+            posthog_team,
+            posthog_organizationmembership,
+            posthog_organization,
+            posthog_user
+        CASCADE
     `)
     const mocks = makePluginObjects(code)
     const teamIds = mocks.pluginConfigRows.map((c) => c.team_id)
