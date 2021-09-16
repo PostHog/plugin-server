@@ -168,6 +168,7 @@ export const createProcessEventTests = (
     })
 
     const capture = async (hub: Hub, eventName: string, properties: any = {}) => {
+        const totalEvents = (await hub.db.fetchEvents()).length
         await ingestEvent(hub, {
             event: eventName,
             distinct_id: properties.distinct_id ?? state.currentDistinctId,
@@ -179,9 +180,11 @@ export const createProcessEventTests = (
             team_id: team.id,
             uuid: new UUIDT().toString(),
         })
+        await delayUntilEventIngested(() => hub.db.fetchEvents(), totalEvents + 1)
     }
 
     const identify = async (hub: Hub, distinctId: string) => {
+        const totalEvents = (await hub.db.fetchEvents()).length
         // Update currentDistinctId state immediately, as the event will be
         // dispatch asynchronously
         const currentDistinctId = state.currentDistinctId
@@ -192,6 +195,7 @@ export const createProcessEventTests = (
             $anon_distinct_id: currentDistinctId,
             distinct_id: distinctId,
         })
+        await delayUntilEventIngested(() => hub.db.fetchEvents(), totalEvents + 1)
     }
 
     const alias = async (hub: Hub, alias: string, distinctId: string) => {
@@ -1502,8 +1506,6 @@ export const createProcessEventTests = (
             // initialDistictId
             await identify(hub, initialDistinctId)
 
-            await delayUntilEventIngested(() => hub.db.fetchEvents(), 7)
-
             // Get pairins of person distinctIds and the events associated with them
             const eventsByPerson = await getEventsByPerson(hub)
 
@@ -1548,8 +1550,6 @@ export const createProcessEventTests = (
             // Let's also make sure that we do not alias when switching back to
             // initialDistictId
             await identify(hub, initialDistinctId)
-
-            await delayUntilEventIngested(() => hub.db.fetchEvents(), 6)
 
             // Get pairins of person distinctIds and the events associated with them
             const eventsByPerson = await getEventsByPerson(hub)
@@ -1617,8 +1617,6 @@ export const createProcessEventTests = (
             // set the first identify going
             await identify(hub, initialDistinctId)
 
-            await delayUntilEventIngested(() => hub.db.fetchEvents(), 3)
-
             // Let's first just make sure `updatePerson` was called, as a way of
             // checking that our mocking was actually invoked
             expect(hub.db.createPerson).toHaveBeenCalled()
@@ -1646,8 +1644,6 @@ export const createProcessEventTests = (
             await identify(hub, identifiedId2)
 
             await alias(hub, identifiedId1, identifiedId2)
-
-            await delayUntilEventIngested(() => hub.db.fetchEvents(), 4)
 
             // Get pairings of person distinctIds and the events associated with them
             const eventsByPerson = await getEventsByPerson(hub)
@@ -1677,8 +1673,6 @@ export const createProcessEventTests = (
             // Then try to alias them
             await alias(hub, anonymousId, initialDistinctId)
 
-            await delayUntilEventIngested(() => hub.db.fetchEvents(), 3)
-
             // Get pairings of person distinctIds and the events associated with them
             const eventsByPerson = await getEventsByPerson(hub)
 
@@ -1706,8 +1700,6 @@ export const createProcessEventTests = (
 
             // Then try to alias them
             await alias(hub, initialDistinctId, anonymousId)
-
-            await delayUntilEventIngested(() => hub.db.fetchEvents(), 3)
 
             // Get pairings of person distinctIds and the events associated with them
             const eventsByPerson = await getEventsByPerson(hub)
@@ -1738,8 +1730,6 @@ export const createProcessEventTests = (
             // Then try to alias them
             await alias(hub, anonymous1, anonymous2)
 
-            await delayUntilEventIngested(() => hub.db.fetchEvents(), 3)
-
             // Get pairings of person distinctIds and the events associated with them
             const eventsByPerson = await getEventsByPerson(hub)
 
@@ -1763,8 +1753,6 @@ export const createProcessEventTests = (
             // Then try to alias them
             state.currentDistinctId = anonymous1
             await alias(hub, anonymous2, anonymous1)
-
-            await delayUntilEventIngested(() => hub.db.fetchEvents(), 1)
 
             // Get pairings of person distinctIds and the events associated with them
             const eventsByPerson = await getEventsByPerson(hub)
