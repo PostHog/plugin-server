@@ -237,10 +237,29 @@ export const createProcessEventTests = (
         expect((await hub.db.fetchPersons()).length).toEqual(2)
         const [person0, person1] = await hub.db.fetchPersons()
 
+        jest.spyOn(hub!.db.kafkaProducer!, 'queueMessage')
+
         if (database === 'clickhouse') {
             await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse), 2)
             const chPeople = await hub.db.fetchPersons(Database.ClickHouse)
             expect(chPeople.length).toEqual(2)
+
+            // try to merge and see if we queue any messages
+            jest.spyOn(hub!.db, 'updatePerson').mockImplementationOnce(() => {
+                throw new Error('updatePerson error')
+            })
+
+            await expect(async () => {
+                await hub!.eventsProcessor!.mergePeople({
+                    mergeInto: person0,
+                    mergeIntoDistinctId: 'person_0',
+                    otherPerson: person1,
+                    otherPersonDistinctId: 'person_1',
+                    totalMergeAttempts: 0,
+                })
+            }).rejects.toThrow()
+
+            expect(hub!.db.kafkaProducer!.queueMessage).not.toHaveBeenCalled()
         }
 
         await eventsProcessor.mergePeople({
@@ -256,6 +275,9 @@ export const createProcessEventTests = (
                 (await hub.db.fetchPersons(Database.ClickHouse)).length === 1 ? [1] : []
             )
             expect((await hub.db.fetchPersons(Database.ClickHouse)).length).toEqual(1)
+
+            // moveDistinctIds 2x, deletePerson 1x
+            expect(hub!.db.kafkaProducer!.queueMessage).toHaveBeenCalledTimes(3)
         }
 
         expect((await hub.db.fetchPersons()).length).toEqual(1)
