@@ -3,6 +3,6 @@ module.exports = {
     testEnvironment: 'node',
     clearMocks: true,
     coverageProvider: 'v8',
-    setupFilesAfterEnv: ['./jest.setup.fetch-mock.js'],
+    setupFilesAfterEnv: ['./jest.setup.fetch-mock.js', './jest.setup.databases.ts'],
     testMatch: ['<rootDir>/tests/**/*.test.ts', '<rootDir>/benchmarks/**/*.benchmark.ts'],
 }
