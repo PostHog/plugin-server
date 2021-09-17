@@ -389,6 +389,8 @@ export const createProcessEventTests = (
             $initial_current_url: 'https://test.com',
             $initial_os: 'Mac OS X',
             utm_medium: 'instagram',
+            $initial_gclid: 'GOOGLE ADS ID',
+            gclid: 'GOOGLE ADS ID',
         })
         expect(events[1].properties.$set).toEqual({
             utm_medium: 'instagram',
@@ -526,6 +528,14 @@ export const createProcessEventTests = (
                 id: expect.any(String),
                 is_numerical: false,
                 name: 'utm_medium',
+                query_usage_30_day: null,
+                team_id: 2,
+                volume_30_day: null,
+            },
+            {
+                id: expect.any(String),
+                is_numerical: false,
+                name: 'gclid',
                 query_usage_30_day: null,
                 team_id: 2,
                 volume_30_day: null,
