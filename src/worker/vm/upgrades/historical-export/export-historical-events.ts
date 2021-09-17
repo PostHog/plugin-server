@@ -184,12 +184,36 @@ export function addHistoricalEventsExportCapability(
         name: INTERFACE_JOB_NAME,
         type: PluginTaskType.Job,
         // TODO: Accept timestamp as payload
-        exec: async (_) => {
+        exec: async (payload) => {
             const exportAlreadyRunning = await meta.storage.get(EXPORT_RUNNING_KEY, false)
 
             // only let one export run at a time
             if (exportAlreadyRunning) {
                 return
+            }
+
+            // override
+            if (payload) {
+                if (payload.dateTo) {
+                    try {
+                        const dateTo = new Date(payload.dateTo)
+                        await meta.storage.set(MAX_TIMESTAMP_KEY, payload.dateTo)
+                        meta.global.timestampLimit = dateTo
+                    } catch (error) {
+                        createLog(`'dateTo' should be an timestamp in ISO string format.`)
+                        throw error
+                    }
+                }
+                if (payload.dateFrom) {
+                    try {
+                        const dateFrom = new Date(payload.dateFrom)
+                        await meta.utils.cursor.init(TIMESTAMP_CURSOR_KEY, dateFrom.getTime() - EVENTS_TIME_INTERVAL)
+                        meta.global.minTimestamp = dateFrom.getTime()
+                    } catch (error) {
+                        createLog(`'dateFrom' should be an timestamp in ISO string format.`)
+                        throw error
+                    }
+                }
             }
 
             await meta.storage.set(EXPORT_RUNNING_KEY, true)
