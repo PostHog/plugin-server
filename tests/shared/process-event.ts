@@ -237,14 +237,14 @@ export const createProcessEventTests = (
         expect((await hub.db.fetchPersons()).length).toEqual(2)
         const [person0, person1] = await hub.db.fetchPersons()
 
-        jest.spyOn(hub!.db.kafkaProducer!, 'queueMessage')
-
         if (database === 'clickhouse') {
             await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse), 2)
             const chPeople = await hub.db.fetchPersons(Database.ClickHouse)
             expect(chPeople.length).toEqual(2)
 
             // try to merge and see if we queue any messages
+            jest.spyOn(hub!.db.kafkaProducer!, 'queueMessage')
+
             jest.spyOn(hub!.db, 'updatePerson').mockImplementationOnce(() => {
                 throw new Error('updatePerson error')
             })
