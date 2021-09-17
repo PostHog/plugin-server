@@ -240,6 +240,7 @@ export const createProcessEventTests = (
         if (database === 'clickhouse') {
             await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse), 2)
             const chPeople = await hub.db.fetchPersons(Database.ClickHouse)
+            console.log(chPeople)
             expect(chPeople.length).toEqual(2)
         }
 
