@@ -374,12 +374,19 @@ export class DB {
     public async fetchPersons(database: Database = Database.Postgres): Promise<Person[] | ClickHousePerson[]> {
         if (database === Database.ClickHouse) {
             const query = `
-                SELECT * FROM person
+            SELECT id, team_id, is_identified, ts as _timestamp, properties, created_at 
+            FROM (
+                SELECT id,
+                    team_id,
+                    max(is_identified) as is_identified,
+                    max(_timestamp) as ts,
+                    argMax(properties, _timestamp) as properties,
+                    argMin(created_at, _timestamp) as created_at
+                FROM person
                 FINAL
-                JOIN (
-                    SELECT id, max(_timestamp) as _timestamp FROM person GROUP BY team_id, id
-                ) as person_max ON person.id = person_max.id AND person._timestamp = person_max._timestamp
-                WHERE is_deleted = 0
+                GROUP BY team_id, id
+                HAVING max(is_deleted)=0
+            )            
             `
             return (await this.clickhouseQuery(query)).data.map((row) => {
                 const { 'person_max._timestamp': _discard1, 'person_max.id': _discard2, ...rest } = row

@@ -234,13 +234,13 @@ export const createProcessEventTests = (
             new UUIDT().toString()
         )
 
+        expect((await hub.db.fetchPersons()).length).toEqual(2)
+        const [person0, person1] = await hub.db.fetchPersons()
+
         if (database === 'clickhouse') {
             await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse), 2)
             expect((await hub.db.fetchPersons(Database.ClickHouse)).length).toEqual(2)
         }
-
-        expect((await hub.db.fetchPersons()).length).toEqual(2)
-        const [person0, person1] = await hub.db.fetchPersons()
 
         await eventsProcessor.mergePeople({
             mergeInto: person0,
