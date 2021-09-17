@@ -450,7 +450,11 @@ export class EventsProcessor {
             try {
                 const updatePersonMessages = await this.db.updatePerson(
                     mergeInto,
-                    { created_at: firstSeen, properties: mergeInto.properties },
+                    {
+                        created_at: firstSeen,
+                        properties: mergeInto.properties,
+                        is_identified: mergeInto.is_identified || otherPerson.is_identified,
+                    },
                     client
                 )
 
