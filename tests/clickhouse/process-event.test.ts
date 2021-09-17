@@ -4,7 +4,7 @@ import { KAFKA_EVENTS_PLUGIN_INGESTION } from '../../src/config/kafka-topics'
 import { Event, PluginsServerConfig } from '../../src/types'
 import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
 import { resetKafka } from '../helpers/kafka'
-import { getFirstTeam } from '../helpers/sql'
+import { getFirstTeam, resetTestDatabase } from '../helpers/sql'
 import { createPerson, createProcessEventTests } from '../shared/process-event'
 
 jest.setTimeout(180_000) // 3 minute timeout
@@ -68,6 +68,8 @@ describe('process event (clickhouse)', () => {
 
             // moveDistinctIds 2x, deletePerson 1x
             expect(hub!.db.kafkaProducer!.queueMessage).toHaveBeenCalledTimes(3)
+
+            await resetTestDatabase()
         })
     })
 })
