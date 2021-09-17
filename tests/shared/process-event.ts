@@ -331,7 +331,7 @@ export const createProcessEventTests = (
         expect(events[0].properties).toEqual({
             $ip: '127.0.0.1',
             $os: 'Mac OS X',
-            $set: { utm_medium: 'twitter', $gclid: 'GOOGLE ADS ID' },
+            $set: { utm_medium: 'twitter', gclid: 'GOOGLE ADS ID' },
             token: 'THIS IS NOT A TOKEN FOR TEAM 2',
             $browser: 'Chrome',
             $set_once: {
@@ -346,7 +346,7 @@ export const createProcessEventTests = (
             distinct_id: 2,
             $current_url: 'https://test.com',
             $browser_version: false,
-            $gclid: 'GOOGLE ADS ID',
+            gclid: 'GOOGLE ADS ID',
             $initial_referrer_url: 'https://google.com/?q=posthog',
             $initial_referring_domain: 'https://google.com',
         })
