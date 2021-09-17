@@ -374,14 +374,16 @@ export class DB {
     public async fetchPersons(database: Database = Database.Postgres): Promise<Person[] | ClickHousePerson[]> {
         if (database === Database.ClickHouse) {
             const query = `
-            SELECT id, team_id, is_identified, ts as _timestamp, properties, created_at 
+            SELECT id, team_id, is_identified, ts as _timestamp, properties, created_at , is_deleted, _offset
             FROM (
                 SELECT id,
                     team_id,
                     max(is_identified) as is_identified,
                     max(_timestamp) as ts,
                     argMax(properties, _timestamp) as properties,
-                    argMin(created_at, _timestamp) as created_at
+                    argMin(created_at, _timestamp) as created_at,
+                    max(is_deleted) as is_deleted,
+                    argMax(_offset, _timestamp) as _offset
                 FROM person
                 FINAL
                 GROUP BY team_id, id
