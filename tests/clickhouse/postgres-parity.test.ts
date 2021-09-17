@@ -39,7 +39,7 @@ describe('postgres parity', () => {
                 return event
             }
         `)
-        await resetTestDatabaseClickhouse(extraServerConfig)
+        // await resetTestDatabaseClickhouse(extraServerConfig)
         const startResponse = await startPluginsServer(extraServerConfig, makePiscina)
         hub = startResponse.hub
         stopServer = startResponse.stop
