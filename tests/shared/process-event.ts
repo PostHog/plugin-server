@@ -64,6 +64,7 @@ export const getEventsByPerson = async (hub: Hub) => {
                 distinctIds,
                 (events as Event[])
                     .filter((event) => distinctIds.includes(event.distinct_id))
+                    .sort((e1, e2) => new Date(e1.timestamp).getTime() - new Date(e2.timestamp).getTime())
                     .map((event) => event.event),
             ] as const
         })
@@ -174,8 +175,8 @@ export const createProcessEventTests = (
             event: eventName,
             distinct_id: properties.distinct_id ?? state.currentDistinctId,
             properties: properties,
-            now: '2021-09-08T15:51:51.072Z',
-            sent_at: '2021-09-08T15:51:51.072Z',
+            now: new Date().toISOString(),
+            sent_at: new Date().toISOString(),
             ip: '127.0.0.1',
             site_url: 'https://posthog.com',
             team_id: team.id,

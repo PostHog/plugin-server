@@ -44,6 +44,8 @@ describe('process event (clickhouse)', () => {
                 throw new Error('updatePerson error')
             })
 
+            hub!.db.kafkaProducer!.queueMessage = jest.fn()
+
             await expect(async () => {
                 await hub!.eventsProcessor!.mergePeople({
                     mergeInto: person0,
@@ -56,18 +58,16 @@ describe('process event (clickhouse)', () => {
 
             expect(hub!.db.kafkaProducer!.queueMessage).not.toHaveBeenCalled()
 
-            await expect(async () => {
-                await hub!.eventsProcessor!.mergePeople({
-                    mergeInto: person0,
-                    mergeIntoDistinctId: 'person_0',
-                    otherPerson: person1,
-                    otherPersonDistinctId: 'person_1',
-                    totalMergeAttempts: 0,
-                })
-            }).rejects.not.toThrow()
+            await hub!.eventsProcessor!.mergePeople({
+                mergeInto: person0,
+                mergeIntoDistinctId: 'person_0',
+                otherPerson: person1,
+                otherPersonDistinctId: 'person_1',
+                totalMergeAttempts: 0,
+            })
 
-            // updatePerson 1x, moveDistinctIds 2x, deletePerson 1x
-            expect(hub!.db.kafkaProducer!.queueMessage).toHaveBeenCalledTimes(4)
+            // moveDistinctIds 2x, deletePerson 1x
+            expect(hub!.db.kafkaProducer!.queueMessage).toHaveBeenCalledTimes(3)
         })
     })
 })
