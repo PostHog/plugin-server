@@ -5,8 +5,8 @@ services:
         image: postgres:12-alpine
         environment:
             POSTGRES_USER: posthog
-            POSTGRES_DB: posthog
             POSTGRES_PASSWORD: posthog
+            POSTGRES_DB: posthog
         volumes:
             - ./docker/postgres/docker-entrypoint-initdb.d/:/docker-entrypoint-initdb.d/
         ports:
