@@ -10,7 +10,6 @@ import { resetTestDatabase } from './helpers/sql'
 jest.mock('@sentry/node')
 jest.mock('../src/utils/db/sql')
 jest.mock('../src/utils/kill')
-jest.setTimeout(60000) // 60 sec timeout
 
 test('startPluginsServer', async () => {
     const testCode = `

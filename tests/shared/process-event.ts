@@ -12,7 +12,7 @@ import { EventProcessingResult, EventsProcessor } from '../../src/worker/ingesti
 import { createUserTeamAndOrganization, getFirstTeam, getTeams, onQuery, resetTestDatabase } from '../helpers/sql'
 
 jest.mock('../../src/utils/status')
-jest.setTimeout(600000) // 600 sec timeout.
+jest.setTimeout(60_000) // 60 sec timeout.
 
 export async function delayUntilEventIngested(
     fetchEvents: () => Promise<any[] | any>,

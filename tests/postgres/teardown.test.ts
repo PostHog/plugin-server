@@ -6,7 +6,6 @@ import { pluginConfig39 } from '../helpers/plugins'
 import { getErrorForPluginConfig, resetTestDatabase } from '../helpers/sql'
 
 jest.mock('../../src/utils/status')
-jest.setTimeout(60000) // 60 sec timeout
 
 const defaultEvent = {
     distinct_id: 'my_id',

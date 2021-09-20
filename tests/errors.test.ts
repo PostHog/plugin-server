@@ -6,8 +6,6 @@ import { pluginConfig39 } from './helpers/plugins'
 import { getErrorForPluginConfig, resetTestDatabase } from './helpers/sql'
 import { delayUntilEventIngested } from './shared/process-event'
 
-jest.setTimeout(60000) // 60 sec timeout
-
 const extraServerConfig: Partial<PluginsServerConfig> = {
     WORKER_CONCURRENCY: 2,
     PLUGINS_CELERY_QUEUE: 'test-plugins-celery-queue-errors',

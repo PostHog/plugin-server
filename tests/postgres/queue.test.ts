@@ -6,8 +6,6 @@ import { createHub } from '../../src/utils/db/hub'
 import { delay } from '../../src/utils/utils'
 import { runProcessEvent } from '../../src/worker/plugins/run'
 
-jest.setTimeout(60000) // 60 sec timeout
-
 function advanceOneTick() {
     return new Promise((resolve) => process.nextTick(resolve))
 }

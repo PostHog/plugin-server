@@ -7,8 +7,6 @@ import { pluginConfig39 } from '../helpers/plugins'
 import { resetTestDatabase } from '../helpers/sql'
 import { delayUntilEventIngested } from '../shared/process-event'
 
-jest.setTimeout(60000) // 60 sec timeout
-
 describe('e2e postgres ingestion timeout', () => {
     let hub: Hub
     let stopServer: () => Promise<void>

@@ -14,7 +14,6 @@ import { delayUntilEventIngested } from '../shared/process-event'
 const { console: testConsole } = writeToFile
 
 jest.mock('../../src/utils/status')
-jest.setTimeout(60000) // 60 sec timeout
 
 // TODO: merge these tests with clickhouse/e2e.test.ts
 describe('e2e postgres ingestion', () => {

@@ -13,7 +13,7 @@ import { plugin60 } from './../helpers/plugins'
 
 jest.mock('../../src/utils/celery/client')
 jest.mock('../../src/main/job-queues/job-queue-manager')
-jest.setTimeout(30000)
+jest.setTimeout(10_000) // 10 seconds
 
 const defaultEvent = {
     distinct_id: 'my_id',

@@ -4,7 +4,7 @@ import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
 import { resetKafka } from '../helpers/kafka'
 import { createProcessEventTests } from '../shared/process-event'
 
-jest.setTimeout(180_000) // 3 minute timeout
+jest.setTimeout(10_000) // 10 seconds
 
 const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_ENABLED: true,

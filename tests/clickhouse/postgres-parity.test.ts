@@ -12,7 +12,6 @@ import { getFirstTeam, resetTestDatabase } from '../helpers/sql'
 import { delayUntilEventIngested } from '../shared/process-event'
 
 jest.mock('../../src/utils/status')
-jest.setTimeout(60000) // 60 sec timeout
 
 const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_ENABLED: true,

@@ -29,7 +29,7 @@ async function resetTestDatabaseWithMmdb(): Promise<void> {
 
 let serverInstance: ServerInstance
 
-jest.setTimeout(30_000)
+jest.setTimeout(30_000) // 30 seconds
 
 afterEach(async () => {
     await serverInstance?.stop()

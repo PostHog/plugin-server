@@ -33,7 +33,6 @@ jest.mock('../src/utils/db/s3-wrapper', () => {
 })
 jest.mock('../src/utils/db/sql')
 jest.mock('../src/utils/kill')
-jest.setTimeout(60000) // 60 sec timeout
 
 const { console: testConsole } = writeToFile
 
