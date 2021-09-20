@@ -13,7 +13,7 @@ export interface TimestampBoundaries {
 
 export interface ExportEventsJobPayload extends Record<string, any> {
     // The lower bound of the timestamp interval to be processed
-    timstampCursor?: number
+    timestampCursor?: number
 
     // The offset *within* a given timestamp interval
     intraIntervalOffset?: number
@@ -30,13 +30,13 @@ export type ExportEventsFromTheBeginningUpgrade = Plugin<{
         pgClient: Client
         eventsToIgnore: Set<string>
         sanitizedTableName: string
-        exportEventsFromTheBeginning: (
-            payload: ExportEventsJobPayload,
-            meta: PluginMeta<ExportEventsFromTheBeginningUpgrade>
-        ) => Promise<void>
-        initialTimestampCursor: number
-        timestampLimit: Date
-        minTimestamp: number
+        exportEventsFromTheBeginning: (payload: ExportEventsJobPayload) => Promise<void>
+        initTimestampsAndCursor: (payload: Record<string, any> | undefined) => Promise<void>
+        setTimestampBoundaries: () => Promise<void>
+        updateProgressBar: (incrementedCursor: number) => void
+        timestampBoundariesForTeam: TimestampBoundaries
+        maxTimestamp: number | null
+        minTimestamp: number | null
     }
 }>
 
