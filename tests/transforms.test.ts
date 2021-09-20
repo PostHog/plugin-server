@@ -7,6 +7,8 @@ import { resetTestDatabase } from './helpers/sql'
 let hub: Hub
 let closeHub: () => Promise<void>
 
+jest.setTimeout(20_000) // 20 second timeout
+
 beforeEach(async () => {
     ;[hub, closeHub] = await createHub()
     await resetTestDatabase(`const processEvent = event => event`)
