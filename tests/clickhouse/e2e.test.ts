@@ -186,11 +186,8 @@ describe('e2e', () => {
             client.sendTask('posthog.tasks.plugins.plugin_job', args, {})
 
             await delayUntilEventIngested(awaitLogs, 4)
-            await delay(1000)
+            await delay(2000)
 
-            const entries = await hub.db.fetchPluginLogEntries()
-
-            console.log(entries)
             const exportedEventsAfterJob = testConsole.read().filter((log) => log[0] === 'exported event')
             expect(exportedEventsAfterJob.length).toEqual(4)
             expect(exportedEventsAfterJob.map((log) => log[1])).toEqual(
