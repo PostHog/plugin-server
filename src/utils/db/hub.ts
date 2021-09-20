@@ -203,15 +203,15 @@ export async function createHub(
 
     hub.pluginMetricsManager = new PluginMetricsManager()
 
-    try {
-        await hub.jobQueueManager.connectProducer()
-    } catch (error) {
-        try {
-            logOrThrowJobQueueError(hub as Hub, error, `Can not start job queue producer!`)
-        } catch {
-            killProcess()
-        }
-    }
+    // try {
+    //     await hub.jobQueueManager.connectProducer()
+    // } catch (error) {
+    //     try {
+    //         logOrThrowJobQueueError(hub as Hub, error, `Can not start job queue producer!`)
+    //     } catch {
+    //         killProcess()
+    //     }
+    // }
 
     const closeHub = async () => {
         if (eventLoopLagInterval) {

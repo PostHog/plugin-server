@@ -414,7 +414,7 @@
       -->
     <macros>
         <shard>01</shard>
-        <replica>ch1</replica> 
+        <replica>ch1</replica>
     </macros>
 
 

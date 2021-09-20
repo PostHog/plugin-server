@@ -4,8 +4,6 @@ import { resetTestDatabaseClickhouse } from '../helpers/clickhouse'
 import { resetKafka } from '../helpers/kafka'
 import { createProcessEventTests } from '../shared/process-event'
 
-jest.setTimeout(180_000) // 3 minute timeout
-
 const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_ENABLED: true,
     KAFKA_HOSTS: process.env.KAFKA_HOSTS || 'kafka:9092',
@@ -15,11 +13,11 @@ const extraServerConfig: Partial<PluginsServerConfig> = {
 describe('process event (clickhouse)', () => {
     beforeAll(async () => {
         await resetKafka(extraServerConfig)
-    })
+    }, 1000)
 
     beforeEach(async () => {
         await resetTestDatabaseClickhouse(extraServerConfig)
-    })
+    }, 1000)
 
     createProcessEventTests('clickhouse', extraServerConfig)
 })

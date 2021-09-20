@@ -5,6 +5,7 @@ import { PluginsServerConfig } from '../../src/types'
 
 export async function resetTestDatabaseClickhouse(extraServerConfig: Partial<PluginsServerConfig>): Promise<void> {
     const config = { ...defaultConfig, ...extraServerConfig }
+    console.log('start clickhouse')
     const clickhouse = new ClickHouse({
         host: config.CLICKHOUSE_HOST,
         port: 8123,
@@ -14,6 +15,8 @@ export async function resetTestDatabaseClickhouse(extraServerConfig: Partial<Plu
             output_format_json_quote_64bit_integers: false,
         },
     })
+    console.log('start truncate')
+
     await clickhouse.querying('TRUNCATE events')
     await clickhouse.querying('TRUNCATE events_mv')
     await clickhouse.querying('TRUNCATE person')
@@ -23,4 +26,5 @@ export async function resetTestDatabaseClickhouse(extraServerConfig: Partial<Plu
     await clickhouse.querying('TRUNCATE session_recording_events')
     await clickhouse.querying('TRUNCATE session_recording_events_mv')
     await clickhouse.querying('TRUNCATE plugin_log_entries')
+    console.log('finish clickhouse')
 }

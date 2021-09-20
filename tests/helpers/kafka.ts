@@ -20,6 +20,14 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
         clientId: `plugin-server-test-${new UUIDT()}`,
         brokers: (config.KAFKA_HOSTS || '').split(','),
         logLevel: logLevel.WARN,
+
+        connectionTimeout: 100,
+        authenticationTimeout: 100,
+        reauthenticationThreshold: 100,
+        requestTimeout: 100,
+        enforceRequestTimeout: true,
+
+        retry: { retries: 0 },
     })
     const producer = kafka.producer()
     const consumer = kafka.consumer({
@@ -36,45 +44,45 @@ export async function resetKafka(extraServerConfig: Partial<PluginsServerConfig>
         KAFKA_PLUGIN_LOG_ENTRIES,
     ])
 
-    await new Promise<void>(async (resolve, reject) => {
-        console.info('setting group join and crash listeners')
-        const { CONNECT, GROUP_JOIN, CRASH } = consumer.events
-        consumer.on(CONNECT, () => {
-            console.log('consumer connected to kafka')
-        })
-        consumer.on(GROUP_JOIN, () => {
-            console.log('joined group')
-            resolve()
-        })
-        consumer.on(CRASH, ({ payload: { error } }) => reject(error))
+    // await new Promise<void>(async (resolve, reject) => {
+    //     console.info('setting group join and crash listeners')
+    //     const { CONNECT, GROUP_JOIN, CRASH } = consumer.events
+    //     consumer.on(CONNECT, () => {
+    //         console.log('consumer connected to kafka')
+    //     })
+    //     consumer.on(GROUP_JOIN, () => {
+    //         console.log('joined group')
+    //         resolve()
+    //     })
+    //     consumer.on(CRASH, ({ payload: { error } }) => reject(error))
 
-        console.info('connecting producer')
-        await producer.connect()
+    //     console.info('connecting producer')
+    //     await producer.connect()
 
-        console.info('subscribing consumer')
-        await consumer.subscribe({ topic: KAFKA_EVENTS_PLUGIN_INGESTION })
+    //     console.info('subscribing consumer')
+    //     await consumer.subscribe({ topic: KAFKA_EVENTS_PLUGIN_INGESTION })
 
-        console.info('running consumer')
-        await consumer.run({
-            eachMessage: async (payload) => {
-                await Promise.resolve()
-                console.info('message received!')
-                messages.push(payload)
-            },
-        })
+    //     console.info('running consumer')
+    //     await consumer.run({
+    //         eachMessage: async (payload) => {
+    //             await Promise.resolve()
+    //             console.info('message received!')
+    //             messages.push(payload)
+    //         },
+    //     })
 
-        console.info(`awaiting ${delayMs} ms before disconnecting`)
-        await delay(delayMs)
+    //     console.info(`awaiting ${delayMs} ms before disconnecting`)
+    //     await delay(delayMs)
 
-        console.info('disconnecting producer')
-        await producer.disconnect()
+    //     console.info('disconnecting producer')
+    //     await producer.disconnect()
 
-        console.info('stopping consumer')
-        await consumer.stop()
+    //     console.info('stopping consumer')
+    //     await consumer.stop()
 
-        console.info('disconnecting consumer')
-        await consumer.disconnect()
-    })
+    //     console.info('disconnecting consumer')
+    //     await consumer.disconnect()
+    // })
 
     return true
 }
@@ -83,7 +91,7 @@ async function createTopics(kafka: Kafka, topics: string[]) {
     const admin = kafka.admin()
     await admin.connect()
     await admin.createTopics({
-        waitForLeaders: true,
+        waitForLeaders: false,
         topics: topics.map((topic) => ({ topic })),
     })
     await admin.disconnect()
