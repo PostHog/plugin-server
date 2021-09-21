@@ -25,6 +25,7 @@ const extraServerConfig: Partial<PluginsServerConfig> = {
     WORKER_CONCURRENCY: 2,
     KAFKA_CONSUMPTION_TOPIC: KAFKA_EVENTS_PLUGIN_INGESTION,
     LOG_LEVEL: LogLevel.Log,
+    CELERY_DEFAULT_QUEUE: 'test-celery-default-queue',
 }
 
 const indexJs = `
@@ -39,7 +40,13 @@ export async function processEvent (event) {
     return event
 }
 
-export function onEvent (event) {
+export function onEvent (event, { global }) {
+    // we use this to mock setupPlugin being 
+    // run after some events were already ingested
+    global.timestampBoundariesForTeam = {
+        max: new Date(),
+        min: new Date(Date.now()-${ONE_HOUR})
+    }
     testConsole.log('onEvent', event.event)
 }
 
@@ -151,13 +158,13 @@ describe('e2e', () => {
             })
 
         test('export historical events', async () => {
-            await posthog.capture('historicalEvent1', { timestamp: '1970-01-01T00:00:01.000Z' })
-            await posthog.capture('historicalEvent2', { timestamp: '1970-01-01T00:00:01.000Z' })
-            await posthog.capture('historicalEvent3', { timestamp: '1970-01-01T00:00:01.000Z' })
-            await posthog.capture('historicalEvent4', { timestamp: '1970-01-01T00:00:01.000Z' })
+            await posthog.capture('historicalEvent1')
+            await posthog.capture('historicalEvent2')
+            await posthog.capture('historicalEvent3')
+            await posthog.capture('historicalEvent4')
 
             await delayUntilEventIngested(() => hub.db.fetchEvents(), 4)
-            await delay(1000)
+            await delay(100)
 
             const historicalEvents = await hub.db.fetchEvents()
             expect(historicalEvents.length).toBe(4)
@@ -178,7 +185,7 @@ describe('e2e', () => {
             client.sendTask('posthog.tasks.plugins.plugin_job', args, {})
 
             await delayUntilEventIngested(awaitLogs, 4)
-            await delay(2000)
+            await delay(100)
 
             const exportedEventsAfterJob = testConsole.read().filter((log) => log[0] === 'exported event')
             expect(exportedEventsAfterJob.length).toEqual(4)

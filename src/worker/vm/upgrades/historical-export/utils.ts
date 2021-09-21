@@ -7,8 +7,8 @@ import { ClickHouseEvent, Event, PluginConfig, TimestampFormat } from '../../../
 import { DB } from '../../../../utils/db/db'
 import { castTimestampToClickhouseFormat } from '../../../../utils/utils'
 export interface TimestampBoundaries {
-    min: Date
-    max: Date
+    min: Date | null
+    max: Date | null
 }
 
 export interface ExportEventsJobPayload extends Record<string, any> {
@@ -50,10 +50,18 @@ export const fetchTimestampBoundariesForTeam = async (db: DB, teamId: number): P
             SELECT min(_timestamp) as min, max(_timestamp) as max
             FROM events
             WHERE team_id = ${teamId}`)
+        const min = clickhouseFetchTimestampsResult.data[0].min
+        const max = clickhouseFetchTimestampsResult.data[0].max
+
+        const minDate = new Date(clickhouseEventTimestampToDate(min))
+        const maxDate = new Date(clickhouseEventTimestampToDate(max))
+
+        const isValidMin = minDate.getTime() !== new Date(0).getTime()
+        const isValidMax = maxDate.getTime() !== new Date(0).getTime()
 
         return {
-            min: new Date(clickhouseEventTimestampToDate(clickhouseFetchTimestampsResult.data[0].min)),
-            max: new Date(clickhouseEventTimestampToDate(clickhouseFetchTimestampsResult.data[0].max)),
+            min: isValidMin ? minDate : null,
+            max: isValidMax ? maxDate : null,
         }
     } else {
         const postgresFetchTimestampsResult = await db.postgresQuery(
@@ -62,9 +70,11 @@ export const fetchTimestampBoundariesForTeam = async (db: DB, teamId: number): P
             'fetchTimestampBoundariesForTeam'
         )
 
+        const min = postgresFetchTimestampsResult.rows[0].min
+        const max = postgresFetchTimestampsResult.rows[0].max
         return {
-            min: new Date(postgresFetchTimestampsResult.rows[0].min),
-            max: new Date(postgresFetchTimestampsResult.rows[0].max),
+            min: min ? new Date(postgresFetchTimestampsResult.rows[0].min) : null,
+            max: max ? new Date(postgresFetchTimestampsResult.rows[0].max) : null,
         }
     }
 }

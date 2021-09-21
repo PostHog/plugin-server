@@ -194,17 +194,6 @@ export function addHistoricalEventsExportCapability(
         // initTimestampsAndCursor will only run on **one** thread, because of our guard against
         // multiple exports. as a result, we need to set the boundaries on postgres, and
         // only set them in global when the job runs, so all threads have global state in sync
-        if (payload && payload.dateTo) {
-            try {
-                await meta.storage.set(MAX_UNIX_TIMESTAMP_KEY, new Date(payload.dateTo).getTime())
-            } catch (error) {
-                createLog(`'dateTo' should be an timestamp in ISO string format.`)
-                throw error
-            }
-        } else {
-            // no timestamp override specified via the payload, default to the last event before the plugin was enabled
-            await meta.storage.set(MAX_UNIX_TIMESTAMP_KEY, meta.global.timestampBoundariesForTeam.max.getTime())
-        }
 
         if (payload && payload.dateFrom) {
             try {
@@ -217,9 +206,31 @@ export function addHistoricalEventsExportCapability(
             }
         } else {
             // no timestamp override specified via the payload, default to the first event ever ingested
+            if (!meta.global.timestampBoundariesForTeam.min) {
+                throw new Error(
+                    `Unable to determine the lower timestamp bound for the export automatically. Please specify a 'dateFrom' value.`
+                )
+            }
             const dateFrom = meta.global.timestampBoundariesForTeam.min.getTime()
             await meta.utils.cursor.init(TIMESTAMP_CURSOR_KEY, dateFrom - EVENTS_TIME_INTERVAL)
             await meta.storage.set(MIN_UNIX_TIMESTAMP_KEY, dateFrom)
+        }
+
+        if (payload && payload.dateTo) {
+            try {
+                await meta.storage.set(MAX_UNIX_TIMESTAMP_KEY, new Date(payload.dateTo).getTime())
+            } catch (error) {
+                createLog(`'dateTo' should be an timestamp in ISO string format.`)
+                throw error
+            }
+        } else {
+            // no timestamp override specified via the payload, default to the last event before the plugin was enabled
+            if (!meta.global.timestampBoundariesForTeam.max) {
+                throw new Error(
+                    `Unable to determine the upper timestamp bound for the export automatically. Please specify a 'dateTo' value.`
+                )
+            }
+            await meta.storage.set(MAX_UNIX_TIMESTAMP_KEY, meta.global.timestampBoundariesForTeam.max.getTime())
         }
     }
 
