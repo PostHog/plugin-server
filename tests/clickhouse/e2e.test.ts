@@ -1,5 +1,3 @@
-import IORedis from 'ioredis'
-
 import { KAFKA_EVENTS_PLUGIN_INGESTION } from '../../src/config/kafka-topics'
 import { startPluginsServer } from '../../src/main/pluginsServer'
 import { LogLevel, PluginsServerConfig } from '../../src/types'
@@ -63,7 +61,6 @@ describe('e2e', () => {
     let hub: Hub
     let stopServer: () => Promise<void>
     let posthog: DummyPostHog
-    let redis: IORedis.Redis
 
     beforeAll(async () => {
         await resetKafka(extraServerConfig)
@@ -77,13 +74,9 @@ describe('e2e', () => {
         hub = startResponse.hub
         stopServer = startResponse.stop
         posthog = createPosthog(hub, pluginConfig39)
-        redis = await hub.redisPool.acquire()
-
-        await redis.del(HISTORICAL_EVENTS_COUNTER_CACHE_KEY)
     })
 
     afterEach(async () => {
-        await hub.redisPool.release(redis)
         await stopServer()
     })
 
