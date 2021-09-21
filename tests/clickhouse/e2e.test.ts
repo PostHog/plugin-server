@@ -14,7 +14,6 @@ import { resetTestDatabase } from '../helpers/sql'
 import { delayUntilEventIngested } from '../shared/process-event'
 
 const { console: testConsole } = writeToFile
-const HISTORICAL_EVENTS_COUNTER_CACHE_KEY = '@plugin/60/2/historical_events_seen'
 const ONE_HOUR = 1000 * 60 * 60
 
 jest.mock('../../src/utils/status')
