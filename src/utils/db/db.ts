@@ -499,22 +499,21 @@ export class DB {
     public async setPersonAsIdentified(person: Person): Promise<void> {
         let shouldUpdateClickhouse = false
 
-        await this.postgresTransaction(async (client) => {
-            const result = await client.query(
-                `
+        const result = await this.postgresQuery(
+            `
                 UPDATE posthog_person 
                 SET is_identified=$1 
                 WHERE id = $2 
                 AND is_identified = $3
                 RETURNING is_identified
             `,
-                [true, person.id, false]
-            )
+            [true, person.id, false],
+            'setPersonAsIdentified'
+        )
 
-            if (result.rows.length > 0) {
-                shouldUpdateClickhouse = true
-            }
-        })
+        if (result.rows.length > 0) {
+            shouldUpdateClickhouse = true
+        }
 
         if (this.kafkaProducer && shouldUpdateClickhouse) {
             const message = {
