@@ -413,9 +413,9 @@ export class DB {
     public async fetchPerson(teamId: number, distinctId: string): Promise<Person | undefined> {
         const selectResult = await this.postgresQuery(
             `SELECT
-                posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties,
-                posthog_person.is_user_id, posthog_person.is_identified, posthog_person.uuid,
-                posthog_persondistinctid.team_id AS persondistinctid__team_id,
+                posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, 
+                posthog_person.properties_last_updated_at, posthog_person.is_user_id, posthog_person.is_identified, 
+                posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id,
                 posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id
             FROM posthog_person
             JOIN posthog_persondistinctid ON (posthog_persondistinctid.person_id = posthog_person.id)
