@@ -1,8 +1,11 @@
-import { Hub, PropertyOperator } from '../../src/types'
+import { DateTime } from 'luxon'
+
+import { ClickHousePerson, Database, Hub, Person, PropertyOperator } from '../../src/types'
 import { DB } from '../../src/utils/db/db'
 import { createHub } from '../../src/utils/db/hub'
-import { ActionManager } from '../../src/worker/ingestion/action-manager'
+import { delay, UUIDT } from '../../src/utils/utils'
 import { resetTestDatabase } from '../helpers/sql'
+import { delayUntilEventIngested } from './process-event'
 
 describe('DB', () => {
     let hub: Hub
@@ -32,7 +35,7 @@ describe('DB', () => {
                     id: ACTION_ID,
                     name: 'Test Action',
                     deleted: false,
-                    post_to_slack: false,
+                    post_to_slack: true,
                     slack_message_format: '',
                     is_calculating: false,
                     steps: [
@@ -55,5 +58,37 @@ describe('DB', () => {
                 },
             },
         })
+    })
+
+    test('setPersonAsIdentified', async () => {
+        const uuid = new UUIDT().toString()
+        const person = await hub.db.createPerson(
+            DateTime.utc(),
+            {},
+            TEAM_ID,
+            null,
+            false, // not identified
+            uuid,
+            ['distinct1']
+        )
+
+        await delayUntilEventIngested(() => hub.db.fetchPersons(), 1)
+
+        if (hub.db.kafkaProducer) {
+            await delayUntilEventIngested(() => hub.db.fetchPersons(Database.ClickHouse), 1)
+        }
+
+        await hub.db.setPersonAsIdentified(person)
+
+        await delay(1000)
+
+        let persons: Person[] | ClickHousePerson[] = []
+        if (hub.db.kafkaProducer) {
+            persons = await hub.db.fetchPersons(Database.ClickHouse)
+        } else {
+            persons = await hub.db.fetchPersons()
+        }
+
+        expect(persons[0].is_identified).toBe(true)
     })
 })

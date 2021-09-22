@@ -281,7 +281,7 @@ export class EventsProcessor {
         return returnedProps
     }
 
-    private async setIsIdentified(teamId: number, distinctId: string, isIdentified = true): Promise<void> {
+    private async setIsIdentified(teamId: number, distinctId: string): Promise<void> {
         let personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
             try {
@@ -301,7 +301,7 @@ export class EventsProcessor {
             }
         }
         if (personFound && !personFound.is_identified) {
-            await this.db.updatePerson(personFound, { is_identified: isIdentified })
+            await this.db.setPersonAsIdentified(personFound)
         }
     }
 

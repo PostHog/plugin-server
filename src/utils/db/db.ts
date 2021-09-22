@@ -496,6 +496,50 @@ export class DB {
         return person
     }
 
+    public async setPersonAsIdentified(person: Person): Promise<void> {
+        let shouldUpdateClickhouse = false
+
+        await this.postgresTransaction(async (client) => {
+            const result = await client.query(
+                `
+                UPDATE posthog_person 
+                SET is_identified=$1 
+                WHERE id = $2 
+                AND is_identified = $3
+                RETURNING is_identified
+            `,
+                [true, person.id, false]
+            )
+
+            if (result.rows.length > 0) {
+                shouldUpdateClickhouse = true
+            }
+        })
+
+        if (this.kafkaProducer && shouldUpdateClickhouse) {
+            const message = {
+                topic: KAFKA_PERSON,
+                messages: [
+                    {
+                        value: Buffer.from(
+                            JSON.stringify({
+                                created_at: castTimestampOrNow(
+                                    person.created_at,
+                                    TimestampFormat.ClickHouseSecondPrecision
+                                ),
+                                properties: JSON.stringify(person.properties),
+                                team_id: person.team_id,
+                                is_identified: true,
+                                id: person.uuid,
+                            })
+                        ),
+                    },
+                ],
+            }
+            await this.kafkaProducer.queueMessage(message)
+        }
+    }
+
     public async updatePerson(person: Person, update: Partial<Person>, client: PoolClient): Promise<ProducerRecord[]>
     public async updatePerson(person: Person, update: Partial<Person>): Promise<Person>
     public async updatePerson(
