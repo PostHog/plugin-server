@@ -73,8 +73,8 @@ export const fetchTimestampBoundariesForTeam = async (db: DB, teamId: number): P
         const min = postgresFetchTimestampsResult.rows[0].min
         const max = postgresFetchTimestampsResult.rows[0].max
         return {
-            min: min ? new Date(postgresFetchTimestampsResult.rows[0].min) : null,
-            max: max ? new Date(postgresFetchTimestampsResult.rows[0].max) : null,
+            min: min ? new Date(min) : null,
+            max: max ? new Date(max) : null,
         }
     }
 }

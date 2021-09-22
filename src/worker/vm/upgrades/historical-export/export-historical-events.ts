@@ -66,6 +66,7 @@ export function addHistoricalEventsExportCapability(
             if (exportAlreadyRunning) {
                 return
             }
+            await meta.storage.set(EXPORT_RUNNING_KEY, true)
 
             // get rid of all state pertaining to a previous run
             await meta.storage.del(TIMESTAMP_CURSOR_KEY)
@@ -76,7 +77,6 @@ export function addHistoricalEventsExportCapability(
 
             await meta.global.initTimestampsAndCursor(payload)
 
-            await meta.storage.set(EXPORT_RUNNING_KEY, true)
             await meta.jobs
                 .exportEventsFromTheBeginning({ retriesPerformedSoFar: 0, incrementTimestampCursor: true })
                 .runNow()
