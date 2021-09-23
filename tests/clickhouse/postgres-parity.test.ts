@@ -112,7 +112,7 @@ describe('postgres parity', () => {
         await delayUntilEventIngested(() => hub.db.fetchDistinctIdValues(person, Database.ClickHouse), 2)
 
         // update properties and set is_identified to true
-        await hub.db.updatePerson(person, { properties: { replacedUserProp: 'propValue' }, is_identified: true })
+        await hub.db.updatePerson(person, { properties: { replacedUserProp: 'propValue' }, is_identified: true }, true)
 
         await delayUntilEventIngested(async () =>
             (await hub.db.fetchPersons(Database.ClickHouse)).filter((p) => p.is_identified)
@@ -134,7 +134,7 @@ describe('postgres parity', () => {
         // update date and boolean to false
 
         const randomDate = DateTime.utc().minus(100000).setZone('UTC')
-        await hub.db.updatePerson(person, { created_at: randomDate, is_identified: false })
+        await hub.db.updatePerson(person, { created_at: randomDate, is_identified: false }, true)
 
         await delayUntilEventIngested(async () =>
             (await hub.db.fetchPersons(Database.ClickHouse)).filter((p) => !p.is_identified)

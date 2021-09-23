@@ -222,7 +222,6 @@ export function generatePostgresValuesString(numberOfColumns: number, rowNumber:
     )
 }
 
-
 interface PropertyUpdateExpressionsAndValues {
     expressions: string[][]
     values: string[]
@@ -241,9 +240,21 @@ export function generatePersonPropertyUpdateExpressions(
         const expressionsForProperty = []
         values.push(propertyKey, propertyValue)
 
+        let valueTypeCast = 'text'
+        switch (typeof propertyValue) {
+            case 'number':
+                valueTypeCast = 'numeric'
+                break
+            case 'boolean':
+                valueTypeCast = 'boolean'
+                break
+            default:
+                valueTypeCast = 'text'
+                break
+        }
         const propertyValueUpdate = `
         CASE WHEN $${index}=ANY(should_update)
-            THEN jsonb_build_object($${index}, $${index + 1})
+            THEN jsonb_build_object($${index}, $${index + 1}::${valueTypeCast})
             ELSE '{}'
         END`
         expressionsForProperty.push(propertyValueUpdate)
@@ -255,7 +266,6 @@ export function generatePersonPropertyUpdateExpressions(
         END`
         expressionsForProperty.push(propertyTimestampUpdate)
 
-
         const shouldUpdateExpression = `
         CASE WHEN $${timestampIndex} > COALESCE(properties_last_updated_at ->> $${index}, '0') THEN $${index} ELSE NULL END
         `
@@ -266,6 +276,7 @@ export function generatePersonPropertyUpdateExpressions(
     }
 
     return {
-        expressions, values
+        expressions,
+        values,
     }
 }

@@ -497,15 +497,14 @@ export class DB {
         return person
     }
 
-    public async updatePerson(person: Person, update: Partial<Person>, client: PoolClient): Promise<ProducerRecord[]>
-    public async updatePerson(person: Person, update: Partial<Person>): Promise<Person>
+    public async updatePerson(person: Person, update: Partial<Person>, overrideData: boolean, client: PoolClient): Promise<ProducerRecord[]>
+    public async updatePerson(person: Person, update: Partial<Person>, overrideData: boolean): Promise<Person>
     public async updatePerson(
         person: Person,
         update: Partial<Person>,
+        overrideData?: boolean,
         client?: PoolClient,
-        overrideData = false
     ): Promise<Person | ProducerRecord[]> {     
-
         let values: any[] = [person.id]
 
         let setStatements = ''
@@ -521,7 +520,7 @@ export class DB {
             properties_last_updated_at = final.properties_last_updated_at`
 
             const queryParts = generatePersonPropertyUpdateExpressions({ k: 1, l: 2 }, new Date().toISOString(), values.length+1)
-            values = [...values, queryParts.values]
+            values = [...values, ...queryParts.values]
             
             let propertyUpdates = ''
             let propertyTimestampExpressions = ''
@@ -567,10 +566,58 @@ export class DB {
             ${setStatements}
         ${updateSubquery}
         WHERE id = $1
-        RETURNING final.properties;`
-        console.log(query)
-    
-        return {} as Person
+        RETURNING *;`
+
+        let updateResult: QueryResult<any> | null = null 
+
+        const alreadyInTransaction = !!client
+
+        let postgresTransaction = this.postgresTransaction.bind(this) 
+        if (alreadyInTransaction) {
+            const transactionMock = async <ReturnType extends any> (func: (client: PoolClient) => Promise<ReturnType>) => {
+                return func(client)
+            }
+            postgresTransaction = transactionMock
+        }
+
+
+        const result = await postgresTransaction(async (client) => {
+            console.log(query, values)
+            console.log(typeof values[5])
+            updateResult = await client.query(query, values)
+            if (this.kafkaProducer) {
+                const message: ProducerRecord = {
+                    topic: KAFKA_PERSON,
+                    messages: [
+                        {
+                            value: Buffer.from(
+                                JSON.stringify({
+                                    created_at: castTimestampOrNow(
+                                        updateResult.rows[0].created_at,
+                                        TimestampFormat.ClickHouseSecondPrecision
+                                    ),
+                                    properties: JSON.stringify(updateResult.rows[0].properties),
+                                    team_id: person.team_id,
+                                    is_identified: updateResult.rows[0].is_identified,
+                                    id: updateResult.rows[0].uuid,
+                                })
+                            ),
+                        },
+                    ],
+                }
+                if (alreadyInTransaction) {
+                    return [message]
+                } else  {
+                    await this.kafkaProducer.queueMessage(message)
+                }
+                
+            }
+            return updateResult.rows[0]
+        })
+
+        console.log(result)
+        return result
+
     }
 
     // public async updatePerson(person: Person, update: Partial<Person>, client: PoolClient): Promise<ProducerRecord[]>

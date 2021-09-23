@@ -238,7 +238,7 @@ export class EventsProcessor {
 
         // Figure out which properties we are actually setting
         const returnedProps: Properties = {}
-        let updatedProperties: Properties = { ...personFound.properties }
+        let updatedProperties: Properties = { }
         Object.entries(propertiesOnce).map(([key, value]) => {
             if (typeof personFound?.properties[key] === 'undefined') {
                 if (!returnedProps['$set_once']) {
@@ -277,7 +277,7 @@ export class EventsProcessor {
             updatedProperties = { ...updatedProperties, ...incrementedPropertiesQueryResult.rows[0].properties }
         }
 
-        await this.db.updatePerson(personFound, { properties: updatedProperties })
+        await this.db.updatePerson(personFound, { properties: updatedProperties }, false)
         return returnedProps
     }
 
@@ -301,7 +301,7 @@ export class EventsProcessor {
             }
         }
         if (personFound && !personFound.is_identified) {
-            await this.db.updatePerson(personFound, { is_identified: isIdentified })
+            await this.db.updatePerson(personFound, { is_identified: isIdentified }, true)
         }
     }
 
@@ -455,7 +455,8 @@ export class EventsProcessor {
                         properties: mergeInto.properties,
                         is_identified: mergeInto.is_identified || otherPerson.is_identified,
                     },
-                    client
+                    true,
+                    client,
                 )
 
                 // Merge the distinct IDs
