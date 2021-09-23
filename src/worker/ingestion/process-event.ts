@@ -238,7 +238,7 @@ export class EventsProcessor {
 
         // Figure out which properties we are actually setting
         const returnedProps: Properties = {}
-        let updatedProperties: Properties = { }
+        let updatedProperties: Properties = {}
         Object.entries(propertiesOnce).map(([key, value]) => {
             if (typeof personFound?.properties[key] === 'undefined') {
                 if (!returnedProps['$set_once']) {
@@ -453,10 +453,11 @@ export class EventsProcessor {
                     {
                         created_at: firstSeen,
                         properties: mergeInto.properties,
+                        properties_last_updated_at: {},
                         is_identified: mergeInto.is_identified || otherPerson.is_identified,
                     },
                     true,
-                    client,
+                    client
                 )
 
                 // Merge the distinct IDs

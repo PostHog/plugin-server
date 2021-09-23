@@ -2235,5 +2235,15 @@ export const createProcessEventTests = (
         expect(person.properties).toEqual({ a: 1, b: 2, c: 3, d: 4 })
     })
 
+    describe('person updates', () => {
+        test('person properties are updated correctly out of order', () => {
+            return
+        })
+
+        test('person merging correctly updates properties', () => {
+            return
+        })
+    })
+
     return returned
 }

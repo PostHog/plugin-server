@@ -447,11 +447,14 @@ export interface ClickHouseEvent extends Omit<Event, 'id' | 'elements' | 'elemen
     elements_chain: string
 }
 
+export type PropertiesLastUpdatedAt = Record<string, string>
+
 /** Properties shared by RawPerson and Person. */
 export interface BasePerson {
     id: number
     team_id: number
     properties: Properties
+    properties_last_updated_at: PropertiesLastUpdatedAt
     is_user_id: number
     is_identified: boolean
     uuid: string

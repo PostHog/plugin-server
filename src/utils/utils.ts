@@ -10,7 +10,15 @@ import { Readable } from 'stream'
 import * as tar from 'tar-stream'
 import * as zlib from 'zlib'
 
-import { LogLevel, Plugin, PluginConfigId, PluginsServerConfig, TimestampFormat } from '../types'
+import {
+    LogLevel,
+    Person,
+    Plugin,
+    PluginConfigId,
+    PluginsServerConfig,
+    PropertiesLastUpdatedAt,
+    TimestampFormat,
+} from '../types'
 import { status } from './status'
 
 /** Time until autoexit (due to error) gives up on graceful exit and kills the process right away. */
@@ -714,3 +722,18 @@ export function intToBase(num: number, base: number): string {
 export class RaceConditionError extends Error {
     name = 'RaceConditionError'
 }
+
+// TODO: reconsider this - maybe not needed given we just prioritize one persons props
+// export function mergePropertiesLastUpdatedAt(mergeInto: Person, otherPerson: Person) {
+//     const allKeys = [...Object.keys(mergeInto.properties_last_updated_at), ...Object.keys(otherPerson.properties_last_updated_at)]
+//     const mergedPropertiesLastUpdatedAt: Record<string, string> = {}
+//     const mergeIntoProps = mergeInto.properties_last_updated_at
+//     const otherPersonProps = otherPerson.properties_last_updated_at
+//     for (const key of allKeys) {
+//         const mergeIntoTimestamp = new Date(mergeIntoProps[key] || 0).getTime()
+//         const otherPersonTimestamp = new Date(otherPersonProps[key] || 0).getTime()
+//         if (mergeIntoTimestamp) {
+
+//         }
+//     }
+// }
