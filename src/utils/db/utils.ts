@@ -211,7 +211,7 @@ export function personInitialAndUTMProperties(properties: Properties): Propertie
     return propertiesCopy
 }
 
-/** Returns string in format: ($1, $2, $3, $4, $5, $6, $7, $8, ..., $N) */
+/** Returns string in format: ($${timestampIndex}, $2, $3, $4, $5, $6, $7, $8, ..., $N) */
 export function generatePostgresValuesString(numberOfColumns: number, rowNumber: number): string {
     return (
         '(' +
@@ -220,4 +220,52 @@ export function generatePostgresValuesString(numberOfColumns: number, rowNumber:
             .join(', ') +
         ')'
     )
+}
+
+
+interface PropertyUpdateExpressionsAndValues {
+    expressions: string[][]
+    values: string[]
+}
+
+export function generatePersonPropertyUpdateExpressions(
+    propertyUpdates: Person['properties'],
+    timestamp: string,
+    startIndex: number
+): PropertyUpdateExpressionsAndValues {
+    const expressions = []
+    const values = [timestamp]
+    const timestampIndex = startIndex
+    let index = startIndex + 1
+    for (const [propertyKey, propertyValue] of Object.entries(propertyUpdates)) {
+        const expressionsForProperty = []
+        values.push(propertyKey, propertyValue)
+
+        const propertyValueUpdate = `
+        CASE WHEN $${index}=ANY(should_update)
+            THEN jsonb_build_object($${index}, $${index + 1})
+            ELSE '{}'
+        END`
+        expressionsForProperty.push(propertyValueUpdate)
+
+        const propertyTimestampUpdate = `
+        CASE WHEN $${index}=ANY(should_update)
+        THEN jsonb_build_object($${index}, $${timestampIndex})
+        ELSE '{}'
+        END`
+        expressionsForProperty.push(propertyTimestampUpdate)
+
+
+        const shouldUpdateExpression = `
+        CASE WHEN $${timestampIndex} > COALESCE(properties_last_updated_at ->> $${index}, '0') THEN $${index} ELSE NULL END
+        `
+        expressionsForProperty.push(shouldUpdateExpression)
+
+        expressions.push(expressionsForProperty)
+        index += 2
+    }
+
+    return {
+        expressions, values
+    }
 }

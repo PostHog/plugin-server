@@ -54,6 +54,7 @@ import { KafkaProducerWrapper } from './kafka-producer-wrapper'
 import { PostgresLogsWrapper } from './postgres-logs-wrapper'
 import {
     chainToElements,
+    generatePersonPropertyUpdateExpressions,
     generatePostgresValuesString,
     hashElements,
     timeoutGuard,
@@ -501,51 +502,127 @@ export class DB {
     public async updatePerson(
         person: Person,
         update: Partial<Person>,
-        client?: PoolClient
-    ): Promise<Person | ProducerRecord[]> {
-        const updatedPerson: Person = { ...person, ...update }
-        const values = [...Object.values(unparsePersonPartial(update)), person.id]
+        client?: PoolClient,
+        overrideData = false
+    ): Promise<Person | ProducerRecord[]> {     
 
-        const queryString = `UPDATE posthog_person SET ${Object.keys(update).map(
-            (field, index) => `"${sanitizeSqlIdentifier(field)}" = $${index + 1}`
-        )} WHERE id = $${Object.values(update).length + 1}`
+        let values: any[] = [person.id]
 
-        if (client) {
-            await client.query(queryString, values)
-        } else {
-            await this.postgresQuery(queryString, values, 'updatePerson')
-        }
-
-        const kafkaMessages = []
-        if (this.kafkaProducer) {
-            const message = {
-                topic: KAFKA_PERSON,
-                messages: [
-                    {
-                        value: Buffer.from(
-                            JSON.stringify({
-                                created_at: castTimestampOrNow(
-                                    updatedPerson.created_at,
-                                    TimestampFormat.ClickHouseSecondPrecision
-                                ),
-                                properties: JSON.stringify(updatedPerson.properties),
-                                team_id: updatedPerson.team_id,
-                                is_identified: updatedPerson.is_identified,
-                                id: updatedPerson.uuid,
-                            })
-                        ),
-                    },
-                ],
+        let setStatements = ''
+        let updateSubquery = ''
+        if (overrideData) {
+            for (const [propertyKey, propertyValue] of Object.entries(update)) {
+                setStatements += `${propertyKey} = $${values.length + 1}`
+                values.push(propertyValue)
             }
-            if (client) {
-                kafkaMessages.push(message)
-            } else {
-                await this.kafkaProducer.queueMessage(message)
-            }
-        }
+        } else if (update.properties) {
+            setStatements = `
+            properties = final.properties,
+            properties_last_updated_at = final.properties_last_updated_at`
 
-        return client ? kafkaMessages : updatedPerson
+            const queryParts = generatePersonPropertyUpdateExpressions({ k: 1, l: 2 }, new Date().toISOString(), values.length+1)
+            values = [...values, queryParts.values]
+            
+            let propertyUpdates = ''
+            let propertyTimestampExpressions = ''
+            let shouldUpdateExpressions = ''
+
+            for (let i = 0; i < queryParts.expressions.length; ++i) {
+                const propertyExpressions = queryParts.expressions[i]
+                propertyUpdates += propertyExpressions[0]
+                propertyTimestampExpressions += propertyExpressions[1]
+                shouldUpdateExpressions += propertyExpressions[2]
+                if (i < queryParts.expressions.length-1) {
+                    propertyUpdates += '||'
+                    propertyTimestampExpressions += '||'
+                    shouldUpdateExpressions += ','
+                }
+            }
+
+            updateSubquery = `FROM (
+                SELECT 
+                    (
+                        properties || ${propertyUpdates}
+                    ) as properties,
+                    (
+                        properties_last_updated_at || ${propertyTimestampExpressions}
+                    ) as properties_last_updated_at
+                    FROM (
+                        SELECT
+                            properties,
+                            properties_last_updated_at,
+                            ARRAY[ ${shouldUpdateExpressions} ] as should_update
+                        FROM
+                            posthog_person
+                        WHERE id = $1
+                    ) as person_props
+            ) as final`
+        }
+    
+    
+        const query = `
+        UPDATE 
+            posthog_person
+        SET 
+            ${setStatements}
+        ${updateSubquery}
+        WHERE id = $1
+        RETURNING final.properties;`
+        console.log(query)
+    
+        return {} as Person
     }
+
+    // public async updatePerson(person: Person, update: Partial<Person>, client: PoolClient): Promise<ProducerRecord[]>
+    // public async updatePerson(person: Person, update: Partial<Person>): Promise<Person>
+    // public async updatePerson(
+    //     person: Person,
+    //     update: Partial<Person>,
+    //     client?: PoolClient
+    // ): Promise<Person | ProducerRecord[]> {
+    //     const updatedPerson: Person = { ...person, ...update }
+    //     const values = [...Object.values(unparsePersonPartial(update)), person.id]
+
+    //     const queryString = `UPDATE posthog_person SET ${Object.keys(update).map(
+    //         (field, index) => `"${sanitizeSqlIdentifier(field)}" = $${index + 1}`
+    //     )} WHERE id = $${Object.values(update).length + 1}`
+
+    //     if (client) {
+    //         await client.query(queryString, values)
+    //     } else {
+    //         await this.postgresQuery(queryString, values, 'updatePerson')
+    //     }
+
+    //     const kafkaMessages = []
+    //     if (this.kafkaProducer) {
+    //         const message = {
+    //             topic: KAFKA_PERSON,
+    //             messages: [
+    //                 {
+    //                     value: Buffer.from(
+    //                         JSON.stringify({
+    //                             created_at: castTimestampOrNow(
+    //                                 updatedPerson.created_at,
+    //                                 TimestampFormat.ClickHouseSecondPrecision
+    //                             ),
+    //                             properties: JSON.stringify(updatedPerson.properties),
+    //                             team_id: updatedPerson.team_id,
+    //                             is_identified: updatedPerson.is_identified,
+    //                             id: updatedPerson.uuid,
+    //                         })
+    //                     ),
+    //                 },
+    //             ],
+    //         }
+    //         if (client) {
+    //             kafkaMessages.push(message)
+    //         } else {
+    //             await this.kafkaProducer.queueMessage(message)
+    //         }
+    //     }
+
+    //     return client ? kafkaMessages : updatedPerson
+    // }
 
     // Using Postgres only as a source of truth
     public async incrementPersonProperties(
