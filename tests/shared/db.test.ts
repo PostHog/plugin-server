@@ -80,7 +80,7 @@ describe('DB', () => {
 
         await hub.db.setPersonAsIdentified(person)
 
-        await delay(1000)
+        await delay(10000)
 
         let persons: Person[] | ClickHousePerson[] = []
         if (hub.db.kafkaProducer) {
@@ -89,6 +89,6 @@ describe('DB', () => {
             persons = await hub.db.fetchPersons()
         }
 
-        expect(persons[0].is_identified).toBe(true)
+        expect(Boolean(persons[0].is_identified)).toBe(true)
     })
 })
