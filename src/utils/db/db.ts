@@ -497,11 +497,12 @@ export class DB {
     }
 
     public async setPersonAsIdentified(person: Person): Promise<void> {
-        await this.postgresQuery(
+        const result = await this.postgresQuery(
             `
                 UPDATE posthog_person 
                 SET is_identified=$1 
                 WHERE id = $2 
+                AND is_identified = $3
                 RETURNING is_identified
             `,
             [true, person.id, false],
