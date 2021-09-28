@@ -317,11 +317,8 @@ export class EventsProcessor {
         }
         if (event === '$create_alias') {
             await this.alias(properties['alias'], distinctId, teamId, false)
-        } else if (event === '$identify') {
-            if (properties['$anon_distinct_id']) {
-                await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
-            }
-            await this.setIsIdentified(teamId, distinctId)
+        } else if (event === '$identify' && properties['$anon_distinct_id']) {
+            await this.alias(properties['$anon_distinct_id'], distinctId, teamId)
         }
     }
 
@@ -399,6 +396,10 @@ export class EventsProcessor {
                     otherPersonDistinctId: previousDistinctId,
                 })
             }
+        }
+
+        if (shouldIdentifyPerson) {
+            await this.setIsIdentified(teamId, distinctId)
         }
     }
 
