@@ -333,6 +333,11 @@ export class EventsProcessor {
         retryIfFailed = true,
         totalMergeAttempts = 0
     ): Promise<void> {
+        // No reason to alias person against itself. Done by posthog-js-lite when updating user properties
+        if (previousDistinctId === distinctId) {
+            return
+        }
+
         const oldPerson = await this.db.fetchPerson(teamId, previousDistinctId)
         const newPerson = await this.db.fetchPerson(teamId, distinctId)
 
