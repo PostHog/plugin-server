@@ -50,7 +50,9 @@ export async function createPerson(
 
 export type ReturnWithHub = { hub?: Hub; closeHub?: () => Promise<void> }
 
-export const getEventsByPerson = async (hub: Hub) => {
+type EventsByPerson = [string[], string[]]
+
+export const getEventsByPerson = async (hub: Hub): Promise<EventsByPerson[]> => {
     // Helper function to retrieve events paired with their associated distinct
     // ids
     const persons = await hub.db.fetchPersons()
@@ -66,7 +68,7 @@ export const getEventsByPerson = async (hub: Hub) => {
                     .filter((event) => distinctIds.includes(event.distinct_id))
                     .sort((e1, e2) => new Date(e1.timestamp).getTime() - new Date(e2.timestamp).getTime())
                     .map((event) => event.event),
-            ] as const
+            ] as EventsByPerson
         })
     )
 }
