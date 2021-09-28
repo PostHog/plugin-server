@@ -347,10 +347,7 @@ export class EventsProcessor {
                     await this.alias(previousDistinctId, distinctId, teamId, shouldIdentifyPerson, false)
                 }
             }
-            return
-        }
-
-        if (!oldPerson && newPerson) {
+        } else if (!oldPerson && newPerson) {
             try {
                 await this.db.addDistinctId(newPerson, previousDistinctId)
                 // Catch race case when somebody already added this distinct_id between .get and .addDistinctId
@@ -361,10 +358,7 @@ export class EventsProcessor {
                     await this.alias(previousDistinctId, distinctId, teamId, shouldIdentifyPerson, false)
                 }
             }
-            return
-        }
-
-        if (!oldPerson && !newPerson) {
+        } else if (!oldPerson && !newPerson) {
             try {
                 await this.db.createPerson(
                     DateTime.utc(),
@@ -383,10 +377,7 @@ export class EventsProcessor {
                     await this.alias(previousDistinctId, distinctId, teamId, shouldIdentifyPerson, false)
                 }
             }
-            return
-        }
-
-        if (oldPerson && newPerson && oldPerson.id !== newPerson.id) {
+        } else if (oldPerson && newPerson && oldPerson.id !== newPerson.id) {
             // $create_alias is an explicit call to merge 2 users, so we'll merge anything
             // for $identify, we'll not merge a user who's already identified into anyone else
             const isIdentifyCallToMergeAnIdentifiedUser = shouldIdentifyPerson && oldPerson.is_identified
