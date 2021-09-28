@@ -1190,7 +1190,7 @@ export const createProcessEventTests = (
         const [person] = await hub.db.fetchPersons()
         expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
         expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
-        expect(person.is_identified).toEqual(true)
+        expect(person.is_identified).toEqual(false)
 
         await processEvent(
             'distinct_id1',
@@ -1243,7 +1243,7 @@ export const createProcessEventTests = (
         const [person] = await hub.db.fetchPersons()
         expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
         expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
-        expect(person.is_identified).toEqual(true)
+        expect(person.is_identified).toEqual(false)
 
         await processEvent(
             'distinct_id1',
@@ -1265,6 +1265,7 @@ export const createProcessEventTests = (
         expect((await hub.db.fetchEvents()).length).toBe(2)
         const [person2] = await hub.db.fetchPersons()
         expect(person2.properties).toEqual({ a_prop: 'test-1', b_prop: 'test-2b', c_prop: 'test-1' })
+        expect(person2.is_identified).toEqual(false)
     })
 
     test('identify with illegal (generic) id', async () => {
@@ -1346,6 +1347,7 @@ export const createProcessEventTests = (
         const [person] = await hub.db.fetchPersons()
         expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['anonymous_id', 'new_distinct_id'])
         expect(person.properties).toEqual({ a_prop: 'test' })
+        expect(person.is_identified).toEqual(true)
 
         // check no errors as this call can happen multiple times
         await processEvent(
@@ -1398,6 +1400,33 @@ export const createProcessEventTests = (
         const [person] = await hub.db.fetchPersons()
         expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['anonymous_id', 'new_distinct_id'])
         expect(person.properties['email']).toEqual('someone@gmail.com')
+        expect(person.is_identified).toEqual(true)
+    })
+
+    test('identify with the same distinct_id as anon_distinct_id', async () => {
+        await createPerson(hub, team, ['anonymous_id'])
+
+        await processEvent(
+            'new_distinct_id',
+            '',
+            '',
+            {
+                event: '$identify',
+                properties: {
+                    $anon_distinct_id: 'anonymous_id',
+                    token: team.api_token,
+                    distinct_id: 'anonymous_id',
+                },
+            } as any as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        const [person] = await hub.db.fetchPersons()
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['anonymous_id'])
+        expect(person.is_identified).toEqual(false)
     })
 
     test('distinct with multiple anonymous_ids which were already created', async () => {
@@ -1426,6 +1455,7 @@ export const createProcessEventTests = (
         expect(persons1.length).toBe(1)
         expect(await hub.db.fetchDistinctIdValues(persons1[0])).toEqual(['anonymous_id', 'new_distinct_id'])
         expect(persons1[0].properties['email']).toEqual('someone@gmail.com')
+        expect(persons1[0].is_identified).toEqual(true)
 
         await createPerson(hub, team, ['anonymous_id_2'])
 
@@ -1455,6 +1485,7 @@ export const createProcessEventTests = (
             'anonymous_id_2',
         ])
         expect(persons2[0].properties['email']).toEqual('someone@gmail.com')
+        expect(persons2[0].is_identified).toEqual(true)
     })
 
     test('distinct team leakage', async () => {
@@ -1495,26 +1526,6 @@ export const createProcessEventTests = (
         expect(await hub.db.fetchDistinctIdValues(people[1])).toEqual(['1', '2'])
         expect(people[0].team_id).toEqual(team2.id)
         expect(await hub.db.fetchDistinctIdValues(people[0])).toEqual(['2'])
-    })
-
-    test('set is_identified', async () => {
-        const distinct_id = '777'
-        const person1 = await createPerson(hub, team, [distinct_id])
-        expect(person1.is_identified).toBe(false)
-
-        await processEvent(
-            distinct_id,
-            '',
-            '',
-            { event: '$identify', properties: {} } as any as PluginEvent,
-            team.id,
-            now,
-            now,
-            new UUIDT().toString()
-        )
-
-        const [person2] = await hub.db.fetchPersons()
-        expect(person2.is_identified).toBe(true)
     })
 
     describe('when handling $identify', () => {
