@@ -1409,7 +1409,7 @@ export const createProcessEventTests = (
         await createPerson(hub, team, ['anonymous_id'])
 
         await processEvent(
-            'new_distinct_id',
+            'anonymous_id',
             '',
             '',
             {
@@ -1542,7 +1542,9 @@ export const createProcessEventTests = (
 
             const anonymousId = 'anonymous_id'
             const initialDistinctId = 'initial_distinct_id'
-            const newDistinctId = 'new_distinct_id'
+
+            const p2DistinctId = 'p2_distinct_id'
+            const p2NewDistinctId = 'new_distinct_id'
 
             // Play out a sequence of events that should result in two users being
             // identified, with the first to events associated with one user, and
@@ -1551,9 +1553,9 @@ export const createProcessEventTests = (
             await identify(hub, initialDistinctId)
             await capture(hub, 'event 2')
 
-            state.currentDistinctId = newDistinctId
+            state.currentDistinctId = p2DistinctId
             await capture(hub, 'event 3')
-            await identify(hub, newDistinctId)
+            await identify(hub, p2NewDistinctId)
             await capture(hub, 'event 4')
 
             // Let's also make sure that we do not alias when switching back to
@@ -1568,7 +1570,10 @@ export const createProcessEventTests = (
                     [anonymousId, initialDistinctId],
                     ['event 1', '$identify', 'event 2', '$identify'],
                 ],
-                [[newDistinctId], ['event 3', '$identify', 'event 4']],
+                [
+                    [p2DistinctId, p2NewDistinctId],
+                    ['event 3', '$identify', 'event 4'],
+                ],
             ])
 
             // Make sure the persons are identified
@@ -1588,7 +1593,9 @@ export const createProcessEventTests = (
 
             const anonymousId = 'anonymous_id'
             const initialDistinctId = 'initial_distinct_id'
-            const newDistinctId = 'new_distinct_id'
+
+            const p2DistinctId = 'p2_distinct_id'
+            const p2NewDistinctId = 'new_distinct_id'
 
             // Play out a sequence of events that should result in two users being
             // identified, with the first to events associated with one user, and
@@ -1596,9 +1603,9 @@ export const createProcessEventTests = (
             await identify(hub, initialDistinctId)
             await capture(hub, 'event 2')
 
-            state.currentDistinctId = newDistinctId
+            state.currentDistinctId = p2DistinctId
             await capture(hub, 'event 3')
-            await identify(hub, newDistinctId)
+            await identify(hub, p2NewDistinctId)
             await capture(hub, 'event 4')
 
             // Let's also make sure that we do not alias when switching back to
@@ -1613,7 +1620,10 @@ export const createProcessEventTests = (
                     [initialDistinctId, anonymousId],
                     ['$identify', 'event 2', '$identify'],
                 ],
-                [[newDistinctId], ['event 3', '$identify', 'event 4']],
+                [
+                    [p2DistinctId, p2NewDistinctId],
+                    ['event 3', '$identify', 'event 4'],
+                ],
             ])
 
             // Make sure the persons are identified
