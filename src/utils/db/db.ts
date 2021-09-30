@@ -503,7 +503,6 @@ export class DB {
                 SET is_identified=$1 
                 WHERE id = $2 
                 AND is_identified = $3
-                RETURNING is_identified
             `,
             [true, person.id, false],
             'setPersonAsIdentified'
