@@ -591,7 +591,7 @@ export class EventsProcessor {
             teamId,
             distinctId,
             elementsChain,
-            createdAt: timestampString,
+            createdAt: castTimestampOrNow(),
         }
 
         let eventId: Event['id'] | undefined
