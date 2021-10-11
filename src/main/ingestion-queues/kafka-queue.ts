@@ -2,15 +2,10 @@ import Piscina from '@posthog/piscina'
 import { PluginEvent } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import { Consumer, EachBatchPayload, Kafka, KafkaMessage } from 'kafkajs'
-import { DateTime } from 'luxon'
 
-import { Hub, Queue, TimestampFormat, WorkerMethods } from '../../types'
+import { Hub, Queue, WorkerMethods } from '../../types'
 import { status } from '../../utils/status'
 import { groupIntoBatches, killGracefully, sanitizeEvent } from '../../utils/utils'
-import { castTimestampOrNow } from '../../utils/utils'
-import { KAFKA_EVENTS_DEAD_LETTER_QUEUE } from './../../config/kafka-topics'
-import { KafkaProducerWrapper } from './../../utils/db/kafka-producer-wrapper'
-import { castTimestampToClickhouseFormat, UUIDT } from './../../utils/utils'
 import { ingestEvent } from './ingest-event'
 
 export class KafkaQueue implements Queue {
