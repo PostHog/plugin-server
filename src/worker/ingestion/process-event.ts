@@ -102,6 +102,8 @@ export class EventsProcessor {
             event: JSON.stringify(data),
         })
 
+        const eventName = data['event']
+
         let result: EventProcessingResult | void
         try {
             // Sanitize values, even though `sanitizeEvent` should have gotten to them
@@ -117,24 +119,27 @@ export class EventsProcessor {
 
             const ts = this.handleTimestamp(data, now, sentAt)
 
+            const enrichedProperties = personInitialAndUTMProperties(properties)
             const initialPersonProperties = {
-                ...properties['$set'],
-                ...properties['$set_once'],
-                ...properties['$increment'],
+                ...enrichedProperties['$set'],
+                ...enrichedProperties['$set_once'],
+                ...enrichedProperties['$increment'],
             }
-            await this.createPersonIfDistinctIdIsNew(
+
+            const personCreated = await this.createPersonIfDistinctIdIsNew(
                 teamId,
                 distinctId,
                 sentAt || ts,
                 new UUIDT().toString(),
-                initialPersonProperties
+                initialPersonProperties,
+                eventName === '$identify'
             )
 
             const timeout1 = timeoutGuard('Still running "handleIdentifyOrAlias". Timeout warning after 30 sec!', {
                 eventUuid,
             })
             try {
-                await this.handleIdentifyOrAlias(data['event'], properties, distinctId, teamId)
+                await this.handleIdentifyOrAlias(eventName, properties, distinctId, teamId)
             } catch (e) {
                 console.error('handleIdentifyOrAlias failed', e, data)
                 Sentry.captureException(e, { extra: { event: data } })
@@ -142,7 +147,7 @@ export class EventsProcessor {
                 clearTimeout(timeout1)
             }
 
-            if (data['event'] === '$snapshot') {
+            if (eventName === '$snapshot') {
                 const timeout2 = timeoutGuard(
                     'Still running "createSessionRecordingEvent". Timeout warning after 30 sec!',
                     { eventUuid }
@@ -169,15 +174,14 @@ export class EventsProcessor {
                 try {
                     const [event, eventId, elements] = await this.capture(
                         eventUuid,
-                        personUuid,
                         ip,
                         siteUrl,
                         teamId,
-                        data['event'],
+                        eventName,
                         distinctId,
                         properties,
                         ts,
-                        sentAt
+                        !personCreated
                     )
                     this.pluginsServer.statsd?.timing('kafka_queue.single_save.standard', singleSaveTimer, {
                         team_id: teamId.toString(),
@@ -464,7 +468,6 @@ export class EventsProcessor {
 
     private async capture(
         eventUuid: string,
-        personUuid: string,
         ip: string | null,
         siteUrl: string,
         teamId: number,
@@ -472,7 +475,7 @@ export class EventsProcessor {
         distinctId: string,
         properties: Properties,
         timestamp: DateTime,
-        sentAt: DateTime | null
+        shouldUpdatePersonProperties = true
     ): Promise<[IEvent, Event['id'] | undefined, Element[] | undefined]> {
         event = sanitizeEventName(event)
         const elements: Record<string, any>[] | undefined = properties['$elements']
@@ -499,7 +502,8 @@ export class EventsProcessor {
 
         properties = personInitialAndUTMProperties(properties)
 
-        if (properties['$set'] || properties['$set_once'] || properties['$increment']) {
+        const areTherePropertiesToUpdate = properties['$set'] || properties['$set_once'] || properties['$increment']
+        if (shouldUpdatePersonProperties && areTherePropertiesToUpdate) {
             const filteredIncrementProperties = filterIncrementProperties(properties['$increment'])
             const updatedSetAndSetOnce = await this.updatePersonProperties(
                 teamId,
@@ -639,24 +643,27 @@ export class EventsProcessor {
         distinctId: string,
         sentAt: DateTime,
         personUuid: string,
-        initialProperties?: Properties
-    ): Promise<void> {
+        initialProperties?: Properties,
+        isIdentified = false
+    ): Promise<boolean> {
         const isNewPerson = await this.personManager.isNewPerson(this.db, teamId, distinctId)
         if (isNewPerson) {
             // Catch race condition where in between getting and creating, another request already created this user
             try {
-                await this.db.createPerson(
+                const person = await this.db.createPerson(
                     sentAt,
                     initialProperties || {},
                     teamId,
                     null,
-                    false,
+                    isIdentified,
                     personUuid.toString(),
                     [distinctId]
                 )
+                return !!person
             } catch (error) {
                 Sentry.captureException(error, { extra: { teamId, distinctId, sentAt, personUuid } })
             }
         }
+        return false
     }
 }

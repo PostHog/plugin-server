@@ -78,7 +78,6 @@ export const createProcessEventTests = (
     extraServerConfig?: Partial<PluginsServerConfig>,
     createTests?: (response: ReturnWithHub) => void
 ): ReturnWithHub => {
-    let queryCounter = 0
     let processEventCounter = 0
     let mockClientEventCounter = 0
     let team: Team
@@ -101,8 +100,6 @@ export const createProcessEventTests = (
 
         await redis.del(hub.PLUGINS_CELERY_QUEUE)
         await redis.del(hub.CELERY_DEFAULT_QUEUE)
-
-        onQuery(hub, () => queryCounter++)
 
         return [hub, closeHub]
     }
@@ -145,7 +142,6 @@ export const createProcessEventTests = (
         returned.hub = hub
         returned.closeHub = closeHub
         eventsProcessor = new EventsProcessor(hub)
-        queryCounter = 0
         processEventCounter = 0
         mockClientEventCounter = 0
         team = await getFirstTeam(hub)
@@ -203,7 +199,7 @@ export const createProcessEventTests = (
     }
 
     const alias = async (hub: Hub, alias: string, distinctId: string) => {
-        await capture(hub, '$create_alias', { alias, disinct_id: distinctId })
+        await capture(hub, '$create_alias', { alias, distinct_id: distinctId })
     }
 
     createTests?.(returned)
@@ -332,13 +328,6 @@ export const createProcessEventTests = (
             DateTime.now(),
             new UUIDT().toString()
         )
-
-        // TODO: Make this test actually useful and not flaky
-        if (database === 'clickhouse') {
-            expect(queryCounter).toBe(11 + 14 /* event & prop definitions */)
-        } else if (database === 'postgresql') {
-            expect(queryCounter).toBe(14 + 14 /* event & prop definitions */)
-        }
 
         let persons = await hub.db.fetchPersons()
         let events = await hub.db.fetchEvents()
@@ -1644,8 +1633,8 @@ export const createProcessEventTests = (
             // is_identified to decide on if we will merge persons, we want to
             // make sure we guard against this race condition. The scenario is:
             //
-            //  1. initiate identify for 'distinct-id'
-            //  2. once person for distinct-id has been created, initiate
+            //  1. initiate identify for 'initial-distinct-id'
+            //  2. once person for initial-distinct-id has been created, initiate
             //     identify for 'new-distinct-id'
             //  3. check that the persons remain distinct
 
@@ -1659,6 +1648,8 @@ export const createProcessEventTests = (
             state.currentDistinctId = newDistinctId
             await capture(hub, 'some event')
             state.currentDistinctId = anonymousId
+            // await capture(hub, 'some event')
+            // state.currentDistinctId = anonymousId
 
             // Hook into createPerson, which is as of writing called from
             // alias. Here we simply call identify again and wait on it
@@ -1685,8 +1676,6 @@ export const createProcessEventTests = (
             // checking that our mocking was actually invoked
             expect(hub.db.createPerson).toHaveBeenCalled()
 
-            // Now make sure that we have one person in the db that has been
-            // identified
             const persons = await hub.db.fetchPersons()
             expect(persons.length).toEqual(2)
             expect(persons.map((person) => person.is_identified)).toEqual([true, true])
