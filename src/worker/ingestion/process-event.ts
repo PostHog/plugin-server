@@ -116,6 +116,20 @@ export class EventsProcessor {
             const personUuid = new UUIDT().toString()
 
             const ts = this.handleTimestamp(data, now, sentAt)
+
+            const initialPersonProperties = {
+                ...properties['$set'],
+                ...properties['$set_once'],
+                ...properties['$increment'],
+            }
+            await this.createPersonIfDistinctIdIsNew(
+                teamId,
+                distinctId,
+                sentAt || ts,
+                new UUIDT().toString(),
+                initialPersonProperties
+            )
+
             const timeout1 = timeoutGuard('Still running "handleIdentifyOrAlias". Timeout warning after 30 sec!', {
                 eventUuid,
             })
@@ -212,28 +226,14 @@ export class EventsProcessor {
         propertiesOnce: Properties,
         incrementProperties: Record<string, number>
     ): Promise<Properties> {
-        let personFound = await this.db.fetchPerson(teamId, distinctId)
+        const personFound = await this.db.fetchPerson(teamId, distinctId)
+
         if (!personFound) {
-            try {
-                personFound = await this.db.createPerson(
-                    DateTime.utc(),
-                    properties,
-                    teamId,
-                    null,
-                    false,
-                    new UUIDT().toString(),
-                    [distinctId]
-                )
-            } catch {
-                // Catch race condition where in between getting and creating,
-                // another request already created this person
-                personFound = await this.db.fetchPerson(teamId, distinctId)
-            }
-        }
-        if (!personFound) {
-            throw new Error(
-                `Could not find person with distinct id "${distinctId}" in team "${teamId}", even after trying to insert them`
-            )
+            const err = new Error(`Could not find person with distinct id "${distinctId}" in team "${teamId}"`)
+            Sentry.captureException(err, {
+                extra: { teamId, distinctId, properties, propertiesOnce, incrementProperties },
+            })
+            throw err
         }
 
         // Figure out which properties we are actually setting
@@ -282,24 +282,7 @@ export class EventsProcessor {
     }
 
     private async setIsIdentified(teamId: number, distinctId: string, isIdentified = true): Promise<void> {
-        let personFound = await this.db.fetchPerson(teamId, distinctId)
-        if (!personFound) {
-            try {
-                personFound = await this.db.createPerson(
-                    DateTime.utc(),
-                    {},
-                    teamId,
-                    null,
-                    true,
-                    new UUIDT().toString(),
-                    [distinctId]
-                )
-            } catch {
-                // Catch race condition where in between getting and creating,
-                // another request already created this person
-                personFound = await this.db.fetchPerson(teamId, distinctId)
-            }
-        }
+        const personFound = await this.db.fetchPerson(teamId, distinctId)
         if (personFound && !personFound.is_identified) {
             await this.db.updatePerson(personFound, { is_identified: isIdentified })
         }
@@ -357,25 +340,6 @@ export class EventsProcessor {
                 // integrity error
                 if (retryIfFailed) {
                     // run everything again to merge the users if needed
-                    await this.alias(previousDistinctId, distinctId, teamId, shouldIdentifyPerson, false)
-                }
-            }
-        } else if (!oldPerson && !newPerson) {
-            try {
-                await this.db.createPerson(
-                    DateTime.utc(),
-                    {},
-                    teamId,
-                    null,
-                    shouldIdentifyPerson,
-                    new UUIDT().toString(),
-                    [distinctId, previousDistinctId]
-                )
-            } catch {
-                // Catch race condition where in between getting and creating,
-                // another request already created this person
-                if (retryIfFailed) {
-                    // Try once more, probably one of the two persons exists now
                     await this.alias(previousDistinctId, distinctId, teamId, shouldIdentifyPerson, false)
                 }
             }
@@ -533,8 +497,6 @@ export class EventsProcessor {
             await this.teamManager.updateEventNamesAndProperties(teamId, event, properties)
         }
 
-        await this.createPersonIfDistinctIdIsNew(teamId, distinctId, sentAt || DateTime.utc(), personUuid)
-
         properties = personInitialAndUTMProperties(properties)
 
         if (properties['$set'] || properties['$set_once'] || properties['$increment']) {
@@ -644,8 +606,6 @@ export class EventsProcessor {
             this.kafkaProducer ? TimestampFormat.ClickHouse : TimestampFormat.ISO
         )
 
-        await this.createPersonIfDistinctIdIsNew(team_id, distinct_id, DateTime.utc(), personUuid.toString())
-
         const data: SessionRecordingEvent = {
             uuid,
             team_id: team_id,
@@ -678,13 +638,22 @@ export class EventsProcessor {
         teamId: number,
         distinctId: string,
         sentAt: DateTime,
-        personUuid: string
+        personUuid: string,
+        initialProperties?: Properties
     ): Promise<void> {
         const isNewPerson = await this.personManager.isNewPerson(this.db, teamId, distinctId)
         if (isNewPerson) {
             // Catch race condition where in between getting and creating, another request already created this user
             try {
-                await this.db.createPerson(sentAt, {}, teamId, null, false, personUuid.toString(), [distinctId])
+                await this.db.createPerson(
+                    sentAt,
+                    initialProperties || {},
+                    teamId,
+                    null,
+                    false,
+                    personUuid.toString(),
+                    [distinctId]
+                )
             } catch (error) {
                 Sentry.captureException(error, { extra: { teamId, distinctId, sentAt, personUuid } })
             }
