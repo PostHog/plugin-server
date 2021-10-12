@@ -1648,8 +1648,6 @@ export const createProcessEventTests = (
             state.currentDistinctId = newDistinctId
             await capture(hub, 'some event')
             state.currentDistinctId = anonymousId
-            // await capture(hub, 'some event')
-            // state.currentDistinctId = anonymousId
 
             // Hook into createPerson, which is as of writing called from
             // alias. Here we simply call identify again and wait on it
