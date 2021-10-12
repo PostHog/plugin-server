@@ -2247,5 +2247,72 @@ export const createProcessEventTests = (
         expect(person.properties).toEqual({ a: 1, b: 2, c: 3, d: 4 })
     })
 
+    test("person properties are set on creation if the event is the person's first", async () => {
+        jest.spyOn(hub.db, 'createPerson')
+        jest.spyOn(hub.db, 'updatePerson')
+
+        await hub.db.postgresQuery(
+            `UPDATE posthog_team
+             SET ingested_event = $1
+             WHERE id = $2`,
+            [true, team.id],
+            'testTag'
+        )
+        team = await getFirstTeam(hub)
+
+        await processEvent(
+            '2',
+            '127.0.0.1',
+            '',
+            {
+                event: '$autocapture',
+                properties: {
+                    distinct_id: 2,
+                    token: team.api_token,
+                    $browser: 'Chrome',
+                    $current_url: 'https://test.com',
+                    $os: 'Mac OS X',
+                    $browser_version: false,
+                    $initial_referring_domain: 'https://google.com',
+                    $initial_referrer_url: 'https://google.com/?q=posthog',
+                    utm_medium: 'twitter',
+                    gclid: 'GOOGLE ADS ID',
+                    $set: {
+                        'set me': 'yes',
+                    },
+                    $set_once: {
+                        'set me once': 'yup',
+                    },
+                },
+            } as any as PluginEvent,
+            team.id,
+            DateTime.now(),
+            DateTime.now(),
+            new UUIDT().toString()
+        )
+
+        // We should call createPerson and set all relevant user properties directly
+        expect(hub.db.createPerson).toHaveBeenCalled()
+
+        // updatePerson shouldn't be called - we used to do this and it was _bad_
+        expect(hub.db.updatePerson).not.toHaveBeenCalled()
+
+        // check that we set the properties correctly
+        const persons = await hub.db.fetchPersons()
+        expect(persons.length).toEqual(1)
+        expect(persons[0].properties).toEqual({
+            $initial_browser: 'Chrome',
+            $initial_browser_version: false,
+            $initial_utm_medium: 'twitter',
+            $initial_current_url: 'https://test.com',
+            $initial_os: 'Mac OS X',
+            utm_medium: 'twitter',
+            $initial_gclid: 'GOOGLE ADS ID',
+            gclid: 'GOOGLE ADS ID',
+            'set me': 'yes',
+            'set me once': 'yup',
+        })
+    })
+
     return returned
 }
