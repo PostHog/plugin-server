@@ -38,11 +38,16 @@ export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestE
         return { success: true }
     } catch (e) {
         status.info('🔔', e)
-        Sentry.captureException(e)
+        Sentry.captureException(e, { extra: { event } })
 
         if (hub.db.kafkaProducer) {
-            const message = generateEventDeadLetterQueueMessage(event, e)
-            await hub.db.kafkaProducer.queueMessage(message)
+            try {
+                const message = generateEventDeadLetterQueueMessage(event, e)
+                await hub.db.kafkaProducer.queueMessage(message)
+            } catch (dlqError) {
+                status.info('🔔', `Errored trying to add event ${event.event} to dead letter queue. Error: ${dlqError}`)
+                Sentry.captureException(e, { extra: { event } })
+            }
         }
         return { error: e.message }
     } finally {

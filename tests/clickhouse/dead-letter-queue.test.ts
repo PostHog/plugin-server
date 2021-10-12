@@ -34,7 +34,9 @@ jest.mock('../../src/worker/ingestion/process-event', () => {
     return { EventsProcessor: jest.fn(() => new MockEventsProcessor()) }
 })
 
-function createEvent(index = 0): PluginEvent {
+const EVENT_UUID = new UUIDT().toString()
+
+function createEvent(): PluginEvent {
     return {
         distinct_id: 'my_id',
         ip: '127.0.0.1',
@@ -42,8 +44,8 @@ function createEvent(index = 0): PluginEvent {
         team_id: 2,
         now: new Date().toISOString(),
         event: 'default event',
-        properties: { key: 'value', index },
-        uuid: new UUIDT().toString(),
+        properties: { key: 'value' },
+        uuid: EVENT_UUID,
     }
 }
 
@@ -80,5 +82,7 @@ describe('events dead letter queue', () => {
         expect(dlqEvent.team_id).toEqual(2)
         expect(dlqEvent.error_location).toEqual('plugin_server_ingest_event')
         expect(dlqEvent.error).toEqual('ingestEvent failed. Error: database unavailable')
+        expect(dlqEvent.properties).toEqual(JSON.stringify({ key: 'value' }))
+        expect(dlqEvent.event_uuid).toEqual(EVENT_UUID)
     })
 })
