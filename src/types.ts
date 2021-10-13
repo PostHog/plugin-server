@@ -476,6 +476,7 @@ export interface BasePerson {
     is_identified: boolean
     uuid: string
     properties_last_updated_at: Record<string, any>
+    properties_last_operation: Record<string, any> | null
 }
 
 /** Raw Person row from database. */
@@ -589,7 +590,7 @@ export interface PersonPropertyFilter extends PropertyFilterWithOperator {
 export interface ElementPropertyFilter extends PropertyFilterWithOperator {
     type: 'element'
     key: 'tag_name' | 'text' | 'href' | 'selector'
-    value: string
+    value: string | string[]
 }
 
 /** Sync with posthog/frontend/src/types.ts */

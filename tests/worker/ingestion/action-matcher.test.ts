@@ -96,6 +96,7 @@ describe('ActionMatcher', () => {
             team_id: 2,
             properties: {},
             properties_last_updated_at: {},
+            properties_last_operation: null,
             is_user_id: 0,
             is_identified: true,
             uuid: 'F99FA0A1-E0C2-4CFE-A09A-4C3C4327A4C8',
@@ -916,6 +917,11 @@ describe('ActionMatcher', () => {
                     selector: 'main > a[href="https://example.com/"]',
                 },
             ])
+            const actionDefinitionArraySelectorProp: Action = await createTestAction([
+                {
+                    properties: [{ type: 'element', key: 'selector', value: ['main h1.headline'] }],
+                },
+            ])
             const actionDefinitionEmptySelectorProp: Action = await createTestAction([
                 {
                     properties: [{ type: 'element', key: 'selector', value: '' }],
@@ -946,6 +952,7 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(event, undefined, elementsHrefProperNondirect)).toEqual([
                 actionDefinitionAnyDescendant,
                 actionDefinitionDirectHref,
+                actionDefinitionArraySelectorProp,
             ])
             expect(await actionMatcher.match(event, undefined, elementsHrefWrongClassNondirect)).toEqual([
                 actionDefinitionDirectHref,
@@ -953,6 +960,7 @@ describe('ActionMatcher', () => {
             expect(await actionMatcher.match(event, undefined, elementsHrefProperDirect)).toEqual([
                 actionDefinitionAnyDescendant,
                 actionDefinitionDirectDescendant,
+                actionDefinitionArraySelectorProp,
             ])
         })
 
