@@ -1,9 +1,13 @@
 import { Properties } from '@posthog/plugin-scaffold'
 import * as Sentry from '@sentry/node'
 import crypto from 'crypto'
+import { ProducerRecord } from 'kafkajs'
 
 import { defaultConfig } from '../../config/config'
 import { BasePerson, Element, Person, RawPerson } from '../../types'
+import { castTimestampOrNow } from '../../utils/utils'
+import { KAFKA_PERSON } from './../../config/kafka-topics'
+import { PersonPropertyUpdateOperation, TimestampFormat } from './../../types'
 
 export function unparsePersonPartial(person: Partial<Person>): Partial<RawPerson> {
     return { ...(person as BasePerson), ...(person.created_at ? { created_at: person.created_at.toISO() } : {}) }
@@ -208,10 +212,11 @@ export function personInitialAndUTMProperties(properties: Properties): Propertie
     if (Object.keys(maybeSetInitial).length > 0) {
         propertiesCopy.$set_once = { ...(properties.$set_once || {}), ...Object.fromEntries(maybeSetInitial) }
     }
+
     return propertiesCopy
 }
 
-/** Returns string in format: ($1, $2, $3, $4, $5, $6, $7, $8, ..., $N) */
+/** Returns string in format: ($${timestampIndex}, $2, $3, $4, $5, $6, $7, $8, ..., $N) */
 export function generatePostgresValuesString(numberOfColumns: number, rowNumber: number): string {
     return (
         '(' +
@@ -220,4 +225,122 @@ export function generatePostgresValuesString(numberOfColumns: number, rowNumber:
             .join(', ') +
         ')'
     )
+}
+
+interface PropertyUpdateExpressionsAndValues {
+    expressions: string[][]
+    values: (string | number)[]
+}
+
+export function generatePersonPropertyUpdateExpressions(
+    propertyUpdates: Person['properties'],
+    timestamp: string,
+    startIndex: number,
+    propertyToOperationMap: Record<string, PersonPropertyUpdateOperation>,
+    personIdIndex = 1
+): PropertyUpdateExpressionsAndValues {
+    const expressions = []
+    const values = [timestamp]
+    const timestampIndex = startIndex
+    let index = startIndex + 1
+    console.log(startIndex)
+    for (const [propertyKey, propertyValue] of Object.entries(propertyUpdates)) {
+        const expressionsForProperty = []
+
+        const propertyUpdateOperation = propertyToOperationMap[propertyKey]
+        const isOperationIncrement = propertyUpdateOperation === PersonPropertyUpdateOperation.Increment
+
+        values.push(
+            propertyKey,
+            propertyValue,
+            isOperationIncrement ? PersonPropertyUpdateOperation.Set : propertyUpdateOperation
+        )
+
+        const propertyValueIndex = index + 1
+        const propertyOperationIndex = index + 2
+
+        let valueTypeCast = 'text'
+        switch (typeof propertyValue) {
+            case 'number':
+                valueTypeCast = 'numeric'
+                break
+            case 'boolean':
+                valueTypeCast = 'boolean'
+                break
+            default:
+                valueTypeCast = 'text'
+                break
+        }
+
+        let propertyValueUpdate = ''
+        if (isOperationIncrement) {
+            propertyValueUpdate = `
+            CASE WHEN (COALESCE(properties->>$${index}, '0')~E'^([-+])?[0-9\.]+$')
+                THEN jsonb_build_object($${index}, (COALESCE(properties->>$${index},'0')::numeric + $${propertyValueIndex}::numeric))
+                ELSE '{}'
+            END `
+        } else {
+            propertyValueUpdate = `
+            CASE WHEN $${index}=ANY(should_update)
+                THEN jsonb_build_object($${index}, $${propertyValueIndex}::${valueTypeCast})
+                ELSE '{}'
+            END `
+        }
+
+        expressionsForProperty.push(propertyValueUpdate)
+
+        const propertyTimestampUpdate = `
+        CASE WHEN $${index}=ANY(should_update)
+            THEN jsonb_build_object($${index}, $${timestampIndex}::text)
+            ELSE '{}'
+        END `
+        expressionsForProperty.push(propertyTimestampUpdate)
+
+        const propertyLastOperationUpdate = `
+        CASE WHEN $${index}=ANY(should_update)
+            THEN jsonb_build_object($${index}, $${propertyOperationIndex}::text)
+            ELSE '{}'
+        END `
+        expressionsForProperty.push(propertyLastOperationUpdate)
+
+        const shouldUpdateExpression = isOperationIncrement
+            ? `
+            $${index}`
+            : `
+            CASE WHEN should_update_person_prop($${personIdIndex}, $${index}, $${timestampIndex}, $${propertyOperationIndex}) THEN $${index} ELSE NULL END`
+        expressionsForProperty.push(shouldUpdateExpression)
+
+        expressions.push(expressionsForProperty)
+        index += 3
+    }
+
+    return {
+        expressions,
+        values,
+    }
+}
+
+export function generateKafkaPersonUpdateMessage(
+    createdAt: string,
+    properties: Properties,
+    teamId: number,
+    isIdentified: boolean,
+    id: string
+): ProducerRecord {
+    return {
+        topic: KAFKA_PERSON,
+        messages: [
+            {
+                value: Buffer.from(
+                    JSON.stringify({
+                        id,
+                        created_at: castTimestampOrNow(createdAt, TimestampFormat.ClickHouseSecondPrecision),
+                        properties: JSON.stringify(properties),
+                        team_id: teamId,
+                        is_identified: isIdentified,
+                    })
+                ),
+            },
+        ],
+    }
 }

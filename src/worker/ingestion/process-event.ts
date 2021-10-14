@@ -30,6 +30,7 @@ import {
 } from '../../utils/db/utils'
 import { status } from '../../utils/status'
 import { castTimestampOrNow, filterIncrementProperties, RaceConditionError, UUID, UUIDT } from '../../utils/utils'
+import { PersonPropertyUpdateOperation } from './../../types'
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
@@ -212,73 +213,53 @@ export class EventsProcessor {
         propertiesOnce: Properties,
         incrementProperties: Record<string, number>
     ): Promise<Properties> {
-        let personFound = await this.db.fetchPerson(teamId, distinctId)
+        const personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
-            try {
-                personFound = await this.db.createPerson(
-                    DateTime.utc(),
-                    properties,
-                    teamId,
-                    null,
-                    false,
-                    new UUIDT().toString(),
-                    [distinctId]
-                )
-            } catch {
-                // Catch race condition where in between getting and creating,
-                // another request already created this person
-                personFound = await this.db.fetchPerson(teamId, distinctId)
-            }
-        }
-        if (!personFound) {
-            throw new Error(
-                `Could not find person with distinct id "${distinctId}" in team "${teamId}", even after trying to insert them`
-            )
+            const err = new Error(`Could not find person with distinct id "${distinctId}" in team "${teamId}"`)
+            Sentry.captureException(err, {
+                extra: { teamId, distinctId, properties, propertiesOnce, incrementProperties },
+            })
+            throw err
         }
 
-        // Figure out which properties we are actually setting
-        const returnedProps: Properties = {}
-        let updatedProperties: Properties = { ...personFound.properties }
-        Object.entries(propertiesOnce).map(([key, value]) => {
-            if (typeof personFound?.properties[key] === 'undefined') {
-                if (!returnedProps['$set_once']) {
-                    returnedProps['$set_once'] = {}
-                }
-                returnedProps['$set_once'][key] = value
-                updatedProperties[key] = value
-            }
-        })
-        Object.entries(properties).map(([key, value]) => {
-            if (personFound?.properties[key] !== value) {
-                if (!returnedProps['$set']) {
-                    returnedProps['$set'] = {}
-                }
-                returnedProps['$set'][key] = value
-                updatedProperties[key] = value
-            }
+        const propertiesToAttemptUpdateOn = {
+            ...propertiesOnce,
+            ...properties,
+            ...incrementProperties,
+        }
+
+        const propertyToOperationMap: Record<string, PersonPropertyUpdateOperation> = {}
+
+        Object.keys(propertiesOnce).map((key) => {
+            propertyToOperationMap[key] = PersonPropertyUpdateOperation.SetOnce
         })
 
-        let incrementedPropertiesQueryResult: QueryResult | null = null
+        Object.keys(properties).map((key) => {
+            propertyToOperationMap[key] = PersonPropertyUpdateOperation.Set
+        })
 
-        const areTherePropsToIncrement = !!Object.keys(incrementProperties).length
+        Object.keys(incrementProperties).map((key) => {
+            propertyToOperationMap[key] = PersonPropertyUpdateOperation.Increment
+        })
 
-        if (areTherePropsToIncrement) {
-            incrementedPropertiesQueryResult = await this.db.incrementPersonProperties(personFound, incrementProperties)
+        // get updated record and compare to old person
+
+        const newProperties = await this.db.updatePersonProperties(
+            personFound,
+            propertiesToAttemptUpdateOn,
+            propertyToOperationMap
+        )
+
+        console.log(newProperties, propertiesToAttemptUpdateOn)
+
+        const updatedProperties: Record<string, any> = {}
+        for (const [key, value] of Object.entries(newProperties)) {
+            if (value === propertiesToAttemptUpdateOn[key]) {
+                updatedProperties[key] = value
+            }
         }
 
-        const arePersonsEqualExcludingIncrement = equal(personFound.properties, updatedProperties)
-
-        // CH still needs to update if there are $increment props but Postgres has already done so
-        if (arePersonsEqualExcludingIncrement && (!this.db.kafkaProducer || !areTherePropsToIncrement)) {
-            return returnedProps
-        }
-
-        if (incrementedPropertiesQueryResult && incrementedPropertiesQueryResult.rows.length > 0) {
-            updatedProperties = { ...updatedProperties, ...incrementedPropertiesQueryResult.rows[0].properties }
-        }
-
-        await this.db.updatePerson(personFound, { properties: updatedProperties })
-        return returnedProps
+        return updatedProperties
     }
 
     private async setIsIdentified(teamId: number, distinctId: string, isIdentified = true): Promise<void> {
@@ -450,6 +431,7 @@ export class EventsProcessor {
                     {
                         created_at: firstSeen,
                         properties: mergeInto.properties,
+                        properties_last_updated_at: {},
                         is_identified: mergeInto.is_identified || otherPerson.is_identified,
                     },
                     client
@@ -539,17 +521,13 @@ export class EventsProcessor {
 
         if (properties['$set'] || properties['$set_once'] || properties['$increment']) {
             const filteredIncrementProperties = filterIncrementProperties(properties['$increment'])
-            const updatedSetAndSetOnce = await this.updatePersonProperties(
+            await this.updatePersonProperties(
                 teamId,
                 distinctId,
                 properties['$set'] || {},
                 properties['$set_once'] || {},
                 filteredIncrementProperties
             )
-
-            delete properties['$set']
-            delete properties['$set_once']
-            properties = { ...properties, ...updatedSetAndSetOnce }
         }
 
         return await this.createEvent(

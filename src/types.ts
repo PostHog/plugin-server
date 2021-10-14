@@ -447,6 +447,8 @@ export interface ClickHouseEvent extends Omit<Event, 'id' | 'elements' | 'elemen
     elements_chain: string
 }
 
+export type PropertiesLastUpdatedAt = Record<string, string>
+
 /** Properties shared by RawPerson and Person. */
 export interface BasePerson {
     id: number
@@ -689,4 +691,10 @@ export type PluginFunction = 'onEvent' | 'processEvent' | 'onSnapshot' | 'plugin
 
 export enum CeleryTriggeredJobOperation {
     Start = 'start',
+}
+
+export enum PersonPropertyUpdateOperation {
+    Set = 'set',
+    SetOnce = 'set_once',
+    Increment = 'increment',
 }
