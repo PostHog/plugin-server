@@ -224,34 +224,40 @@ describe('updatePersonProperties', () => {
     // 13| set      | yes           | equal                      | set_once    | no
     // 14| set_once | yes           | equal                      | set_once    | no
 
-    // UNCOMMENT WHEN https://github.com/PostHog/posthog/pull/6428 gets merged
-    // test('update without properties_last_updated_at', async () => {
-    //     const person = await createPerson(hub, team, ['person_0'], { a: 0, b: 0 }, {}, { a: 'set', b: 'set_once' })
+    test('update without properties_last_updated_at', async () => {
+        const person = await createPerson(hub, team, ['person_0'], { a: 0, b: 0 }, {}, { a: 'set', b: 'set_once' })
 
-    //     const newProps = await hub.db.updatePersonProperties(
-    //         person,
-    //         { a: 1, b: 2 },
-    //         { a: PersonPropertyUpdateOperation.Set, b: PersonPropertyUpdateOperation.SetOnce },
-    //         NOW
-    //     )
+        const newProps = await hub.db.updatePersonProperties(
+            person,
+            { a: 1, b: 2 },
+            { a: PersonPropertyUpdateOperation.Set, b: PersonPropertyUpdateOperation.SetOnce },
+            NOW
+        )
 
-    //     // both updated
-    //     expect(newProps).toEqual({ a: 1, b: 2 })
-    // })
+        // both updated
+        expect(newProps).toEqual({ a: 1, b: 2 })
+    })
 
-    // test('update without properties_last_operation', async () => {
-    //     const person = await createPerson(hub, team, ['person_0'], { a: 0, b: 0 }, { a: FUTURE_TIMESTAMP, b: PAST_TIMESTAMP }, {})
+    test('update without properties_last_operation', async () => {
+        const person = await createPerson(
+            hub,
+            team,
+            ['person_0'],
+            { a: 0, b: 0 },
+            { a: FUTURE_TIMESTAMP, b: PAST_TIMESTAMP },
+            {}
+        )
 
-    //     const newProps = await hub.db.updatePersonProperties(
-    //         person,
-    //         { a: 1, b: 2 },
-    //         { a: PersonPropertyUpdateOperation.Set, b: PersonPropertyUpdateOperation.SetOnce },
-    //         NOW
-    //     )
+        const newProps = await hub.db.updatePersonProperties(
+            person,
+            { a: 1, b: 2 },
+            { a: PersonPropertyUpdateOperation.Set, b: PersonPropertyUpdateOperation.SetOnce },
+            NOW
+        )
 
-    //     // both updated
-    //     expect(newProps).toEqual({ a: 1, b: 2 })
-    // })
+        // both updated
+        expect(newProps).toEqual({ a: 1, b: 2 })
+    })
 
     test('update non-existent property', async () => {
         const person = await createPerson(hub, team, ['person_0'], {})
