@@ -568,7 +568,6 @@ export class DB {
         WHERE id = $1
         RETURNING *;`
 
-        console.log(query)
         let newProperties = {}
         await this.postgresTransaction(async (client) => {
             const updateResult = await client.query(query, values)
@@ -617,8 +616,6 @@ export class DB {
             ${setStatements}
         WHERE id = $1
         RETURNING *;`
-
-        //let updateResult: QueryResult<any> | null = null
 
         let result: QueryResult<any>
 

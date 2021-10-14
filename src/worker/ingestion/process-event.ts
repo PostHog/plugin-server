@@ -250,8 +250,6 @@ export class EventsProcessor {
             propertyToOperationMap
         )
 
-        console.log(newProperties, propertiesToAttemptUpdateOn)
-
         const updatedProperties: Record<string, any> = {}
         for (const [key, value] of Object.entries(newProperties)) {
             if (value === propertiesToAttemptUpdateOn[key]) {

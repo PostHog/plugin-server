@@ -243,7 +243,6 @@ export function generatePersonPropertyUpdateExpressions(
     const values = [timestamp]
     const timestampIndex = startIndex
     let index = startIndex + 1
-    console.log(startIndex)
     for (const [propertyKey, propertyValue] of Object.entries(propertyUpdates)) {
         const expressionsForProperty = []
 
