@@ -442,14 +442,25 @@ export class DB {
         isUserId: number | null,
         isIdentified: boolean,
         uuid: string,
-        distinctIds?: string[]
+        distinctIds?: string[],
+        propertiesLastUpdatedAt: Record<string, any> = {},
+        propertiesLastOperation: Record<string, any> = {}
     ): Promise<Person> {
         const kafkaMessages: ProducerRecord[] = []
 
         const person = await this.postgresTransaction(async (client) => {
             const insertResult = await client.query(
-                'INSERT INTO posthog_person (created_at, properties, properties_last_updated_at, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-                [createdAt.toISO(), JSON.stringify(properties), '{}', teamId, isUserId, isIdentified, uuid]
+                'INSERT INTO posthog_person (created_at, properties, properties_last_updated_at, properties_last_operation, team_id, is_user_id, is_identified, uuid) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+                [
+                    createdAt.toISO(),
+                    JSON.stringify(properties),
+                    JSON.stringify(propertiesLastUpdatedAt),
+                    JSON.stringify(propertiesLastOperation),
+                    teamId,
+                    isUserId,
+                    isIdentified,
+                    uuid,
+                ]
             )
             const personCreated = insertResult.rows[0] as RawPerson
             const person = {
@@ -502,13 +513,14 @@ export class DB {
     public async updatePersonProperties(
         person: Person,
         propertiesToAttemptUpdateOn: Properties,
-        propertyToOperationMap: Record<string, PersonPropertyUpdateOperation>
+        propertyToOperationMap: Record<string, PersonPropertyUpdateOperation>,
+        isoTimestamp: string
     ): Promise<any> {
         let values: any[] = [person.id]
 
         const queryParts = generatePersonPropertyUpdateExpressions(
             propertiesToAttemptUpdateOn,
-            new Date().toISOString(),
+            isoTimestamp, // this should be the event timestamp
             values.length + 1,
             propertyToOperationMap
         )

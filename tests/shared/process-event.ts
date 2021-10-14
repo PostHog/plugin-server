@@ -43,9 +43,21 @@ export async function createPerson(
     server: Hub,
     team: Team,
     distinctIds: string[],
-    properties: Record<string, any> = {}
+    properties: Record<string, any> = {},
+    propertiesLastUpdatedAt: Record<string, any> = {},
+    propertiesLastOperation: Record<string, any> = {}
 ): Promise<Person> {
-    return server.db.createPerson(DateTime.utc(), properties, team.id, null, false, new UUIDT().toString(), distinctIds)
+    return server.db.createPerson(
+        DateTime.utc(),
+        properties,
+        team.id,
+        null,
+        false,
+        new UUIDT().toString(),
+        distinctIds,
+        propertiesLastUpdatedAt,
+        propertiesLastOperation
+    )
 }
 
 export type ReturnWithHub = { hub?: Hub; closeHub?: () => Promise<void> }
