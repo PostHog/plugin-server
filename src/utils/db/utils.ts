@@ -272,6 +272,8 @@ export function generatePersonPropertyUpdateExpressions(
         }
 
         let propertyValueUpdate = ''
+
+        // increment should always happen, we need to apply all updates irrespective of order
         if (isOperationIncrement) {
             propertyValueUpdate = `
             CASE WHEN (COALESCE(properties->>$${index}, '0')~E'^([-+])?[0-9\.]+$')

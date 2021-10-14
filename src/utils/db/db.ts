@@ -517,9 +517,10 @@ export class DB {
     ): Promise<any> {
         let values: any[] = [person.id]
 
+        // generates the dynamic parts of the update query + values
         const queryParts = generatePersonPropertyUpdateExpressions(
             propertiesToAttemptUpdateOn,
-            isoTimestamp, // this should be the event timestamp
+            isoTimestamp,
             values.length + 1,
             propertyToOperationMap
         )
