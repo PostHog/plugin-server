@@ -211,7 +211,8 @@ export class EventsProcessor {
         distinctId: string,
         properties: Properties,
         propertiesOnce: Properties,
-        incrementProperties: Record<string, number>
+        incrementProperties: Record<string, number>,
+        isoTimestamp: string
     ): Promise<Properties> {
         const personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
@@ -247,7 +248,8 @@ export class EventsProcessor {
         const newProperties = await this.db.updatePersonProperties(
             personFound,
             propertiesToAttemptUpdateOn,
-            propertyToOperationMap
+            propertyToOperationMap,
+            isoTimestamp
         )
 
         const updatedProperties: Record<string, any> = {}
@@ -524,7 +526,8 @@ export class EventsProcessor {
                 distinctId,
                 properties['$set'] || {},
                 properties['$set_once'] || {},
-                filteredIncrementProperties
+                filteredIncrementProperties,
+                timestamp.toISO()
             )
         }
 
