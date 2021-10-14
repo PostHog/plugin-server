@@ -419,7 +419,12 @@ export const createProcessEventTests = (
         expect(events[1].properties.$set).toEqual({
             utm_medium: 'instagram',
         })
-        expect(events[1].properties.$set_once).toBeUndefined()
+        expect(events[1].properties.$set_once).toEqual({
+            $initial_browser: 'Firefox',
+            $initial_browser_version: 80,
+            $initial_current_url: 'https://test.com/pricing',
+            $initial_utm_medium: 'instagram',
+        })
 
         const [person] = persons
         const distinctIds = await hub.db.fetchDistinctIdValues(person)
@@ -441,7 +446,6 @@ export const createProcessEventTests = (
             expect(event.elements_hash).toEqual('0679137c0cd2408a2906839143e7a71f')
         }
 
-        // Don't update any props, set and set_once should be undefined
         await processEvent(
             '2',
             '127.0.0.1',
@@ -454,7 +458,6 @@ export const createProcessEventTests = (
                     utm_medium: 'instagram',
                     $current_url: 'https://test.com/pricing',
                     $browser: 'Firefox',
-
                     $elements: [
                         { tag_name: 'a', nth_child: 1, nth_of_type: 2, attr__class: 'btn btn-sm' },
                         { tag_name: 'div', nth_child: 1, nth_of_type: 2, $el_text: '💻' },
@@ -468,9 +471,6 @@ export const createProcessEventTests = (
         )
 
         events = await hub.db.fetchEvents()
-
-        expect(events[2].properties.$set).toBeUndefined()
-        expect(events[2].properties.$set_once).toBeUndefined()
 
         team = await getFirstTeam(hub)
 
@@ -2256,6 +2256,16 @@ export const createProcessEventTests = (
         expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
 
         expect(person.properties).toEqual({ a: 1, b: 2, c: 3, d: 4 })
+    })
+
+    describe('person updates', () => {
+        test('person properties are updated correctly out of order', () => {
+            return
+        })
+
+        test('person merging correctly updates properties', () => {
+            return
+        })
     })
 
     return returned

@@ -4,7 +4,7 @@ import { captureException } from '@sentry/node'
 import { Pool as GenericPool } from 'generic-pool'
 import { StatsD } from 'hot-shots'
 import Redis from 'ioredis'
-import { KafkaMessage, ProducerRecord } from 'kafkajs'
+import { ProducerRecord } from 'kafkajs'
 import { DateTime } from 'luxon'
 import { Pool, PoolClient, QueryConfig, QueryResult, QueryResultRow } from 'pg'
 
@@ -51,14 +51,16 @@ import {
     UUID,
     UUIDT,
 } from '../utils'
+import { PersonPropertyUpdateOperation } from './../../types'
 import { KafkaProducerWrapper } from './kafka-producer-wrapper'
 import { PostgresLogsWrapper } from './postgres-logs-wrapper'
 import {
     chainToElements,
+    generateKafkaPersonUpdateMessage,
+    generatePersonPropertyUpdateExpressions,
     generatePostgresValuesString,
     hashElements,
     timeoutGuard,
-    unparsePersonPartial,
 } from './utils'
 
 export interface LogEntryPayload {
@@ -497,6 +499,96 @@ export class DB {
         return person
     }
 
+    public async updatePersonProperties(
+        person: Person,
+        propertiesToAttemptUpdateOn: Properties,
+        propertyToOperationMap: Record<string, PersonPropertyUpdateOperation>
+    ): Promise<any> {
+        let values: any[] = [person.id]
+
+        const queryParts = generatePersonPropertyUpdateExpressions(
+            propertiesToAttemptUpdateOn,
+            new Date().toISOString(),
+            values.length + 1,
+            propertyToOperationMap
+        )
+        values = [...values, ...queryParts.values]
+
+        let propertyUpdates = ''
+        let propertyTimestampExpressions = ''
+        let propertyLastOperationExpressions = ''
+
+        let shouldUpdateExpressions = ''
+
+        for (let i = 0; i < queryParts.expressions.length; ++i) {
+            const propertyExpressions = queryParts.expressions[i]
+            propertyUpdates += propertyExpressions[0]
+            propertyTimestampExpressions += propertyExpressions[1]
+            propertyLastOperationExpressions += propertyExpressions[2]
+            shouldUpdateExpressions += propertyExpressions[3]
+            if (i < queryParts.expressions.length - 1) {
+                propertyUpdates += '||'
+                propertyTimestampExpressions += '||'
+                propertyLastOperationExpressions += '||'
+                shouldUpdateExpressions += ','
+            }
+        }
+
+        const updateSubquery = `FROM (
+                SELECT 
+                    (
+                        properties || ${propertyUpdates}
+                    ) as properties,
+                    (
+                        COALESCE(properties_last_updated_at, '{}') || ${propertyTimestampExpressions}
+                    ) as properties_last_updated_at,
+                    (
+                        COALESCE(properties_last_operation, '{}')  || ${propertyLastOperationExpressions}
+                    ) as properties_last_operation
+                    FROM (
+                        SELECT
+                            properties,
+                            properties_last_updated_at,
+                            properties_last_operation,
+                            ARRAY[ ${shouldUpdateExpressions} ] as should_update
+                        FROM
+                            posthog_person
+                        WHERE id = $1
+                    ) as person_props
+            ) as final`
+
+        const query = `
+        UPDATE 
+            posthog_person
+        SET 
+            properties = final.properties,
+            properties_last_updated_at = final.properties_last_updated_at,
+            properties_last_operation = final.properties_last_operation
+        ${updateSubquery}
+        WHERE id = $1
+        RETURNING *;`
+
+        console.log(query)
+        let newProperties = {}
+        await this.postgresTransaction(async (client) => {
+            const updateResult = await client.query(query, values)
+            newProperties = updateResult.rows[0].properties
+            if (this.kafkaProducer) {
+                const message = generateKafkaPersonUpdateMessage(
+                    updateResult.rows[0].created_at,
+                    updateResult.rows[0].properties,
+                    person.team_id,
+                    updateResult.rows[0].is_identified,
+                    updateResult.rows[0].uuid
+                )
+                await this.kafkaProducer.queueMessage(message)
+            }
+        })
+
+        return newProperties
+    }
+
+    // This operation completely overrides columns to be updated
     public async updatePerson(person: Person, update: Partial<Person>, client: PoolClient): Promise<ProducerRecord[]>
     public async updatePerson(person: Person, update: Partial<Person>): Promise<Person>
     public async updatePerson(
@@ -504,18 +596,39 @@ export class DB {
         update: Partial<Person>,
         client?: PoolClient
     ): Promise<Person | ProducerRecord[]> {
-        const updatedPerson: Person = { ...person, ...update }
-        const values = [...Object.values(unparsePersonPartial(update)), person.id]
+        const values: any[] = [person.id]
 
-        const queryString = `UPDATE posthog_person SET ${Object.keys(update).map(
-            (field, index) => `"${sanitizeSqlIdentifier(field)}" = $${index + 1}`
-        )} WHERE id = $${Object.values(update).length + 1}`
+        let setStatements = ''
+        let i = 0
+        const valuesToUpdate = Object.entries(update)
+        for (const [key, value] of valuesToUpdate) {
+            setStatements += `${key} = $${values.length + 1}`
+            values.push(value)
+            if (i < valuesToUpdate.length - 1) {
+                setStatements += ', '
+            }
+            ++i
+        }
+
+        const query = `
+        UPDATE 
+            posthog_person
+        SET 
+            ${setStatements}
+        WHERE id = $1
+        RETURNING *;`
+
+        //let updateResult: QueryResult<any> | null = null
+
+        let result: QueryResult<any>
 
         if (client) {
-            await client.query(queryString, values)
+            result = await client.query(query, values)
         } else {
-            await this.postgresQuery(queryString, values, 'updatePerson')
+            result = await this.postgresQuery(query, values, 'updatePerson')
         }
+
+        const updatedPerson = result.rows[0]
 
         const kafkaMessages = []
         if (this.kafkaProducer) {
@@ -546,36 +659,6 @@ export class DB {
         }
 
         return client ? kafkaMessages : updatedPerson
-    }
-
-    // Using Postgres only as a source of truth
-    public async incrementPersonProperties(
-        person: Person,
-        propertiesToIncrement: Record<string, number>
-    ): Promise<QueryResult> {
-        const values = [...Object.values(propertiesToIncrement), person.id]
-        const propertyUpdates = Object.keys(propertiesToIncrement)
-            .map((propName, index) => {
-                const sanitizedPropName = sanitizeSqlIdentifier(propName)
-                return `|| CASE WHEN (COALESCE(properties->>'${sanitizedPropName}', '0')~E'^([-+])?[0-9\.]+$')
-                    THEN jsonb_build_object('${sanitizedPropName}', (COALESCE(properties->>'${sanitizedPropName}','0')::numeric + $${
-                    index + 1
-                }))
-                    ELSE '{}'
-                END `
-            })
-            .join('')
-
-        const newProperties = await this.postgresQuery(
-            `UPDATE posthog_person
-            SET properties = properties ${propertyUpdates}
-            WHERE id = $${values.length}
-            RETURNING properties;`,
-            values,
-            'incrementPersonProperties'
-        )
-
-        return newProperties
     }
 
     public async deletePerson(person: Person, client: PoolClient): Promise<ProducerRecord[]> {
