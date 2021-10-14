@@ -1219,8 +1219,8 @@ export const createProcessEventTests = (
                 },
             } as any as PluginEvent,
             team.id,
-            now,
-            now,
+            now.plus(1),
+            now.plus(1),
             new UUIDT().toString()
         )
         expect((await hub.db.fetchEvents()).length).toBe(2)
