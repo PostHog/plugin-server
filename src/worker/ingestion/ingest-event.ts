@@ -47,6 +47,7 @@ export async function ingestEvent(hub: Hub, event: PluginEvent): Promise<IngestE
             try {
                 const message = generateEventDeadLetterQueueMessage(event, e)
                 await hub.db.kafkaProducer.queueMessage(message)
+                hub.statsd?.increment('events_added_to_dead_letter_queue')
             } catch (dlqError) {
                 status.info('🔔', `Errored trying to add event ${event.event} to dead letter queue. Error: ${dlqError}`)
                 Sentry.captureException(e, { extra: { event } })
