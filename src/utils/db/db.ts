@@ -1179,9 +1179,9 @@ export class DB {
         if (organization_id) {
             const now = new Date().toISOString()
             await this.postgresQuery(
-                `INSERT INTO posthog_organizationmembership (id, organization_id, user_id, level, joined_at, updated_at, slug)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                [new UUIDT().toString(), organization_id, createUserResult.rows[0].id, 1, now, now, 1],
+                `INSERT INTO posthog_organizationmembership (id, organization_id, user_id, level, joined_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6)`,
+                [new UUIDT().toString(), organization_id, createUserResult.rows[0].id, 1, now, now],
                 'createOrganizationMembership'
             )
         }
