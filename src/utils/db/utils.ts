@@ -216,7 +216,7 @@ export function personInitialAndUTMProperties(properties: Properties): Propertie
     return propertiesCopy
 }
 
-/** Returns string in format: ($${timestampIndex}, $2, $3, $4, $5, $6, $7, $8, ..., $N) */
+/** Returns string in format: ($1, $2, $3, $4, $5, $6, $7, $8, ..., $N) */
 export function generatePostgresValuesString(numberOfColumns: number, rowNumber: number): string {
     return (
         '(' +
