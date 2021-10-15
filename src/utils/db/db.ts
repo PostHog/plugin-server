@@ -44,6 +44,7 @@ import {
     castTimestampOrNow,
     clickHouseTimestampToISO,
     escapeClickHouseString,
+    getFinalPostgresQuery,
     RaceConditionError,
     sanitizeSqlIdentifier,
     tryTwice,
@@ -56,7 +57,6 @@ import { PostgresLogsWrapper } from './postgres-logs-wrapper'
 import {
     chainToElements,
     generateKafkaPersonUpdateMessage,
-    generatePersonPropertyUpdateExpressions,
     generatePostgresValuesString,
     hashElements,
     timeoutGuard,
@@ -515,75 +515,43 @@ export class DB {
         propertyToOperationMap: Record<string, PersonPropertyUpdateOperation>,
         isoTimestamp: string
     ): Promise<any> {
-        let values: any[] = [person.id]
+        const values = [person.id, isoTimestamp]
 
-        // generates the dynamic parts of the update query + values
-        const queryParts = generatePersonPropertyUpdateExpressions(
-            propertiesToAttemptUpdateOn,
-            isoTimestamp,
-            values.length + 1,
-            propertyToOperationMap
-        )
-        values = [...values, ...queryParts.values]
+        const propertyUpdates = Object.entries(propertiesToAttemptUpdateOn)
 
-        let propertyUpdates = ''
-        let propertyTimestampExpressions = ''
-        let propertyLastOperationExpressions = ''
-
-        let shouldUpdateExpressions = ''
-
-        for (let i = 0; i < queryParts.expressions.length; ++i) {
-            const propertyExpressions = queryParts.expressions[i]
-            propertyUpdates += propertyExpressions[0]
-            propertyTimestampExpressions += propertyExpressions[1]
-            propertyLastOperationExpressions += propertyExpressions[2]
-            shouldUpdateExpressions += propertyExpressions[3]
-            if (i < queryParts.expressions.length - 1) {
-                propertyUpdates += '||'
-                propertyTimestampExpressions += '||'
-                propertyLastOperationExpressions += '||'
-                shouldUpdateExpressions += ','
+        let propertyUpdateExpressions = ''
+        let i = 0
+        for (const [key, value] of propertyUpdates) {
+            const parsedValue = typeof value === 'string' ? `"${value}"` : value
+            values.push(propertyToOperationMap[key], key, parsedValue)
+            propertyUpdateExpressions += `row($${values.length - 2}, $${values.length - 1}, $${
+                values.length
+            }::jsonb)::person_property_update`
+            if (i !== propertyUpdates.length - 1) {
+                propertyUpdateExpressions += ','
             }
+            ++i
         }
 
-        const updateSubquery = `FROM (
-                SELECT 
-                    (
-                        properties || ${propertyUpdates}
-                    ) as properties,
-                    (
-                        COALESCE(properties_last_updated_at, '{}') || ${propertyTimestampExpressions}
-                    ) as properties_last_updated_at,
-                    (
-                        COALESCE(properties_last_operation, '{}')  || ${propertyLastOperationExpressions}
-                    ) as properties_last_operation
-                    FROM (
-                        SELECT
-                            properties,
-                            properties_last_updated_at,
-                            properties_last_operation,
-                            ARRAY[ ${shouldUpdateExpressions} ] as should_update
-                        FROM
-                            posthog_person
-                        WHERE id = $1
-                    ) as person_props
-            ) as final`
-
         const query = `
-        UPDATE 
-            posthog_person
-        SET 
-            properties = final.properties,
-            properties_last_updated_at = final.properties_last_updated_at,
-            properties_last_operation = final.properties_last_operation
-        ${updateSubquery}
-        WHERE id = $1
-        RETURNING *;`
+        SELECT update_person_props(
+            id, 
+            properties,
+            properties_last_updated_at, 
+            properties_last_operation, 
+            $2, 
+            ARRAY[
+                ${propertyUpdateExpressions}
+            ]
+        ) as new_properties
+        FROM posthog_person 
+        WHERE id=$1 
+        `
 
         let newProperties = {}
         await this.postgresTransaction(async (client) => {
             const updateResult = await client.query(query, values)
-            newProperties = updateResult.rows[0].properties
+            newProperties = updateResult.rows[0].new_properties
             if (this.kafkaProducer) {
                 const message = generateKafkaPersonUpdateMessage(
                     updateResult.rows[0].created_at,

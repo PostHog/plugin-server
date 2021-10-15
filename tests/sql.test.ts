@@ -386,30 +386,4 @@ describe('updatePersonProperties', () => {
         // neither updated
         expect(newProps2).toEqual({ a: 0, b: 0 })
     })
-
-    test('increment will always update', async () => {
-        const person = await createPerson(
-            hub,
-            team,
-            ['person_0'],
-            { a: 0, b: 0, c: 0, d: 0 },
-            { a: PAST_TIMESTAMP, b: FUTURE_TIMESTAMP, c: PAST_TIMESTAMP, d: FUTURE_TIMESTAMP },
-            { a: 'set', b: 'set_once', c: 'set_once', d: 'set' }
-        )
-
-        const newProps1 = await hub.db.updatePersonProperties(
-            person,
-            { a: 1, b: 1, c: 1, d: 1 },
-            {
-                a: PersonPropertyUpdateOperation.Increment,
-                b: PersonPropertyUpdateOperation.Increment,
-                c: PersonPropertyUpdateOperation.Increment,
-                d: PersonPropertyUpdateOperation.Increment,
-            },
-            NOW
-        )
-
-        // all incremented
-        expect(newProps1).toEqual({ a: 1, b: 1, c: 1, d: 1 })
-    })
 })
