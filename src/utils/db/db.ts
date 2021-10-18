@@ -535,7 +535,7 @@ export class DB {
         }
 
         const query = `
-        SELECT update_person_props(
+        SELECT update__and_return_person_props(
             id, 
             properties,
             properties_last_updated_at, 
