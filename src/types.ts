@@ -447,6 +447,26 @@ export interface ClickHouseEvent extends Omit<Event, 'id' | 'elements' | 'elemen
     elements_chain: string
 }
 
+export interface DeadLetterQueueEvent {
+    id: string
+    event_uuid: string
+    event: string
+    properties: string
+    distinct_id: string
+    team_id: number
+    elements_chain: string
+    created_at: string
+    ip: string
+    site_url: string
+    now: string
+    raw_payload: string
+    error_timestamp: string
+    error_location: string
+    error: string
+    _timestamp: string
+    _offset: number
+}
+
 /** Properties shared by RawPerson and Person. */
 export interface BasePerson {
     id: number
@@ -456,6 +476,7 @@ export interface BasePerson {
     is_identified: boolean
     uuid: string
     properties_last_updated_at: Record<string, any>
+    properties_last_operation: Record<string, any> | null
 }
 
 /** Raw Person row from database. */

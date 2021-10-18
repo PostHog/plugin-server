@@ -29,7 +29,7 @@ import {
     timeoutGuard,
 } from '../../utils/db/utils'
 import { status } from '../../utils/status'
-import { castTimestampOrNow, filterIncrementProperties, RaceConditionError, UUID, UUIDT } from '../../utils/utils'
+import { castTimestampOrNow, RaceConditionError, UUID, UUIDT } from '../../utils/utils'
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
@@ -227,22 +227,21 @@ export class EventsProcessor {
         teamId: number,
         distinctId: string,
         properties: Properties,
-        propertiesOnce: Properties,
-        incrementProperties: Record<string, number>
+        propertiesOnce: Properties
     ): Promise<Properties> {
         const personFound = await this.db.fetchPerson(teamId, distinctId)
 
         if (!personFound) {
             const err = new Error(`Could not find person with distinct id "${distinctId}" in team "${teamId}"`)
             Sentry.captureException(err, {
-                extra: { teamId, distinctId, properties, propertiesOnce, incrementProperties },
+                extra: { teamId, distinctId, properties, propertiesOnce },
             })
             throw err
         }
 
         // Figure out which properties we are actually setting
         const returnedProps: Properties = {}
-        let updatedProperties: Properties = { ...personFound.properties }
+        const updatedProperties: Properties = { ...personFound.properties }
         Object.entries(propertiesOnce).map(([key, value]) => {
             if (typeof personFound?.properties[key] === 'undefined') {
                 if (!returnedProps['$set_once']) {
@@ -262,23 +261,10 @@ export class EventsProcessor {
             }
         })
 
-        let incrementedPropertiesQueryResult: QueryResult | null = null
+        const arePersonsEqual = equal(personFound.properties, updatedProperties)
 
-        const areTherePropsToIncrement = !!Object.keys(incrementProperties).length
-
-        if (areTherePropsToIncrement) {
-            incrementedPropertiesQueryResult = await this.db.incrementPersonProperties(personFound, incrementProperties)
-        }
-
-        const arePersonsEqualExcludingIncrement = equal(personFound.properties, updatedProperties)
-
-        // CH still needs to update if there are $increment props but Postgres has already done so
-        if (arePersonsEqualExcludingIncrement && (!this.db.kafkaProducer || !areTherePropsToIncrement)) {
+        if (arePersonsEqual && !this.db.kafkaProducer) {
             return returnedProps
-        }
-
-        if (incrementedPropertiesQueryResult && incrementedPropertiesQueryResult.rows.length > 0) {
-            updatedProperties = { ...updatedProperties, ...incrementedPropertiesQueryResult.rows[0].properties }
         }
 
         await this.db.updatePerson(personFound, { properties: updatedProperties })
@@ -502,15 +488,13 @@ export class EventsProcessor {
 
         properties = personInitialAndUTMProperties(properties)
 
-        const areTherePropertiesToUpdate = properties['$set'] || properties['$set_once'] || properties['$increment']
+        const areTherePropertiesToUpdate = properties['$set'] || properties['$set_once']
         if (shouldUpdatePersonProperties && areTherePropertiesToUpdate) {
-            const filteredIncrementProperties = filterIncrementProperties(properties['$increment'])
             const updatedSetAndSetOnce = await this.updatePersonProperties(
                 teamId,
                 distinctId,
                 properties['$set'] || {},
-                properties['$set_once'] || {},
-                filteredIncrementProperties
+                properties['$set_once'] || {}
             )
 
             delete properties['$set']
@@ -554,7 +538,7 @@ export class EventsProcessor {
             teamId,
             distinctId,
             elementsChain,
-            createdAt: timestampString,
+            createdAt: castTimestampOrNow(),
         }
 
         let eventId: Event['id'] | undefined

@@ -19,6 +19,7 @@ import {
     Cohort,
     CohortPeople,
     Database,
+    DeadLetterQueueEvent,
     Element,
     ElementGroup,
     Event,
@@ -414,7 +415,7 @@ export class DB {
         const selectResult = await this.postgresQuery(
             `SELECT
                 posthog_person.id, posthog_person.created_at, posthog_person.team_id, posthog_person.properties, 
-                posthog_person.properties_last_updated_at, posthog_person.is_user_id, posthog_person.is_identified, 
+                posthog_person.properties_last_updated_at, posthog_person.properties_last_operation, posthog_person.is_user_id, posthog_person.is_identified, 
                 posthog_person.uuid, posthog_persondistinctid.team_id AS persondistinctid__team_id,
                 posthog_persondistinctid.distinct_id AS persondistinctid__distinct_id
             FROM posthog_person
@@ -545,36 +546,6 @@ export class DB {
         }
 
         return client ? kafkaMessages : updatedPerson
-    }
-
-    // Using Postgres only as a source of truth
-    public async incrementPersonProperties(
-        person: Person,
-        propertiesToIncrement: Record<string, number>
-    ): Promise<QueryResult> {
-        const values = [...Object.values(propertiesToIncrement), person.id]
-        const propertyUpdates = Object.keys(propertiesToIncrement)
-            .map((propName, index) => {
-                const sanitizedPropName = sanitizeSqlIdentifier(propName)
-                return `|| CASE WHEN (COALESCE(properties->>'${sanitizedPropName}', '0')~E'^([-+])?[0-9\.]+$')
-                    THEN jsonb_build_object('${sanitizedPropName}', (COALESCE(properties->>'${sanitizedPropName}','0')::numeric + $${
-                    index + 1
-                }))
-                    ELSE '{}'
-                END `
-            })
-            .join('')
-
-        const newProperties = await this.postgresQuery(
-            `UPDATE posthog_person
-            SET properties = properties ${propertyUpdates}
-            WHERE id = $${values.length}
-            RETURNING properties;`,
-            values,
-            'incrementPersonProperties'
-        )
-
-        return newProperties
     }
 
     public async deletePerson(person: Person, client: PoolClient): Promise<ProducerRecord[]> {
@@ -819,6 +790,12 @@ export class DB {
             )
             return result.rows as Event[]
         }
+    }
+
+    public async fetchDeadLetterQueueEvents(): Promise<DeadLetterQueueEvent[]> {
+        const result = await this.clickhouseQuery(`SELECT * FROM events_dead_letter_queue ORDER BY _timestamp ASC`)
+        const events = result.data as DeadLetterQueueEvent[]
+        return events
     }
 
     // SessionRecordingEvent
