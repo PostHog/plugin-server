@@ -546,23 +546,28 @@ export class DB {
         ) as new_properties
         FROM posthog_person 
         WHERE id=$1 
+        FOR UPDATE
         `
 
         let newProperties = {}
+        let kafkaMessage: ProducerRecord | null = null
         await this.postgresTransaction(async (client) => {
             const updateResult = await client.query(query, values)
             newProperties = updateResult.rows[0].new_properties
             if (this.kafkaProducer) {
-                const message = generateKafkaPersonUpdateMessage(
+                kafkaMessage = generateKafkaPersonUpdateMessage(
                     updateResult.rows[0].created_at,
                     updateResult.rows[0].properties,
                     person.team_id,
                     updateResult.rows[0].is_identified,
                     updateResult.rows[0].uuid
                 )
-                await this.kafkaProducer.queueMessage(message)
             }
         })
+
+        if (kafkaMessage && this.kafkaProducer) {
+            await this.kafkaProducer.queueMessage(kafkaMessage)
+        }
 
         return newProperties
     }
