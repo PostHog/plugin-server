@@ -13,6 +13,7 @@ import {
     Event,
     Hub,
     Person,
+    PersonPropertyUpdateOperation,
     PostgresSessionRecordingEvent,
     SessionRecordingEvent,
     TeamId,
@@ -29,8 +30,7 @@ import {
     timeoutGuard,
 } from '../../utils/db/utils'
 import { status } from '../../utils/status'
-import { castTimestampOrNow, filterIncrementProperties, RaceConditionError, UUID, UUIDT } from '../../utils/utils'
-import { PersonPropertyUpdateOperation } from './../../types'
+import { castTimestampOrNow, UUID, UUIDT } from '../../utils/utils'
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
@@ -211,14 +211,13 @@ export class EventsProcessor {
         distinctId: string,
         properties: Properties,
         propertiesOnce: Properties,
-        incrementProperties: Record<string, number>,
         isoTimestamp: string
     ): Promise<Properties> {
         const personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
             const err = new Error(`Could not find person with distinct id "${distinctId}" in team "${teamId}"`)
             Sentry.captureException(err, {
-                extra: { teamId, distinctId, properties, propertiesOnce, incrementProperties },
+                extra: { teamId, distinctId, properties, propertiesOnce },
             })
             throw err
         }
@@ -226,7 +225,6 @@ export class EventsProcessor {
         const propertiesToAttemptUpdateOn = {
             ...propertiesOnce,
             ...properties,
-            ...incrementProperties,
         }
 
         const propertyToOperationMap: Record<string, PersonPropertyUpdateOperation> = {}
@@ -237,10 +235,6 @@ export class EventsProcessor {
 
         Object.keys(properties).map((key) => {
             propertyToOperationMap[key] = PersonPropertyUpdateOperation.Set
-        })
-
-        Object.keys(incrementProperties).map((key) => {
-            propertyToOperationMap[key] = PersonPropertyUpdateOperation.Increment
         })
 
         // get updated record and compare to old person
@@ -520,13 +514,11 @@ export class EventsProcessor {
         properties = personInitialAndUTMProperties(properties)
 
         if (properties['$set'] || properties['$set_once'] || properties['$increment']) {
-            const filteredIncrementProperties = filterIncrementProperties(properties['$increment'])
             await this.updatePersonProperties(
                 teamId,
                 distinctId,
                 properties['$set'] || {},
                 properties['$set_once'] || {},
-                filteredIncrementProperties,
                 timestamp.toISO()
             )
         }

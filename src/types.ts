@@ -716,5 +716,4 @@ export enum CeleryTriggeredJobOperation {
 export enum PersonPropertyUpdateOperation {
     Set = 'set',
     SetOnce = 'set_once',
-    Increment = 'increment',
 }
