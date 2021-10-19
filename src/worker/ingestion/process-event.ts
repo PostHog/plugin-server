@@ -206,13 +206,89 @@ export class EventsProcessor {
         return now
     }
 
+    private async updatePersonPropertiesDeprecated(
+        teamId: number,
+        distinctId: string,
+        properties: Properties,
+        propertiesOnce: Properties
+    ): Promise<Properties> {
+        let personFound = await this.db.fetchPerson(teamId, distinctId)
+        if (!personFound) {
+            try {
+                personFound = await this.db.createPerson(
+                    DateTime.utc(),
+                    properties,
+                    teamId,
+                    null,
+                    false,
+                    new UUIDT().toString(),
+                    [distinctId]
+                )
+            } catch {
+                // Catch race condition where in between getting and creating,
+                // another request already created this person
+                personFound = await this.db.fetchPerson(teamId, distinctId)
+            }
+        }
+        if (!personFound) {
+            throw new Error(
+                `Could not find person with distinct id "${distinctId}" in team "${teamId}", even after trying to insert them`
+            )
+        }
+
+        // Figure out which properties we are actually setting
+        const returnedProps: Properties = {}
+        const updatedProperties: Properties = { ...personFound.properties }
+        Object.entries(propertiesOnce).map(([key, value]) => {
+            if (typeof personFound?.properties[key] === 'undefined') {
+                if (!returnedProps['$set_once']) {
+                    returnedProps['$set_once'] = {}
+                }
+                returnedProps['$set_once'][key] = value
+                updatedProperties[key] = value
+            }
+        })
+        Object.entries(properties).map(([key, value]) => {
+            if (personFound?.properties[key] !== value) {
+                if (!returnedProps['$set']) {
+                    returnedProps['$set'] = {}
+                }
+                returnedProps['$set'][key] = value
+                updatedProperties[key] = value
+            }
+        })
+
+        const arePersonsEqual = equal(personFound.properties, updatedProperties)
+
+        if (arePersonsEqual && !this.db.kafkaProducer) {
+            return returnedProps
+        }
+
+        await this.db.updatePerson(personFound, { properties: updatedProperties })
+        return returnedProps
+    }
+
     private async updatePersonProperties(
         teamId: number,
         distinctId: string,
         properties: Properties,
         propertiesOnce: Properties,
         isoTimestamp: string
-    ): Promise<Properties> {
+    ): Promise<void> {
+        try {
+            const newPersonPropertiesUpdateTeams = this.pluginsServer.NEW_PERSON_PROPERTIES_UPDATE_ENABLED_TEAMS.split(
+                ','
+            ).map((teamId) => Number(teamId))
+            if (newPersonPropertiesUpdateTeams.includes(teamId)) {
+                await this.updatePersonPropertiesDeprecated(teamId, distinctId, properties, propertiesOnce)
+                return
+            }
+        } catch (error) {
+            Sentry.captureException(error)
+            await this.updatePersonPropertiesDeprecated(teamId, distinctId, properties, propertiesOnce)
+            return
+        }
+
         const personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
             const err = new Error(`Could not find person with distinct id "${distinctId}" in team "${teamId}"`)
@@ -239,21 +315,12 @@ export class EventsProcessor {
 
         // get updated record and compare to old person
 
-        const newProperties = await this.db.updatePersonProperties(
+        await this.db.updatePersonProperties(
             personFound,
             propertiesToAttemptUpdateOn,
             propertyToOperationMap,
             isoTimestamp
         )
-
-        const updatedProperties: Record<string, any> = {}
-        for (const [key, value] of Object.entries(newProperties)) {
-            if (value === propertiesToAttemptUpdateOn[key]) {
-                updatedProperties[key] = value
-            }
-        }
-
-        return updatedProperties
     }
 
     private async setIsIdentified(teamId: number, distinctId: string, isIdentified = true): Promise<void> {

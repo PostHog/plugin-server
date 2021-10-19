@@ -435,6 +435,20 @@ export class DB {
         }
     }
 
+    // test util
+    public async fetchPersonByPersonId(teamId: number, personId: number): Promise<Person | undefined> {
+        const selectResult = await this.postgresQuery(
+            `SELECT * FROM posthog_person WHERE team_id = $1 AND id = $2`,
+            [teamId, personId],
+            'fetchPersonByPersonId'
+        )
+
+        if (selectResult.rows.length > 0) {
+            const rawPerson: RawPerson = selectResult.rows[0]
+            return { ...rawPerson, created_at: DateTime.fromISO(rawPerson.created_at).toUTC() }
+        }
+    }
+
     public async createPerson(
         createdAt: DateTime,
         properties: Properties,
@@ -515,7 +529,7 @@ export class DB {
         propertiesToAttemptUpdateOn: Properties,
         propertyToOperationMap: Record<string, PersonPropertyUpdateOperation>,
         isoTimestamp: string
-    ): Promise<any> {
+    ): Promise<void> {
         const values = [person.id, isoTimestamp]
 
         const propertyUpdates = Object.entries(propertiesToAttemptUpdateOn)
@@ -534,21 +548,7 @@ export class DB {
             ++i
         }
 
-        const query = `
-        SELECT update__and_return_person_props(
-            id, 
-            properties,
-            properties_last_updated_at, 
-            properties_last_operation, 
-            $2, 
-            ARRAY[
-                ${propertyUpdateExpressions}
-            ]
-        ) as new_properties
-        FROM posthog_person 
-        WHERE id=$1 
-        FOR UPDATE
-        `
+        const query = `SELECT update_person_props($1, $2, ARRAY[ ${propertyUpdateExpressions} ] );`
 
         let newProperties = {}
         let kafkaMessage: ProducerRecord | null = null
@@ -569,8 +569,6 @@ export class DB {
         if (kafkaMessage && this.kafkaProducer) {
             await this.kafkaProducer.queueMessage(kafkaMessage)
         }
-
-        return newProperties
     }
 
     // This operation completely overrides columns to be updated

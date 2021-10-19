@@ -2123,6 +2123,10 @@ export const createProcessEventTests = (
     })
 
     describe('person updates', () => {
+        test('run old approach on teams not in NEW_PERSON_PROPERTIES_UPDATE_ENABLED_TEAMS', () => {
+            return
+        })
+
         test('person properties are updated correctly out of order', () => {
             return
         })

@@ -1,4 +1,4 @@
-import { Hub, PersonPropertyUpdateOperation, PluginConfig, PluginError, Team } from '../src/types'
+import { Hub, Person, PersonPropertyUpdateOperation, PluginConfig, PluginError, Team } from '../src/types'
 import { createHub } from '../src/utils/db/hub'
 import {
     disablePlugin,
@@ -19,6 +19,19 @@ let team: Team
 const FUTURE_TIMESTAMP = '2050-10-14T11:42:06.502Z'
 const PAST_TIMESTAMP = '2000-10-14T11:42:06.502Z'
 const NOW = new Date().toISOString()
+
+// util to get the new props after an update
+async function updatePersonProperties(
+    hub: Hub,
+    person: Person,
+    propertiesToAttemptUpdateOn: Person['properties'],
+    propertyToOperationMap: Record<string, PersonPropertyUpdateOperation>,
+    isoTimestamp: string
+): Promise<Person['properties']> {
+    await hub.db.updatePersonProperties(person, propertiesToAttemptUpdateOn, propertyToOperationMap, isoTimestamp)
+
+    return (await hub.db.fetchPersonByPersonId(person.team_id, person.id)).properties
+}
 
 beforeEach(async () => {
     ;[hub, closeHub] = await createHub()
@@ -227,7 +240,8 @@ describe('updatePersonProperties', () => {
     test('update without properties_last_updated_at', async () => {
         const person = await createPerson(hub, team, ['person_0'], { a: 0, b: 0 }, {}, { a: 'set', b: 'set_once' })
 
-        const newProps = await hub.db.updatePersonProperties(
+        const newProps = await updatePersonProperties(
+            hub,
             person,
             { a: 1, b: 2 },
             { a: PersonPropertyUpdateOperation.Set, b: PersonPropertyUpdateOperation.SetOnce },
@@ -248,7 +262,8 @@ describe('updatePersonProperties', () => {
             {}
         )
 
-        const newProps = await hub.db.updatePersonProperties(
+        const newProps = await updatePersonProperties(
+            hub,
             person,
             { a: 1, b: 2 },
             { a: PersonPropertyUpdateOperation.Set, b: PersonPropertyUpdateOperation.SetOnce },
@@ -262,7 +277,8 @@ describe('updatePersonProperties', () => {
     test('update non-existent property', async () => {
         const person = await createPerson(hub, team, ['person_0'], {})
 
-        const newProps = await hub.db.updatePersonProperties(
+        const newProps = await updatePersonProperties(
+            hub,
             person,
             { a: 1, b: 2 },
             { a: PersonPropertyUpdateOperation.Set, b: PersonPropertyUpdateOperation.SetOnce },
@@ -282,7 +298,8 @@ describe('updatePersonProperties', () => {
             { a: 'set', b: 'set_once' }
         )
 
-        const newProps = await hub.db.updatePersonProperties(
+        const newProps = await updatePersonProperties(
+            hub,
             person,
             { a: 1, b: 2 },
             { a: PersonPropertyUpdateOperation.Set, b: PersonPropertyUpdateOperation.Set },
@@ -303,7 +320,8 @@ describe('updatePersonProperties', () => {
             { a: 'set', b: 'set_once' }
         )
 
-        const newProps = await hub.db.updatePersonProperties(
+        const newProps = await updatePersonProperties(
+            hub,
             person,
             { a: 1, b: 2 },
             { a: PersonPropertyUpdateOperation.Set, b: PersonPropertyUpdateOperation.Set },
@@ -324,7 +342,8 @@ describe('updatePersonProperties', () => {
             { a: 'set', b: 'set_once' }
         )
 
-        const newProps = await hub.db.updatePersonProperties(
+        const newProps = await updatePersonProperties(
+            hub,
             person,
             { a: 1, b: 2 },
             { a: PersonPropertyUpdateOperation.SetOnce, b: PersonPropertyUpdateOperation.SetOnce },
@@ -345,7 +364,8 @@ describe('updatePersonProperties', () => {
             { a: 'set', b: 'set_once' }
         )
 
-        const newProps = await hub.db.updatePersonProperties(
+        const newProps = await updatePersonProperties(
+            hub,
             person,
             { a: 1, b: 2 },
             { a: PersonPropertyUpdateOperation.SetOnce, b: PersonPropertyUpdateOperation.SetOnce },
@@ -366,7 +386,8 @@ describe('updatePersonProperties', () => {
             { a: 'set', b: 'set_once' }
         )
 
-        const newProps1 = await hub.db.updatePersonProperties(
+        const newProps1 = await updatePersonProperties(
+            hub,
             person,
             { a: 1, b: 2 },
             { a: PersonPropertyUpdateOperation.SetOnce, b: PersonPropertyUpdateOperation.SetOnce },
@@ -376,7 +397,8 @@ describe('updatePersonProperties', () => {
         // neither updated
         expect(newProps1).toEqual({ a: 0, b: 0 })
 
-        const newProps2 = await hub.db.updatePersonProperties(
+        const newProps2 = await updatePersonProperties(
+            hub,
             person,
             { a: 1, b: 2 },
             { a: PersonPropertyUpdateOperation.SetOnce, b: PersonPropertyUpdateOperation.SetOnce },

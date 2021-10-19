@@ -13,6 +13,7 @@ const extraServerConfig: Partial<PluginsServerConfig> = {
     KAFKA_ENABLED: true,
     KAFKA_HOSTS: process.env.KAFKA_HOSTS || 'kafka:9092',
     KAFKA_CONSUMPTION_TOPIC: KAFKA_EVENTS_PLUGIN_INGESTION,
+    NEW_PERSON_PROPERTIES_UPDATE_ENABLED_TEAMS: '99',
 }
 
 describe('process event (clickhouse)', () => {
