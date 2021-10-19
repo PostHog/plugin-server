@@ -10,7 +10,14 @@ import { posthog } from '../../src/utils/posthog'
 import { delay, UUIDT } from '../../src/utils/utils'
 import { ingestEvent } from '../../src/worker/ingestion/ingest-event'
 import { EventProcessingResult, EventsProcessor } from '../../src/worker/ingestion/process-event'
-import { createUserTeamAndOrganization, getFirstTeam, getTeams, onQuery, resetTestDatabase } from '../helpers/sql'
+import {
+    createTeam,
+    createUserTeamAndOrganization,
+    getFirstTeam,
+    getTeams,
+    onQuery,
+    resetTestDatabase,
+} from '../helpers/sql'
 
 jest.mock('../../src/utils/status')
 jest.setTimeout(600000) // 600 sec timeout.
@@ -100,6 +107,7 @@ export const createProcessEventTests = (
     let eventsProcessor: EventsProcessor
     let now = DateTime.utc()
     const returned: ReturnWithHub = {}
+    let team99: Team
 
     async function createTestHub(): Promise<[Hub, () => Promise<void>]> {
         const [hub, closeHub] = await createHub({
@@ -162,6 +170,11 @@ export const createProcessEventTests = (
         mockClientEventCounter = 0
         team = await getFirstTeam(hub)
         now = DateTime.utc()
+
+        await createTeam(hub.db.postgres, 99, team.organization_id)
+
+        const teams = await getTeams(hub)
+        team99 = teams.find((t) => t.id === 99)!
 
         // clear the webhook redis cache
         const hooksCacheKey = `@posthog/plugin-server/hooks/${team.id}`
@@ -2122,18 +2135,65 @@ export const createProcessEventTests = (
         })
     })
 
-    describe('person updates', () => {
-        test('run old approach on teams not in NEW_PERSON_PROPERTIES_UPDATE_ENABLED_TEAMS', () => {
-            return
-        })
+    test('run old approach on teams not in NEW_PERSON_PROPERTIES_UPDATE_ENABLED_TEAMS', async () => {
+        jest.spyOn(hub.db, 'updatePerson')
+        jest.spyOn(hub.db, 'updatePersonProperties')
+        await processEvent(
+            'distinct_id1',
+            '',
+            '',
+            {
+                event: 'some_event',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id1',
+                    $set: { key2: 'value3', key3: 'value4' },
+                    $set_once: { key2_once: 'value3', key3_once: 'value4' },
+                },
+            } as any as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
 
-        test('person properties are updated correctly out of order', () => {
-            return
-        })
+        expect(hub.db.updatePersonProperties).not.toHaveBeenCalled()
 
-        test('person merging correctly updates properties', () => {
-            return
-        })
+        return
+    })
+
+    test('run new approach on teams in NEW_PERSON_PROPERTIES_UPDATE_ENABLED_TEAMS', async () => {
+        jest.spyOn(hub.db, 'updatePerson')
+        jest.spyOn(hub.db, 'updatePersonProperties')
+        await processEvent(
+            'distinct_id1',
+            '',
+            '',
+            {
+                event: 'some_event',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id1',
+                    $set: { key2: 'value3', key3: 'value4' },
+                    $set_once: { key2_once: 'value3', key3_once: 'value4' },
+                },
+            } as any as PluginEvent,
+            team99.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+
+        expect(hub.db.updatePersonProperties).toHaveBeenCalled()
+
+        return
+    })
+    test('person properties are updated correctly out of order', () => {
+        return
+    })
+
+    test('person merging correctly updates properties', () => {
+        return
     })
 
     return returned

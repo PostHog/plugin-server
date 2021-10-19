@@ -9,7 +9,7 @@ import {
     setPluginMetrics,
 } from '../src/utils/db/sql'
 import { commonOrganizationId } from './helpers/plugins'
-import { getFirstTeam, resetTestDatabase } from './helpers/sql'
+import { createUserTeamAndOrganization, getFirstTeam, resetTestDatabase } from './helpers/sql'
 import { createPerson } from './shared/process-event'
 
 let hub: Hub

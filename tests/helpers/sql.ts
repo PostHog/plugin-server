@@ -179,6 +179,11 @@ export async function createUserTeamAndOrganization(
         joined_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
     })
+
+    await createTeam(db, teamId, organizationId)
+}
+
+export async function createTeam(db: Pool, teamId: number, organizationId: string): Promise<void> {
     await insertRow(db, 'posthog_team', {
         id: teamId,
         organization_id: organizationId,

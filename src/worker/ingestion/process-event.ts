@@ -276,10 +276,16 @@ export class EventsProcessor {
         isoTimestamp: string
     ): Promise<void> {
         try {
+            console.log(this.pluginsServer.NEW_PERSON_PROPERTIES_UPDATE_ENABLED_TEAMS)
+
             const newPersonPropertiesUpdateTeams = this.pluginsServer.NEW_PERSON_PROPERTIES_UPDATE_ENABLED_TEAMS.split(
                 ','
             ).map((teamId) => Number(teamId))
-            if (newPersonPropertiesUpdateTeams.includes(teamId)) {
+            console.log(newPersonPropertiesUpdateTeams)
+            console.log(newPersonPropertiesUpdateTeams)
+            console.log(newPersonPropertiesUpdateTeams)
+            console.log(newPersonPropertiesUpdateTeams)
+            if (!newPersonPropertiesUpdateTeams.includes(teamId)) {
                 await this.updatePersonPropertiesDeprecated(teamId, distinctId, properties, propertiesOnce)
                 return
             }
