@@ -232,7 +232,7 @@ export function generateKafkaPersonUpdateMessage(
     teamId: number,
     isIdentified: boolean,
     id: string,
-    isDeleted: number
+    isDeleted = 0
 ): ProducerRecord {
     return {
         topic: KAFKA_PERSON,

@@ -457,9 +457,7 @@ export class DB {
             } as Person
 
             if (this.kafkaProducer) {
-                kafkaMessages.push(
-                    generateKafkaPersonUpdateMessage(createdAt, properties, teamId, isIdentified, uuid, 0)
-                )
+                kafkaMessages.push(generateKafkaPersonUpdateMessage(createdAt, properties, teamId, isIdentified, uuid))
             }
 
             for (const distinctId of distinctIds || []) {
@@ -508,8 +506,7 @@ export class DB {
                 updatedPerson.properties,
                 updatedPerson.team_id,
                 updatedPerson.is_identified,
-                updatedPerson.uuid,
-                0
+                updatedPerson.uuid
             )
             if (client) {
                 kafkaMessages.push(message)
