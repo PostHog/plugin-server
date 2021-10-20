@@ -197,7 +197,7 @@ export class EventsProcessor {
                     Sentry.captureException(error, { extra: { data, now, sentAt } })
                 }
             }
-            return DateTime.fromISO(new Date(data['timestamp']).toISOString())
+            return DateTime.fromJSDate(new Date(data['timestamp']))
         }
         if (data['offset']) {
             return now.minus(Duration.fromMillis(data['offset']))
