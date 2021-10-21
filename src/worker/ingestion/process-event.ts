@@ -211,28 +211,9 @@ export class EventsProcessor {
         properties: Properties,
         propertiesOnce: Properties
     ): Promise<Properties> {
-        let personFound = await this.db.fetchPerson(teamId, distinctId)
+        const personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
-            try {
-                personFound = await this.db.createPerson(
-                    DateTime.utc(),
-                    properties,
-                    teamId,
-                    null,
-                    false,
-                    new UUIDT().toString(),
-                    [distinctId]
-                )
-            } catch {
-                // Catch race condition where in between getting and creating,
-                // another request already created this person
-                personFound = await this.db.fetchPerson(teamId, distinctId)
-            }
-        }
-        if (!personFound) {
-            throw new Error(
-                `Could not find person with distinct id "${distinctId}" in team "${teamId}", even after trying to insert them`
-            )
+            throw new Error(`Could not find person with distinct id "${distinctId}" in team "${teamId}"`)
         }
 
         // Figure out which properties we are actually setting
