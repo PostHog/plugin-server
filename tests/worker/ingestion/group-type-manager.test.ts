@@ -98,7 +98,7 @@ describe('GroupTypeManager()', () => {
             expect(hub.db.postgresQuery).toHaveBeenCalledTimes(1)
         })
 
-        it('handles raciness for inserting', async () => {
+        it('handles raciness for inserting a new group', async () => {
             expect(await groupTypeManager.fetchGroupTypes(2)).toEqual({})
 
             await hub.db.insertGroupType(2, 'foo', 0) // Emulate another thread inserting foo
@@ -106,6 +106,20 @@ describe('GroupTypeManager()', () => {
             expect(await groupTypeManager.fetchGroupTypes(2)).toEqual({
                 foo: 0,
                 second: 1,
+            })
+        })
+
+        it('handles raciness for when same group type has already been inserted', async () => {
+            expect(await groupTypeManager.fetchGroupTypes(2)).toEqual({})
+
+            // Emulate another thread inserting group types
+            await hub.db.insertGroupType(2, 'foo', 0)
+            await hub.db.insertGroupType(2, 'bar', 0)
+
+            expect(await groupTypeManager.fetchGroupTypeIndex(2, 'bar')).toEqual(1)
+            expect(await groupTypeManager.fetchGroupTypes(2)).toEqual({
+                foo: 0,
+                bar: 1,
             })
         })
 
