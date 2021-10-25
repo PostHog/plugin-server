@@ -2123,8 +2123,8 @@ export const createProcessEventTests = (
                     properties: {
                         token: team.api_token,
                         distinct_id: 'distinct_id1',
-                        group_type: 'organization',
-                        group_key: 'org::5',
+                        $group_type: 'organization',
+                        $group_key: 'org::5',
                         $group_set: {
                             foo: 'bar',
                         },

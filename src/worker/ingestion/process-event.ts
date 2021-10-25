@@ -684,11 +684,11 @@ export class EventsProcessor {
 
     // :TODO: Support _updating_ part of properties, not just setting everything at once.
     private async upsertGroup(teamId: number, properties: Properties): Promise<void> {
-        if (!properties['group_type'] || !properties['group_key']) {
+        if (!properties['$group_type'] || !properties['$group_key']) {
             return
         }
 
-        const { group_type: groupType, group_key: groupKey, $group_set: groupPropertiesToSet } = properties
+        const { $group_type: groupType, $group_key: groupKey, $group_set: groupPropertiesToSet } = properties
         const groupTypeIndex = await this.groupTypeManager.fetchGroupTypeIndex(teamId, groupType)
 
         if (groupTypeIndex !== null) {
