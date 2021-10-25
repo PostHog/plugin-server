@@ -1,4 +1,4 @@
-import { GroupTypeToColumnIndex,TeamId } from '../../types'
+import { GroupTypeToColumnIndex, TeamId } from '../../types'
 import { DB } from '../../utils/db/db'
 import { timeoutGuard } from '../../utils/db/utils'
 import { getByAge } from '../../utils/utils'

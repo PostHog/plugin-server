@@ -2137,9 +2137,15 @@ export const createProcessEventTests = (
             )
 
             expect((await hub.db.fetchEvents()).length).toBe(1)
-            const groups = await hub.db.fetchGroups()
+            const [group] = await hub.db.fetchGroups()
 
-            expect(groups).toEqual({})
+            expect(group).toEqual({
+                group_key: 'org::5',
+                group_properties: JSON.stringify({ foo: 'bar' }),
+                group_type_index: 0,
+                team_id: 2,
+                created_at: expect.any(String),
+            })
         })
     }
 

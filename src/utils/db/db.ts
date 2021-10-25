@@ -1170,12 +1170,19 @@ export class DB {
         }
 
         const insertGroupTypeResult = await this.postgresQuery(
-            `INSERT INTO posthog_grouptypemapping (group_type, group_type_index, team_id)
-            VALUES ($1, $2, $3)
-            ON CONFLICT DO NOTHING
-            RETURNING group_type_index`,
-            [groupType, index, teamId],
-            'upsertGroupType'
+            `
+            WITH insert_result AS (
+                INSERT INTO posthog_grouptypemapping (team_id, group_type, group_type_index)
+                VALUES ($1, $2, $3)
+                ON CONFLICT DO NOTHING
+                RETURNING group_type_index
+            )
+            SELECT * FROM insert_result
+            UNION
+            SELECT group_type_index FROM posthog_grouptypemapping WHERE team_id = $1 AND group_type = $2;
+            `,
+            [teamId, groupType, index],
+            'insertGroupType'
         )
 
         if (insertGroupTypeResult.rows.length == 0) {

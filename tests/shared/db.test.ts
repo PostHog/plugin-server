@@ -81,10 +81,12 @@ describe('DB', () => {
 
         it('handles conflict by name when inserting', async () => {
             expect(await db.insertGroupType(2, 'group_name', 0)).toEqual(0)
-            expect(await db.insertGroupType(2, 'group_name', 0)).toEqual(null)
-            expect(await db.insertGroupType(2, 'group_name', 0)).toEqual(null)
+            expect(await db.insertGroupType(2, 'group_name', 0)).toEqual(0)
+            expect(await db.insertGroupType(2, 'group_name', 0)).toEqual(0)
+            expect(await db.insertGroupType(2, 'foo', 0)).toEqual(1)
+            expect(await db.insertGroupType(2, 'foo', 0)).toEqual(1)
 
-            expect(await db.fetchGroupTypes(2)).toEqual({ group_name: 0 })
+            expect(await db.fetchGroupTypes(2)).toEqual({ group_name: 0, foo: 1 })
         })
     })
 })
