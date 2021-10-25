@@ -688,7 +688,7 @@ export class EventsProcessor {
             return
         }
 
-        const { group_type: groupType, group_key: groupKey, $set: groupPropertiesToSet } = properties
+        const { group_type: groupType, group_key: groupKey, $group_set: groupPropertiesToSet } = properties
         const groupTypeIndex = await this.groupTypeManager.fetchGroupTypeIndex(teamId, groupType)
 
         if (groupTypeIndex !== null) {
