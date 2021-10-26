@@ -492,6 +492,68 @@ export class DB {
         return person
     }
 
+    private addPropsUpdateValues(
+        properties: Properties,
+        op: PersonPropertyUpdateOperation,
+        values: Array<any>,
+        expressions: Array<string>
+    ) {
+        for (const [key, value] of Object.entries(properties)) {
+            const parsedValue = typeof value === 'string' ? `"${value}"` : value
+            values.push(op, key, parsedValue)
+            expressions.push(
+                `row($${values.length - 2}, $${values.length - 1}, $${values.length}::jsonb)::person_property_update`
+            )
+        }
+    }
+
+    public async updatePersonProperties(
+        teamId: number,
+        distinctId: string,
+        properties: Properties,
+        propertiesOnce: Properties,
+        timestamp: DateTime
+    ): Promise<void> {
+        const values: Array<any> = ['<id>', timestamp.toISO()]
+
+        const propertyUpdateExpressionsArr: any[] = []
+        this.addPropsUpdateValues(properties, PersonPropertyUpdateOperation.Set, values, propertyUpdateExpressionsArr)
+        this.addPropsUpdateValues(
+            properties,
+            PersonPropertyUpdateOperation.SetOnce,
+            values,
+            propertyUpdateExpressionsArr
+        )
+        const propertyUpdateExpressions = propertyUpdateExpressionsArr.join(',')
+
+        const query = `SELECT update_person_props($1, $2, ARRAY[ ${propertyUpdateExpressions} ] );`
+
+        let props = {}
+        let personFound: Person | undefined
+        await this.postgresTransaction(async (client) => {
+            personFound = await this.fetchPerson(teamId, distinctId)
+            if (!personFound) {
+                // can I throw in a transaction
+                throw new Error(
+                    `Could not find person with distinct id "${distinctId}" in team "${teamId}" to update props`
+                )
+            }
+            values[0] = personFound.id
+            props = await client.query(query, values)
+        })
+
+        if (this.kafkaProducer && personFound) {
+            const kafkaMessage = generateKafkaPersonUpdateMessage(
+                timestamp,
+                props, // todo: right type
+                teamId,
+                personFound.is_identified, // is this safe to use this way
+                personFound.uuid
+            )
+            await this.kafkaProducer.queueMessage(kafkaMessage)
+        }
+    }
+
     public async updatePerson(person: Person, update: Partial<Person>, client: PoolClient): Promise<ProducerRecord[]>
     public async updatePerson(person: Person, update: Partial<Person>): Promise<Person>
     public async updatePerson(

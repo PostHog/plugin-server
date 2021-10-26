@@ -13,6 +13,7 @@ import {
     Event,
     Hub,
     Person,
+    PersonPropertyUpdateOperation,
     PostgresSessionRecordingEvent,
     SessionRecordingEvent,
     TeamId,
@@ -252,6 +253,25 @@ export class EventsProcessor {
 
         await this.db.updatePerson(personFound, { properties: updatedProperties })
         return returnedProps
+    }
+
+    private sanitizePropertiesOnce(properties: Properties, propertiesOnce: Properties): void {
+        // If set and set_once are used for the same key we only use set
+        // because an earlier set_once shouldn't override a key that has seen a set call, but should for set_once
+        Object.keys(properties).map((key) => {
+            delete propertiesOnce[key]
+        })
+    }
+
+    private async updatePersonPropertiesNew(
+        teamId: number,
+        distinctId: string,
+        properties: Properties,
+        propertiesOnce: Properties,
+        timestamp: DateTime
+    ): Promise<void> {
+        this.sanitizePropertiesOnce(properties, propertiesOnce)
+        await this.db.updatePersonProperties(teamId, distinctId, properties, propertiesOnce, timestamp)
     }
 
     private async setIsIdentified(teamId: number, distinctId: string, isIdentified = true): Promise<void> {
