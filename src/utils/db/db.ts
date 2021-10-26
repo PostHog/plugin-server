@@ -1,3 +1,4 @@
+import { expressionStatement } from '@babel/types'
 import ClickHouse from '@posthog/clickhouse'
 import { CacheOptions, Properties } from '@posthog/plugin-scaffold'
 import { captureException } from '@sentry/node'
@@ -29,6 +30,7 @@ import {
     Hook,
     Person,
     PersonDistinctId,
+    PersonPropertyUpdateOperation,
     PluginConfig,
     PluginLogEntry,
     PluginLogEntrySource,
@@ -60,6 +62,8 @@ import {
     chainToElements,
     generateKafkaPersonUpdateMessage,
     generatePostgresValuesString,
+    getPersonPropertyUpdateExpressions,
+    getPersonPropertyUpdateValues,
     hashElements,
     timeoutGuard,
     unparsePersonPartial,
@@ -492,21 +496,6 @@ export class DB {
         return person
     }
 
-    private addPropsUpdateValues(
-        properties: Properties,
-        op: PersonPropertyUpdateOperation,
-        values: Array<any>,
-        expressions: Array<string>
-    ) {
-        for (const [key, value] of Object.entries(properties)) {
-            const parsedValue = typeof value === 'string' ? `"${value}"` : value
-            values.push(op, key, parsedValue)
-            expressions.push(
-                `row($${values.length - 2}, $${values.length - 1}, $${values.length}::jsonb)::person_property_update`
-            )
-        }
-    }
-
     public async updatePersonProperties(
         teamId: number,
         distinctId: string,
@@ -515,17 +504,10 @@ export class DB {
         timestamp: DateTime
     ): Promise<void> {
         const values: Array<any> = ['<id>', timestamp.toISO()]
-
-        const propertyUpdateExpressionsArr: any[] = []
-        this.addPropsUpdateValues(properties, PersonPropertyUpdateOperation.Set, values, propertyUpdateExpressionsArr)
-        this.addPropsUpdateValues(
-            properties,
-            PersonPropertyUpdateOperation.SetOnce,
-            values,
-            propertyUpdateExpressionsArr
-        )
-        const propertyUpdateExpressions = propertyUpdateExpressionsArr.join(',')
-
+        const startIndex = values.length
+        values.concat(getPersonPropertyUpdateValues(properties, PersonPropertyUpdateOperation.Set))
+        values.concat(getPersonPropertyUpdateValues(propertiesOnce, PersonPropertyUpdateOperation.SetOnce))
+        const propertyUpdateExpressions = getPersonPropertyUpdateExpressions(values, startIndex)
         const query = `SELECT update_person_props($1, $2, ARRAY[ ${propertyUpdateExpressions} ] );`
 
         let props = {}
@@ -533,7 +515,6 @@ export class DB {
         await this.postgresTransaction(async (client) => {
             personFound = await this.fetchPerson(teamId, distinctId)
             if (!personFound) {
-                // can I throw in a transaction
                 throw new Error(
                     `Could not find person with distinct id "${distinctId}" in team "${teamId}" to update props`
                 )
@@ -542,12 +523,12 @@ export class DB {
             props = await client.query(query, values)
         })
 
-        if (this.kafkaProducer && personFound) {
+        if (this.kafkaProducer && personFound && personFound.properties != props) {
             const kafkaMessage = generateKafkaPersonUpdateMessage(
                 timestamp,
-                props, // todo: right type
-                teamId,
-                personFound.is_identified, // is this safe to use this way
+                props,
+                personFound.team_id,
+                personFound.is_identified,
                 personFound.uuid
             )
             await this.kafkaProducer.queueMessage(kafkaMessage)
