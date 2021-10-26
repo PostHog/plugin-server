@@ -1989,6 +1989,38 @@ export const createProcessEventTests = (
         expect(person.properties).toEqual({ a_prop: 'test-1', c_prop: 'test-1' })
     })
 
+    test('set and set_once on the same key use set value and ignore set_once value', async () => {
+        await createPerson(hub, team, ['distinct id'])
+        // TODO: need gating to call the new fn before this test
+        await processEvent(
+            'distinct_id1',
+            '',
+            '',
+            {
+                event: 'some_event',
+                properties: {
+                    token: team.api_token,
+                    distinct_id: 'distinct_id1',
+                    $set: { a_prop: 'test-set' },
+                    $set_once: { a_prop: 'test-set_once' },
+                },
+            } as any as PluginEvent,
+            team.id,
+            now,
+            now,
+            new UUIDT().toString()
+        )
+        expect((await hub.db.fetchEvents()).length).toBe(1)
+
+        const [event] = await hub.db.fetchEvents()
+        expect(event.properties['$set']).toEqual({ a_prop: 'test-set' })
+        expect(event.properties['$set_once']).toEqual({ a_prop: 'test-set_once' })
+
+        const [person] = await hub.db.fetchPersons()
+        expect(await hub.db.fetchDistinctIdValues(person)).toEqual(['distinct_id1'])
+        expect(person.properties).toEqual({ a_prop: 'test-set' })
+    })
+
     test('any event can do $set on props (new user)', async () => {
         await processEvent(
             'distinct_id1',
