@@ -17,8 +17,8 @@ export function getDefaultConfig(): PluginsServerConfig {
         DATABASE_URL: isTestEnv
             ? 'postgres://localhost:5432/test_posthog'
             : isDevEnv
-            ? 'postgres://localhost:5432/posthog'
-            : null,
+                ? 'postgres://localhost:5432/posthog'
+                : null,
         POSTHOG_DB_NAME: null,
         POSTHOG_DB_USER: 'postgres',
         POSTHOG_DB_PASSWORD: '',
@@ -75,6 +75,7 @@ export function getDefaultConfig(): PluginsServerConfig {
         CAPTURE_INTERNAL_METRICS: false,
         PISCINA_USE_ATOMICS: true,
         PISCINA_ATOMICS_TIMEOUT: 5000,
+        NEW_PERSON_PROPERTIES_UPDATE_ENABLED_TEAMS: '',
     }
 }
 
@@ -130,6 +131,8 @@ export function getConfigHelp(): Record<keyof PluginsServerConfig, string> {
             'corresponds to the piscina useAtomics config option (https://github.com/piscinajs/piscina#constructor-new-piscinaoptions)',
         PISCINA_ATOMICS_TIMEOUT:
             '(advanced) corresponds to the length of time a piscina worker should block for when looking for tasks',
+        NEW_PERSON_PROPERTIES_UPDATE_ENABLED_TEAMS:
+            '(advanced) teams for which to run the new person properties update flow on',
     }
 }
 

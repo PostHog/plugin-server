@@ -214,6 +214,28 @@ export class EventsProcessor {
         teamId: number,
         distinctId: string,
         properties: Properties,
+        propertiesOnce: Properties,
+        timestamp: DateTime
+    ): Promise<void> {
+        let useNewPropertiesUpdateFunction = false
+        try {
+            const newPersonPropertiesUpdateTeams = this.pluginsServer.NEW_PERSON_PROPERTIES_UPDATE_ENABLED_TEAMS.split(
+                ','
+            ).map((teamId) => Number(teamId))
+            useNewPropertiesUpdateFunction = !!newPersonPropertiesUpdateTeams.includes(teamId)
+        } catch (error) {
+            Sentry.captureException(error)
+        }
+        if (useNewPropertiesUpdateFunction) {
+            await this.updatePersonPropertiesNew(teamId, distinctId, properties, propertiesOnce, timestamp)
+        }
+        await this.updatePersonPropertiesDeprecated(teamId, distinctId, properties, propertiesOnce)
+    }
+
+    private async updatePersonPropertiesDeprecated(
+        teamId: number,
+        distinctId: string,
+        properties: Properties,
         propertiesOnce: Properties
     ): Promise<void> {
         const personFound = await this.db.fetchPerson(teamId, distinctId)
@@ -502,6 +524,7 @@ export class EventsProcessor {
             await this.teamManager.updateEventNamesAndProperties(teamId, event, properties)
         }
 
+        // TODO: Why do we use setAt here instead of timestamp, but timestamp later in createEvent?
         await this.createPersonIfDistinctIdIsNew(teamId, distinctId, sentAt || DateTime.utc(), personUuid)
 
         properties = personInitialAndUTMProperties(properties)
@@ -514,7 +537,8 @@ export class EventsProcessor {
                 teamId,
                 distinctId,
                 properties['$set'] || {},
-                properties['$set_once'] || {}
+                properties['$set_once'] || {},
+                timestamp
             )
         }
 
