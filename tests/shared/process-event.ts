@@ -2137,6 +2137,8 @@ export const createProcessEventTests = (
             )
 
             expect((await hub.db.fetchEvents()).length).toBe(1)
+            await delayUntilEventIngested(() => hub.db.fetchGroups(), 1)
+
             const [group] = await hub.db.fetchGroups()
 
             expect(group).toEqual({
