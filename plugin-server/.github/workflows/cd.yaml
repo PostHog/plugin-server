@@ -115,6 +115,7 @@ jobs:
               with:
                   path: posthog
                   repository: PostHog/posthog
+                  ref: person-version
                   token: ${{ secrets.POSTHOG_BOT_GITHUB_TOKEN }}
 
             - name: Check out plugin server repo
