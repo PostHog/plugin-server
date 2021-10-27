@@ -30,6 +30,8 @@ import {
 } from '../../utils/db/utils'
 import { status } from '../../utils/status'
 import { castTimestampOrNow, RaceConditionError, UUID, UUIDT } from '../../utils/utils'
+import { GroupTypeManager } from './group-type-manager'
+import { addGroupProperties } from './groups'
 import { PersonManager } from './person-manager'
 import { TeamManager } from './team-manager'
 
@@ -73,6 +75,7 @@ export class EventsProcessor {
     celery: Client
     teamManager: TeamManager
     personManager: PersonManager
+    groupTypeManager: GroupTypeManager
 
     constructor(pluginsServer: Hub) {
         this.pluginsServer = pluginsServer
@@ -82,6 +85,7 @@ export class EventsProcessor {
         this.celery = new Client(pluginsServer.db, pluginsServer.CELERY_DEFAULT_QUEUE)
         this.teamManager = pluginsServer.teamManager
         this.personManager = new PersonManager(pluginsServer)
+        this.groupTypeManager = new GroupTypeManager(pluginsServer.db)
     }
 
     public async processEvent(
@@ -211,27 +215,10 @@ export class EventsProcessor {
         properties: Properties,
         propertiesOnce: Properties
     ): Promise<Properties> {
-        let personFound = await this.db.fetchPerson(teamId, distinctId)
-        if (!personFound) {
-            try {
-                personFound = await this.db.createPerson(
-                    DateTime.utc(),
-                    properties,
-                    teamId,
-                    null,
-                    false,
-                    new UUIDT().toString(),
-                    [distinctId]
-                )
-            } catch {
-                // Catch race condition where in between getting and creating,
-                // another request already created this person
-                personFound = await this.db.fetchPerson(teamId, distinctId)
-            }
-        }
+        const personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
             throw new Error(
-                `Could not find person with distinct id "${distinctId}" in team "${teamId}", even after trying to insert them`
+                `Could not find person with distinct id "${distinctId}" in team "${teamId}" to update properties`
             )
         }
 
@@ -268,23 +255,9 @@ export class EventsProcessor {
     }
 
     private async setIsIdentified(teamId: number, distinctId: string, isIdentified = true): Promise<void> {
-        let personFound = await this.db.fetchPerson(teamId, distinctId)
+        const personFound = await this.db.fetchPerson(teamId, distinctId)
         if (!personFound) {
-            try {
-                personFound = await this.db.createPerson(
-                    DateTime.utc(),
-                    {},
-                    teamId,
-                    null,
-                    true,
-                    new UUIDT().toString(),
-                    [distinctId]
-                )
-            } catch {
-                // Catch race condition where in between getting and creating,
-                // another request already created this person
-                personFound = await this.db.fetchPerson(teamId, distinctId)
-            }
+            throw new Error(`Could not find person with distinct id "${distinctId}" in team "${teamId}" to identify`)
         }
         if (personFound && !personFound.is_identified) {
             await this.db.updatePerson(personFound, { is_identified: isIdentified })
@@ -522,8 +495,11 @@ export class EventsProcessor {
         await this.createPersonIfDistinctIdIsNew(teamId, distinctId, sentAt || DateTime.utc(), personUuid)
 
         properties = personInitialAndUTMProperties(properties)
+        properties = await addGroupProperties(teamId, properties, this.groupTypeManager)
 
-        if (properties['$set'] || properties['$set_once']) {
+        if (event === '$groupidentify') {
+            await this.upsertGroup(teamId, properties)
+        } else if (properties['$set'] || properties['$set_once']) {
             const updatedSetAndSetOnce = await this.updatePersonProperties(
                 teamId,
                 distinctId,
@@ -670,8 +646,24 @@ export class EventsProcessor {
             try {
                 await this.db.createPerson(sentAt, {}, teamId, null, false, personUuid.toString(), [distinctId])
             } catch (error) {
-                Sentry.captureException(error, { extra: { teamId, distinctId, sentAt, personUuid } })
+                if (!error.message || !error.message.includes('duplicate key value violates unique constraint')) {
+                    Sentry.captureException(error, { extra: { teamId, distinctId, sentAt, personUuid } })
+                }
             }
+        }
+    }
+
+    // :TODO: Support _updating_ part of properties, not just setting everything at once.
+    private async upsertGroup(teamId: number, properties: Properties): Promise<void> {
+        if (!properties['$group_type'] || !properties['$group_key']) {
+            return
+        }
+
+        const { $group_type: groupType, $group_key: groupKey, $group_set: groupPropertiesToSet } = properties
+        const groupTypeIndex = await this.groupTypeManager.fetchGroupTypeIndex(teamId, groupType)
+
+        if (groupTypeIndex !== null) {
+            await this.db.upsertGroup(teamId, groupTypeIndex, groupKey, groupPropertiesToSet || {})
         }
     }
 }
