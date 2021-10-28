@@ -72,6 +72,7 @@ describe('postgres parity', () => {
                 is_deleted: 0,
                 _timestamp: expect.any(String),
                 _offset: expect.any(Number),
+                version: null,
             },
         ])
         const clickHouseDistinctIds = await hub.db.fetchDistinctIdValues(person, Database.ClickHouse)
