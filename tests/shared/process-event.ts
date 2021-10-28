@@ -419,7 +419,12 @@ export const createProcessEventTests = (
         expect(events[1].properties.$set).toEqual({
             utm_medium: 'instagram',
         })
-        expect(events[1].properties.$set_once).toBeUndefined()
+        expect(events[1].properties.$set_once).toEqual({
+            $initial_browser: 'Firefox',
+            $initial_browser_version: 80,
+            $initial_utm_medium: 'instagram',
+            $initial_current_url: 'https://test.com/pricing',
+        })
 
         const [person] = persons
         const distinctIds = await hub.db.fetchDistinctIdValues(person)
